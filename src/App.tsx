@@ -1022,9 +1022,7 @@ export function App() {
                               <Edit2 className="w-3.5 h-3.5" />
                             </button>
                             <button
-                              onClick={(e) =>
-                                handlePromptDeleteMeeting(mtg, e)
-                              }
+                              onClick={(e) => handlePromptDeleteMeeting(mtg, e)}
                               className="p-1 text-slate-400 hover:text-rose-400 transition"
                               title="Toplantıyı Sil"
                             >

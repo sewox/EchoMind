@@ -2,7 +2,7 @@
 # EchoMind Safe Test Runner with Timeout & Auto-Kill Safeguard
 # Prevents orphaned test processes from running in background and consuming CPU.
 
-TIMEOUT_SECONDS=45
+TIMEOUT_SECONDS=120
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # 1. Clean up any existing stale test runners

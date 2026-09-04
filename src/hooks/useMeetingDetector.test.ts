@@ -166,4 +166,34 @@ describe("useMeetingDetector Hook", () => {
 
     expect(onAutoStop).toHaveBeenCalled();
   });
+
+  it("handles initial detected apps in fetchStatus and updates prompt", async () => {
+    vi.mocked(invoke).mockImplementation((cmd: string) => {
+      if (cmd === "get_detector_status") {
+        return Promise.resolve({
+          is_active: true,
+          detected_apps: [mockApp],
+          active_count: 1,
+          last_check_timestamp: "12:00:00",
+          settings: {
+            enabled: true,
+            auto_start_record: false,
+            auto_stop_on_app_close: true,
+            ignored_apps: [],
+          },
+        });
+      }
+      return Promise.resolve();
+    });
+
+    const { result } = renderHook(() =>
+      useMeetingDetector({ isRecording: false }),
+    );
+
+    await act(async () => {
+      await result.current.fetchStatus();
+    });
+
+    expect(result.current.promptApp).toEqual(mockApp);
+  });
 });

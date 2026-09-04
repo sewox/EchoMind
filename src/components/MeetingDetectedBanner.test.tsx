@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { MeetingDetectedBanner } from "./MeetingDetectedBanner";
 import { I18nProvider } from "../locales/i18nContext";
@@ -19,6 +19,29 @@ describe("MeetingDetectedBanner Component", () => {
     onAlwaysAutoStart: vi.fn(),
     onDismiss: vi.fn(),
   };
+
+  beforeEach(() => {
+    // Mock Web Audio API
+    window.AudioContext = vi.fn().mockImplementation(() => ({
+      currentTime: 0,
+      destination: {},
+      createOscillator: () => ({
+        type: "sine",
+        frequency: { setValueAtTime: vi.fn() },
+        connect: vi.fn(),
+        start: vi.fn(),
+        stop: vi.fn(),
+      }),
+      createGain: () => ({
+        gain: {
+          setValueAtTime: vi.fn(),
+          linearRampToValueAtTime: vi.fn(),
+          exponentialRampToValueAtTime: vi.fn(),
+        },
+        connect: vi.fn(),
+      }),
+    })) as unknown as typeof AudioContext;
+  });
 
   it("renders detected app details and handles start button click", () => {
     render(
@@ -58,6 +81,61 @@ describe("MeetingDetectedBanner Component", () => {
 
     const dismissBtn = screen.getByTitle(/Yoksay/i);
     fireEvent.click(dismissBtn);
-    expect(defaultProps.onDismiss).toHaveBeenCalledWith("teams");
+    expect(defaultProps.onDismiss).toHaveBeenCalledWith(mockApp.app_id);
+  });
+
+  it("renders various meeting app icons correctly", () => {
+    const apps = ["zoom", "meet", "webex", "discord", "slack", "other"];
+    for (const app_id of apps) {
+      const { unmount } = render(
+        <I18nProvider>
+          <MeetingDetectedBanner
+            {...defaultProps}
+            appInfo={{ ...mockApp, app_id, display_name: `${app_id} App` }}
+          />
+        </I18nProvider>,
+      );
+      expect(screen.getByText(`${app_id} App`)).toBeInTheDocument();
+      unmount();
+    }
+  });
+
+  it("handles webkitAudioContext fallback and missing AudioContext gracefully", () => {
+    // Test webkitAudioContext
+    delete (window as any).AudioContext;
+    (window as any).webkitAudioContext = vi.fn().mockImplementation(() => ({
+      currentTime: 0,
+      destination: {},
+      createOscillator: () => ({
+        type: "sine",
+        frequency: { setValueAtTime: vi.fn() },
+        connect: vi.fn(),
+        start: vi.fn(),
+        stop: vi.fn(),
+      }),
+      createGain: () => ({
+        gain: {
+          setValueAtTime: vi.fn(),
+          linearRampToValueAtTime: vi.fn(),
+          exponentialRampToValueAtTime: vi.fn(),
+        },
+        connect: vi.fn(),
+      }),
+    }));
+
+    const { unmount } = render(
+      <I18nProvider>
+        <MeetingDetectedBanner {...defaultProps} />
+      </I18nProvider>,
+    );
+    unmount();
+
+    // Test completely missing AudioContext
+    delete (window as any).webkitAudioContext;
+    render(
+      <I18nProvider>
+        <MeetingDetectedBanner {...defaultProps} />
+      </I18nProvider>,
+    );
   });
 });

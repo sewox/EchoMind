@@ -173,6 +173,54 @@ describe("RetranscribeModal Component", () => {
     expect(screen.getByText(/API Anahtarı girmelisiniz/i)).toBeInTheDocument();
   });
 
+  it("handles Groq and OpenAI cloud providers with API keys and retranscribe error", async () => {
+    localStorage.setItem("echomind_groq_key", "gsk_groq_retranscribe_key");
+    (invoke as any).mockImplementation((cmd: string) => {
+      if (cmd === "get_available_models") return Promise.resolve([]);
+      if (cmd === "get_stored_api_keys")
+        return Promise.resolve({
+          groq: "gsk_groq_retranscribe_key",
+          gemini: "",
+          openai: "",
+        });
+      if (cmd === "retranscribe_meeting")
+        return Promise.reject("Sunucu bağlantı hatası");
+      return Promise.resolve();
+    });
+
+    render(
+      <I18nProvider>
+        <RetranscribeModal {...defaultProps} />
+      </I18nProvider>,
+    );
+
+    const cloudBtn = screen.getByText(/Yüksek Hızlı Bulut Zekası/i);
+    await act(async () => {
+      fireEvent.click(cloudBtn);
+    });
+
+    // Select Groq
+    const groqOption = screen.getByText(/Groq Zekası/i);
+    fireEvent.click(groqOption);
+
+    const submitBtn = screen.getByRole("button", {
+      name: /Yeniden Yazıya Dök/i,
+    });
+    await act(async () => {
+      fireEvent.click(submitBtn);
+      await new Promise((r) => setTimeout(r, 20));
+    });
+
+    expect(
+      await screen.findByText(/Sunucu bağlantı hatası/i),
+    ).toBeInTheDocument();
+
+    // Click close button
+    const closeBtn = screen.getByRole("button", { name: /Vazgeç/i });
+    fireEvent.click(closeBtn);
+    expect(defaultProps.onClose).toHaveBeenCalled();
+  });
+
   it("does not render when isOpen is false", () => {
     const { container } = render(
       <I18nProvider>
@@ -181,5 +229,48 @@ describe("RetranscribeModal Component", () => {
     );
 
     expect(container.firstChild).toBeNull();
+  });
+
+  it("handles apple_speech, sensevoice, and ollama summary engine selections", async () => {
+    (invoke as any).mockImplementation((cmd: string) => {
+      if (cmd === "retranscribe_meeting") {
+        return Promise.resolve({
+          ...mockMeeting,
+          transcription: "Apple Speech retranscribed",
+        });
+      }
+      return Promise.resolve();
+    });
+
+    localStorage.setItem("echomind_ollama_endpoint", "http://localhost:11434");
+    localStorage.setItem("echomind_ollama_model", "llama3.2");
+
+    render(
+      <I18nProvider>
+        <RetranscribeModal {...defaultProps} />
+      </I18nProvider>,
+    );
+
+    // Select sensevoice or apple_speech if available
+    const selects = screen.getAllByRole("combobox");
+    if (selects.length > 0) {
+      fireEvent.change(selects[0], { target: { value: "apple_speech" } });
+    }
+
+    const submitBtn = screen.getByRole("button", {
+      name: /Yeniden Yazıya Dök/i,
+    });
+    await act(async () => {
+      fireEvent.click(submitBtn);
+    });
+
+    expect(invoke).toHaveBeenCalledWith(
+      "retranscribe_meeting",
+      expect.objectContaining({
+        summaryProvider: "ollama",
+        customEndpoint: "http://localhost:11434",
+        customModel: "llama3.2",
+      }),
+    );
   });
 });

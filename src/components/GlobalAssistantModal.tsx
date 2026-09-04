@@ -228,7 +228,7 @@ export const GlobalAssistantModal: React.FC<GlobalAssistantModalProps> = ({
           query: term.trim(),
         },
       );
-      setSearchResults(results);
+      setSearchResults(results || []);
     } catch (err) {
       console.error("Global arama hatası:", err);
     } finally {

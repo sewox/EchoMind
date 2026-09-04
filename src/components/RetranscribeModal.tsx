@@ -404,7 +404,9 @@ export const RetranscribeModal: React.FC<RetranscribeModalProps> = ({
                           <div className="text-xs font-bold text-white">
                             {m.name}
                           </div>
-                          <div className="text-[11px] text-slate-400">{m.desc}</div>
+                          <div className="text-[11px] text-slate-400">
+                            {m.desc}
+                          </div>
                         </div>
                         {localModel === m.id && (
                           <Check className="w-4 h-4 text-cyan-400 shrink-0 ml-2" />
@@ -446,8 +448,12 @@ export const RetranscribeModal: React.FC<RetranscribeModalProps> = ({
                             : "bg-slate-950/60 border-slate-800 hover:border-slate-700 text-slate-300"
                         }`}
                       >
-                        <div className="text-xs font-bold text-white">{p.name}</div>
-                        <div className="text-[11px] text-slate-400">{p.desc}</div>
+                        <div className="text-xs font-bold text-white">
+                          {p.name}
+                        </div>
+                        <div className="text-[11px] text-slate-400">
+                          {p.desc}
+                        </div>
                       </button>
                     ))}
                   </div>
@@ -494,7 +500,9 @@ export const RetranscribeModal: React.FC<RetranscribeModalProps> = ({
                     <option value="openai">
                       {t("retranscribe.openaiProvider")}
                     </option>
-                    <option value="groq">{t("retranscribe.groqProvider")}</option>
+                    <option value="groq">
+                      {t("retranscribe.groqProvider")}
+                    </option>
                     <option value="heuristic">
                       {t("retranscribe.heuristicProvider")}
                     </option>

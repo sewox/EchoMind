@@ -201,6 +201,162 @@ describe("GlobalAssistantModal Component", () => {
     fireEvent.click(chatTab);
   });
 
+  it("handles copy message and error states", async () => {
+    (invoke as any).mockImplementation((cmd: string) => {
+      if (cmd === "ask_global_assistant") {
+        return Promise.reject("Ollama bağlantı hatası");
+      }
+      return Promise.resolve();
+    });
+
+    render(
+      <I18nProvider>
+        <GlobalAssistantModal {...defaultProps} />
+      </I18nProvider>,
+    );
+
+    const input = screen.getByPlaceholderText(
+      /Toplantılarım hakkında bir şey sor/i,
+    );
+    fireEvent.change(input, { target: { value: "Test hata sorusu" } });
+
+    const form = input.closest("form")!;
+    await act(async () => {
+      fireEvent.submit(form);
+    });
+
+    expect(
+      await screen.findByText(/Ollama bağlantı hatası/i),
+    ).toBeInTheDocument();
+  });
+
+  it("handles copy assistant response to clipboard", async () => {
+    (invoke as any).mockImplementation((cmd: string) => {
+      if (cmd === "ask_global_assistant") {
+        return Promise.resolve({
+          answer: "Kopyalanacak yanıt metni.",
+          cited_meeting_ids: [],
+          provider_used: "Ollama Llama3",
+        });
+      }
+      return Promise.resolve();
+    });
+
+    render(
+      <I18nProvider>
+        <GlobalAssistantModal {...defaultProps} />
+      </I18nProvider>,
+    );
+
+    const input = screen.getByPlaceholderText(
+      /Toplantılarım hakkında bir şey sor/i,
+    );
+    fireEvent.change(input, { target: { value: "Kopyala sorusu" } });
+
+    const form = input.closest("form")!;
+    await act(async () => {
+      fireEvent.submit(form);
+    });
+
+    expect(
+      await screen.findByText("Kopyalanacak yanıt metni."),
+    ).toBeInTheDocument();
+
+    const copyBtns = screen.getAllByTitle("Yanıtı Kopyala");
+    fireEvent.click(copyBtns[copyBtns.length - 1]);
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
+      "Kopyalanacak yanıt metni.",
+    );
+  });
+
+  it("handles cloud assistant queries and custom Ollama endpoints", async () => {
+    localStorage.setItem("echomind_active_engine", "cloud_gemini");
+    localStorage.setItem("echomind_gemini_key", "AIzaSy_assistant_key");
+    localStorage.setItem(
+      "echomind_ollama_endpoint",
+      "http://192.168.1.100:11434",
+    );
+    localStorage.setItem("echomind_ollama_model", "mistral");
+
+    (invoke as any).mockImplementation((cmd: string) => {
+      if (cmd === "ask_global_assistant") {
+        return Promise.resolve({
+          answer: "Gemini ile oluşturulan çoklu toplantı yanıtı.",
+          cited_meeting_ids: ["mtg-001"],
+          provider_used: "Google Gemini Flash",
+        });
+      }
+      return Promise.resolve();
+    });
+
+    render(
+      <I18nProvider>
+        <GlobalAssistantModal {...defaultProps} />
+      </I18nProvider>,
+    );
+
+    const input = screen.getByPlaceholderText(
+      /Toplantılarım hakkında bir şey sor/i,
+    );
+    fireEvent.change(input, { target: { value: "Gemini sorusu" } });
+
+    const form = input.closest("form")!;
+    await act(async () => {
+      fireEvent.submit(form);
+      await new Promise((r) => setTimeout(r, 20));
+    });
+
+    expect(invoke).toHaveBeenCalledWith("ask_global_assistant", {
+      query: "Gemini sorusu",
+      provider: "gemini",
+      apiKey: "AIzaSy_assistant_key",
+      customEndpoint: "http://192.168.1.100:11434",
+      customModel: "mistral",
+    });
+
+    expect(
+      await screen.findByText("Gemini ile oluşturulan çoklu toplantı yanıtı."),
+    ).toBeInTheDocument();
+  });
+
+  it("handles meeting search selection and close button click", async () => {
+    (invoke as any).mockImplementation((cmd: string) => {
+      if (cmd === "global_search_meetings")
+        return Promise.resolve(mockSearchResults);
+      return Promise.resolve();
+    });
+
+    const onSelectMeetingMock = vi.fn();
+
+    render(
+      <I18nProvider>
+        <GlobalAssistantModal
+          {...defaultProps}
+          onSelectMeeting={onSelectMeetingMock}
+        />
+      </I18nProvider>,
+    );
+
+    // Switch to search tab
+    const searchTab = screen.getByRole("button", { name: /Ara\.\.\./i });
+    fireEvent.click(searchTab);
+
+    const searchInput = screen.getByPlaceholderText(/Tüm toplantı başlıkları/i);
+    await act(async () => {
+      fireEvent.change(searchInput, { target: { value: "Depo" } });
+      await new Promise((r) => setTimeout(r, 50));
+    });
+
+    // Click on search result action button
+    const openMeetingBtn = await screen.findByRole("button", {
+      name: /Toplantıya Git/i,
+    });
+    fireEvent.click(openMeetingBtn);
+
+    expect(onSelectMeetingMock).toHaveBeenCalledWith("mtg-001");
+    expect(defaultProps.onClose).toHaveBeenCalled();
+  });
+
   it("does not render when isOpen is false", () => {
     const { container } = render(
       <I18nProvider>

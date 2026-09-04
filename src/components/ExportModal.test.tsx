@@ -90,6 +90,14 @@ describe("ExportModal Component", () => {
       "save_meeting_export_file",
       expect.objectContaining({ exportType: "md" }),
     );
+    expect(invoke).toHaveBeenCalledWith(
+      "save_meeting_export_file",
+      expect.objectContaining({ exportType: "txt" }),
+    );
+    expect(invoke).toHaveBeenCalledWith(
+      "save_meeting_export_file",
+      expect.objectContaining({ exportType: "json" }),
+    );
 
     // 3. Copy operations
     const copyBtns = screen.getAllByRole("button", { name: /Kopyala/i });

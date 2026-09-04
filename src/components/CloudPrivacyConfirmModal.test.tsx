@@ -37,6 +37,27 @@ describe("CloudPrivacyConfirmModal Component", () => {
     expect(defaultProps.onConfirmCloud).toHaveBeenCalled();
   });
 
+  it("handles proceeding with cloud when dontShowAgain checkbox is checked", () => {
+    render(
+      <I18nProvider>
+        <CloudPrivacyConfirmModal {...defaultProps} />
+      </I18nProvider>,
+    );
+
+    const checkbox = screen.getByRole("checkbox");
+    fireEvent.click(checkbox);
+
+    const proceedBtn = screen.getByRole("button", {
+      name: /Bulut ile Hızlıca Çözümle/i,
+    });
+    fireEvent.click(proceedBtn);
+
+    expect(defaultProps.onConfirmCloud).toHaveBeenCalled();
+    expect(localStorage.getItem("echomind_suppress_cloud_warning")).toBe(
+      "true",
+    );
+  });
+
   it("handles switching to local with dontShowAgain checkbox set", () => {
     render(
       <I18nProvider>

@@ -218,7 +218,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           setLiveMicLevel(status.mic_level || 0);
           setIsSpeaking(status.is_speaking || false);
         }
-      } catch (_) {}
+      } catch {}
     }, 80);
 
     return () => {
@@ -499,7 +499,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <strong>
                   kendi sesiniz ile toplantıdaki diğer katılımcıların sesini
                 </strong>{" "}
-                yerel işletim sistemi API'si üzerinden otomatik olarak birleştirir ve net bir şekilde yazıya döker.
+                yerel işletim sistemi API'si üzerinden otomatik olarak
+                birleştirir ve net bir şekilde yazıya döker.
               </p>
 
               <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-400 pt-1">

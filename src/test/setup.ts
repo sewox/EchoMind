@@ -2,12 +2,27 @@ import "@testing-library/jest-dom";
 import { vi } from "vitest";
 
 // Mock Tauri API core and event
+export const globalTestEventListeners: Record<
+  string,
+  ((event: any) => void)[]
+> = {};
+
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
 }));
 
 vi.mock("@tauri-apps/api/event", () => ({
-  listen: vi.fn(() => Promise.resolve(() => {})),
+  listen: vi.fn((event: string, cb: (e: any) => void) => {
+    if (!globalTestEventListeners[event]) {
+      globalTestEventListeners[event] = [];
+    }
+    globalTestEventListeners[event].push(cb);
+    return Promise.resolve(() => {
+      globalTestEventListeners[event] = (
+        globalTestEventListeners[event] || []
+      ).filter((fn) => fn !== cb);
+    });
+  }),
   emit: vi.fn(),
 }));
 

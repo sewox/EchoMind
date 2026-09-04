@@ -77,7 +77,8 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
         <div className="flex items-start gap-2.5 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-[11px] leading-relaxed">
           <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
           <span>
-            Bu toplantı kaydı, ses dökümü ve yapay zeka analizleri kalıcı olarak silinecektir. Bu işlem geri alınamaz.
+            Bu toplantı kaydı, ses dökümü ve yapay zeka analizleri kalıcı olarak
+            silinecektir. Bu işlem geri alınamaz.
           </span>
         </div>
 

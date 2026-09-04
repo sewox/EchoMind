@@ -10,9 +10,12 @@ export function useAudioRecording() {
 
   // Sync with global recording events & Rust audio engine status continuously
   useEffect(() => {
-    const unlistenStart = listen<{ title?: string }>("trigger-start-recording", () => {
-      setIsRecording(true);
-    });
+    const unlistenStart = listen<{ title?: string }>(
+      "trigger-start-recording",
+      () => {
+        setIsRecording(true);
+      },
+    );
     const unlistenStop = listen("trigger-stop-recording", () => {
       setIsRecording(false);
     });

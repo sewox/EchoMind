@@ -83,6 +83,16 @@ describe("SummaryCardsView Component", () => {
     const langSelect = screen.getByRole("combobox");
     fireEvent.change(langSelect, { target: { value: "en" } });
     expect(defaultProps.onLanguageChange).toHaveBeenCalledWith("en");
+
+    // Toggle Action Item Checkbox
+    const toggleActionBtn = screen.getByRole("button", { name: "" });
+    fireEvent.click(toggleActionBtn);
+    expect(defaultProps.onToggleActionItem).toHaveBeenCalledWith(0);
+
+    // Click Citation Badge
+    const citeBadge = screen.getByTitle(/Transkript #1 referansına git/i);
+    fireEvent.click(citeBadge);
+    expect(defaultProps.onJumpToCitation).toHaveBeenCalledWith(1);
   });
 
   it("disables language selector when isTranslating is true", () => {

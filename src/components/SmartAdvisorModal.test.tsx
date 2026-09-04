@@ -175,6 +175,103 @@ describe("SmartAdvisorModal Component", () => {
     }
   });
 
+  it("handles inline key input with remember choice checked", async () => {
+    render(
+      <I18nProvider>
+        <SmartAdvisorModal {...defaultProps} />
+      </I18nProvider>,
+    );
+
+    const cloudCard = screen
+      .getByText("⚡ Yıldırım Hızı (Bulut)")
+      .closest("button");
+    if (cloudCard) {
+      await act(async () => {
+        fireEvent.click(cloudCard);
+      });
+    }
+
+    const rememberCheck = screen.getByRole("checkbox");
+    fireEvent.click(rememberCheck);
+
+    const groqInput = screen.getByPlaceholderText("gsk_...");
+    fireEvent.change(groqInput, { target: { value: "gsk_remember_key" } });
+
+    const startBtn = screen.getByRole("button", { name: /^Başlat$/i });
+    await act(async () => {
+      fireEvent.click(startBtn);
+    });
+
+    expect(localStorage.getItem("echomind_groq_key")).toBe("gsk_remember_key");
+    expect(localStorage.getItem("echomind_active_engine")).toBe("cloud_groq");
+  });
+
+  it("handles Gemini and OpenAI inline key saving with remember choice", async () => {
+    render(
+      <I18nProvider>
+        <SmartAdvisorModal {...defaultProps} />
+      </I18nProvider>,
+    );
+
+    const cloudCard = screen
+      .getByText("⚡ Yıldırım Hızı (Bulut)")
+      .closest("button");
+    if (cloudCard) {
+      await act(async () => {
+        fireEvent.click(cloudCard);
+      });
+    }
+
+    // Switch to Gemini
+    const geminiBtn = screen.getByRole("button", { name: /Google Gemini/i });
+    fireEvent.click(geminiBtn);
+
+    const geminiInput = screen.getByPlaceholderText("AIzaSy...");
+    fireEvent.change(geminiInput, {
+      target: { value: "AIzaSy_remember_gemini" },
+    });
+
+    const startBtn = screen.getByRole("button", { name: /^Başlat$/i });
+    await act(async () => {
+      fireEvent.click(startBtn);
+    });
+
+    expect(localStorage.getItem("echomind_gemini_key")).toBe(
+      "AIzaSy_remember_gemini",
+    );
+    expect(defaultProps.onConfirm).toHaveBeenCalledWith(
+      "cloud_gemini",
+      "AIzaSy_remember_gemini",
+      expect.any(String),
+      "auto",
+    );
+  });
+
+  it("handles open settings link in SmartAdvisorModal", async () => {
+    render(
+      <I18nProvider>
+        <SmartAdvisorModal {...defaultProps} />
+      </I18nProvider>,
+    );
+
+    const cloudCard = screen
+      .getByText("⚡ Yıldırım Hızı (Bulut)")
+      .closest("button");
+    if (cloudCard) {
+      await act(async () => {
+        fireEvent.click(cloudCard);
+      });
+    }
+
+    const settingsLink = screen.getByRole("button", {
+      name: /Ayarlardan Yönet/i,
+    });
+    fireEvent.click(settingsLink);
+
+    expect(defaultProps.onClose).toHaveBeenCalled();
+    expect(defaultProps.onOpenSettings).toHaveBeenCalled();
+  });
+
   it("does not render when isOpen is false", () => {
     const { container } = render(
       <I18nProvider>

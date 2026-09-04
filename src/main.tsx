@@ -12,7 +12,8 @@ const isIslandView =
 if (isIslandView && typeof document !== "undefined") {
   document.documentElement.style.backgroundColor = "transparent";
   document.body.style.backgroundColor = "transparent";
-  document.body.className = "bg-transparent text-slate-100 antialiased h-screen w-screen overflow-hidden select-none";
+  document.body.className =
+    "bg-transparent text-slate-100 antialiased h-screen w-screen overflow-hidden select-none";
 }
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(

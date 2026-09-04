@@ -322,12 +322,14 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
                     )}
                   </div>
                   <p className="text-xs text-slate-400">
-                    İşletim sisteminizin yerleşik Türkçe konuşma tanıma motoru. 0 MB RAM, sıfır gecikme ve Apple Neural Engine hızlandırmasıyla çalışır.
+                    İşletim sisteminizin yerleşik Türkçe konuşma tanıma motoru.
+                    0 MB RAM, sıfır gecikme ve Apple Neural Engine
+                    hızlandırmasıyla çalışır.
                   </p>
                   <div className="flex items-center gap-4 text-xs text-slate-400 pt-1">
                     <span className="flex items-center gap-1">
-                      <HardDrive className="w-3.5 h-3.5 text-slate-500" />
-                      0 MB İndirme
+                      <HardDrive className="w-3.5 h-3.5 text-slate-500" />0 MB
+                      İndirme
                     </span>
                     <span className="flex items-center gap-1">
                       <Cpu className="w-3.5 h-3.5 text-slate-500" />
@@ -347,13 +349,16 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
                   <button
                     onClick={() => handleSelectOfflineEngine("apple_speech")}
                     disabled={activeEngine === "apple_speech"}
+                    aria-label="macOS Yerel Ses Tanıma Seç"
                     className={`px-4 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 ${
                       activeEngine === "apple_speech"
                         ? "bg-slate-800 text-slate-500 cursor-default"
                         : "bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/20"
                     }`}
                   >
-                    {activeEngine === "apple_speech" ? "Kullanımda" : "Bunu Seç"}
+                    {activeEngine === "apple_speech"
+                      ? "Kullanımda"
+                      : "Bunu Seç"}
                   </button>
                 </div>
               </div>
@@ -380,7 +385,8 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
                     )}
                   </div>
                   <p className="text-xs text-slate-400">
-                    Halüsinasyonsuz, kelime uydurmayan ve Whisper'dan 15 kat daha hızlı çalışan yeni nesil yerel konuşma tanıma motoru.
+                    Halüsinasyonsuz, kelime uydurmayan ve Whisper'dan 15 kat
+                    daha hızlı çalışan yeni nesil yerel konuşma tanıma motoru.
                   </p>
                   <div className="flex items-center gap-4 text-xs text-slate-400 pt-1">
                     <span className="flex items-center gap-1">
@@ -405,6 +411,7 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
                   <button
                     onClick={() => handleSelectOfflineEngine("sensevoice")}
                     disabled={activeEngine === "sensevoice"}
+                    aria-label="SenseVoice Seç"
                     className={`px-4 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 ${
                       activeEngine === "sensevoice"
                         ? "bg-slate-800 text-slate-500 cursor-default"

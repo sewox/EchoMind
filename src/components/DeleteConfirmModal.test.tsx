@@ -8,7 +8,8 @@ vi.mock("../locales/i18nContext", () => ({
     t: (key: string) => {
       const translations: Record<string, string> = {
         "sidebar.deleteMeetingTitle": "Toplantıyı Sil",
-        "sidebar.deleteMeetingConfirm": "Bu toplantıyı silmek istediğinize emin misiniz?",
+        "sidebar.deleteMeetingConfirm":
+          "Bu toplantıyı silmek istediğinize emin misiniz?",
         "common.cancel": "Vazgeç",
         "common.delete": "Sil",
         "common.close": "Kapat",
