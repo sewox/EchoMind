@@ -1,0 +1,50 @@
+# Dependencies
+node_modules/
+
+
+# Build outputs
+dist/
+dist-ssr/
+coverage/
+*.local
+
+# Rust & Tauri builds
+src-tauri/target/
+target/
+
+# Local models and large binaries
+src-tauri/models/*.bin
+models/*.bin
+*.gguf
+*.bin
+
+# Local audio recordings & test data
+data/recordings/
+*.flac
+*.mp3
+*.wav
+*.m4a
+
+# Logs & Temporary files
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store
+.tempmediaStorage/
+.user_uploaded/
+
+# Environment files
+.env
+.env.local
+.env.production
+.env.development
+
+# Editor directories
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

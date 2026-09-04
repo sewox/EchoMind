@@ -1,0 +1,17 @@
+# EchoMind AI Assistant Rules
+
+## Core Principles
+- **Performance First:** Use Rust for all backend tasks. Minimize memory footprint.
+- **Hardware Awareness:** Always check for Apple Silicon (Metal), NVIDIA (CUDA), or CPU (AVX2/AMX) availability.
+- **Privacy:** Transcription must be offline by default. Summarization can be hybrid (Gemini API or Local Gemma 2).
+- **No Electron:** Use Tauri for UI to keep RAM usage under 100MB.
+
+## Technical Preferences
+- **Backend:** Rust with `tokio` for async and `tauri` for desktop integration.
+- **Audio:** `cpal` for cross-platform audio. Use `ScreenCaptureKit` for macOS loopback and `WASAPI` for Windows.
+- **AI Engines:** `whisper-rs` (C++ bindings) for transcription, `llama-cpp-rs` for local LLM.
+- **Frontend:** React + Tailwind CSS + Shadcn/ui.
+
+## Security
+- Never hardcode API keys. Use a secure local store or environment variables.
+- Prompt for user permission before starting any recording.
