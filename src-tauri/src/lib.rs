@@ -1,4 +1,5 @@
 pub mod audio;
+pub mod audio_clipper;
 pub mod cloud_transcriber;
 pub mod detector;
 pub mod diarization;
@@ -16,6 +17,7 @@ use audio::{
     get_audio_status, list_audio_devices, open_audio_midi_setup, start_audio_capture,
     start_meeting_recording, start_mic_preview, stop_audio_capture, stop_mic_preview,
 };
+use audio_clipper::clip_meeting_soundbite;
 use detector::{
     check_active_meetings, get_detector_status, hide_island_window, show_island_window,
     show_main_window, start_meeting_detector, stop_meeting_detector, update_detector_settings,
@@ -104,6 +106,7 @@ pub fn run() {
             clean_transcript_text,
             get_meeting_analytics,
             get_meeting_analytics_by_id,
+            clip_meeting_soundbite,
             global_search_meetings,
             ask_global_assistant,
             update_meeting_speaker_name,

@@ -102,8 +102,18 @@ export const de: TranslationKeys = {
     renameSpeaker: "Sprechernamen bearbeiten",
     speakerInfo: "Sprechertrennung und zeitgestempelter Dialogablauf",
     playSentence: "Diesen Satz anhören",
+    clipSoundbite: "✂️ Soundbite Schneiden",
+    soundbiteCreated: "Audio-Ausschnitt erfolgreich erstellt und gespeichert!",
   },
   summary: {
+    audioMemo: {
+      button: "🎙️ Audio-Memo Anhören (KI-Podcast)",
+      playing: "Audio-Memo wird abgespielt...",
+      paused: "Pausiert",
+      speed: "Tempo",
+      stop: "Stopp",
+      play: "Anhören",
+    },
     rebuildReport: "✨ Bericht Neu Erstellen",
     rebuilding: "Bericht wird erstellt...",
     rebuildTooltip: "Erstellen Sie eine neue KI-Zusammenfassung aus dem Dialog",

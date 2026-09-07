@@ -27,6 +27,7 @@ import { CustomTemplateModal } from "./transcript/CustomTemplateModal";
 import { MeetingAnalyticsModal } from "./transcript/MeetingAnalyticsModal";
 import { MeetingTemplate, BUILTIN_TEMPLATES } from "../types/templates";
 import { MeetingAnalytics } from "../types/analytics";
+import { SoundbiteResult } from "../types/soundbite";
 import { useI18n } from "../locales/i18nContext";
 
 export const SUMMARY_LANGUAGES = [
@@ -194,6 +195,27 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
       console.error("Analytics fetch error:", err);
     } finally {
       setIsLoadingAnalytics(false);
+    }
+  };
+
+  // Soundbite Clipper State
+  const [soundbiteToast, setSoundbiteToast] = useState<string | null>(null);
+
+  const handleClipSoundbite = async (segment: TranscriptSegment) => {
+    if (!selectedPastMeeting?.id) return;
+    try {
+      const res = await invoke<SoundbiteResult>("clip_meeting_soundbite", {
+        meetingId: selectedPastMeeting.id,
+        segmentId: segment.id,
+        startMs: segment.start_time_ms,
+        endMs: segment.end_time_ms,
+      });
+      if (res) {
+        setSoundbiteToast(`✂️ ${res.filename} (${res.duration_seconds}s)`);
+        setTimeout(() => setSoundbiteToast(null), 3500);
+      }
+    } catch (err) {
+      console.error("Soundbite clip error:", err);
     }
   };
 
@@ -964,8 +986,19 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
             onCancelEditSpeaker={() => setEditingSpeakerId(null)}
             onEditingNameChange={setEditingNameValue}
             onSegmentPlay={handleSegmentPlay}
+            onClipSoundbite={handleClipSoundbite}
             onOpenRetranscribe={() => setIsRetranscribeModalOpen(true)}
           />
+        )}
+
+        {/* Soundbite Clip Floating Toast Notification */}
+        {soundbiteToast && (
+          <div className="fixed bottom-16 right-8 z-50 animate-in slide-in-from-bottom-5 fade-in duration-300 pointer-events-none">
+            <div className="px-4 py-2.5 rounded-2xl bg-slate-900/95 border border-amber-500/40 shadow-2xl shadow-amber-950/50 text-amber-300 text-xs font-semibold flex items-center gap-2 backdrop-blur-md">
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+              <span>{soundbiteToast}</span>
+            </div>
+          </div>
         )}
 
         {activeTab === "summary" && (
