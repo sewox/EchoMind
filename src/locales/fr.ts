@@ -100,6 +100,17 @@ export const fr: TranslationKeys = {
     emptyActionsDesc:
       "Aucune tâche ou action concrète n'a encore été détectée dans les discussions.",
     responsible: "Responsable",
+    templateTitle: "Modèles de Réunion",
+    customTemplates: "Modèles Personnalisés",
+    createCustomTemplate: "+ Créer un Modèle de Prompt",
+    promptStudioTitle: "Studio de Prompts & Modèles",
+    promptStudioDesc: "Concevez des formats de résumé IA adaptés aux besoins de votre équipe.",
+    templateNameLabel: "Nom du Modèle",
+    templateDescLabel: "Description Courte",
+    systemPromptLabel: "Prompt Système Personnalisé",
+    saveTemplate: "Enregistrer le Modèle",
+    templateNameRequired: "Veuillez entrer un nom de modèle.",
+    templatePromptRequired: "Veuillez entrer un prompt système.",
   },
   retranscribe: {
     title: "Retranscrire l'Audio de la Réunion",

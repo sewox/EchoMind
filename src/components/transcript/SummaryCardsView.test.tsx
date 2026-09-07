@@ -55,21 +55,24 @@ describe("SummaryCardsView Component", () => {
     onGenerateSummary: vi.fn(),
     onOpenRetranscribe: vi.fn(),
     onExportNotes: vi.fn(),
+    selectedTemplateId: "general",
+    customTemplates: [],
+    onSelectTemplate: vi.fn(),
+    onOpenCreateCustom: vi.fn(),
+    onDeleteCustomTemplate: vi.fn(),
   };
 
-  it("renders executive summary cards and handles language translation and action buttons", () => {
+  it("renders executive summary cards and handles language translation, templates, and action buttons", () => {
     render(
       <I18nProvider>
         <SummaryCardsView {...defaultProps} />
       </I18nProvider>,
     );
 
-    expect(
-      screen.getByText("Q3 Finansal hedefleri belirlemek"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText("Yurt dışı depo yatırımı onaylandı"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Q3 Finansal hedefleri belirlemek")).toBeInTheDocument();
+    expect(screen.getByText("Yurt dışı depo yatırımı onaylandı")).toBeInTheDocument();
+    expect(screen.getByText("Kira sözleşmesi imzalanacak")).toBeInTheDocument();
+    expect(screen.getByText("Toplantı Şablonları:")).toBeInTheDocument();
     expect(screen.getByText("Bütçe Planlama")).toBeInTheDocument();
     expect(screen.getByText("Maliyetler %20 düşürülecek")).toBeInTheDocument();
     expect(screen.getByText("Ahmet")).toBeInTheDocument();

@@ -22,6 +22,8 @@ import { AudioPlayerBar } from "./transcript/AudioPlayerBar";
 import { TasksDecisionsView } from "./transcript/TasksDecisionsView";
 import { SummaryCardsView } from "./transcript/SummaryCardsView";
 import { LiveFeedView } from "./transcript/LiveFeedView";
+import { CustomTemplateModal } from "./transcript/CustomTemplateModal";
+import { MeetingTemplate, BUILTIN_TEMPLATES } from "../types/templates";
 import { useI18n } from "../locales/i18nContext";
 
 export const SUMMARY_LANGUAGES = [
@@ -118,6 +120,43 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
 
   // Export Modal State
   const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
+
+  // Template & Custom Prompt Studio State
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>(() => {
+    return localStorage.getItem("echomind_selected_template") || "general";
+  });
+  const [customTemplates, setCustomTemplates] = useState<MeetingTemplate[]>(() => {
+    try {
+      const saved = localStorage.getItem("echomind_custom_templates");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [isCustomTemplateModalOpen, setIsCustomTemplateModalOpen] = useState<boolean>(false);
+
+  const handleSelectTemplate = (template: MeetingTemplate) => {
+    setSelectedTemplateId(template.id);
+    localStorage.setItem("echomind_selected_template", template.id);
+  };
+
+  const handleSaveCustomTemplate = (template: MeetingTemplate) => {
+    const updated = [...customTemplates, template];
+    setCustomTemplates(updated);
+    localStorage.setItem("echomind_custom_templates", JSON.stringify(updated));
+    setSelectedTemplateId(template.id);
+    localStorage.setItem("echomind_selected_template", template.id);
+  };
+
+  const handleDeleteCustomTemplate = (templateId: string) => {
+    const updated = customTemplates.filter((t) => t.id !== templateId);
+    setCustomTemplates(updated);
+    localStorage.setItem("echomind_custom_templates", JSON.stringify(updated));
+    if (selectedTemplateId === templateId) {
+      setSelectedTemplateId("general");
+      localStorage.setItem("echomind_selected_template", "general");
+    }
+  };
 
   // Native Rust CoreAudio Player State & Controls
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
@@ -438,14 +477,21 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
       const customModel =
         localStorage.getItem("echomind_ollama_model") || undefined;
 
+      const allTemplates = [...BUILTIN_TEMPLATES, ...customTemplates];
+      const activeTpl =
+        allTemplates.find((t) => t.id === selectedTemplateId) || BUILTIN_TEMPLATES[0];
+
       const summaryRes = await invoke<SummaryResult>(
         "generate_meeting_summary",
         {
+          meetingId: selectedPastMeeting?.id || "current_session",
           segments,
           provider,
           apiKey: apiKey || null,
           customEndpoint,
           customModel,
+          templateId: activeTpl.id,
+          customPrompt: activeTpl.systemPrompt || null,
         },
       );
 
@@ -808,6 +854,11 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
             summaryLang={summaryLang}
             isTranslating={isTranslating}
             selectedPastMeeting={selectedPastMeeting}
+            selectedTemplateId={selectedTemplateId}
+            customTemplates={customTemplates}
+            onSelectTemplate={handleSelectTemplate}
+            onOpenCreateCustom={() => setIsCustomTemplateModalOpen(true)}
+            onDeleteCustomTemplate={handleDeleteCustomTemplate}
             onLanguageChange={handleSummaryLanguageChange}
             onToggleActionItem={handleToggleActionItem}
             onJumpToCitation={handleJumpToCitation}
@@ -934,6 +985,13 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
           }}
         />
       )}
+
+      {/* Custom Template / Prompt Studio Modal */}
+      <CustomTemplateModal
+        isOpen={isCustomTemplateModalOpen}
+        onClose={() => setIsCustomTemplateModalOpen(false)}
+        onSaveTemplate={handleSaveCustomTemplate}
+      />
     </div>
   );
 };

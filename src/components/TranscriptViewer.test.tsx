@@ -2382,4 +2382,110 @@ describe("TranscriptViewer Component", () => {
     }
     unmount();
   });
+
+  it("handles meeting template selection and custom prompt creation in report tab", async () => {
+    (invoke as any).mockImplementation((cmd: string) => {
+      if (cmd === "generate_meeting_summary") {
+        return Promise.resolve({
+          meeting_goal: "Sprint 42 hedefleri",
+          key_highlights: ["Refactoring planı"],
+          action_items: [],
+          phase1_agreed: [],
+          phase2_deferred: [],
+          detailed_topics: [],
+          participants: [],
+          summary: "Sprint planlama özeti",
+          key_decisions: [],
+          agenda_topics: [],
+          provider_used: "Gemini",
+          generation_time_ms: 100,
+        });
+      }
+      return Promise.resolve({});
+    });
+
+    const { unmount } = render(
+      <I18nProvider>
+        <TranscriptViewer
+          {...defaultProps}
+          selectedPastMeeting={mockPastMeeting}
+        />
+      </I18nProvider>,
+    );
+
+    // Switch to summary tab
+    const summaryTab = screen.getByRole("button", { name: /Toplantı Raporu/i });
+    await act(async () => {
+      fireEvent.click(summaryTab);
+    });
+
+    // Open template selector dropdown
+    const tplDropdownBtn = screen.getByRole("button", { name: /Yönetici Özeti/i });
+    await act(async () => {
+      fireEvent.click(tplDropdownBtn);
+    });
+
+    // Select Sprint Planning template
+    const sprintTpl = screen.getByText("Sprint & Teknik Planlama");
+    await act(async () => {
+      fireEvent.click(sprintTpl);
+    });
+
+    expect(localStorage.getItem("echomind_selected_template")).toBe("sprint_planning");
+
+    // Open custom template modal
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Sprint & Teknik Planlama/i }));
+    });
+    const createCustomBtn = screen.getByRole("button", {
+      name: /\+ Özel Prompt Şablonu Oluştur/i,
+    });
+    await act(async () => {
+      fireEvent.click(createCustomBtn);
+    });
+
+    // Fill and save custom template
+    const nameInput = screen.getByPlaceholderText(/Örn: Haftalık Pazarlama/i);
+    const promptInput = screen.getByPlaceholderText(/SEN KIDEMLİ BİR PAZARLAMA/i);
+    await act(async () => {
+      fireEvent.change(nameInput, { target: { value: "Test Şablonu" } });
+      fireEvent.change(promptInput, { target: { value: "Özel test promptu" } });
+      fireEvent.click(screen.getByRole("button", { name: /Şablonu Kaydet/i }));
+    });
+
+    const savedTemplates = JSON.parse(
+      localStorage.getItem("echomind_custom_templates") || "[]",
+    );
+    expect(savedTemplates.length).toBeGreaterThan(0);
+    expect(savedTemplates[0].name).toBe("Test Şablonu");
+
+    // Click Rebuild summary with custom template
+    const generateBtn = screen.queryByRole("button", {
+      name: /Raporu Yeniden Oluştur/i,
+    });
+    if (generateBtn) {
+      await act(async () => {
+        fireEvent.click(generateBtn);
+      });
+      expect(invoke).toHaveBeenCalledWith(
+        "generate_meeting_summary",
+        expect.objectContaining({
+          templateId: expect.stringContaining("custom_"),
+          customPrompt: "Özel test promptu",
+        }),
+      );
+    }
+
+    // Delete custom template
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Test Şablonu/i }));
+    });
+    const deleteBtn = screen.getByTitle("Şablonu sil");
+    await act(async () => {
+      fireEvent.click(deleteBtn);
+    });
+    expect(localStorage.getItem("echomind_selected_template")).toBe("general");
+
+    unmount();
+  });
 });

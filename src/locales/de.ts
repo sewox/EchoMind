@@ -102,6 +102,17 @@ export const de: TranslationKeys = {
     emptyActionsDesc:
       "In den Gesprächsdaten wurden bisher keine konkreten Aufgaben identifiziert.",
     responsible: "Verantwortlich",
+    templateTitle: "Meeting-Vorlagen",
+    customTemplates: "Eigene Vorlagen",
+    createCustomTemplate: "+ Eigene Prompt-Vorlage Erstellen",
+    promptStudioTitle: "Prompt & Vorlagen Studio",
+    promptStudioDesc: "Entwerfen Sie maßgeschneiderte KI-Zusammenfassungsformate für Ihre Teams.",
+    templateNameLabel: "Vorlagenname",
+    templateDescLabel: "Kurzbeschreibung",
+    systemPromptLabel: "Eigener System-Prompt & Rollenanweisung",
+    saveTemplate: "Vorlage Speichern",
+    templateNameRequired: "Bitte geben Sie einen Vorlagennamen ein.",
+    templatePromptRequired: "Bitte geben Sie einen System-Prompt ein.",
   },
   retranscribe: {
     title: "Audio Neu Transkribieren",

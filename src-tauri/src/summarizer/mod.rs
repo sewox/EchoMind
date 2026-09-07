@@ -31,6 +31,8 @@ impl SummarizerEngine {
         api_key: Option<&str>,
         custom_endpoint: Option<&str>,
         custom_model: Option<&str>,
+        template_id: Option<&str>,
+        custom_prompt: Option<&str>,
     ) -> SummaryResult {
         let start_time = Instant::now();
 
@@ -59,7 +61,7 @@ impl SummarizerEngine {
             let clean_key = key.trim();
             if !clean_key.is_empty() {
                 if prov_norm.contains("gemini") {
-                    match LLMClient::generate_gemini_summary(segments, clean_key, start_time) {
+                    match LLMClient::generate_gemini_summary(segments, clean_key, template_id, custom_prompt, start_time) {
                         Ok(res) => return res,
                         Err(e) => eprintln!("❌ Gemini summary generation error: {}", e),
                     }
@@ -70,6 +72,8 @@ impl SummarizerEngine {
                         "https://api.openai.com/v1/chat/completions",
                         "gpt-4o-mini",
                         "OpenAI GPT-4o-mini",
+                        template_id,
+                        custom_prompt,
                         start_time,
                     ) {
                         Ok(res) => return res,
@@ -82,6 +86,8 @@ impl SummarizerEngine {
                         "https://api.groq.com/openai/v1/chat/completions",
                         "llama-3.3-70b-versatile",
                         "Groq Llama-3.3-70B",
+                        template_id,
+                        custom_prompt,
                         start_time,
                     ) {
                         Ok(res) => return res,
@@ -92,7 +98,7 @@ impl SummarizerEngine {
         }
 
         // 2. Try Local LLM Server (Ollama / Local Server)
-        if let Ok(ollama_res) = LLMClient::generate_ollama_summary(segments, custom_endpoint, custom_model, start_time) {
+        if let Ok(ollama_res) = LLMClient::generate_ollama_summary(segments, custom_endpoint, custom_model, template_id, custom_prompt, start_time) {
             return ollama_res;
         }
 
@@ -154,6 +160,8 @@ pub async fn generate_meeting_summary(
     api_key: Option<String>,
     custom_endpoint: Option<String>,
     custom_model: Option<String>,
+    template_id: Option<String>,
+    custom_prompt: Option<String>,
 ) -> Result<SummaryResult, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let storage_dir = get_storage_dir();
@@ -178,6 +186,8 @@ pub async fn generate_meeting_summary(
             api_key.as_deref(),
             custom_endpoint.as_deref(),
             custom_model.as_deref(),
+            template_id.as_deref(),
+            custom_prompt.as_deref(),
         );
 
         // Update meeting record with rich intelligence
@@ -600,11 +610,29 @@ mod tests {
             },
         ];
 
-        let result = SummarizerEngine::generate_summary(&segments, "local", None, None, None);
+        let result = SummarizerEngine::generate_summary(&segments, "local", None, None, None, None, None);
         assert!(!result.summary.is_empty());
         assert!(!result.meeting_goal.is_empty());
         assert!(!result.action_items.is_empty());
         assert_eq!(result.provider_used, "🔒 Cihaz İçi Hızlı Özet (Çevrimdışı)");
+    }
+
+    #[test]
+    fn test_build_system_prompt_templates() {
+        let one_on_one = LLMClient::build_system_prompt(Some("one_on_one"), None);
+        assert!(one_on_one.contains("1-on-1"));
+
+        let sprint = LLMClient::build_system_prompt(Some("sprint_planning"), None);
+        assert!(sprint.contains("Sprint Planlama"));
+
+        let sales = LLMClient::build_system_prompt(Some("sales_bant"), None);
+        assert!(sales.contains("BANT/MEDDIC"));
+
+        let brain = LLMClient::build_system_prompt(Some("brainstorming"), None);
+        assert!(brain.contains("Beyin Fırtınası"));
+
+        let custom = LLMClient::build_system_prompt(Some("custom"), Some("ÖZEL TALİMAT"));
+        assert!(custom.contains("ÖZEL TALİMAT"));
     }
 
     #[test]

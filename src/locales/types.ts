@@ -94,6 +94,17 @@ export interface TranslationKeys {
     emptyActions: string;
     emptyActionsDesc: string;
     responsible: string;
+    templateTitle?: string;
+    customTemplates?: string;
+    createCustomTemplate?: string;
+    promptStudioTitle?: string;
+    promptStudioDesc?: string;
+    templateNameLabel?: string;
+    templateDescLabel?: string;
+    systemPromptLabel?: string;
+    saveTemplate?: string;
+    templateNameRequired?: string;
+    templatePromptRequired?: string;
   };
   retranscribe: {
     title: string;

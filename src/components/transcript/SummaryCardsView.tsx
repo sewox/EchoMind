@@ -19,12 +19,19 @@ import {
 import { SummaryResult, SUMMARY_LANGUAGES } from "../TranscriptViewer";
 import { MeetingRecord } from "../../App";
 import { useI18n } from "../../locales/i18nContext";
+import { MeetingTemplate } from "../../types/templates";
+import { TemplateSelector } from "./TemplateSelector";
 
 interface SummaryCardsViewProps {
   richSummary: SummaryResult | null;
   summaryLang: string;
   isTranslating: boolean;
   selectedPastMeeting?: MeetingRecord | null;
+  selectedTemplateId?: string;
+  customTemplates?: MeetingTemplate[];
+  onSelectTemplate?: (template: MeetingTemplate) => void;
+  onOpenCreateCustom?: () => void;
+  onDeleteCustomTemplate?: (templateId: string) => void;
   onLanguageChange: (langCode: string) => void;
   onToggleActionItem: (index: number) => void;
   onJumpToCitation: (citationIndex: number) => void;
@@ -38,6 +45,11 @@ export const SummaryCardsView: React.FC<SummaryCardsViewProps> = ({
   summaryLang,
   isTranslating,
   selectedPastMeeting,
+  selectedTemplateId = "general",
+  customTemplates = [],
+  onSelectTemplate,
+  onOpenCreateCustom,
+  onDeleteCustomTemplate,
   onLanguageChange,
   onToggleActionItem,
   onJumpToCitation,
@@ -49,30 +61,49 @@ export const SummaryCardsView: React.FC<SummaryCardsViewProps> = ({
 
   return (
     <div className="max-w-5xl mx-auto w-full space-y-5 pb-8">
-      {/* Top Controls: Language & Action Buttons */}
+      {/* Top Controls: Template, Language & Action Buttons */}
       <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-2xl bg-slate-900/80 border border-slate-800 backdrop-blur-sm">
-        {/* Language Selector */}
-        <div className="flex items-center gap-2.5">
-          <Languages className="w-4 h-4 text-cyan-400 shrink-0" />
-          <span className="text-xs sm:text-sm font-semibold text-slate-300">
-            {t("summary.translateTo")}
-          </span>
-          <div className="relative inline-flex items-center">
-            <select
-              value={summaryLang}
-              onChange={(e) => onLanguageChange(e.target.value)}
-              disabled={isTranslating || !richSummary}
-              className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-700 text-xs sm:text-sm font-medium text-slate-100 hover:border-cyan-500 focus:border-cyan-500 focus:outline-none cursor-pointer transition disabled:opacity-50"
-            >
-              {SUMMARY_LANGUAGES.map((l) => (
-                <option key={l.code} value={l.code}>
-                  {l.flag} {l.label}
-                </option>
-              ))}
-            </select>
-            {isTranslating && (
-              <Loader2 className="w-3.5 h-3.5 animate-spin text-cyan-400 ml-2" />
-            )}
+        {/* Template & Language Selectors */}
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* Template Selector */}
+          {onSelectTemplate && onOpenCreateCustom && onDeleteCustomTemplate && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs sm:text-sm font-semibold text-slate-300">
+                {t("summary.templateTitle")}:
+              </span>
+              <TemplateSelector
+                selectedTemplateId={selectedTemplateId}
+                customTemplates={customTemplates}
+                onSelectTemplate={onSelectTemplate}
+                onOpenCreateCustom={onOpenCreateCustom}
+                onDeleteCustomTemplate={onDeleteCustomTemplate}
+              />
+            </div>
+          )}
+
+          {/* Language Selector */}
+          <div className="flex items-center gap-2">
+            <Languages className="w-4 h-4 text-cyan-400 shrink-0" />
+            <span className="text-xs sm:text-sm font-semibold text-slate-300">
+              {t("summary.translateTo")}
+            </span>
+            <div className="relative inline-flex items-center">
+              <select
+                value={summaryLang}
+                onChange={(e) => onLanguageChange(e.target.value)}
+                disabled={isTranslating || !richSummary}
+                className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-700 text-xs sm:text-sm font-medium text-slate-100 hover:border-cyan-500 focus:border-cyan-500 focus:outline-none cursor-pointer transition disabled:opacity-50"
+              >
+                {SUMMARY_LANGUAGES.map((l) => (
+                  <option key={l.code} value={l.code}>
+                    {l.flag} {l.label}
+                  </option>
+                ))}
+              </select>
+              {isTranslating && (
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-cyan-400 ml-2" />
+              )}
+            </div>
           </div>
         </div>
 
@@ -81,7 +112,7 @@ export const SummaryCardsView: React.FC<SummaryCardsViewProps> = ({
           {selectedPastMeeting && (
             <button
               onClick={onOpenRetranscribe}
-              className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs sm:text-sm font-medium transition flex items-center gap-1.5"
+              className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-200 border border-slate-700 text-xs sm:text-sm font-medium transition flex items-center gap-1.5"
               title={t("transcript.retranscribeTooltip")}
             >
               <RotateCw className="w-3.5 h-3.5 text-cyan-400" />
@@ -92,7 +123,7 @@ export const SummaryCardsView: React.FC<SummaryCardsViewProps> = ({
           {selectedPastMeeting && (
             <button
               onClick={onExportNotes}
-              className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs sm:text-sm font-medium transition flex items-center gap-1.5"
+              className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-200 border border-slate-700 text-xs sm:text-sm font-medium transition flex items-center gap-1.5"
               title={t("summary.downloadMarkdown")}
             >
               <Download className="w-3.5 h-3.5 text-cyan-400" />

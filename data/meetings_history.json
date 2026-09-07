@@ -1,5 +1,51 @@
 [
   {
+    "id": "test_123",
+    "title": "Test Toplantısı",
+    "date_formatted": "21 Ağustos 2026",
+    "duration_seconds": 120,
+    "duration_formatted": "02:00",
+    "audio_file_path": null,
+    "segments": [],
+    "summary": "Test Özet",
+    "key_decisions": [
+      "Karar 1"
+    ],
+    "meeting_goal": "Test Amacı",
+    "key_highlights": [
+      "Ders 1"
+    ],
+    "action_items": [
+      {
+        "task": "Görev 1",
+        "assignee": "Sercan",
+        "source_citations": [
+          1
+        ],
+        "is_completed": false
+      }
+    ],
+    "phase1_agreed": [
+      "Faz 1"
+    ],
+    "phase2_deferred": [
+      "Faz 2"
+    ],
+    "detailed_topics": [
+      {
+        "topic_title": "Konu 1",
+        "bullet_points": [
+          "Madde 1"
+        ]
+      }
+    ],
+    "participants": [
+      "Sercan"
+    ],
+    "engine_used": "Cihazda (Whisper Small)",
+    "summary_provider": "EchoMind"
+  },
+  {
     "id": "mtg_import_20260903_145633",
     "title": "İçe Aktarıldı: Arksigner Toplantı",
     "date_formatted": "03 September 2026, 14:56",

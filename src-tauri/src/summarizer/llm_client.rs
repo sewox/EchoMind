@@ -6,10 +6,98 @@ use super::local_extractor::LocalSummaryExtractor;
 pub struct LLMClient;
 
 impl LLMClient {
+    pub fn build_system_prompt(template_id: Option<&str>, custom_prompt: Option<&str>) -> String {
+        let tid = template_id.unwrap_or("general");
+        
+        let specific_role = match tid {
+            "one_on_one" => {
+                "SEN DÜNYANIN EN DİKKATLİ BİREBİR (1-on-1) GÖRÜŞME VE LİDERLİK KOÇUSUN.\n\
+Bu toplantı bir yönetici ile çalışan arasındaki birebir görüşmedir. Odaklanman gereken ana konular:\n\
+- Çalışanın kariyer hedefleri, motivasyon durumu ve iş tatmini\n\
+- Karşılaşılan engeller, teknik/organizasyonel tıkanıklıklar (blockers)\n\
+- Karşılıklı verilen yapıcı geri bildirimler\n\
+- Bir sonraki birebir görüşmeye kadar tamamlanacak kişisel gelişim ve görev taahhütleri."
+            }
+            "sprint_planning" => {
+                "SEN KIDEMLİ BİR AGILE SCRUM MASTER VE YAZILIM MİMARISIN.\n\
+Bu toplantı bir Sprint Planlama / Teknik Değerlendirme toplantısıdır. Odaklanman gereken ana konular:\n\
+- Belirlenen net Sprint Hedefi (Sprint Goal)\n\
+- Tartışılan kullanıcı hikayeleri (User Stories) ve kabul kriterleri\n\
+- Alınan teknik mimari kararlar, refactoring ve teknik borç yönetimi\n\
+- Tespit edilen blocker'lar, bağımlılıklar ve net görev dağılımları (Action Items)."
+            }
+            "sales_bant" => {
+                "SEN KIDEMLİ BİR KURUMSAL SATIŞ DİREKTÖRÜ VE BANT/MEDDIC STRATEJİSTİSİN.\n\
+Bu toplantı bir müşteri satış / keşif görüşmesidir. Odaklanman gereken ana konular:\n\
+- Bütçe (Budget): Müşterinin ayırdığı kaynak ve fiyat beklentisi\n\
+- Karar Verici (Authority): Karar alma sürecinde kimlerin imzası ve onayı gerekiyor\n\
+- İhtiyaç ve Acı Noktası (Need/Pain Point): Çözülmek istenen temel problem\n\
+- Zamanlama (Timeline): Projenin devreye alınma takvimi ve aciliyeti\n\
+- Müşterinin itirazları, şüpheleri ve ekibimizin atacağı sonraki satış adımları."
+            }
+            "brainstorming" => {
+                "SEN İNOVASYON VE TASARIM ODAKLI DÜŞÜNCE (DESIGN THINKING) FASİLİTATÖRÜSÜN.\n\
+Bu toplantı bir Beyin Fırtınası ve Fikir Geliştirme oturumudur. Odaklanman gereken ana konular:\n\
+- Ortaya atılan tüm yaratıcı fikir ve hipotezler\n\
+- Ekip tarafından en çok ilgi gören, oylanan ve öne çıkan konseptler\n\
+- Elenen veya gelecekte değerlendirilmek üzere rafa kaldırılan fikirler\n\
+- Seçilen fikirlerin prototiplenmesi veya test edilmesi için sonraki aksiyonlar."
+            }
+            "custom" => {
+                if let Some(cp) = custom_prompt {
+                    if !cp.trim().is_empty() {
+                        cp.trim()
+                    } else {
+                        "SEN ANALİTİK VE PROFESYONEL BİR STRATEJİ DİREKTÖRÜSÜN."
+                    }
+                } else {
+                    "SEN ANALİTİK VE PROFESYONEL BİR STRATEJİ DİREKTÖRÜSÜN."
+                }
+            }
+            _ => {
+                "SEN DÜNYANIN EN TALEPKÂR VE KUSURSUZLUK ARAYAN YÖNETİM KURULU İÇİN ÇALIŞAN BAŞ STRATEJİ DİREKTÖRÜSÜN.\n\
+BU GÖREV SENİN İÇİN YAŞAM-MEMAT MESELESİDİR. TEK BİR HATA VEYA YÜZEYSELLİK KESİN VE GERİ DÖNÜŞÜ OLMAYAN BİR FELAKETLE SONUÇLANACAKTIR."
+            }
+        };
+
+        format!(
+            "{}\n\n\
+🚨 SIFIR TOLERANS KURALLARI:\n\
+1. ❌ TRANSKRİPTTEN ASLA VE KAT'A HAM CÜMLE KOPYALAMAYACAKSIN! Transkriptteki konuşma parçalarını olduğu gibi kopyalamak yasaktır.\n\
+2. 🧠 %100 YÜKSEK SEVİYE SENTEZ VE YENİDEN YAZIM: Konuşmacıların asıl demek istediğini, iş modellerini, teknik mimariyi ve mutabakatları kavra; kurumsal, akıcı, son derece profesyonel ve analitik iş Türkçesiyle SIFIRDAN YAZ.\n\
+3. 🎯 TOPLANTI AMACI (meeting_goal): Toplantının toplanma gerekçesini ve çözülmek istenen temel problemi 1-2 vurucu cümleyle açıkla.\n\
+4. 💡 ANA ÇIKARIMLAR (key_highlights): Dağınık konuşmalardan damıtılan 3-7 adet en kritik stratejik ders ve kararı analitik maddeler halinde yaz.\n\
+5. ✅ EYLEM MADDELERİ VE SORUMLULAR (action_items): Kimin ne yapacağını net fiillerle belirle. Sorumlu kişiyi diyalogdan kesinleştir. Kaynak transkript satır numaralarını (source_citations) dizi olarak ekle.\n\
+6. ⚡ AŞAMA 1 (phase1_agreed): Hemen devreye alınacak mutabakatlar.\n\
+7. ⏳ AŞAMA 2 (phase2_deferred): Sonraki fazlara veya geleceğe ertelenen maddeler.\n\
+8. 📂 DETAYLI KONU BAŞLIKLARI (detailed_topics): Toplantıyı mantıksal konulara böl ve her konunun altına derinlemesine 2-5 analitik alt madde yaz.\n\
+9. 👥 KATILIMCILAR: Toplantıda aktif konuşan kişilerin listesi.\n\n\
+YALNIZCA VE YALNIZCA AŞAĞIDAKİ GEÇERLİ JSON ŞEMASINDA YANIT VER:\n\
+{{\n\
+  \"smart_title\": \"Toplantının içeriğine uygun, profesyonel, kısa ve öz başlık (3-6 kelime, örn: 'Depo Entegrasyonu ve KDV Tevkifatı')\",\n\
+  \"meeting_goal\": \"Toplantının net amacı (1-2 cümle).\",\n\
+  \"key_highlights\": [\"Sentezlenmiş ana çıkarım 1\", \"Sentezlenmiş ana çıkarım 2\"],\n\
+  \"action_items\": [\n\
+    {{\"task\": \"Somut görev açıklaması\", \"assignee\": \"Sorumlu Kişi veya null\", \"source_citations\": [1, 2], \"is_completed\": false}}\n\
+  ],\n\
+  \"phase1_agreed\": [\"Aşama 1'de hemen yapılacak mutabakat 1\"],\n\
+  \"phase2_deferred\": [\"Aşama 2'ye ertelenen özellik 1\"],\n\
+  \"detailed_topics\": [\n\
+    {{\"topic_title\": \"Gündem Konusu Başlığı\", \"bullet_points\": [\"Sentezlenmiş analiz maddesi 1\", \"Sentezlenmiş analiz maddesi 2\"]}}\n\
+  ],\n\
+  \"participants\": [\"Toplantıda konuşan kişilerin listesi\"],\n\
+  \"summary\": \"Kapsamlı yönetici özeti.\"\n\
+}}",
+            specific_role
+        )
+    }
+
     pub fn generate_ollama_summary(
         segments: &[TranscriptSegment],
         endpoint: Option<&str>,
         model_name: Option<&str>,
+        template_id: Option<&str>,
+        custom_prompt: Option<&str>,
         start_time: Instant,
     ) -> Result<SummaryResult, String> {
         let base_url = endpoint.unwrap_or("http://127.0.0.1:11434").trim().trim_end_matches('/');
@@ -21,30 +109,8 @@ impl LLMClient {
             full_transcript.push_str(&format!("[#{}] [{}] {}: {}\n", idx + 1, seg.timestamp_formatted, seg.speaker_name, seg.text));
         }
 
-        let prompt = format!(
-            "SEN DÜNYANIN EN DİKKATLİ VE ANALİTİK YÖNETİM KURULU STRATEJİ DİREKTÖRÜSÜN.\n\
-Aşağıdaki toplantı konuşma dökümünü incele. Toplantı konuşması hangi dilde (İngilizce, Almanca, Türkçe vb.) yapılmış olursa olsun, YÖNETİCİ ÖZETİNİ VE TÜM ALANLARI ÖNCELİKLİ OLARAK TÜRKÇE, KURUMSAL, AKICI VE ANALİTİK BİR ŞEKİLDE SENTEZLE.\n\n\
-KURALLAR:\n\
-1. Ham transkripti kopyalama, profesyonelce yeniden sentezle.\n\
-2. SADECE ve SADECE aşağıdaki geçerli JSON şemasında yanıt ver:\n\
-{{\n\
-  \"smart_title\": \"Toplantının içeriğine uygun, profesyonel, kısa ve öz başlık (3-6 kelime, örn: 'Depo Entegrasyonu ve KDV Tevkifatı')\",\n\
-  \"meeting_goal\": \"Toplantının net amacı (1-2 cümle).\",\n\
-  \"key_highlights\": [\"Sentezlenmiş ana çıkarım 1\", \"Sentezlenmiş ana çıkarım 2\"],\n\
-  \"action_items\": [\n\
-    {{\"task\": \"Somut görev açıklaması\", \"assignee\": \"Sorumlu Kişi veya null\", \"source_citations\": [1], \"is_completed\": false}}\n\
-  ],\n\
-  \"phase1_agreed\": [\"Aşama 1 mutabakatı 1\"],\n\
-  \"phase2_deferred\": [\"Geleceğe ertelenen madde 1\"],\n\
-  \"detailed_topics\": [\n\
-    {{\"topic_title\": \"Gündem Konusu Başlığı\", \"bullet_points\": [\"Analiz maddesi 1\", \"Analiz maddesi 2\"]}}\n\
-  ],\n\
-  \"participants\": [\"Katılımcı 1\"],\n\
-  \"summary\": \"Kapsamlı yönetici özeti paragrafı.\"\n\
-}}\n\n\
-TRANSKRİPT:\n{}",
-            full_transcript
-        );
+        let sys_prompt = Self::build_system_prompt(template_id, custom_prompt);
+        let prompt = format!("{}\n\nTRANSKRİPT:\n{}", sys_prompt, full_transcript);
 
         let req_body = serde_json::json!({
             "model": model,
@@ -81,6 +147,8 @@ TRANSKRİPT:\n{}",
         endpoint: &str,
         model: &str,
         display_name: &str,
+        template_id: Option<&str>,
+        custom_prompt: Option<&str>,
         start_time: Instant,
     ) -> Result<SummaryResult, String> {
         let mut full_transcript = String::new();
@@ -88,34 +156,7 @@ TRANSKRİPT:\n{}",
             full_transcript.push_str(&format!("[#{}] [{}] {}: {}\n", idx + 1, seg.timestamp_formatted, seg.speaker_name, seg.text));
         }
 
-        let system_prompt = "SEN DÜNYANIN EN TALEPKÂR VE KUSURSUZLUK ARAYAN YÖNETİM KURULU İÇİN ÇALIŞAN BAŞ STRATEJİ DİREKTÖRÜSÜN.\n\
-BU GÖREV SENİN İÇİN YAŞAM-MEMAT MESELESİDİR. TEK BİR HATA, TEK BİR TEMBELLİK VEYA YÜZEYSELLİK KESİN VE GERİ DÖNÜŞÜ OLMAYAN BİR FELAKETLE SONUÇLANACAKTIR.\n\n\
-🚨 SIFIR TOLERANS KURALLARI:\n\
-1. ❌ TRANSKRİPTTEN ASLA VE KAT'A HAM CÜMLE KOPYALAMAYACAKSIN! Transkriptteki konuşma parçalarını olduğu gibi alıp başlıkların altına yapıştırmak EN BÜYÜK YASAKTIR. Böyle bir tembellik görevin derhal başarısız sayılmasına sebep olur.\n\
-2. 🧠 %100 YÜKSEK SEVİYE SENTEZ VE YENİDEN YAZIM: Tüm konuşmayı satır satır oku, konuşmacıların asıl demek istediğini, tartıştıkları iş modellerini, teknik mimariyi, finansal riskleri ve mutabakatları derinlemesine kavra. Ardından bunları kurumsal, akıcı, son derece profesyonel ve analitik iş Türkçesiyle SIFIRDAN YAZ.\n\
-3. 🎯 TOPLANTI AMACI (meeting_goal): 'X Bey konuştu' gibi yüzeysel laflar YASAKTIR. Toplantının toplanma gerekçesini, çözülmek istenen temel kurumsal/teknik problemi (örn: 'Yurt dışı depo yatırımları, çoklu para birimli tahsilat akışları ve KDV tevkifat süreçlerinin muhasebe entegrasyonu') 1-2 vurucu cümleyle açıkla.\n\
-4. 💡 ALINAN DERSLER VE STRATEJİK ÇIKARIMLAR (key_highlights): Dağınık konuşmalardan damıtılan 3-7 adet en kritik stratejik ders ve kararı analitik maddeler halinde yaz.\n\
-5. ✅ EYLEM MADDELERİ VE SORUMLULAR (action_items): Kimin ne yapacağını net fiillerle belirle (Örn: 'Serkan Bey: Yurt dışı depo vergi mevzuatı için yerel danışmanla görüşecek'). Sorumlu kişiyi diyalogdan kesinleştir. Kaynak transkript satır numaralarını (source_citations) dizi olarak ekle.\n\
-6. ⚡ AŞAMA 1 (phase1_agreed): Hemen devreye alınacak mutabakatlar.\n\
-7. ⏳ AŞAMA 2 (phase2_deferred): Sonraki fazlara veya geleceğe ertelenen maddeler.\n\
-8. 📂 DETAYLI KONU BAŞLIKLARI (detailed_topics): Toplantıyı mantıksal konulara böl ve her konunun altına derinlemesine 2-5 analitik alt madde yaz.\n\
-9. 👥 KATILIMCILAR: Toplantıda aktif konuşan kişilerin listesi.\n\n\
-YALNIZCA VE YALNIZCA AŞAĞIDAKİ GEÇERLİ JSON ŞEMASINDA YANIT VER:\n\
-{\n\
-  \"smart_title\": \"Toplantının içeriğine uygun, profesyonel, kısa ve öz başlık (3-6 kelime, örn: 'Depo Entegrasyonu ve KDV Tevkifatı')\",\n\
-  \"meeting_goal\": \"Toplantının net amacı (1-2 cümle).\",\n\
-  \"key_highlights\": [\"Sentezlenmiş ana çıkarım 1\", \"Sentezlenmiş ana çıkarım 2\"],\n\
-  \"action_items\": [\n\
-    {\"task\": \"Somut görev açıklaması\", \"assignee\": \"Sorumlu Kişi veya null\", \"source_citations\": [1, 2], \"is_completed\": false}\n\
-  ],\n\
-  \"phase1_agreed\": [\"Aşama 1'de hemen yapılacak mutabakat 1\"],\n\
-  \"phase2_deferred\": [\"Aşama 2'ye ertelenen özellik 1\"],\n\
-  \"detailed_topics\": [\n\
-    {\"topic_title\": \"Gündem Konusu Başlığı\", \"bullet_points\": [\"Sentezlenmiş analiz maddesi 1\", \"Sentezlenmiş analiz maddesi 2\"]}\n\
-  ],\n\
-  \"participants\": [\"Ramazan Biçer\", \"Sercan Kara\"],\n\
-  \"summary\": \"Kapsamlı yönetici özeti.\"\n\
-}";
+        let system_prompt = Self::build_system_prompt(template_id, custom_prompt);
 
         let client = reqwest::blocking::Client::builder()
             .timeout(std::time::Duration::from_secs(120))
@@ -156,6 +197,8 @@ YALNIZCA VE YALNIZCA AŞAĞIDAKİ GEÇERLİ JSON ŞEMASINDA YANIT VER:\n\
     pub fn generate_gemini_summary(
         segments: &[TranscriptSegment],
         api_key: &str,
+        template_id: Option<&str>,
+        custom_prompt: Option<&str>,
         start_time: Instant,
     ) -> Result<SummaryResult, String> {
         let mut full_transcript = String::new();
@@ -163,38 +206,8 @@ YALNIZCA VE YALNIZCA AŞAĞIDAKİ GEÇERLİ JSON ŞEMASINDA YANIT VER:\n\
             full_transcript.push_str(&format!("[#{}] [{}] {}: {}\n", idx + 1, seg.timestamp_formatted, seg.speaker_name, seg.text));
         }
 
-        let prompt = format!(
-            "SEN DÜNYANIN EN TALEPKÂR VE KUSURSUZLUK ARAYAN YÖNETİM KURULU İÇİN ÇALIŞAN BAŞ STRATEJİ DİREKTÖRÜSÜN.\n\
-            BU GÖREV SENİN İÇİN YAŞAM-MEMAT MESELESİDİR. TEK BİR HATA, TEK BİR TEMBELLİK VEYA YÜZEYSELLİK KESİN VE GERİ DÖNÜŞÜ OLMAYAN BİR FELAKETLE SONUÇLANACAKTIR.\n\n\
-            🚨 SIFIR TOLERANS KURALLARI:\n\
-            1. ❌ TRANSKRİPTTEN ASLA VE KAT'A HAM CÜMLE KOPYALAMAYACAKSIN! Transkriptteki konuşma parçalarını olduğu gibi alıp başlıkların altına yapıştırmak EN BÜYÜK YASAKTIR. Böyle bir tembellik görevin derhal başarısız sayılmasına sebep olur.\n\
-            2. 🧠 %100 YÜKSEK SEVİYE SENTEZ VE YENİDEN YAZIM: Tüm konuşmayı satır satır oku, konuşmacıların asıl demek istediğini, tartıştıkları iş modellerini, teknik mimariyi, finansal riskleri ve mutabakatları derinlemesine kavra. Ardından bunları kurumsal, akıcı, son derece profesyonel ve analitik iş Türkçesiyle SIFIRDAN YAZ.\n\
-            3. 🎯 TOPLANTI AMACI (meeting_goal): 'X Bey konuştu' gibi yüzeysel laflar YASAKTIR. Toplantının toplanma gerekçesini, çözülmek istenen temel kurumsal/teknik problemi (örn: 'Yurt dışı depo yatırımları, çoklu para birimli tahsilat akışları ve KDV tevkifat süreçlerinin muhasebe entegrasyonu') 1-2 vurucu cümleyle açıkla.\n\
-            4. 💡 ALINAN DERSLER VE STRATEJİK ÇIKARIMLAR (key_highlights): Dağınık konuşmalardan damıtılan 3-7 adet en kritik stratejik ders ve kararı analitik maddeler halinde yaz.\n\
-            5. ✅ EYLEM MADDELERİ VE SORUMLULAR (action_items): Kimin ne yapacağını net fiillerle belirle (Örn: 'Serkan Bey: Yurt dışı depo vergi mevzuatı için yerel danışmanla görüşecek'). Sorumlu kişiyi diyalogdan kesinleştir. Kaynak transkript satır numaralarını (source_citations) dizi olarak ekle.\n\
-            6. ⚡ AŞAMA 1 (phase1_agreed): Hemen devreye alınacak mutabakatlar.\n\
-            7. ⏳ AŞAMA 2 (phase2_deferred): Sonraki fazlara veya geleceğe ertelenen maddeler.\n\
-            8. 📂 DETAYLI KONU BAŞLIKLARI (detailed_topics): Toplantıyı mantıksal konulara böl ve her konunun altına derinlemesine 2-5 analitik alt madde yaz.\n\
-            9. 👥 KATILIMCILAR: Toplantıda aktif konuşan kişilerin listesi.\n\n\
-            JSON ŞEMASI:\n\
-            {{\n\
-              \"smart_title\": \"Toplantının içeriğine uygun, profesyonel, kısa ve öz başlık (3-6 kelime, örn: 'Depo Entegrasyonu ve KDV Tevkifatı')\",\n\
-              \"meeting_goal\": \"Toplantının net amacı (1-2 cümle).\",\n\
-              \"key_highlights\": [\"Sentezlenmiş ana çıkarım 1\", \"Sentezlenmiş ana çıkarım 2\"],\n\
-              \"action_items\": [\n\
-                {{\"task\": \"Somut görev açıklaması\", \"assignee\": \"Sorumlu Kişi veya null\", \"source_citations\": [1, 2], \"is_completed\": false}}\n\
-              ],\n\
-              \"phase1_agreed\": [\"Aşama 1'de hemen yapılacak mutabakat 1\"],\n\
-              \"phase2_deferred\": [\"Aşama 2'ye ertelenen özellik 1\"],\n\
-              \"detailed_topics\": [\n\
-                {{\"topic_title\": \"Gündend Konusu Başlığı\", \"bullet_points\": [\"Sentezlenmiş analiz maddesi 1\", \"Sentezlenmiş analiz maddesi 2\"]}}\n\
-              ],\n\
-              \"participants\": [\"Toplantıda konuşan kişilerin listesi\"],\n\
-              \"summary\": \"Kapsamlı yönetici özeti.\"\n\
-            }}\n\n\
-            TRANSKRİPT:\n{}",
-            full_transcript
-        );
+        let sys_prompt = Self::build_system_prompt(template_id, custom_prompt);
+        let prompt = format!("{}\n\nTRANSKRİPT:\n{}", sys_prompt, full_transcript);
 
         let body = GeminiRequest {
             contents: vec![GeminiContent {

@@ -105,6 +105,17 @@ export const es: TranslationKeys = {
     emptyActionsDesc:
       "No se detectaron tareas concretas en las conversaciones de la reunión.",
     responsible: "Responsable",
+    templateTitle: "Plantillas de Reunión",
+    customTemplates: "Plantillas Personalizadas",
+    createCustomTemplate: "+ Crear Plantilla de Prompt",
+    promptStudioTitle: "Estudio de Prompts & Plantillas",
+    promptStudioDesc: "Diseñe formatos de resumen con IA adaptados a los flujos de su equipo.",
+    templateNameLabel: "Nombre de la Plantilla",
+    templateDescLabel: "Descripción Corta",
+    systemPromptLabel: "Prompt del Sistema Personalizado",
+    saveTemplate: "Guardar Plantilla",
+    templateNameRequired: "Por favor, introduzca un nombre de plantilla.",
+    templatePromptRequired: "Por favor, introduzca un prompt de sistema.",
   },
   retranscribe: {
     title: "Retranscribir Audio de la Reunión",
