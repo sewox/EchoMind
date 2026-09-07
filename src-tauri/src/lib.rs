@@ -37,8 +37,9 @@ use summarizer::{
     ask_global_assistant, clean_transcript_text, enhance_meeting_transcript, export_meeting_action_items_csv,
     export_meeting_action_items_markdown, export_meeting_email_digest, export_meeting_followup_email,
     export_meeting_notes, export_meeting_notes_html, export_meeting_notes_slack,
-    filter_meeting_filler_words, generate_meeting_summary, global_search_meetings, open_meeting_html_report,
-    save_meeting_export_file, test_ollama_connection, translate_meeting_summary,
+    filter_meeting_filler_words, generate_meeting_summary, get_meeting_analytics, get_meeting_analytics_by_id,
+    global_search_meetings, open_meeting_html_report, save_meeting_export_file, test_ollama_connection,
+    translate_meeting_summary,
 };
 use transcriber::{
     clear_transcription_history, download_whisper_model, get_available_models, get_model_status,
@@ -101,6 +102,8 @@ pub fn run() {
             save_meeting_export_file,
             filter_meeting_filler_words,
             clean_transcript_text,
+            get_meeting_analytics,
+            get_meeting_analytics_by_id,
             global_search_meetings,
             ask_global_assistant,
             update_meeting_speaker_name,

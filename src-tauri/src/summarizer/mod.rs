@@ -6,6 +6,7 @@ pub mod translator;
 pub mod exporter;
 pub mod rag;
 pub mod cleaner;
+pub mod analytics;
 
 pub use types::*;
 pub use redaction::*;
@@ -15,6 +16,7 @@ pub use translator::*;
 pub use exporter::*;
 pub use rag::*;
 pub use cleaner::*;
+pub use analytics::*;
 
 use std::time::Instant;
 use crate::storage::{MeetingRecord, StorageEngine, get_storage_dir};
@@ -419,6 +421,35 @@ pub fn clean_transcript_text(
     lang_code: Option<String>,
 ) -> (String, usize) {
     SpeechCleaner::clean_text(&raw_text, lang_code.as_deref())
+}
+
+#[tauri::command]
+pub fn get_meeting_analytics(
+    segments: Vec<TranscriptSegment>,
+    total_duration_seconds: Option<f64>,
+) -> Result<MeetingAnalytics, String> {
+    Ok(AnalyticsEngine::calculate(&segments, total_duration_seconds))
+}
+
+#[tauri::command]
+pub fn get_meeting_analytics_by_id(
+    meeting_id: String,
+) -> Result<MeetingAnalytics, String> {
+    let storage = StorageEngine::new();
+    let meetings_lock = storage.meetings.lock().unwrap();
+
+    let target_meeting = meetings_lock
+        .iter()
+        .find(|m| m.id == meeting_id)
+        .ok_or_else(|| format!("Toplantı kaydı bulunamadı: {}", meeting_id))?;
+
+    let duration_sec = if target_meeting.duration_seconds > 0 {
+        Some(target_meeting.duration_seconds as f64)
+    } else {
+        None
+    };
+
+    Ok(AnalyticsEngine::calculate(&target_meeting.segments, duration_sec))
 }
 
 #[tauri::command]

@@ -14,6 +14,7 @@ import {
   CheckSquare,
   Loader2,
   RotateCw,
+  BarChart3,
 } from "lucide-react";
 import { MeetingRecord, ActionItem, TopicBreakdown } from "../App";
 import { ExportModal } from "./ExportModal";
@@ -23,7 +24,9 @@ import { TasksDecisionsView } from "./transcript/TasksDecisionsView";
 import { SummaryCardsView } from "./transcript/SummaryCardsView";
 import { LiveFeedView } from "./transcript/LiveFeedView";
 import { CustomTemplateModal } from "./transcript/CustomTemplateModal";
+import { MeetingAnalyticsModal } from "./transcript/MeetingAnalyticsModal";
 import { MeetingTemplate, BUILTIN_TEMPLATES } from "../types/templates";
+import { MeetingAnalytics } from "../types/analytics";
 import { useI18n } from "../locales/i18nContext";
 
 export const SUMMARY_LANGUAGES = [
@@ -164,6 +167,35 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
   });
   const [cleanedSegmentsMap, setCleanedSegmentsMap] = useState<Record<number, string>>({});
   const [fillersRemovedCount, setFillersRemovedCount] = useState<number>(0);
+
+  // Meeting Analytics Modal State
+  const [isAnalyticsModalOpen, setIsAnalyticsModalOpen] = useState<boolean>(false);
+  const [meetingAnalytics, setMeetingAnalytics] = useState<MeetingAnalytics | null>(null);
+  const [isLoadingAnalytics, setIsLoadingAnalytics] = useState<boolean>(false);
+
+  const handleOpenAnalytics = async () => {
+    if (segments.length === 0) return;
+    setIsLoadingAnalytics(true);
+    try {
+      if (selectedPastMeeting?.id) {
+        const res = await invoke<MeetingAnalytics>("get_meeting_analytics_by_id", {
+          meetingId: selectedPastMeeting.id,
+        });
+        setMeetingAnalytics(res);
+      } else {
+        const res = await invoke<MeetingAnalytics>("get_meeting_analytics", {
+          segments,
+          totalDurationSeconds: audioDuration > 0 ? audioDuration : null,
+        });
+        setMeetingAnalytics(res);
+      }
+      setIsAnalyticsModalOpen(true);
+    } catch (err) {
+      console.error("Analytics fetch error:", err);
+    } finally {
+      setIsLoadingAnalytics(false);
+    }
+  };
 
   // Native Rust CoreAudio Player State & Controls
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
@@ -844,6 +876,18 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
 
               {segments.length > 0 && (
                 <button
+                  onClick={handleOpenAnalytics}
+                  disabled={isLoadingAnalytics}
+                  className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-indigo-500/30 text-xs font-semibold shadow-sm transition flex items-center gap-1.5 shrink-0 disabled:opacity-50"
+                  title={t("transcript.analytics.modalSubtitle")}
+                >
+                  <BarChart3 className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>{isLoadingAnalytics ? "..." : t("transcript.analytics.button")}</span>
+                </button>
+              )}
+
+              {segments.length > 0 && (
+                <button
                   onClick={() => setIsExportModalOpen(true)}
                   className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-semibold shadow-md shadow-cyan-900/30 transition flex items-center gap-1.5 shrink-0"
                   title={t("transcript.shareReportTooltip")}
@@ -1067,6 +1111,14 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
         isOpen={isCustomTemplateModalOpen}
         onClose={() => setIsCustomTemplateModalOpen(false)}
         onSaveTemplate={handleSaveCustomTemplate}
+      />
+
+      {/* Meeting & Participant Analytics Modal */}
+      <MeetingAnalyticsModal
+        isOpen={isAnalyticsModalOpen}
+        onClose={() => setIsAnalyticsModalOpen(false)}
+        analytics={meetingAnalytics}
+        meetingTitle={selectedPastMeeting?.title}
       />
     </div>
   );

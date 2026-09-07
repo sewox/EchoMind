@@ -2559,5 +2559,75 @@ describe("TranscriptViewer Component", () => {
 
     unmount();
   });
+
+  it("opens meeting analytics modal and fetches analytics data", async () => {
+    const mockAnalytics = {
+      total_duration_seconds: 120,
+      total_speech_seconds: 11,
+      total_silence_seconds: 109,
+      silence_percentage: 90.8,
+      total_words: 10,
+      average_wpm: 120,
+      meeting_balance_score: 95,
+      speaker_stats: [
+        {
+          speaker_id: "spk1",
+          speaker_name: "Ahmet",
+          total_speech_seconds: 5,
+          talk_percentage: 45.5,
+          word_count: 5,
+          wpm: 120,
+          segment_count: 1,
+          longest_monologue_seconds: 5,
+        },
+        {
+          speaker_id: "spk2",
+          speaker_name: "Mehmet",
+          total_speech_seconds: 6,
+          talk_percentage: 54.5,
+          word_count: 5,
+          wpm: 120,
+          segment_count: 1,
+          longest_monologue_seconds: 6,
+        },
+      ],
+      dominant_speaker: "Mehmet",
+      dominant_speaker_percentage: 54.5,
+      meeting_pace_label: "Moderate",
+      key_insights: ["Toplantıda konuşma süreleri dengeli dağılmış."],
+    };
+
+    (invoke as any).mockImplementation((cmd: string) => {
+      if (cmd === "get_meeting_analytics_by_id") {
+        return Promise.resolve(mockAnalytics);
+      }
+      if (cmd === "get_meeting_analytics") {
+        return Promise.resolve(mockAnalytics);
+      }
+      return Promise.resolve();
+    });
+
+    const { unmount } = render(
+      <I18nProvider>
+        <TranscriptViewer {...defaultProps} />
+      </I18nProvider>,
+    );
+
+    const analyticsBtn = screen.getByRole("button", { name: /Katılımcı & Toplantı Analitiği/i });
+    expect(analyticsBtn).toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.click(analyticsBtn);
+    });
+
+    expect(invoke).toHaveBeenCalledWith("get_meeting_analytics_by_id", {
+      meetingId: "mtg-001",
+    });
+
+    expect(screen.getByText(/Toplantı & Katılımcı Analitiği/i)).toBeInTheDocument();
+    expect(screen.getByText("%95")).toBeInTheDocument();
+
+    unmount();
+  });
 });
 
