@@ -151,6 +151,44 @@ impl SummarizerEngine {
     ) -> String {
         MeetingExporter::export_notes_email_digest(record, custom_summary, lang_code)
     }
+
+    pub fn export_notes_slack_markdown(
+        record: &MeetingRecord,
+        custom_summary: Option<&SummaryResult>,
+        lang_code: Option<&str>,
+    ) -> String {
+        MeetingExporter::export_notes_slack_markdown(record, custom_summary, lang_code)
+    }
+
+    pub fn export_action_items_csv(
+        record: &MeetingRecord,
+        custom_summary: Option<&SummaryResult>,
+    ) -> String {
+        MeetingExporter::export_action_items_csv(record, custom_summary)
+    }
+
+    pub fn export_action_items_markdown(
+        record: &MeetingRecord,
+        custom_summary: Option<&SummaryResult>,
+    ) -> String {
+        MeetingExporter::export_action_items_markdown(record, custom_summary)
+    }
+
+    pub fn export_followup_email(
+        record: &MeetingRecord,
+        custom_summary: Option<&SummaryResult>,
+        lang_code: Option<&str>,
+    ) -> FollowupEmailResult {
+        let (subject, body) = MeetingExporter::export_followup_email(record, custom_summary, lang_code);
+        let encoded_subject = urlencoding::encode(&subject);
+        let encoded_body = urlencoding::encode(&body);
+        let mailto_url = format!("mailto:?subject={}&body={}", encoded_subject, encoded_body);
+        FollowupEmailResult {
+            subject,
+            body,
+            mailto_url,
+        }
+    }
 }
 
 #[tauri::command]
@@ -292,6 +330,72 @@ pub fn export_meeting_email_digest(
 }
 
 #[tauri::command]
+pub fn export_meeting_notes_slack(
+    meeting_id: String,
+    custom_summary: Option<SummaryResult>,
+    lang_code: Option<String>,
+) -> Result<String, String> {
+    let storage = StorageEngine::new();
+    let meetings_lock = storage.meetings.lock().unwrap();
+
+    let target_meeting = meetings_lock
+        .iter()
+        .find(|m| m.id == meeting_id)
+        .ok_or_else(|| format!("Toplantı kaydı bulunamadı: {}", meeting_id))?;
+
+    Ok(SummarizerEngine::export_notes_slack_markdown(target_meeting, custom_summary.as_ref(), lang_code.as_deref()))
+}
+
+#[tauri::command]
+pub fn export_meeting_action_items_csv(
+    meeting_id: String,
+    custom_summary: Option<SummaryResult>,
+) -> Result<String, String> {
+    let storage = StorageEngine::new();
+    let meetings_lock = storage.meetings.lock().unwrap();
+
+    let target_meeting = meetings_lock
+        .iter()
+        .find(|m| m.id == meeting_id)
+        .ok_or_else(|| format!("Toplantı kaydı bulunamadı: {}", meeting_id))?;
+
+    Ok(SummarizerEngine::export_action_items_csv(target_meeting, custom_summary.as_ref()))
+}
+
+#[tauri::command]
+pub fn export_meeting_action_items_markdown(
+    meeting_id: String,
+    custom_summary: Option<SummaryResult>,
+) -> Result<String, String> {
+    let storage = StorageEngine::new();
+    let meetings_lock = storage.meetings.lock().unwrap();
+
+    let target_meeting = meetings_lock
+        .iter()
+        .find(|m| m.id == meeting_id)
+        .ok_or_else(|| format!("Toplantı kaydı bulunamadı: {}", meeting_id))?;
+
+    Ok(SummarizerEngine::export_action_items_markdown(target_meeting, custom_summary.as_ref()))
+}
+
+#[tauri::command]
+pub fn export_meeting_followup_email(
+    meeting_id: String,
+    custom_summary: Option<SummaryResult>,
+    lang_code: Option<String>,
+) -> Result<FollowupEmailResult, String> {
+    let storage = StorageEngine::new();
+    let meetings_lock = storage.meetings.lock().unwrap();
+
+    let target_meeting = meetings_lock
+        .iter()
+        .find(|m| m.id == meeting_id)
+        .ok_or_else(|| format!("Toplantı kaydı bulunamadı: {}", meeting_id))?;
+
+    Ok(SummarizerEngine::export_followup_email(target_meeting, custom_summary.as_ref(), lang_code.as_deref()))
+}
+
+#[tauri::command]
 pub fn open_meeting_html_report(
     meeting_id: String,
     custom_summary: Option<SummaryResult>,
@@ -356,6 +460,9 @@ pub async fn save_meeting_export_file(
         match export_type.to_lowercase().as_str() {
             "html" => (SummarizerEngine::export_notes_html(target, summary_ref, lang_ref), "html", "HTML Raporu (*.html)"),
             "md" | "markdown" => (SummarizerEngine::export_notes_markdown(target, summary_ref, lang_ref), "md", "Markdown Dosyası (*.md)"),
+            "slack" => (SummarizerEngine::export_notes_slack_markdown(target, summary_ref, lang_ref), "txt", "Slack / Teams Metni (*.txt)"),
+            "csv" | "tasks_csv" => (SummarizerEngine::export_action_items_csv(target, summary_ref), "csv", "CSV Görev Listesi (*.csv)"),
+            "tasks_md" => (SummarizerEngine::export_action_items_markdown(target, summary_ref), "md", "Markdown Görev Listesi (*.md)"),
             "email" | "digest" => (SummarizerEngine::export_notes_email_digest(target, summary_ref, lang_ref), "txt", "E-Posta Özeti (*.txt)"),
             "json" => (serde_json::to_string_pretty(target).map_err(|e| e.to_string())?, "json", "JSON Verisi (*.json)"),
             _ => (
@@ -798,5 +905,124 @@ mod tests {
         assert!(html.contains("Scale international warehouse logistics"));
         assert!(html.contains("Sign overseas lease contract"));
         assert!(html.contains("Print / Save as PDF"));
+    }
+
+    #[test]
+    fn test_export_notes_slack_markdown() {
+        let record = MeetingRecord {
+            id: "mtg-slack".to_string(),
+            title: "Sprint Retrospective".to_string(),
+            date_formatted: "08.09.2026".to_string(),
+            duration_seconds: 1800,
+            duration_formatted: "30:00".to_string(),
+            audio_file_path: None,
+            segments: vec![],
+            summary: "Sprint tamamlandı, hedeflere ulaşıldı.".to_string(),
+            key_decisions: vec!["Yeni CI/CD pipeline'ına geçilecek".to_string()],
+            meeting_goal: Some("Sprint değerlendirmesi".to_string()),
+            key_highlights: Some(vec!["Hız %15 arttı".to_string()]),
+            action_items: Some(vec![ActionItem {
+                task: "Docker image boyutunu küçült".to_string(),
+                assignee: Some("Emre".to_string()),
+                source_citations: vec![],
+                is_completed: false,
+            }]),
+            phase1_agreed: None,
+            phase2_deferred: None,
+            detailed_topics: None,
+            participants: Some(vec!["Emre".to_string(), "Can".to_string()]),
+            engine_used: None,
+            summary_provider: None,
+        };
+
+        let slack_md = SummarizerEngine::export_notes_slack_markdown(&record, None, Some("tr"));
+        assert!(slack_md.contains("*🎯 Toplantı Amacı*"));
+        assert!(slack_md.contains("*✅ Eylem Maddeleri & Sorumlular*"));
+        assert!(slack_md.contains("Docker image boyutunu küçült"));
+        assert!(slack_md.contains("@Emre"));
+    }
+
+    #[test]
+    fn test_export_action_items_csv_and_markdown() {
+        let record = MeetingRecord {
+            id: "mtg-tasks".to_string(),
+            title: "Product Roadmap Planning".to_string(),
+            date_formatted: "08.09.2026".to_string(),
+            duration_seconds: 3600,
+            duration_formatted: "01:00:00".to_string(),
+            audio_file_path: None,
+            segments: vec![],
+            summary: "".to_string(),
+            key_decisions: vec![],
+            meeting_goal: None,
+            key_highlights: None,
+            action_items: Some(vec![
+                ActionItem {
+                    task: "API endpoint tasarla, \"v2\" desteği ekle".to_string(),
+                    assignee: Some("Selin".to_string()),
+                    source_citations: vec![],
+                    is_completed: false,
+                },
+                ActionItem {
+                    task: "UI wireframeleri çiz".to_string(),
+                    assignee: None,
+                    source_citations: vec![],
+                    is_completed: true,
+                },
+            ]),
+            phase1_agreed: None,
+            phase2_deferred: None,
+            detailed_topics: None,
+            participants: None,
+            engine_used: None,
+            summary_provider: None,
+        };
+
+        let csv = SummarizerEngine::export_action_items_csv(&record, None);
+        assert!(csv.starts_with("\"ID\",\"Task\",\"Assignee\",\"Status\",\"Meeting Title\",\"Date\""));
+        assert!(csv.contains("\"1\",\"API endpoint tasarla, \"\"v2\"\" desteği ekle\",\"Selin\",\"To Do\",\"Product Roadmap Planning\",\"08.09.2026\""));
+        assert!(csv.contains("\"2\",\"UI wireframeleri çiz\",\"Unassigned\",\"Done\",\"Product Roadmap Planning\",\"08.09.2026\""));
+
+        let tasks_md = SummarizerEngine::export_action_items_markdown(&record, None);
+        assert!(tasks_md.contains("# ✅ Aksiyon Maddeleri: Product Roadmap Planning (08.09.2026)"));
+        assert!(tasks_md.contains("- [ ] **API endpoint tasarla, \"v2\" desteği ekle** (@Selin)"));
+        assert!(tasks_md.contains("- [x] **UI wireframeleri çiz**"));
+    }
+
+    #[test]
+    fn test_export_followup_email() {
+        let record = MeetingRecord {
+            id: "mtg-email".to_string(),
+            title: "Client Sync & Demo".to_string(),
+            date_formatted: "08.09.2026".to_string(),
+            duration_seconds: 1200,
+            duration_formatted: "20:00".to_string(),
+            audio_file_path: None,
+            segments: vec![],
+            summary: "Müşteri demo sunumu başarılı geçti.".to_string(),
+            key_decisions: vec!["Pilot başlangıç tarihi belirlendi".to_string()],
+            meeting_goal: Some("Demo sunumu ve teklif onayı".to_string()),
+            key_highlights: Some(vec!["Müşteri güvenlik modülünü onayladı".to_string()]),
+            action_items: Some(vec![ActionItem {
+                task: "Sözleşme taslağını ilet".to_string(),
+                assignee: Some("Burak".to_string()),
+                source_citations: vec![],
+                is_completed: false,
+            }]),
+            phase1_agreed: None,
+            phase2_deferred: None,
+            detailed_topics: None,
+            participants: Some(vec!["Burak".to_string(), "Zeynep".to_string()]),
+            engine_used: None,
+            summary_provider: None,
+        };
+
+        let email_res = SummarizerEngine::export_followup_email(&record, None, Some("tr"));
+        assert!(email_res.subject.contains("Takip & Toplantı Notları: Client Sync & Demo"));
+        assert!(email_res.body.contains("🎯 Toplantı Amacı:"));
+        assert!(email_res.body.contains("🎯 ✅ Eylem Maddeleri & Sorumlular:"));
+        assert!(email_res.body.contains("Sözleşme taslağını ilet"));
+        assert!(email_res.mailto_url.starts_with("mailto:?subject="));
+        assert!(email_res.mailto_url.contains("&body="));
     }
 }

@@ -1131,6 +1131,7 @@ dependencies = [
  "tauri",
  "tauri-build",
  "tauri-plugin-shell",
+ "urlencoding",
  "whisper-rs",
  "windows 0.58.0",
 ]
