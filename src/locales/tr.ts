@@ -102,8 +102,18 @@ export const tr: TranslationKeys = {
     renameSpeaker: "Konuşmacı Adını Düzenle",
     speakerInfo: "Konuşmacı ayrımı ve zaman damgalı diyalog akışı",
     playSentence: "Bu Cümleyi Dinle",
+    clipSoundbite: "✂️ Ses Parçası Kırp (Soundbite)",
+    soundbiteCreated: "Ses parçası başarıyla kırpıldı ve kaydedildi!",
   },
   summary: {
+    audioMemo: {
+      button: "🎙️ Sesli Bülteni Dinle (AI Podcast)",
+      playing: "Sesli Özet Dinleniyor...",
+      paused: "Duraklatıldı",
+      speed: "Hız",
+      stop: "Durdur",
+      play: "Dinle",
+    },
     rebuildReport: "✨ Raporu Yeniden Oluştur",
     rebuilding: "Rapor Hazırlanıyor...",
     rebuildTooltip: "Mevcut konuşmalardan yeni bir yapay zeka özeti çıkarın",

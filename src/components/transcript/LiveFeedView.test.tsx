@@ -183,4 +183,21 @@ describe("LiveFeedView Component", () => {
       screen.getByText(/Henüz bir konuşma kaydı bulunmuyor/i),
     ).toBeInTheDocument();
   });
+
+  it("handles soundbite clip button click", () => {
+    const handleClip = vi.fn();
+    render(
+      <I18nProvider>
+        <LiveFeedView
+          {...defaultProps}
+          onClipSoundbite={handleClip}
+        />
+      </I18nProvider>,
+    );
+
+    const clipBtn = screen.getByTitle(/Ses Parçası Kırp/i);
+    expect(clipBtn).toBeInTheDocument();
+    fireEvent.click(clipBtn);
+    expect(handleClip).toHaveBeenCalledWith(mockSegments[0]);
+  });
 });

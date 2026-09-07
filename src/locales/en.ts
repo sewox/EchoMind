@@ -101,8 +101,18 @@ export const en: TranslationKeys = {
     renameSpeaker: "Edit Speaker Name",
     speakerInfo: "Speaker diarization and timestamped dialogue feed",
     playSentence: "Play Sentence",
+    clipSoundbite: "✂️ Clip Soundbite",
+    soundbiteCreated: "Soundbite audio clip created and saved successfully!",
   },
   summary: {
+    audioMemo: {
+      button: "🎙️ Listen Audio Memo (AI Podcast)",
+      playing: "Playing Audio Memo...",
+      paused: "Paused",
+      speed: "Speed",
+      stop: "Stop",
+      play: "Play",
+    },
     rebuildReport: "✨ Rebuild Report",
     rebuilding: "Generating Report...",
     rebuildTooltip:

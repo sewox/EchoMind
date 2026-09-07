@@ -8,6 +8,7 @@ import {
   Play,
   Zap,
   Sparkles,
+  Scissors,
 } from "lucide-react";
 import { TranscriptSegment } from "../TranscriptViewer";
 import { MeetingRecord } from "../../App";
@@ -33,6 +34,7 @@ interface LiveFeedViewProps {
   onCancelEditSpeaker: () => void;
   onEditingNameChange: (val: string) => void;
   onSegmentPlay: (startMs: number) => void;
+  onClipSoundbite?: (segment: TranscriptSegment) => void;
   onOpenRetranscribe?: () => void;
 }
 
@@ -56,6 +58,7 @@ export const LiveFeedView: React.FC<LiveFeedViewProps> = ({
   onCancelEditSpeaker,
   onEditingNameChange,
   onSegmentPlay,
+  onClipSoundbite,
   onOpenRetranscribe,
 }) => {
   const { t } = useI18n();
@@ -231,7 +234,7 @@ export const LiveFeedView: React.FC<LiveFeedViewProps> = ({
                   )}
                 </div>
 
-                {/* Timestamp & Play Segment Button */}
+                {/* Timestamp & Play Segment & Clip Soundbite Buttons */}
                 <div className="flex items-center gap-2">
                   {selectedPastMeeting?.audio_file_path && (
                     <button
@@ -240,6 +243,15 @@ export const LiveFeedView: React.FC<LiveFeedViewProps> = ({
                       title={t("transcript.playSentence") || "Bu Cümleyi Dinle"}
                     >
                       <Play className="w-3.5 h-3.5 fill-slate-400 hover:fill-cyan-300" />
+                    </button>
+                  )}
+                  {selectedPastMeeting?.audio_file_path && onClipSoundbite && (
+                    <button
+                      onClick={() => onClipSoundbite(seg)}
+                      className="p-1 rounded-md text-slate-400 hover:text-amber-300 hover:bg-slate-800 transition"
+                      title={t("transcript.clipSoundbite") || "✂️ Ses Parçası Kırp (Soundbite)"}
+                    >
+                      <Scissors className="w-3.5 h-3.5" />
                     </button>
                   )}
                   <span className="text-xs 2xl:text-sm font-mono text-slate-400">
