@@ -7,6 +7,7 @@ import {
   Check,
   Play,
   Zap,
+  Sparkles,
 } from "lucide-react";
 import { TranscriptSegment } from "../TranscriptViewer";
 import { MeetingRecord } from "../../App";
@@ -22,6 +23,10 @@ interface LiveFeedViewProps {
   editingSpeakerId: string | null;
   editingNameValue: string;
   selectedPastMeeting?: MeetingRecord | null;
+  isFillerFilterActive?: boolean;
+  fillersRemovedCount?: number;
+  cleanedSegmentsMap?: Record<number, string>;
+  onToggleFillerFilter?: () => void;
   onRedactTranscript: () => void;
   onStartEditSpeaker: (speakerId: string, currentName: string) => void;
   onSaveSpeakerName: (speakerId: string) => void;
@@ -41,6 +46,10 @@ export const LiveFeedView: React.FC<LiveFeedViewProps> = ({
   editingSpeakerId,
   editingNameValue,
   selectedPastMeeting,
+  isFillerFilterActive = false,
+  fillersRemovedCount = 0,
+  cleanedSegmentsMap = {},
+  onToggleFillerFilter,
   onRedactTranscript,
   onStartEditSpeaker,
   onSaveSpeakerName,
@@ -53,28 +62,69 @@ export const LiveFeedView: React.FC<LiveFeedViewProps> = ({
 
   return (
     <div className="max-w-5xl mx-auto w-full space-y-4">
-      {selectedPastMeeting && segments.length > 0 && (
-        <div className="flex items-center justify-between pb-3 mb-2 border-b border-white/5">
-          <span className="text-xs 2xl:text-sm text-slate-400">
-            {t("transcript.speakerInfo") ||
-              "Konuşmacı ayrımı ve zaman damgalı diyalog akışı"}
-          </span>
-          <button
-            onClick={onRedactTranscript}
-            disabled={isRedacting}
-            className="px-3 py-1.5 rounded-xl bg-cyan-950/60 hover:bg-cyan-900/80 text-cyan-300 border border-cyan-500/30 text-xs 2xl:text-sm font-medium transition flex items-center gap-1.5 disabled:opacity-50"
-            title="Ses tanıma (ASR) ve fonetik kelime hatalarını yapay zeka ile otomatik düzelt"
-          >
-            <Wand2
-              className={`w-3.5 h-3.5 ${isRedacting ? "animate-spin" : ""}`}
-            />
-            <span>
-              {isRedacting
-                ? t("transcript.redacting") || "Redakte Ediliyor..."
-                : t("transcript.smartRedaction") ||
-                  "✍️ Akıllı Redaksiyon & Düzeltme"}
+      {segments.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-3 mb-2 border-b border-white/5">
+          <div className="flex items-center gap-2">
+            <span className="text-xs 2xl:text-sm text-slate-400">
+              {t("transcript.speakerInfo") ||
+                "Konuşmacı ayrımı ve zaman damgalı diyalog akışı"}
             </span>
-          </button>
+            {isFillerFilterActive && fillersRemovedCount > 0 && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-cyan-500/20 border border-cyan-500/30 text-cyan-300 text-[10px] 2xl:text-xs font-semibold animate-in fade-in duration-200">
+                <Sparkles className="w-3 h-3 text-amber-400" />
+                <span>
+                  {t("transcript.fillerFilter.activeBadge", { count: fillersRemovedCount }) ||
+                    `${fillersRemovedCount} dolgu kelime temizlendi`}
+                </span>
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            {/* Filler Words Filter Toggle */}
+            {onToggleFillerFilter && (
+              <button
+                onClick={onToggleFillerFilter}
+                className={`px-3 py-1.5 rounded-xl border text-xs 2xl:text-sm font-medium transition flex items-center gap-1.5 cursor-pointer ${
+                  isFillerFilterActive
+                    ? "bg-gradient-to-r from-cyan-600 to-blue-600 text-white border-cyan-400/50 shadow-md shadow-cyan-900/40"
+                    : "bg-slate-900/80 hover:bg-slate-800 text-slate-300 border-slate-700"
+                }`}
+                title={
+                  isFillerFilterActive
+                    ? t("transcript.fillerFilter.tooltipOriginal") || "Ham transkripte dön"
+                    : t("transcript.fillerFilter.tooltipClean") || "Dolgu kelimeleri ve takılmaları temizle"
+                }
+              >
+                <Sparkles
+                  className={`w-3.5 h-3.5 ${
+                    isFillerFilterActive ? "text-amber-300 fill-amber-300" : "text-slate-400"
+                  }`}
+                />
+                <span>{t("transcript.fillerFilter.toggle") || "Konuşmayı Netleştir"}</span>
+              </button>
+            )}
+
+            {/* Smart Redaction Button (Only for past meetings) */}
+            {selectedPastMeeting && (
+              <button
+                onClick={onRedactTranscript}
+                disabled={isRedacting}
+                className="px-3 py-1.5 rounded-xl bg-cyan-950/60 hover:bg-cyan-900/80 text-cyan-300 border border-cyan-500/30 text-xs 2xl:text-sm font-medium transition flex items-center gap-1.5 disabled:opacity-50"
+                title="Ses tanıma (ASR) ve fonetik kelime hatalarını yapay zeka ile otomatik düzelt"
+              >
+                <Wand2
+                  className={`w-3.5 h-3.5 ${isRedacting ? "animate-spin" : ""}`}
+                />
+                <span>
+                  {isRedacting
+                    ? t("transcript.redacting") || "Redakte Ediliyor..."
+                    : t("transcript.smartRedaction") ||
+                      "✍️ Akıllı Redaksiyon & Düzeltme"}
+                </span>
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -112,6 +162,10 @@ export const LiveFeedView: React.FC<LiveFeedViewProps> = ({
             seg.speaker_name.toLowerCase().includes("user") ||
             seg.speaker_name.toLowerCase().includes("mikrofon");
           const isHighlighted = highlightedSegmentId === seg.id;
+          const displaySpeechText =
+            isFillerFilterActive && cleanedSegmentsMap[seg.id]
+              ? cleanedSegmentsMap[seg.id]
+              : seg.text;
 
           return (
             <div
@@ -199,7 +253,7 @@ export const LiveFeedView: React.FC<LiveFeedViewProps> = ({
 
               {/* Speech Text */}
               <p className="text-sm 2xl:text-base text-slate-100 leading-relaxed pl-1 pt-1 font-normal">
-                {seg.text}
+                {displaySpeechText}
               </p>
             </div>
           );

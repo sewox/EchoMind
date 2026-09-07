@@ -60,9 +60,16 @@ export const es: TranslationKeys = {
     searchPlaceholder: "Buscar en el diálogo...",
     retranscribe: "Retranscribir",
     retranscribeTooltip:
-      "Elija otro modo de precisión para retranscribir desde cero",
-    shareReport: "Compartir Informe",
-    shareReportTooltip: "Compartir o exportar notas y el informe ejecutivo",
+      "Vuelve a procesar el audio con un modelo de IA diferente",
+    shareReport: "Compartir / Exportar",
+    shareReportTooltip: "Exporta las notas a PDF, Slack, E-Mail o Markdown",
+    fillerFilter: {
+      toggle: "Fluidez y Claridad",
+      activeBadge: "{count} muletillas eliminadas",
+      tooltipClean: "Limpia muletillas ('este', 'o sea', 'pues') y tartamudeos",
+      tooltipOriginal: "Volver a la transcripción original",
+    },
+    redactPii: "Ocultar Datos PII",
     liveSpeaking: "Hablando",
     noSegmentsTitle: "No se ha detectado voz",
     noSegmentsDesc:

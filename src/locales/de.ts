@@ -60,9 +60,16 @@ export const de: TranslationKeys = {
     searchPlaceholder: "Im Dialog suchen...",
     retranscribe: "Neu Transkribieren",
     retranscribeTooltip:
-      "Wählen Sie einen anderen Präzisionsmodus für eine neue Transkription",
-    shareReport: "Bericht Teilen",
-    shareReportTooltip: "Meeting-Notizen exportieren und teilen",
+      "Audiodatei mit einem anderen KI-Modell erneut transkribieren",
+    shareReport: "Bericht Teilen / Exportieren",
+    shareReportTooltip: "Meeting-Notizen als PDF, Slack, E-Mail oder Markdown exportieren",
+    fillerFilter: {
+      toggle: "Sprache Glätten",
+      activeBadge: "{count} Füllwörter entfernt",
+      tooltipClean: "Entfernt Füllwörter ('äh', 'ähm', 'halt') und Stottern",
+      tooltipOriginal: "Zurück zum Originaltranskript",
+    },
+    redactPii: "DSGVO / PII Maskieren",
     liveSpeaking: "Spricht",
     noSegmentsTitle: "Noch keine Sprache erkannt",
     noSegmentsDesc:

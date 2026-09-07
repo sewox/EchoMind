@@ -59,9 +59,16 @@ export const en: TranslationKeys = {
     searchPlaceholder: "Search dialogue...",
     retranscribe: "Re-transcribe",
     retranscribeTooltip:
-      "Choose a different precision mode or language to transcribe from scratch",
-    shareReport: "Share Report",
-    shareReportTooltip: "Share or export meeting notes and executive report",
+      "Re-process the meeting audio using a different AI model or provider",
+    shareReport: "Export / Share",
+    shareReportTooltip: "Export meeting notes to PDF, Slack, Email, or Markdown",
+    fillerFilter: {
+      toggle: "Polish Speech",
+      activeBadge: "{count} fillers removed",
+      tooltipClean: "Clean filler words ('um', 'uh', 'you know') and stuttering",
+      tooltipOriginal: "Switch back to raw transcript",
+    },
+    redactPii: "Mask PII Data",
     liveSpeaking: "Speaking",
     noSegmentsTitle: "No speech detected yet",
     noSegmentsDesc:
