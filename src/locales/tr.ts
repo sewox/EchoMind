@@ -175,9 +175,23 @@ export const tr: TranslationKeys = {
     markdownTitle: "Markdown Raporu (.md)",
     markdownDesc:
       "Notion, Obsidian, GitHub ve dokümantasyon araçlarıyla %100 uyumlu zengin metin formatı.",
+    slackTitle: "Slack & Teams Uyumlu Özet",
+    slackDesc:
+      "Kanallarda doğrudan paylaşabileceğiniz emojili, biçimlendirilmiş ve derli toplu mesaj formatı.",
+    copySlackButton: "Slack Formatında Kopyala",
+    tasksTitle: "Linear, Notion & Jira Görev Listesi",
+    tasksDesc:
+      "Aksiyon maddelerini doğrudan proje yönetim araçlarına aktarmak için CSV veya Markdown checklist formatı.",
+    downloadCsvButton: ".csv Görevleri İndir",
+    copyTasksMdButton: "Görevleri Kopyala (.md)",
+    followupEmailTitle: "1-Tık Takip E-Postası (Follow-up)",
+    followupEmailDesc:
+      "Varsayılan e-posta istemcinizde (Mail, Outlook) anında konu ve gövdesi hazır yeni ileti açar.",
+    openEmailClientButton: "E-Posta İstemcisinde Aç",
+    copyEmailButton: "E-Posta Metnini Kopyala",
     emailDigestTitle: "Yönetici E-Posta Özeti (.txt)",
     emailDigestDesc:
-      "Ekibinize veya yöneticinize tek tıkla e-posta ile gönderebileceğiniz temiz bülten formatı.",
+      "Ekibinize veya yöneticinize gönderebileceğiniz temiz bülten formatı.",
     jsonTitle: "Geliştirici & Veri Formatı (.json)",
     jsonDesc:
       "Tüm konuşmacı süreleri, ses segmentleri ve detaylı özet şemasını içeren tam JSON verisi.",

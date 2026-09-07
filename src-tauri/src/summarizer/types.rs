@@ -30,6 +30,13 @@ pub struct CrossMeetingSearchResult {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FollowupEmailResult {
+    pub subject: String,
+    pub body: String,
+    pub mailto_url: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SmartAdvisorRecommendation {
     pub recommended_engine: String,
     pub estimated_seconds: u64,

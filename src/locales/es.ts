@@ -178,6 +178,20 @@ export const es: TranslationKeys = {
     markdownTitle: "Informe Markdown (.md)",
     markdownDesc:
       "100% compatible con Notion, Obsidian, GitHub y herramientas de documentación.",
+    slackTitle: "Formato Slack & Teams",
+    slackDesc:
+      "Fragmento estructurado y con emojis, listo para compartir en canales de comunicación.",
+    copySlackButton: "Copiar para Slack",
+    tasksTitle: "Acciones para Linear, Notion y Jira",
+    tasksDesc:
+      "Exporta tareas a CSV o copia casillas de verificación en Markdown directamente.",
+    downloadCsvButton: "Descargar Tareas (.csv)",
+    copyTasksMdButton: "Copiar Tareas (.md)",
+    followupEmailTitle: "E-Mail de Seguimiento en 1 Clic",
+    followupEmailDesc:
+      "Abre al instante tu cliente de correo con asunto y puntos clave listos.",
+    openEmailClientButton: "Abrir en Cliente de Correo",
+    copyEmailButton: "Copiar Correo",
     emailDigestTitle: "Boletín por E-Mail (.txt)",
     emailDigestDesc:
       "Formato limpio listo para enviar a su equipo por correo electrónico.",

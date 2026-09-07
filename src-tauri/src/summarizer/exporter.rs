@@ -563,4 +563,235 @@ body {
         text.push_str(&format!("{}\n", labels.footer_text));
         text
     }
+
+    pub fn export_notes_slack_markdown(
+        record: &MeetingRecord,
+        custom_summary: Option<&SummaryResult>,
+        lang_code: Option<&str>,
+    ) -> String {
+        let labels = ReportLabels::for_lang(lang_code);
+        let goal_opt = custom_summary.map(|s| &s.meeting_goal).or(record.meeting_goal.as_ref());
+        let highlights_opt = custom_summary.map(|s| &s.key_highlights).or(record.key_highlights.as_ref());
+        let actions_opt = custom_summary.map(|s| &s.action_items).or(record.action_items.as_ref());
+        let phase1_opt = custom_summary.map(|s| &s.phase1_agreed).or(record.phase1_agreed.as_ref());
+        let phase2_opt = custom_summary.map(|s| &s.phase2_deferred).or(record.phase2_deferred.as_ref());
+        let parts_opt = custom_summary.map(|s| &s.participants).or(record.participants.as_ref());
+
+        let mut slack = String::new();
+        slack.push_str(&format!("*📋 {} — {}*\n", labels.report_title_prefix, record.title));
+        slack.push_str(&format!("_{}: {} • {}: {}_\n", labels.date_label, record.date_formatted, labels.duration_label, record.duration_formatted));
+
+        if let Some(parts) = parts_opt {
+            if !parts.is_empty() {
+                slack.push_str(&format!("*{}:* _{}_\n", labels.participants_title, parts.join(", ")));
+            }
+        }
+        slack.push_str("\n");
+
+        if let Some(goal) = goal_opt {
+            slack.push_str(&format!("*{}*\n> {}\n\n", labels.meeting_goal_title, goal));
+        }
+
+        if let Some(highlights) = highlights_opt {
+            if !highlights.is_empty() {
+                slack.push_str(&format!("*{}*\n", labels.highlights_title));
+                for h in highlights {
+                    slack.push_str(&format!("• {}\n", h));
+                }
+                slack.push_str("\n");
+            }
+        }
+
+        if let Some(actions) = actions_opt {
+            if !actions.is_empty() {
+                slack.push_str(&format!("*{}*\n", labels.action_items_title));
+                for a in actions {
+                    let box_emoji = if a.is_completed { "☑️" } else { "◻️" };
+                    let assignee = a.assignee.as_deref().map(|p| format!(" _(@{})_", p)).unwrap_or_default();
+                    slack.push_str(&format!("{} *{}*{}\n", box_emoji, a.task, assignee));
+                }
+                slack.push_str("\n");
+            }
+        }
+
+        if let Some(phase1) = phase1_opt {
+            if !phase1.is_empty() {
+                slack.push_str(&format!("*{}*\n", labels.phase1_title));
+                for p in phase1 {
+                    slack.push_str(&format!("• {}\n", p));
+                }
+                slack.push_str("\n");
+            }
+        }
+
+        if let Some(phase2) = phase2_opt {
+            if !phase2.is_empty() {
+                slack.push_str(&format!("*{}*\n", labels.phase2_title));
+                for p in phase2 {
+                    slack.push_str(&format!("• {}\n", p));
+                }
+                slack.push_str("\n");
+            }
+        }
+
+        slack.push_str("───────────────────────────────────\n");
+        slack.push_str(&format!("_{}_\n", labels.footer_text));
+        slack
+    }
+
+    pub fn export_action_items_csv(
+        record: &MeetingRecord,
+        custom_summary: Option<&SummaryResult>,
+    ) -> String {
+        let actions_opt = custom_summary.map(|s| &s.action_items).or(record.action_items.as_ref());
+        let mut csv = String::new();
+        csv.push_str("\"ID\",\"Task\",\"Assignee\",\"Status\",\"Meeting Title\",\"Date\"\n");
+
+        if let Some(actions) = actions_opt {
+            for (idx, a) in actions.iter().enumerate() {
+                let status = if a.is_completed { "Done" } else { "To Do" };
+                let assignee = a.assignee.as_deref().unwrap_or("Unassigned");
+                let clean_task = a.task.replace('"', "\"\"");
+                let clean_title = record.title.replace('"', "\"\"");
+                csv.push_str(&format!(
+                    "\"{}\",\"{}\",\"{}\",\"{}\",\"{}\",\"{}\"\n",
+                    idx + 1,
+                    clean_task,
+                    assignee,
+                    status,
+                    clean_title,
+                    record.date_formatted
+                ));
+            }
+        }
+        csv
+    }
+
+    pub fn export_action_items_markdown(
+        record: &MeetingRecord,
+        custom_summary: Option<&SummaryResult>,
+    ) -> String {
+        let actions_opt = custom_summary.map(|s| &s.action_items).or(record.action_items.as_ref());
+        let mut md = String::new();
+        md.push_str(&format!("# ✅ Aksiyon Maddeleri: {} ({})\n\n", record.title, record.date_formatted));
+
+        if let Some(actions) = actions_opt {
+            for a in actions {
+                let check = if a.is_completed { "[x]" } else { "[ ]" };
+                let assignee = a.assignee.as_deref().map(|p| format!(" (@{})", p)).unwrap_or_default();
+                md.push_str(&format!("- {} **{}**{}\n", check, a.task, assignee));
+            }
+        }
+        md
+    }
+
+    pub fn export_followup_email(
+        record: &MeetingRecord,
+        custom_summary: Option<&SummaryResult>,
+        lang_code: Option<&str>,
+    ) -> (String, String) {
+        let labels = ReportLabels::for_lang(lang_code);
+        let goal_opt = custom_summary.map(|s| &s.meeting_goal).or(record.meeting_goal.as_ref());
+        let highlights_opt = custom_summary.map(|s| &s.key_highlights).or(record.key_highlights.as_ref());
+        let actions_opt = custom_summary.map(|s| &s.action_items).or(record.action_items.as_ref());
+        let phase1_opt = custom_summary.map(|s| &s.phase1_agreed).or(record.phase1_agreed.as_ref());
+
+        let code = lang_code.unwrap_or("tr").to_lowercase();
+        let prefix = if code.len() >= 2 { &code[..2] } else { "tr" };
+
+        let (subject_prefix, greeting, intro_template, pending_label, done_label, closing, signoff) = match prefix {
+            "en" => (
+                "Follow-up & Meeting Notes",
+                "Hi Team,",
+                format!("Thank you for attending our meeting on \"{}\" ({}). Here is the consolidated summary and actionable items:", record.title, record.date_formatted),
+                "[PENDING]",
+                "[DONE]",
+                "Please let me know if you have any questions or additional points to cover.",
+                "Best regards,"
+            ),
+            "de" => (
+                "Follow-up & Meeting-Notizen",
+                "Hallo Team,",
+                format!("Vielen Dank für Ihre Teilnahme am Meeting \"{}\" ({}). Hier ist die Zusammenfassung der wichtigsten Punkte und Aufgaben:", record.title, record.date_formatted),
+                "[OFFEN]",
+                "[ERLEDIGT]",
+                "Bei Fragen oder Ergänzungen stehen wir Ihnen gerne zur Verfügung.",
+                "Mit freundlichen Grüßen,"
+            ),
+            "fr" => (
+                "Suivi & Notes de Réunion",
+                "Bonjour l'équipe,",
+                format!("Merci pour votre participation à la réunion \"{}\" ({}). Voici le compte-rendu consolidé et les actions retenues :", record.title, record.date_formatted),
+                "[À FAIRE]",
+                "[TERMINÉ]",
+                "N'hésitez pas à revenir vers moi pour toute question ou remarque.",
+                "Cordialement,"
+            ),
+            "es" => (
+                "Seguimiento y Notas de Reunión",
+                "Hola a todos,",
+                format!("Gracias por asistir a la reunión \"{}\" ({}). A continuación les comparto el resumen y las tareas asignadas:", record.title, record.date_formatted),
+                "[PENDIENTE]",
+                "[COMPLETADO]",
+                "Quedo a su disposición para cualquier duda o comentario.",
+                "Saludos cordiales,"
+            ),
+            _ => (
+                "Takip & Toplantı Notları",
+                "Merhaba Ekip,",
+                format!("{} tarihinde gerçekleştirdiğimiz \"{}\" konulu toplantımızın özet notları ve belirlenen aksiyon maddeleri aşağıda bilginize sunulmuştur:", record.date_formatted, record.title),
+                "[YAPILACAK]",
+                "[TAMAMLANDI]",
+                "Sorularınız veya eklemek istedikleriniz olursa lütfen iletiniz.",
+                "İyi çalışmalar dilerim."
+            ),
+        };
+
+        let subject = format!("{}: {} ({})", subject_prefix, record.title, record.date_formatted);
+        
+        let mut body = String::new();
+        body.push_str(&format!("{}\n\n", greeting));
+        body.push_str(&format!("{}\n\n", intro_template));
+
+        if let Some(goal) = goal_opt {
+            body.push_str(&format!("📌 {}:\n{}\n\n", labels.meeting_goal_title, goal));
+        }
+
+        if let Some(highlights) = highlights_opt {
+            if !highlights.is_empty() {
+                body.push_str(&format!("💡 {}:\n", labels.highlights_title));
+                for h in highlights {
+                    body.push_str(&format!("• {}\n", h));
+                }
+                body.push_str("\n");
+            }
+        }
+
+        if let Some(actions) = actions_opt {
+            if !actions.is_empty() {
+                body.push_str(&format!("🎯 {}:\n", labels.action_items_title));
+                for a in actions {
+                    let status = if a.is_completed { done_label } else { pending_label };
+                    let assignee = a.assignee.as_deref().map(|p| format!(" - {}: @{}", labels.assignee_label, p)).unwrap_or_default();
+                    body.push_str(&format!("• {} {}{}\n", status, a.task, assignee));
+                }
+                body.push_str("\n");
+            }
+        }
+
+        if let Some(phase1) = phase1_opt {
+            if !phase1.is_empty() {
+                body.push_str(&format!("⚡ {}:\n", labels.phase1_title));
+                for p in phase1 {
+                    body.push_str(&format!("• {}\n", p));
+                }
+                body.push_str("\n");
+            }
+        }
+
+        body.push_str(&format!("{}\n{}\n\n", closing, signoff));
+        body.push_str(&format!("---\n{}\n", labels.footer_text));
+
+        (subject, body)
+    }
 }

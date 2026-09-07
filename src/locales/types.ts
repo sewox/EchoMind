@@ -160,6 +160,17 @@ export interface TranslationKeys {
     downloadHtmlButton: string;
     markdownTitle: string;
     markdownDesc: string;
+    slackTitle: string;
+    slackDesc: string;
+    copySlackButton: string;
+    tasksTitle: string;
+    tasksDesc: string;
+    downloadCsvButton: string;
+    copyTasksMdButton: string;
+    followupEmailTitle: string;
+    followupEmailDesc: string;
+    openEmailClientButton: string;
+    copyEmailButton: string;
     emailDigestTitle: string;
     emailDigestDesc: string;
     jsonTitle: string;

@@ -174,6 +174,20 @@ export const en: TranslationKeys = {
     markdownTitle: "Markdown Report (.md)",
     markdownDesc:
       "100% compatible with Notion, Obsidian, GitHub, and documentation tools.",
+    slackTitle: "Slack & Teams Formatted Digest",
+    slackDesc:
+      "Clean, emoji-rich, markdown-formatted snippet ready to paste straight into communication channels.",
+    copySlackButton: "Copy for Slack",
+    tasksTitle: "Linear, Notion & Jira Action Items",
+    tasksDesc:
+      "Export structured tasks to CSV or copy as Markdown checkboxes directly into task trackers.",
+    downloadCsvButton: "Download .csv Tasks",
+    copyTasksMdButton: "Copy Tasks (.md)",
+    followupEmailTitle: "1-Click Follow-up Email",
+    followupEmailDesc:
+      "Instantly launches your default mail client (Mail, Outlook) with subject & action summary prefilled.",
+    openEmailClientButton: "Open in Mail Client",
+    copyEmailButton: "Copy Email Body",
     emailDigestTitle: "Executive Email Digest (.txt)",
     emailDigestDesc:
       "Clean bulletin format ready to send to your team or manager via email.",

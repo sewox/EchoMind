@@ -30,6 +30,7 @@ const mockSummary = {
 describe("ExportModal Component", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubGlobal("open", vi.fn());
   });
 
   const defaultProps = {
@@ -41,7 +42,7 @@ describe("ExportModal Component", () => {
     langCode: "tr",
   };
 
-  it("handles html report printing, file saving, and copy operations", async () => {
+  it("handles 1-click follow-up email, Slack export, and Linear/Notion tasks", async () => {
     (invoke as any).mockImplementation((cmd: string, args: any) => {
       if (cmd === "open_meeting_html_report")
         return Promise.resolve("/tmp/report.html");
@@ -49,6 +50,16 @@ describe("ExportModal Component", () => {
         return Promise.resolve(`/tmp/saved.${args.exportType}`);
       if (cmd === "export_meeting_notes")
         return Promise.resolve("# Notes Markdown");
+      if (cmd === "export_meeting_notes_slack")
+        return Promise.resolve("*Slack Markdown*");
+      if (cmd === "export_meeting_action_items_markdown")
+        return Promise.resolve("- [ ] Task 1");
+      if (cmd === "export_meeting_followup_email")
+        return Promise.resolve({
+          subject: "Takip & Notlar",
+          body: "Toplantı özeti",
+          mailto_url: "mailto:?subject=Takip&body=Ozet",
+        });
       if (cmd === "export_meeting_email_digest")
         return Promise.resolve("Subject: Email Digest");
       return Promise.resolve();
@@ -60,7 +71,20 @@ describe("ExportModal Component", () => {
       </I18nProvider>,
     );
 
-    // 1. Open / Print HTML report
+    // 1. Follow-up Email Client Open
+    const openEmailBtn = screen.getByRole("button", {
+      name: /E-Posta İstemcisinde Aç/i,
+    });
+    await act(async () => {
+      fireEvent.click(openEmailBtn);
+    });
+    expect(invoke).toHaveBeenCalledWith(
+      "export_meeting_followup_email",
+      expect.any(Object),
+    );
+    expect(screen.getByText(/E-posta istemcisi açıldı/i)).toBeInTheDocument();
+
+    // 2. Open / Print HTML report
     const printBtn = screen.getByRole("button", {
       name: /Raporu Aç \/ Yazdır/i,
     });
@@ -75,8 +99,8 @@ describe("ExportModal Component", () => {
       screen.getByText(/Görsel rapor varsayılan tarayıcınızda açıldı/i),
     ).toBeInTheDocument();
 
-    // 2. Download each format (.html, .md, .txt, .json)
-    const downloadBtns = screen.getAllByRole("button", { name: /İndir/i });
+    // 3. Download buttons (html, md, tasks_csv, slack, txt, json)
+    const downloadBtns = screen.getAllByRole("button", { name: /İndir|\.txt|\.json/i });
     for (const btn of downloadBtns) {
       await act(async () => {
         fireEvent.click(btn);
@@ -84,24 +108,50 @@ describe("ExportModal Component", () => {
     }
     expect(invoke).toHaveBeenCalledWith(
       "save_meeting_export_file",
+      expect.objectContaining({ exportType: "tasks_csv" }),
+    );
+    expect(invoke).toHaveBeenCalledWith(
+      "save_meeting_export_file",
       expect.objectContaining({ exportType: "html" }),
     );
+
+    // 4. Copy buttons (Slack, Tasks md, Followup email, Markdown, Transcript)
+    const copySlackBtn = screen.getByRole("button", {
+      name: /Slack Formatında Kopyala/i,
+    });
+    await act(async () => {
+      fireEvent.click(copySlackBtn);
+    });
     expect(invoke).toHaveBeenCalledWith(
-      "save_meeting_export_file",
-      expect.objectContaining({ exportType: "md" }),
-    );
-    expect(invoke).toHaveBeenCalledWith(
-      "save_meeting_export_file",
-      expect.objectContaining({ exportType: "txt" }),
-    );
-    expect(invoke).toHaveBeenCalledWith(
-      "save_meeting_export_file",
-      expect.objectContaining({ exportType: "json" }),
+      "export_meeting_notes_slack",
+      expect.any(Object),
     );
 
-    // 3. Copy operations
-    const copyBtns = screen.getAllByRole("button", { name: /Kopyala/i });
-    for (const btn of copyBtns) {
+    const copyTasksBtn = screen.getByRole("button", {
+      name: /Görevleri Kopyala/i,
+    });
+    await act(async () => {
+      fireEvent.click(copyTasksBtn);
+    });
+    expect(invoke).toHaveBeenCalledWith(
+      "export_meeting_action_items_markdown",
+      expect.any(Object),
+    );
+
+    const copyEmailBtn = screen.getByRole("button", {
+      name: /E-Posta Metnini Kopyala/i,
+    });
+    await act(async () => {
+      fireEvent.click(copyEmailBtn);
+    });
+    expect(invoke).toHaveBeenCalledWith(
+      "export_meeting_followup_email",
+      expect.any(Object),
+    );
+
+    // Copy all other buttons (Markdown and Transcript)
+    const allCopyBtns = screen.getAllByRole("button", { name: /Kopyala/i });
+    for (const btn of allCopyBtns) {
       await act(async () => {
         fireEvent.click(btn);
       });
@@ -110,13 +160,47 @@ describe("ExportModal Component", () => {
       "export_meeting_notes",
       expect.any(Object),
     );
-    expect(invoke).toHaveBeenCalledWith(
-      "export_meeting_email_digest",
-      expect.any(Object),
-    );
   });
 
-  it("handles error states during print, save, and copy", async () => {
+  it("handles empty mailto_url and empty props gracefully", async () => {
+    (invoke as any).mockImplementation((cmd: string) => {
+      if (cmd === "export_meeting_followup_email") {
+        return Promise.resolve({
+          subject: "Konu",
+          body: "Gövde",
+          mailto_url: "",
+        });
+      }
+      return Promise.resolve("");
+    });
+
+    render(
+      <I18nProvider>
+        <ExportModal
+          isOpen={true}
+          onClose={vi.fn()}
+          meetingId="mtg-002"
+          meetingTitle=""
+          activeSummary={null}
+          langCode={undefined}
+        />
+      </I18nProvider>,
+    );
+
+    const openEmailBtn = screen.getByRole("button", {
+      name: /E-Posta İstemcisinde Aç/i,
+    });
+    await act(async () => {
+      fireEvent.click(openEmailBtn);
+    });
+    expect(invoke).toHaveBeenCalledWith("export_meeting_followup_email", {
+      meetingId: "mtg-002",
+      customSummary: null,
+      langCode: null,
+    });
+  });
+
+  it("handles error states during email open, print, save, and copy", async () => {
     (invoke as any).mockRejectedValue(new Error("Export failed"));
 
     render(
@@ -124,6 +208,15 @@ describe("ExportModal Component", () => {
         <ExportModal {...defaultProps} />
       </I18nProvider>,
     );
+
+    // Email open error
+    const openEmailBtn = screen.getByRole("button", {
+      name: /E-Posta İstemcisinde Aç/i,
+    });
+    await act(async () => {
+      fireEvent.click(openEmailBtn);
+    });
+    expect(screen.getByText(/E-posta istemcisi açılamadı/i)).toBeInTheDocument();
 
     // Print error
     const printBtn = screen.getByRole("button", {
