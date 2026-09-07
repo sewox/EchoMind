@@ -2629,5 +2629,69 @@ describe("TranscriptViewer Component", () => {
 
     unmount();
   });
+
+  it("handles clipping a soundbite from a transcript segment", async () => {
+    (invoke as any).mockImplementation((cmd: string) => {
+      if (cmd === "clip_meeting_soundbite") {
+        return Promise.resolve({
+          file_path: "/path/to/soundbite_mtg-001_seg_1.wav",
+          filename: "soundbite_mtg-001_seg_1.wav",
+          duration_seconds: 5.0,
+          start_ms: 0,
+          end_ms: 5000,
+        });
+      }
+      return Promise.resolve();
+    });
+
+    const { unmount } = render(
+      <I18nProvider>
+        <TranscriptViewer {...defaultProps} />
+      </I18nProvider>,
+    );
+
+    const clipBtns = screen.getAllByTitle(/Ses Parçası Kırp/i);
+    expect(clipBtns.length).toBeGreaterThanOrEqual(1);
+
+    await act(async () => {
+      fireEvent.click(clipBtns[0]);
+    });
+
+    expect(invoke).toHaveBeenCalledWith("clip_meeting_soundbite", {
+      meetingId: "mtg-001",
+      segmentId: 1,
+      startMs: 0,
+      endMs: 5000,
+    });
+
+    expect(screen.getByText(/soundbite_mtg-001_seg_1.wav/i)).toBeInTheDocument();
+
+    unmount();
+  });
+
+  it("handles soundbite clipping error gracefully", async () => {
+    (invoke as any).mockImplementation((cmd: string) => {
+      if (cmd === "clip_meeting_soundbite") {
+        return Promise.reject(new Error("Clip failed"));
+      }
+      return Promise.resolve();
+    });
+
+    const { unmount } = render(
+      <I18nProvider>
+        <TranscriptViewer {...defaultProps} />
+      </I18nProvider>,
+    );
+
+    const clipBtns = screen.getAllByTitle(/Ses Parçası Kırp/i);
+    await act(async () => {
+      fireEvent.click(clipBtns[0]);
+    });
+
+    // Soundbite toast should not appear on error
+    expect(screen.queryByText(/Soundbite Hazır/i)).not.toBeInTheDocument();
+
+    unmount();
+  });
 });
 

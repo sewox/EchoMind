@@ -100,8 +100,18 @@ export const fr: TranslationKeys = {
     renameSpeaker: "Modifier le nom du locuteur",
     speakerInfo: "Séparation des locuteurs et flux de dialogue horodaté",
     playSentence: "Écouter cette phrase",
+    clipSoundbite: "✂️ Extraire un Soundbite",
+    soundbiteCreated: "Extrait audio créé et enregistré avec succès !",
   },
   summary: {
+    audioMemo: {
+      button: "🎙️ Écouter le Mémo Audio (Podcast IA)",
+      playing: "Lecture du mémo audio...",
+      paused: "En pause",
+      speed: "Vitesse",
+      stop: "Arrêter",
+      play: "Écouter",
+    },
     rebuildReport: "✨ Recréer le Rapport",
     rebuilding: "Génération du rapport...",
     rebuildTooltip: "Générer un nouveau résumé IA à partir des dialogues",

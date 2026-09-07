@@ -104,8 +104,18 @@ export const es: TranslationKeys = {
     speakerInfo:
       "Separación de oradores y flujo de diálogo con marca de tiempo",
     playSentence: "Escuchar esta frase",
+    clipSoundbite: "✂️ Cortar Soundbite",
+    soundbiteCreated: "¡Fragmento de audio creado y guardado con éxito!",
   },
   summary: {
+    audioMemo: {
+      button: "🎙️ Escuchar Memorando de Audio (Podcast IA)",
+      playing: "Reproduciendo audio memo...",
+      paused: "En pausa",
+      speed: "Velocidad",
+      stop: "Detener",
+      play: "Escuchar",
+    },
     rebuildReport: "✨ Recrear Informe",
     rebuilding: "Generando informe...",
     rebuildTooltip:

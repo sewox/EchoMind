@@ -21,6 +21,7 @@ import { MeetingRecord } from "../../App";
 import { useI18n } from "../../locales/i18nContext";
 import { MeetingTemplate } from "../../types/templates";
 import { TemplateSelector } from "./TemplateSelector";
+import { AudioMemoPlayer } from "./AudioMemoPlayer";
 
 interface SummaryCardsViewProps {
   richSummary: SummaryResult | null;
@@ -132,6 +133,15 @@ export const SummaryCardsView: React.FC<SummaryCardsViewProps> = ({
           )}
         </div>
       </div>
+
+      {/* 🎙️ AI Sesli Bülten (Audio Memo Podcast) */}
+      {richSummary && (
+        <AudioMemoPlayer
+          summary={richSummary}
+          meetingTitle={selectedPastMeeting?.title}
+          langCode={summaryLang}
+        />
+      )}
 
       {/* 1. 🎯 Toplantı Amacı (Purpose / Goal) */}
       {richSummary?.meeting_goal && (

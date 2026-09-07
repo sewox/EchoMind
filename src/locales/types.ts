@@ -96,8 +96,18 @@ export interface TranslationKeys {
     renameSpeaker: string;
     speakerInfo?: string;
     playSentence?: string;
+    clipSoundbite?: string;
+    soundbiteCreated?: string;
   };
   summary: {
+    audioMemo?: {
+      button: string;
+      playing: string;
+      paused: string;
+      speed: string;
+      stop: string;
+      play: string;
+    };
     rebuildReport: string;
     rebuilding: string;
     rebuildTooltip: string;
