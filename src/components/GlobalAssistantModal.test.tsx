@@ -143,8 +143,16 @@ describe("GlobalAssistantModal Component", () => {
 
   it("allows switching to global search tab, filtering by categories, and jumping to search results", async () => {
     (invoke as any).mockImplementation((cmd: string) => {
-      if (cmd === "global_search_meetings") {
+      if (cmd === "search_cross_meeting_memory" || cmd === "global_search_meetings") {
         return Promise.resolve(mockSearchResults);
+      }
+      if (cmd === "get_cross_meeting_memory_stats") {
+        return Promise.resolve({
+          total_meetings: 1,
+          total_segments: 5,
+          total_words: 150,
+          unique_speakers: ["Ahmet"],
+        });
       }
       return Promise.resolve();
     });
@@ -321,6 +329,16 @@ describe("GlobalAssistantModal Component", () => {
 
   it("handles meeting search selection and close button click", async () => {
     (invoke as any).mockImplementation((cmd: string) => {
+      if (cmd === "get_cross_meeting_memory_stats") {
+        return Promise.resolve({
+          total_meetings: 3,
+          total_segments: 45,
+          total_words: 1250,
+          unique_speakers: ["Ahmet", "Zeynep"],
+        });
+      }
+      if (cmd === "search_cross_meeting_memory")
+        return Promise.resolve(mockSearchResults);
       if (cmd === "global_search_meetings")
         return Promise.resolve(mockSearchResults);
       return Promise.resolve();
@@ -341,11 +359,30 @@ describe("GlobalAssistantModal Component", () => {
     const searchTab = screen.getByRole("button", { name: /Ara\.\.\./i });
     fireEvent.click(searchTab);
 
+    // Verify memory stats banner rendered
+    expect(await screen.findByText(/3 Toplantı Hafızası/i)).toBeInTheDocument();
+
     const searchInput = screen.getByPlaceholderText(/Tüm toplantı başlıkları/i);
     await act(async () => {
       fireEvent.change(searchInput, { target: { value: "Depo" } });
       await new Promise((r) => setTimeout(r, 50));
     });
+
+    // Change speaker dropdown filter
+    const speakerSelect = screen.queryByRole("combobox");
+    if (speakerSelect) {
+      await act(async () => {
+        fireEvent.change(speakerSelect, { target: { value: "Ahmet" } });
+      });
+      expect(invoke).toHaveBeenCalledWith(
+        "search_cross_meeting_memory",
+        expect.objectContaining({
+          options: expect.objectContaining({
+            speaker_filter: "Ahmet",
+          }),
+        }),
+      );
+    }
 
     // Click on search result action button
     const openMeetingBtn = await screen.findByRole("button", {
@@ -355,6 +392,47 @@ describe("GlobalAssistantModal Component", () => {
 
     expect(onSelectMeetingMock).toHaveBeenCalledWith("mtg-001");
     expect(defaultProps.onClose).toHaveBeenCalled();
+  });
+
+  it("handles memory search error fallback and clearing search term", async () => {
+    (invoke as any).mockImplementation((cmd: string) => {
+      if (cmd === "get_cross_meeting_memory_stats") {
+        return Promise.reject("Stats failed");
+      }
+      if (cmd === "search_cross_meeting_memory") {
+        return Promise.reject("Memory search failed");
+      }
+      if (cmd === "global_search_meetings") {
+        return Promise.resolve(mockSearchResults);
+      }
+      return Promise.resolve();
+    });
+
+    render(
+      <I18nProvider>
+        <GlobalAssistantModal {...defaultProps} />
+      </I18nProvider>,
+    );
+
+    // Switch to search tab
+    const searchTab = screen.getByRole("button", { name: /Ara\.\.\./i });
+    fireEvent.click(searchTab);
+
+    const searchInput = screen.getByPlaceholderText(/Tüm toplantı başlıkları/i);
+    await act(async () => {
+      fireEvent.change(searchInput, { target: { value: "Depo" } });
+    });
+
+    expect(await screen.findByText("Q3 Bütçe ve Lojistik")).toBeInTheDocument();
+
+    // Clear search term with X button
+    const clearBtn = searchInput.nextElementSibling;
+    if (clearBtn) {
+      await act(async () => {
+        fireEvent.click(clearBtn);
+      });
+      expect(searchInput).toHaveValue("");
+    }
   });
 
   it("does not render when isOpen is false", () => {

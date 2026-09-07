@@ -21,8 +21,12 @@ import {
   HelpCircle,
   ArrowRight,
   FolderOpen,
+  Users,
+  Database,
+  FileText,
 } from "lucide-react";
 import { useI18n } from "../locales/i18nContext";
+import { MemoryStats } from "../types/memory";
 
 export interface SearchMatch {
   match_type: string;
@@ -101,11 +105,21 @@ export const GlobalAssistantModal: React.FC<GlobalAssistantModalProps> = ({
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
 
-  // Search Tab States
+  // Search & Cross Memory States
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [isSearching, setIsSearching] = useState<boolean>(false);
   const [searchResults, setSearchResults] = useState<GlobalSearchResult[]>([]);
   const [searchFilter, setSearchFilter] = useState<string>("all");
+  const [speakerFilter, setSpeakerFilter] = useState<string>("");
+  const [memoryStats, setMemoryStats] = useState<MemoryStats | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      invoke<MemoryStats>("get_cross_meeting_memory_stats")
+        .then((stats) => setMemoryStats(stats))
+        .catch((err) => console.error("Memory stats error:", err));
+    }
+  }, [isOpen]);
 
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -213,9 +227,12 @@ export const GlobalAssistantModal: React.FC<GlobalAssistantModalProps> = ({
     }
   };
 
-  const handleGlobalSearch = async (term: string) => {
-    setSearchTerm(term);
-    if (!term.trim()) {
+  const handleGlobalSearch = async (term: string, speakerOverride?: string) => {
+    const activeTerm = term;
+    setSearchTerm(activeTerm);
+    const activeSpeaker = speakerOverride !== undefined ? speakerOverride : speakerFilter;
+
+    if (!activeTerm.trim() && !activeSpeaker) {
       setSearchResults([]);
       return;
     }
@@ -223,14 +240,29 @@ export const GlobalAssistantModal: React.FC<GlobalAssistantModalProps> = ({
     setIsSearching(true);
     try {
       const results = await invoke<GlobalSearchResult[]>(
-        "global_search_meetings",
+        "search_cross_meeting_memory",
         {
-          query: term.trim(),
+          options: {
+            query: activeTerm.trim(),
+            speaker_filter: activeSpeaker ? activeSpeaker : null,
+            min_score: 5,
+          },
         },
       );
       setSearchResults(results || []);
     } catch (err) {
-      console.error("Global arama hatası:", err);
+      console.error("Memory arama hatası, fallback yapılıyor:", err);
+      try {
+        const fallbackResults = await invoke<GlobalSearchResult[]>(
+          "global_search_meetings",
+          {
+            query: activeTerm.trim(),
+          },
+        );
+        setSearchResults(fallbackResults || []);
+      } catch (e) {
+        console.error("Global arama hatası:", e);
+      }
     } finally {
       setIsSearching(false);
     }
@@ -453,27 +485,71 @@ export const GlobalAssistantModal: React.FC<GlobalAssistantModalProps> = ({
           </div>
         )}
 
-        {/* Tab 2: Global Deep Search */}
+        {/* Tab 2: Global Deep Search & Cross-Meeting Memory */}
         {activeTab === "search" && (
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden p-6 gap-4">
-            {/* Search Input */}
-            <div className="relative shrink-0">
-              <Search className="w-4 h-4 absolute left-4 top-3.5 text-slate-400" />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => handleGlobalSearch(e.target.value)}
-                placeholder="Tüm toplantı başlıkları, hedefleri, kararları, görevleri ve konuşmalarında ara..."
-                className="w-full pl-11 pr-10 py-3 rounded-2xl bg-slate-950/90 border border-slate-800 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
-                autoFocus
-              />
-              {searchTerm && (
-                <button
-                  onClick={() => handleGlobalSearch("")}
-                  className="absolute right-3.5 top-3.5 text-slate-500 hover:text-slate-300"
-                >
-                  <X className="w-4 h-4" />
-                </button>
+            {/* Memory Knowledge Base Stats Banner */}
+            {memoryStats && (
+              <div className="p-3 rounded-2xl bg-gradient-to-r from-cyan-950/40 via-blue-950/30 to-indigo-950/40 border border-cyan-500/20 flex items-center justify-between flex-wrap gap-2 text-xs">
+                <div className="flex items-center gap-4 text-slate-300">
+                  <span className="flex items-center gap-1.5 font-medium text-cyan-300">
+                    <Database className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>{memoryStats.total_meetings} Toplantı Hafızası</span>
+                  </span>
+                  <span className="flex items-center gap-1.5 text-slate-400">
+                    <Users className="w-3.5 h-3.5 text-indigo-400" />
+                    <span>{memoryStats.unique_speakers.length} Konuşmacı</span>
+                  </span>
+                  <span className="flex items-center gap-1.5 text-slate-400">
+                    <FileText className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>{memoryStats.total_words.toLocaleString()} Kelime</span>
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Search Input & Speaker Filter Bar */}
+            <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 absolute left-4 top-3.5 text-slate-400" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => handleGlobalSearch(e.target.value)}
+                  placeholder="Tüm toplantı başlıkları, hedefleri, kararları, görevleri ve konuşmalarında ara..."
+                  className="w-full pl-11 pr-10 py-3 rounded-2xl bg-slate-950/90 border border-slate-800 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                  autoFocus
+                />
+                {searchTerm && (
+                  <button
+                    onClick={() => handleGlobalSearch("")}
+                    className="absolute right-3.5 top-3.5 text-slate-500 hover:text-slate-300"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+
+              {/* Speaker Select Dropdown */}
+              {memoryStats && memoryStats.unique_speakers.length > 0 && (
+                <div className="relative shrink-0">
+                  <select
+                    value={speakerFilter}
+                    onChange={(e) => {
+                      const newSpeaker = e.target.value;
+                      setSpeakerFilter(newSpeaker);
+                      handleGlobalSearch(searchTerm, newSpeaker);
+                    }}
+                    className="px-3 py-3 rounded-2xl bg-slate-950/90 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
+                  >
+                    <option value="">Tüm Konuşmacılar</option>
+                    {memoryStats.unique_speakers.map((spk) => (
+                      <option key={spk} value={spk}>
+                        🎙️ {spk}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               )}
             </div>
 
@@ -538,9 +614,16 @@ export const GlobalAssistantModal: React.FC<GlobalAssistantModalProps> = ({
                       {/* Meeting Header */}
                       <div className="flex items-center justify-between border-b border-white/10 pb-3">
                         <div>
-                          <h4 className="text-sm md:text-base font-bold text-white flex items-center gap-2">
-                            <span>{res.meeting_title}</span>
-                          </h4>
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-sm md:text-base font-bold text-white">
+                              {res.meeting_title}
+                            </h4>
+                            {res.score > 0 && (
+                              <span className="px-2 py-0.5 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 text-[10px] font-semibold">
+                                {res.score >= 50 ? "%95 Eşleşme" : `%${Math.min(90, res.score * 2)} Alaka`}
+                              </span>
+                            )}
+                          </div>
                           <div className="flex items-center gap-3 text-xs text-slate-400 mt-1">
                             <span className="flex items-center gap-1">
                               <Calendar className="w-3 h-3" />
