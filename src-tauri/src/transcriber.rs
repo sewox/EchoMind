@@ -182,6 +182,7 @@ impl GlobalTranscriberEngine {
             let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 5 });
             params.set_n_threads(n_threads);
             params.set_language(whisper_lang);
+            params.set_initial_prompt(prompt);
             params.set_no_context(true); // Isolate chunks from previous hallucination loops
             params.set_temperature(0.0);
             params.set_temperature_inc(0.0); // Keep greedy zero-temperature
