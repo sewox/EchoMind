@@ -64,6 +64,24 @@ export interface TranslationKeys {
       tooltipClean: string;
       tooltipOriginal: string;
     };
+    analytics: {
+      button: string;
+      modalTitle: string;
+      modalSubtitle: string;
+      balanceScore: string;
+      balanceScoreDesc: string;
+      talkTime: string;
+      silenceTime: string;
+      totalWords: string;
+      pace: string;
+      wpm: string;
+      dominantSpeaker: string;
+      speakerStatsTitle: string;
+      insightsTitle: string;
+      longestMonologue: string;
+      segments: string;
+      close: string;
+    };
     redactPii: string;
     liveSpeaking: string;
     noSegmentsTitle: string;
