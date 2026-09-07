@@ -101,6 +101,17 @@ export const tr: TranslationKeys = {
     emptyActionsDesc:
       "Toplantı konuşmalarında henüz somut bir aksiyon veya görev maddesi tespit edilmedi.",
     responsible: "Sorumlu",
+    templateTitle: "Toplantı Şablonları",
+    customTemplates: "Özel Şablonlarınız",
+    createCustomTemplate: "+ Özel Prompt Şablonu Oluştur",
+    promptStudioTitle: "Özel Prompt & Şablon Stüdyosu",
+    promptStudioDesc: "Toplantılarınıza ve şirket süreçlerinize özel AI analiz formatı tasarlayın.",
+    templateNameLabel: "Şablon Adı",
+    templateDescLabel: "Kısa Açıklama",
+    systemPromptLabel: "Özel Sistem Promptu & Rol Yönergesi",
+    saveTemplate: "Şablonu Kaydet",
+    templateNameRequired: "Lütfen bir şablon adı girin.",
+    templatePromptRequired: "Lütfen yapay zekaya verilecek sistem promptunu girin.",
   },
   retranscribe: {
     title: "Konuşmaları Yeniden Yazıya Dök",

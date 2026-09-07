@@ -102,6 +102,17 @@ export const en: TranslationKeys = {
     emptyActionsDesc:
       "No concrete tasks or action items were detected in the meeting discussion yet.",
     responsible: "Assignee",
+    templateTitle: "Meeting Templates",
+    customTemplates: "Custom Templates",
+    createCustomTemplate: "+ Create Custom Prompt Template",
+    promptStudioTitle: "Custom Prompt & Template Studio",
+    promptStudioDesc: "Design tailored AI summary formats for your team workflows.",
+    templateNameLabel: "Template Name",
+    templateDescLabel: "Short Description",
+    systemPromptLabel: "Custom System Prompt & Role Instructions",
+    saveTemplate: "Save Template",
+    templateNameRequired: "Please enter a template name.",
+    templatePromptRequired: "Please enter a system prompt.",
   },
   retranscribe: {
     title: "Re-transcribe Meeting Audio",
