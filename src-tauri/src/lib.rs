@@ -1,6 +1,7 @@
 pub mod audio;
 pub mod audio_clipper;
 pub mod cloud_transcriber;
+pub mod cross_memory;
 pub mod detector;
 pub mod diarization;
 pub mod hardware;
@@ -18,6 +19,7 @@ use audio::{
     start_meeting_recording, start_mic_preview, stop_audio_capture, stop_mic_preview,
 };
 use audio_clipper::clip_meeting_soundbite;
+use cross_memory::{get_cross_meeting_memory_stats, search_cross_meeting_memory};
 use detector::{
     check_active_meetings, get_detector_status, hide_island_window, show_island_window,
     show_main_window, start_meeting_detector, stop_meeting_detector, update_detector_settings,
@@ -108,6 +110,8 @@ pub fn run() {
             get_meeting_analytics_by_id,
             clip_meeting_soundbite,
             global_search_meetings,
+            search_cross_meeting_memory,
+            get_cross_meeting_memory_stats,
             ask_global_assistant,
             update_meeting_speaker_name,
             update_meeting_title,

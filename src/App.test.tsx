@@ -1079,17 +1079,27 @@ describe("App Top-Level Integration", () => {
   it("handles global assistant selecting a meeting and navigating to it", async () => {
     (invoke as any).mockImplementation((cmd: string) => {
       if (cmd === "get_all_meetings") return Promise.resolve(mockPastMeetings);
-      if (cmd === "global_search_meetings") {
+      if (cmd === "get_cross_meeting_memory_stats") {
+        return Promise.resolve({
+          total_meetings: 1,
+          total_segments: 5,
+          total_words: 100,
+          unique_speakers: ["Ali"],
+        });
+      }
+      if (cmd === "search_cross_meeting_memory" || cmd === "global_search_meetings") {
         return Promise.resolve([
           {
             meeting_id: "mtg-app-1",
             meeting_title: "Haftalık İcra Kurulu Toplantısı",
             date_formatted: "01.09.2026",
             duration_formatted: "10:00",
+            score: 80,
             matches: [
               {
                 match_type: "goal",
-                text_snippet: "Gelir artışı",
+                snippet: "Gelir artışı",
+                matched_text: "Gelir artışı",
                 segment_id: 1,
               },
             ],
