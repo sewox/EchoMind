@@ -158,6 +158,13 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
     }
   };
 
+  // Speech De-filler & Fluency Filter State
+  const [isFillerFilterActive, setIsFillerFilterActive] = useState<boolean>(() => {
+    return localStorage.getItem("echomind_filler_filter_active") === "true";
+  });
+  const [cleanedSegmentsMap, setCleanedSegmentsMap] = useState<Record<number, string>>({});
+  const [fillersRemovedCount, setFillersRemovedCount] = useState<number>(0);
+
   // Native Rust CoreAudio Player State & Controls
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [audioCurrentTime, setAudioCurrentTime] = useState<number>(0);
@@ -633,6 +640,71 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
     }
   };
 
+  // Re-calculate cleaned segments whenever segments or filler filter changes
+  useEffect(() => {
+    if (!isFillerFilterActive || segments.length === 0) {
+      setCleanedSegmentsMap({});
+      setFillersRemovedCount(0);
+      return;
+    }
+
+    let isMounted = true;
+
+    const processCleaner = async () => {
+      try {
+        if (selectedPastMeeting?.id) {
+          const res = await invoke<{
+            segments: Array<{ id: number; cleaned_text: string; removed_fillers_count: number }>;
+            total_fillers_removed: number;
+          }>("filter_meeting_filler_words", {
+            meetingId: selectedPastMeeting.id,
+            langCode: selectedLanguage || null,
+          });
+          if (isMounted && res) {
+            const map: Record<number, string> = {};
+            res.segments.forEach((s) => {
+              map[s.id] = s.cleaned_text;
+            });
+            setCleanedSegmentsMap(map);
+            setFillersRemovedCount(res.total_fillers_removed);
+          }
+        } else {
+          // Process segments in live session
+          let totalCount = 0;
+          const map: Record<number, string> = {};
+          for (const seg of segments) {
+            const [cleaned, count] = await invoke<[string, number]>("clean_transcript_text", {
+              rawText: seg.text,
+              langCode: selectedLanguage || seg.language || null,
+            });
+            map[seg.id] = cleaned;
+            totalCount += count;
+          }
+          if (isMounted) {
+            setCleanedSegmentsMap(map);
+            setFillersRemovedCount(totalCount);
+          }
+        }
+      } catch (err) {
+        console.warn("Speech cleaner execution error:", err);
+      }
+    };
+
+    processCleaner();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isFillerFilterActive, segments, selectedPastMeeting, selectedLanguage]);
+
+  const handleToggleFillerFilter = () => {
+    setIsFillerFilterActive((prev) => {
+      const next = !prev;
+      localStorage.setItem("echomind_filler_filter_active", String(next));
+      return next;
+    });
+  };
+
   const filteredSegments = segments.filter(
     (s) =>
       s.text.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -838,6 +910,10 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
             editingSpeakerId={editingSpeakerId}
             editingNameValue={editingNameValue}
             selectedPastMeeting={selectedPastMeeting}
+            isFillerFilterActive={isFillerFilterActive}
+            fillersRemovedCount={fillersRemovedCount}
+            cleanedSegmentsMap={cleanedSegmentsMap}
+            onToggleFillerFilter={handleToggleFillerFilter}
             onRedactTranscript={handleRedactTranscript}
             onStartEditSpeaker={handleStartEditSpeaker}
             onSaveSpeakerName={handleSaveSpeakerName}

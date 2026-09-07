@@ -5,6 +5,7 @@ pub mod llm_client;
 pub mod translator;
 pub mod exporter;
 pub mod rag;
+pub mod cleaner;
 
 pub use types::*;
 pub use redaction::*;
@@ -13,6 +14,7 @@ pub use llm_client::*;
 pub use translator::*;
 pub use exporter::*;
 pub use rag::*;
+pub use cleaner::*;
 
 use std::time::Instant;
 use crate::storage::{MeetingRecord, StorageEngine, get_storage_dir};
@@ -393,6 +395,30 @@ pub fn export_meeting_followup_email(
         .ok_or_else(|| format!("Toplantı kaydı bulunamadı: {}", meeting_id))?;
 
     Ok(SummarizerEngine::export_followup_email(target_meeting, custom_summary.as_ref(), lang_code.as_deref()))
+}
+
+#[tauri::command]
+pub fn filter_meeting_filler_words(
+    meeting_id: String,
+    lang_code: Option<String>,
+) -> Result<CleanedTranscriptResult, String> {
+    let storage = StorageEngine::new();
+    let meetings_lock = storage.meetings.lock().unwrap();
+
+    let target_meeting = meetings_lock
+        .iter()
+        .find(|m| m.id == meeting_id)
+        .ok_or_else(|| format!("Toplantı kaydı bulunamadı: {}", meeting_id))?;
+
+    Ok(SpeechCleaner::clean_segments(&target_meeting.segments, lang_code.as_deref()))
+}
+
+#[tauri::command]
+pub fn clean_transcript_text(
+    raw_text: String,
+    lang_code: Option<String>,
+) -> (String, usize) {
+    SpeechCleaner::clean_text(&raw_text, lang_code.as_deref())
 }
 
 #[tauri::command]

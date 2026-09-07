@@ -59,9 +59,17 @@ export const tr: TranslationKeys = {
     searchPlaceholder: "Konuşmalarda ara...",
     retranscribe: "Yeniden Yazıya Dök",
     retranscribeTooltip:
-      "Farklı bir hassasiyet modu veya dil seçerek konuşmaları baştan çözümleyin",
-    shareReport: "Raporu Paylaş",
-    shareReportTooltip: "Toplantı Notlarını ve Raporu Paylaş / Dışa Aktar",
+      "Farklı bir yapay zeka modeliyle ses kaydını sıfırdan yeniden çözümler",
+    shareReport: "Raporu Paylaş / Dışa Aktar",
+    shareReportTooltip:
+      "Toplantı özetini PDF, Slack, E-Posta veya Markdown olarak dışa aktar",
+    fillerFilter: {
+      toggle: "Konuşmayı Netleştir",
+      activeBadge: "{count} dolgu kelime temizlendi",
+      tooltipClean: "Dolgu sesleri ('ııı', 'şey', 'yani') ve takılmaları temizler",
+      tooltipOriginal: "Orijinal ham konuşma metnine dön",
+    },
+    redactPii: "Kişisel Verileri Maskele (PII)",
     liveSpeaking: "Konuşuluyor",
     noSegmentsTitle: "Henüz konuşma algılanmadı",
     noSegmentsDesc:

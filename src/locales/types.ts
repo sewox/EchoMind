@@ -58,6 +58,13 @@ export interface TranslationKeys {
     retranscribeTooltip: string;
     shareReport: string;
     shareReportTooltip: string;
+    fillerFilter: {
+      toggle: string;
+      activeBadge: string;
+      tooltipClean: string;
+      tooltipOriginal: string;
+    };
+    redactPii: string;
     liveSpeaking: string;
     noSegmentsTitle: string;
     noSegmentsDesc: string;

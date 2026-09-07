@@ -14,7 +14,7 @@ describe("LiveFeedView Component", () => {
       start_time_ms: 1000,
       end_time_ms: 4000,
       timestamp_formatted: "00:01 -> 00:04",
-      text: "Bugünkü toplantının amacı Q3 bütçesini onaylamak.",
+      text: "ııı Bugünkü toplantının amacı Q3 bütçesini onaylamak.",
       language: "tr",
       confidence: 0.98,
     },
@@ -42,6 +42,10 @@ describe("LiveFeedView Component", () => {
     editingSpeakerId: null,
     editingNameValue: "",
     selectedPastMeeting: mockPastMeeting,
+    isFillerFilterActive: false,
+    fillersRemovedCount: 0,
+    cleanedSegmentsMap: {},
+    onToggleFillerFilter: vi.fn(),
     onRedactTranscript: vi.fn(),
     onStartEditSpeaker: vi.fn(),
     onSaveSpeakerName: vi.fn(),
@@ -58,7 +62,7 @@ describe("LiveFeedView Component", () => {
     );
 
     expect(
-      screen.getByText("Bugünkü toplantının amacı Q3 bütçesini onaylamak."),
+      screen.getByText("ııı Bugünkü toplantının amacı Q3 bütçesini onaylamak."),
     ).toBeInTheDocument();
 
     const playBtn = screen.getByTitle("Bu Cümleyi Dinle");
@@ -80,6 +84,26 @@ describe("LiveFeedView Component", () => {
     expect(segElement?.className).toContain("border-cyan-400");
   });
 
+  it("handles filler filter toggle and displays cleaned speech text and badge", () => {
+    render(
+      <I18nProvider>
+        <LiveFeedView
+          {...defaultProps}
+          isFillerFilterActive={true}
+          fillersRemovedCount={3}
+          cleanedSegmentsMap={{ 1: "Bugünkü toplantının amacı Q3 bütçesini onaylamak." }}
+        />
+      </I18nProvider>,
+    );
+
+    expect(screen.getByText(/3 dolgu kelime temizlendi/i)).toBeInTheDocument();
+    expect(screen.getByText("Bugünkü toplantının amacı Q3 bütçesini onaylamak.")).toBeInTheDocument();
+
+    const filterBtn = screen.getByRole("button", { name: /Konuşmayı Netleştir/i });
+    fireEvent.click(filterBtn);
+    expect(defaultProps.onToggleFillerFilter).toHaveBeenCalled();
+  });
+
   it("handles speaker inline renaming and keyboard shortcuts", () => {
     const { rerender } = render(
       <I18nProvider>
@@ -87,7 +111,7 @@ describe("LiveFeedView Component", () => {
       </I18nProvider>,
     );
 
-    const editSpeakerBtn = screen.getByTitle(/Konuşmacı Adını Düzenle/i);
+    const editSpeakerBtn = screen.getByTitle(/Konuşmacı Adını Düzenle|İsmi Değiştir/i);
     fireEvent.click(editSpeakerBtn);
     expect(defaultProps.onStartEditSpeaker).toHaveBeenCalledWith(
       "spk_1",

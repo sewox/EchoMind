@@ -375,7 +375,7 @@ describe("TranscriptViewer Component", () => {
       </I18nProvider>,
     );
 
-    const exportBtn = screen.getByRole("button", { name: /Dışa Aktar/i });
+    const exportBtn = screen.getAllByRole("button", { name: /Dışa Aktar/i })[0];
     fireEvent.click(exportBtn);
     expect(screen.getByText(/Raporu Dışa Aktar & Paylaş/i)).toBeInTheDocument();
 
@@ -1659,7 +1659,7 @@ describe("TranscriptViewer Component", () => {
     expect(writeTextSpy).toHaveBeenCalled();
 
     // Retranscribe modal open from live view
-    const retranscribeBtns = screen.getAllByTitle(/baştan çözümleyin/i);
+    const retranscribeBtns = screen.queryAllByTitle(/yeniden çözümler|baştan çözümleyin/i);
     if (retranscribeBtns.length > 0) {
       await act(async () => {
         fireEvent.click(retranscribeBtns[0]);
@@ -1808,7 +1808,7 @@ describe("TranscriptViewer Component", () => {
       fireEvent.click(summaryTab);
     });
 
-    const retranscribeBtns = screen.getAllByTitle(/baştan çözümleyin/i);
+    const retranscribeBtns = screen.getAllByTitle(/yeniden çözümler|baştan çözümleyin/i);
     if (retranscribeBtns.length > 0) {
       await act(async () => {
         fireEvent.click(retranscribeBtns[0]);
@@ -2488,4 +2488,76 @@ describe("TranscriptViewer Component", () => {
 
     unmount();
   });
+
+  it("handles speech filler filter toggle in live session and past meeting", async () => {
+    (invoke as any).mockImplementation((cmd: string) => {
+      if (cmd === "filter_meeting_filler_words") {
+        return Promise.resolve({
+          segments: [
+            { id: 1, cleaned_text: "Depo yatırımı için onay alındı.", removed_fillers_count: 2 },
+            { id: 2, cleaned_text: "Lojistik maliyetleri %15 azalacak.", removed_fillers_count: 1 },
+          ],
+          total_fillers_removed: 3,
+          original_word_count: 12,
+          cleaned_word_count: 9,
+        });
+      }
+      if (cmd === "clean_transcript_text") {
+        return Promise.resolve(["Temizlenmiş metin", 2]);
+      }
+      return Promise.resolve();
+    });
+
+    const { unmount, rerender } = render(
+      <I18nProvider>
+        <TranscriptViewer {...defaultProps} />
+      </I18nProvider>,
+    );
+
+    const toggleFilterBtn = screen.getByRole("button", { name: /Konuşmayı Netleştir/i });
+    expect(toggleFilterBtn).toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.click(toggleFilterBtn);
+    });
+
+    expect(invoke).toHaveBeenCalledWith("filter_meeting_filler_words", expect.any(Object));
+    expect(localStorage.getItem("echomind_filler_filter_active")).toBe("true");
+
+    // Test live session cleaner flow (selectedPastMeeting is null)
+    (invoke as any).mockImplementation((cmd: string) => {
+      if (cmd === "clean_transcript_text") {
+        return Promise.resolve(["Temizlenmiş canlı metin", 1]);
+      }
+      if (cmd === "get_transcription_history") {
+        return Promise.resolve(mockPastMeeting.segments);
+      }
+      return Promise.resolve([]);
+    });
+
+    rerender(
+      <I18nProvider>
+        <TranscriptViewer
+          {...defaultProps}
+          selectedPastMeeting={null}
+          isRecording={true}
+        />
+      </I18nProvider>,
+    );
+
+    await act(async () => {
+      const toggleBtn = screen.getByRole("button", { name: /Konuşmayı Netleştir/i });
+      fireEvent.click(toggleBtn);
+    });
+
+    // Test error branch handling
+    (invoke as any).mockRejectedValueOnce(new Error("Cleaner failed"));
+    await act(async () => {
+      const toggleBtn = screen.getByRole("button", { name: /Konuşmayı Netleştir/i });
+      fireEvent.click(toggleBtn);
+    });
+
+    unmount();
+  });
 });
+

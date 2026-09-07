@@ -34,10 +34,10 @@ use storage::{
     update_meeting_speaker_name, update_meeting_title,
 };
 use summarizer::{
-    ask_global_assistant, enhance_meeting_transcript, export_meeting_action_items_csv,
+    ask_global_assistant, clean_transcript_text, enhance_meeting_transcript, export_meeting_action_items_csv,
     export_meeting_action_items_markdown, export_meeting_email_digest, export_meeting_followup_email,
     export_meeting_notes, export_meeting_notes_html, export_meeting_notes_slack,
-    generate_meeting_summary, global_search_meetings, open_meeting_html_report,
+    filter_meeting_filler_words, generate_meeting_summary, global_search_meetings, open_meeting_html_report,
     save_meeting_export_file, test_ollama_connection, translate_meeting_summary,
 };
 use transcriber::{
@@ -99,6 +99,8 @@ pub fn run() {
             export_meeting_email_digest,
             open_meeting_html_report,
             save_meeting_export_file,
+            filter_meeting_filler_words,
+            clean_transcript_text,
             global_search_meetings,
             ask_global_assistant,
             update_meeting_speaker_name,
