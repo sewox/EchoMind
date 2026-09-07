@@ -168,6 +168,11 @@ fn get_macos_cpu_brand() -> Option<String> {
     None
 }
 
+#[cfg(not(target_os = "macos"))]
+fn get_macos_cpu_brand() -> Option<String> {
+    None
+}
+
 #[cfg(target_os = "windows")]
 fn detect_windows_cuda() -> bool {
     std::path::Path::new("C:\\Windows\\System32\\nvcuda.dll").exists()

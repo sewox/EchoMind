@@ -276,10 +276,10 @@ impl MeetingDetector {
         results
     }
 
-    pub fn is_app_in_active_call(app_id: &str) -> bool {
+    pub fn is_app_in_active_call(_app_id: &str) -> bool {
         #[cfg(target_os = "macos")]
         {
-            match app_id {
+            match _app_id {
                 "facetime" => {
                     std::process::Command::new("osascript")
                         .args(["-e", "tell application \"System Events\" to return (exists (processes where name is \"FaceTime\"))"])
