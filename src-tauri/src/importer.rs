@@ -305,6 +305,8 @@ pub async fn import_audio_file(
             api_key.as_deref(),
             None,
             None,
+            None,
+            None,
         );
 
         let engine_label = if let (Some(prov), Some(key)) = (cloud_provider.as_deref(), api_key.as_deref()) {
@@ -524,6 +526,8 @@ pub async fn retranscribe_meeting(
             summary_api_key.as_deref(),
             custom_endpoint.as_deref(),
             custom_model.as_deref(),
+            None,
+            None,
         );
 
         let engine_label = if let (Some(prov), Some(key)) = (cloud_provider.as_deref(), api_key.as_deref()) {
