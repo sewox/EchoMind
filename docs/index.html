@@ -4,11 +4,25 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>EchoMind AI Assistant • Hardware-Aware Hybrid Meeting Intelligence</title>
-  <meta name="description" content="EchoMind: Apple Metal ve NVIDIA CUDA ile %100 yerel ve gizli çalışan, kurumsal DLP korumalı ve toplantılar arası semantik hafızalı yeni nesil masaüstü yapay zekâ toplantı asistanı.">
-  <meta property="og:title" content="EchoMind AI Assistant • Zero-Trust Meeting Platform">
-  <meta property="og:description" content="Donanım farkındalıklı hibrit yapay zekâ, canlı DLP maskeleme ve toplantılar arası akıllı hafıza.">
+  
+  <!-- SEO & Social Meta -->
+  <meta name="description" content="EchoMind: Apple Metal and NVIDIA CUDA hardware-aware meeting assistant with zero-trust DLP masking, encrypted disk storage, and cross-meeting semantic memory.">
+  <meta name="keywords" content="EchoMind, AI Meeting Assistant, Whisper.cpp, Apple Metal, NVIDIA CUDA, Privacy-First, Zero Trust, DLP, Meeting Transcriber, macOS, Windows">
+  <meta name="author" content="EchoMind Team">
+
+  <!-- Open Graph / Facebook -->
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://sewox.github.io/EchoMind/">
+  <meta property="og:title" content="EchoMind AI Assistant • Hardware-Aware Hybrid Meeting Intelligence">
+  <meta property="og:description" content="100% on-device local transcription, real-time DLP redaction, and cross-meeting semantic memory.">
+  <meta property="og:image" content="https://sewox.github.io/EchoMind/assets/og-preview.png">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:url" content="https://sewox.github.io/EchoMind/">
+  <meta name="twitter:title" content="EchoMind AI Assistant • Hardware-Aware Meeting Platform">
+  <meta name="twitter:description" content="Private, hardware-accelerated AI meeting transcription and intelligence with Zero-Trust DLP.">
+
   <link rel="stylesheet" href="style.css">
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%236366f1'><path d='M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z'/><path d='M19 10v2a7 7 0 0 1-14 0v-2H3v2a9 9 0 0 0 8 8.94V23h2v-2.06A9 9 0 0 0 21 12v-2h-2z'/></svg>">
 </head>
@@ -50,9 +64,18 @@
   <!-- Hero Section -->
   <section class="hero">
     <div class="container">
-      <div class="badge-pill">
-        <span class="badge-pulse"></span>
-        <span data-i18n="badgeRelease">EchoMind v0.2.0 Yayında • Sıfır-Güven Mimarisi</span>
+      
+      <!-- Product Hunt / Release Badge -->
+      <div style="display: flex; justify-content: center; gap: 12px; flex-wrap: wrap;">
+        <a href="https://www.producthunt.com" target="_blank" rel="noopener noreferrer" class="ph-badge-pill">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M13.6 8.4h-3.2v3.6h3.2c1 0 1.8-.8 1.8-1.8s-.8-1.8-1.8-1.8zm0-3.6H6.8v14.4h3.6v-3.6h3.2c3 0 5.4-2.4 5.4-5.4S16.6 4.8 13.6 4.8z"/></svg>
+          <span data-i18n="badgeProductHunt">🚀 Product Hunt'ta Keşfedin</span>
+        </a>
+
+        <div class="badge-pill">
+          <span class="badge-pulse"></span>
+          <span data-i18n="badgeRelease">EchoMind v0.2.0 Yayında • Sıfır-Güven Mimarisi</span>
+        </div>
       </div>
 
       <h1 class="gradient-text" data-i18n="heroTitle">
@@ -64,13 +87,13 @@
       </p>
 
       <div class="hero-actions">
-        <a href="https://github.com/sewox/EchoMind/releases/download/v0.2.0/EchoMind_0.2.0_x64-setup.exe" class="btn btn-primary btn-lg">
+        <a id="heroDownloadWin" href="https://github.com/sewox/EchoMind/releases/download/v0.2.0/EchoMind_0.2.0_x64-setup.exe" class="btn btn-primary btn-lg">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>
-          <span data-i18n="btnDownloadWindows">Windows İçin İndir (.exe)</span>
+          <span data-i18n="btnDownloadWindows">Windows (.exe İndir)</span>
         </a>
-        <a href="https://github.com/sewox/EchoMind/releases/download/v0.2.0/EchoMind_0.2.0_aarch64.dmg" class="btn btn-secondary btn-lg">
+        <a id="heroDownloadMac" href="https://github.com/sewox/EchoMind/releases/download/v0.2.0/EchoMind_0.2.0_aarch64.dmg" class="btn btn-secondary btn-lg">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 7.05c.61-.75 1.04-1.8 0.92-2.85-.9.04-2.03.62-2.67 1.37-.56.65-1.06 1.71-.93 2.73 1.01.08 2.07-.5 2.68-1.25z"/></svg>
-          <span data-i18n="btnDownloadMac">macOS İçin İndir (.dmg)</span>
+          <span data-i18n="btnDownloadMac">macOS (.dmg İndir)</span>
         </a>
       </div>
 
@@ -124,31 +147,31 @@
           <div class="hw-advisor-interactive">
             <div class="hw-selector-list">
               <button class="hw-item-btn active" data-hw="appleSilicon">
-                <span>🍏 Apple Silicon (Metal)</span>
-                <small>M1/M2/M3/M4</small>
+                <span data-i18n="hwBtnApple">🍏 Apple Silicon (Metal)</span>
+                <small data-i18n="hwSubApple">M1/M2/M3/M4 Donanım Hızlandırma</small>
               </button>
               <button class="hw-item-btn" data-hw="nvidiaRtx">
-                <span>🟢 NVIDIA GeForce (CUDA)</span>
-                <small>RTX 30/40 Series</small>
+                <span data-i18n="hwBtnNvidia">🟢 NVIDIA GeForce (CUDA)</span>
+                <small data-i18n="hwSubNvidia">RTX 30/40 Serisi Tensor Çekirdekleri</small>
               </button>
               <button class="hw-item-btn" data-hw="intelCpu">
-                <span>💻 Intel / AMD CPU</span>
-                <small>AVX2 Vectorized</small>
+                <span data-i18n="hwBtnIntel">💻 Intel / AMD CPU</span>
+                <small data-i18n="hwSubIntel">AVX2 Vektör Komut Seti</small>
               </button>
             </div>
 
             <div class="hw-result-display">
               <div class="hw-stat">
-                <div class="hw-stat-label">Hızlandırıcı Motor</div>
+                <div class="hw-stat-label" data-i18n="hwLabelEngine">Hızlandırıcı Motor</div>
                 <div class="hw-stat-val" id="hwEngineVal">Whisper.cpp (Apple Metal GPU / ANE)</div>
               </div>
               <div class="hw-stat">
-                <div class="hw-stat-label">Önerilen Model</div>
+                <div class="hw-stat-label" data-i18n="hwLabelModel">Önerilen Model</div>
                 <div class="hw-stat-val" id="hwModelVal" style="color: var(--accent-emerald);">Whisper Medium.en / Small</div>
               </div>
               <div class="hw-stat">
-                <div class="hw-stat-label">Transkripsiyon Hızı</div>
-                <div class="hw-stat-val" id="hwSpeedVal" style="color: var(--text-primary); font-size: 0.95rem;">0.15x Real-Time (1 saat ~90sn)</div>
+                <div class="hw-stat-label" data-i18n="hwLabelSpeed">Transkripsiyon Hızı</div>
+                <div class="hw-stat-val" id="hwSpeedVal" style="color: var(--text-primary); font-size: 0.95rem;">0.15x Gerçek Zamanlı (1 saatlik ses ~90 saniye)</div>
               </div>
             </div>
           </div>
@@ -164,7 +187,7 @@
           
           <!-- Interactive DLP Sandbox -->
           <div class="dlp-sandbox">
-            <textarea class="dlp-input-box" id="dlpInput" placeholder="Buraya test metni yazın..."></textarea>
+            <textarea class="dlp-input-box" id="dlpInput" data-i18n-placeholder="dlpPlaceholder" placeholder="Buraya test metni yazın..."></textarea>
             <div class="dlp-output-box" id="dlpOutput"></div>
           </div>
         </div>
@@ -177,8 +200,8 @@
           <h3 data-i18n="bentoMemTitle">🧠 Toplantılar Arası Semantik Hafıza</h3>
           <p data-i18n="bentoMemDesc">Sadece anlık toplantıyı değil, aylar önceki konuşmaları da hatırlar. Doğal dilde soru sorarak kararlara ve alıntılara ulaşın.</p>
           <div style="background: rgba(0,0,0,0.3); padding: 12px; border-radius: 8px; font-size: 0.85rem; border: 1px solid var(--border-subtle);">
-            <div style="color: var(--accent-cyan); font-weight: 600; margin-bottom: 4px;">💬 "Geçen ay bütçe için ne konuşulmuştu?"</div>
-            <div style="color: var(--text-muted);">↳ 3 farklı toplantıdan 4 alıntı getirildi (14 Mayıs, 22 Haziran).</div>
+            <div style="color: var(--accent-cyan); font-weight: 600; margin-bottom: 4px;" data-i18n="memQuery">💬 "Geçen ay bütçe için ne konuşulmuştu?"</div>
+            <div style="color: var(--text-muted);" data-i18n="memResult">↳ 3 farklı toplantıdan 4 alıntı getirildi (14 Mayıs, 22 Haziran).</div>
           </div>
         </div>
 
@@ -200,8 +223,8 @@
           <div class="card-icon amber">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           </div>
-          <h3>🎙️ Konuşmacı Ayrıştırma & Analitik</h3>
-          <p>Konuşmacıları frekanslarına göre tanır, hitaplardan isimlerini öğrenir ve toplantı denge skorunu hesaplar.</p>
+          <h3 data-i18n="bentoDiarTitle">🎙️ Konuşmacı Ayrıştırma & Analitik</h3>
+          <p data-i18n="bentoDiarDesc">Konuşmacıları frekanslarına göre tanır, hitaplardan isimlerini öğrenir ve toplantı denge skorunu hesaplar.</p>
           <div style="display: flex; gap: 6px; height: 10px; background: rgba(255,255,255,0.05); border-radius: 6px; overflow: hidden; margin-top: 16px;">
             <div style="width: 60%; background: var(--accent-primary);" title="Ahmet %60"></div>
             <div style="width: 25%; background: var(--accent-cyan);" title="Can %25"></div>
@@ -217,40 +240,39 @@
   <section class="download-section" id="download">
     <div class="container">
       <div class="section-header">
-        <h2 data-i18n="secDownloadTitle">Hemen İndirin ve Başlayın</h2>
-        <p data-i18n="secDownloadSubtitle">Ücretsiz ve açık kaynaklı. Windows ve macOS işletim sistemleri için derlendi.</p>
+        <h2 data-i18n="secDownloadTitle">Platformunuz İçin İndirin</h2>
+        <p data-i18n="secDownloadSubtitle">Ücretsiz ve açık kaynaklı. İşletim sisteminize uygun kurulum dosyasını seçebilirsiniz.</p>
       </div>
 
       <div class="download-cards-grid">
         
         <!-- Windows Setup Exe -->
-        <div class="download-card featured">
-          <div class="featured-badge">Önerilen / Recommended</div>
+        <div class="download-card">
           <svg class="platform-icon" viewBox="0 0 24 24" fill="#0078D7"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>
-          <h4>Windows Kurulum (.exe)</h4>
-          <div class="file-info" data-i18n="winSetupDesc">Windows 10/11 x64 İçin Standart Kurulum Paketi</div>
+          <h4 data-i18n="winSetupTitle">Windows Kurulum (.exe)</h4>
+          <div class="file-info" data-i18n="winSetupDesc">Windows 10/11 x64 için standart NSIS kurulum paketi.</div>
           <a href="https://github.com/sewox/EchoMind/releases/download/v0.2.0/EchoMind_0.2.0_x64-setup.exe" class="btn btn-primary" style="width: 100%;">
-            <span>İndir (4.9 MB)</span>
+            <span data-i18n="btnDownloadWinExe">İndir .exe (4.9 MB)</span>
           </a>
         </div>
 
         <!-- Windows MSI -->
         <div class="download-card">
           <svg class="platform-icon" viewBox="0 0 24 24" fill="#0078D7"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>
-          <h4>Windows Installer (.msi)</h4>
-          <div class="file-info" data-i18n="winMsiDesc">Kurumsal Sistem Yöneticileri İçin Windows Installer</div>
+          <h4 data-i18n="winMsiTitle">Windows Installer (.msi)</h4>
+          <div class="file-info" data-i18n="winMsiDesc">Kurumsal sistem yöneticileri için Windows MSI paketi.</div>
           <a href="https://github.com/sewox/EchoMind/releases/download/v0.2.0/EchoMind_0.2.0_x64_en-US.msi" class="btn btn-secondary" style="width: 100%;">
-            <span>İndir (7.0 MB)</span>
+            <span data-i18n="btnDownloadWinMsi">İndir .msi (7.0 MB)</span>
           </a>
         </div>
 
         <!-- macOS DMG -->
         <div class="download-card">
           <svg class="platform-icon" viewBox="0 0 24 24" fill="#f8fafc"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 7.05c.61-.75 1.04-1.8 0.92-2.85-.9.04-2.03.62-2.67 1.37-.56.65-1.06 1.71-.93 2.73 1.01.08 2.07-.5 2.68-1.25z"/></svg>
-          <h4>macOS Disk İmajı (.dmg)</h4>
-          <div class="file-info" data-i18n="macDmgDesc">Apple Silicon (M1/M2/M3/M4) İşlemcili Mac'ler İçin</div>
+          <h4 data-i18n="macDmgTitle">macOS Disk İmajı (.dmg)</h4>
+          <div class="file-info" data-i18n="macDmgDesc">Apple Silicon (M1/M2/M3/M4) işlemcili Mac bilgisayarlar için.</div>
           <a href="https://github.com/sewox/EchoMind/releases/download/v0.2.0/EchoMind_0.2.0_aarch64.dmg" class="btn btn-secondary" style="width: 100%;">
-            <span>İndir (8.4 MB)</span>
+            <span data-i18n="btnDownloadMacDmg">İndir .dmg (8.4 MB)</span>
           </a>
         </div>
 
