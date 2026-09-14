@@ -465,9 +465,10 @@ pub fn open_meeting_html_report(
         .find(|m| m.id == meeting_id)
         .ok_or_else(|| format!("Toplantı bulunamadı: {}", meeting_id))?;
 
+    let safe_id: String = meeting_id.chars().filter(|c| c.is_alphanumeric() || *c == '-').collect();
     let html_content = SummarizerEngine::export_notes_html(target, custom_summary.as_ref(), lang_code.as_deref());
     let temp_dir = std::env::temp_dir();
-    let temp_file = temp_dir.join(format!("EchoMind_Rapor_{}.html", meeting_id));
+    let temp_file = temp_dir.join(format!("EchoMind_Rapor_{}.html", safe_id));
     std::fs::write(&temp_file, html_content.as_bytes())
         .map_err(|e| format!("Geçici rapor dosyası oluşturulamadı: {}", e))?;
 
@@ -503,6 +504,7 @@ pub async fn save_meeting_export_file(
     custom_summary: Option<SummaryResult>,
     lang_code: Option<String>,
 ) -> Result<String, String> {
+    let safe_id: String = meeting_id.chars().filter(|c| c.is_alphanumeric() || *c == '-').collect();
     let (content, default_ext, file_filter_name) = {
         let storage = StorageEngine::new();
         let meetings_lock = storage.meetings.lock().unwrap();
@@ -530,8 +532,9 @@ pub async fn save_meeting_export_file(
         }
     };
 
+    let safe_ext: String = default_ext.chars().filter(|c| c.is_alphanumeric()).collect();
     let dialog = rfd::AsyncFileDialog::new()
-        .set_file_name(&format!("EchoMind_Rapor_{}.{}", meeting_id, default_ext))
+        .set_file_name(&format!("EchoMind_Rapor_{}.{}", safe_id, safe_ext))
         .add_filter(file_filter_name, &[default_ext]);
 
     if let Some(file_handle) = dialog.save_file().await {

@@ -47,7 +47,7 @@ mod e2e_qa_suite {
             return;
         }
 
-        let test_files = ["Arksigner Toplantı.mp3", "Kayıt (60).mp3"];
+        let test_files = ["Kayıt (1).m4a", "Kayıt.m4a"];
         for fname in &test_files {
             let p = audio_dir.join(fname);
             if p.exists() {
@@ -188,39 +188,97 @@ mod e2e_qa_suite {
     }
 
     #[test]
-    fn test_qa_06_real_meeting_speech_transcription() {
-        let audio_dir = Path::new(USER_AUDIO_DIR);
-        let p = audio_dir.join("Arksigner Toplantı.mp3");
-        if !p.exists() {
-            println!("Arksigner Toplantı.mp3 bulunamadı, atlanıyor.");
-            return;
+    fn test_qa_07_adversarial_memory_search_inputs() {
+        let meetings = vec![
+            crate::storage::MeetingRecord {
+                id: "adv-1".to_string(),
+                title: "Güvenlik İnceleme Toplantısı".to_string(),
+                date_formatted: "14.09.2026".to_string(),
+                duration_seconds: 60,
+                duration_formatted: "01:00".to_string(),
+                audio_file_path: None,
+                segments: vec![],
+                summary: "Güvenlik açıkları konuşuldu.".to_string(),
+                key_decisions: vec!["SQL injection önlemleri alınacak.".to_string()],
+                meeting_goal: None,
+                key_highlights: None,
+                action_items: None,
+                phase1_agreed: None,
+                phase2_deferred: None,
+                detailed_topics: None,
+                participants: None,
+                engine_used: None,
+                summary_provider: None,
+            }
+        ];
+
+        let chaotic_inputs = [
+            "<script>alert(1)</script>",
+            "'; DROP TABLE meetings; --",
+            "SELECT * FROM \"users\" WHERE 1=1;",
+            "💥🔥🎉 \u{0000}\u{200B}\u{200C}",
+            &"A".repeat(10000), // Aşırı uzun girdi
+            "   \t\n   ", // Sadece boşluk
+        ];
+
+        for query in chaotic_inputs {
+            let res = crate::cross_memory::CrossMeetingMemoryEngine::search(&meetings, crate::cross_memory::MemoryQueryOptions {
+                query: query.to_string(),
+                speaker_filter: None,
+                min_score: Some(1),
+            });
+            // Should never panic or crash
+            assert!(res.len() <= meetings.len());
         }
+    }
 
-        let (mut pcm, _) = crate::importer::decode_audio_file_to_pcm16k(&p).expect("Decode failed");
-        crate::audio::normalize_audio_samples(&mut pcm);
+    #[test]
+    fn test_qa_08_invalid_soundbite_boundaries() {
+        use std::path::Path;
+        // Reverse bounds: start > end
+        let res_rev = crate::audio_clipper::AudioClipper::clip_to_wav(
+            Path::new("/non_existent_file.wav"),
+            10000,
+            2000,
+            Path::new("/tmp/test_clip.wav"),
+        );
+        assert!(res_rev.is_err(), "Ters zaman aralığı (10s -> 2s) hata dönmeli");
 
-        // Take 60 seconds from minute 5:00 (300s -> 360s: 300*16,000 = 4,800,000 to 5,760,000)
-        let sample_slice = if pcm.len() > 5760000 {
-            &pcm[4800000..5760000]
-        } else if pcm.len() > 960000 {
-            &pcm[..960000]
-        } else {
-            &pcm
-        };
+        // Non existent source file
+        let res_no_file = crate::audio_clipper::AudioClipper::clip_to_wav(
+            Path::new("/invalid/path/non_existent_12345.wav"),
+            0,
+            5000,
+            Path::new("/tmp/test_clip_2.wav"),
+        );
+        assert!(res_no_file.is_err(), "Olmayan ses dosyasında hata dönmeli");
+    }
 
-        let engine = crate::transcriber::GlobalTranscriberEngine::new();
-        let _ = engine.init_model("models/ggml-small.bin");
+    #[test]
+    fn test_qa_09_extreme_speaker_analytics_boundaries() {
+        // Zero duration segments
+        let empty_segs = vec![];
+        let a1 = crate::summarizer::analytics::AnalyticsEngine::calculate(&empty_segs, Some(0.0));
+        assert_eq!(a1.meeting_balance_score, 0);
 
-        let start = std::time::Instant::now();
-        let segments = engine.transcribe_pcm(sample_slice, "tr").unwrap_or_default();
-        let dur = start.elapsed();
-
-        println!("\n=======================================================");
-        println!("✅ [QA REAL ASR] Arksigner Toplantısı (5. Dakika Konuşma Kesiti - {:.2?} sürede tamamlandı):", dur);
-        println!("=======================================================");
-        for s in &segments {
-            println!("  [{}] {}: {}", s.timestamp_formatted, s.speaker_name, s.text);
+        // 50 equal speakers with 1-second segment each
+        let mut many_segs = Vec::new();
+        for i in 0..50 {
+            many_segs.push(crate::transcriber::TranscriptSegment {
+                id: i + 1,
+                speaker_id: format!("spk_{}", i),
+                speaker_name: format!("Katılımcı {}", i),
+                start_time_ms: (i as u64) * 1000,
+                end_time_ms: (i as u64 + 1) * 1000,
+                timestamp_formatted: "00:00".to_string(),
+                text: "Merhaba dünya testi".to_string(),
+                language: "tr".to_string(),
+                confidence: 1.0,
+            });
         }
-        assert!(!segments.is_empty(), "Transkripsiyon segmentleri üretilmeli");
+        let a2 = crate::summarizer::analytics::AnalyticsEngine::calculate(&many_segs, Some(50.0));
+        assert_eq!(a2.speaker_stats.len(), 50);
+        assert!(a2.meeting_balance_score >= 80, "50 eşit konuşmacı yüksek denge puanı almalı");
     }
 }
+

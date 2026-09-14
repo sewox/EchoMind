@@ -38,10 +38,10 @@
       }
     ],
     "security": {
-      "csp": null,
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: data: blob: https:; connect-src 'self' ipc: http://127.0.0.1:11434 http://localhost:11434 https://api.openai.com https://api.groq.com https://generativelanguage.googleapis.com; font-src 'self' data:; media-src 'self' asset: data: blob:;",
       "assetProtocol": {
         "enable": true,
-        "scope": ["**"]
+        "scope": ["$APP_DATA/**", "$RESOURCE/**", "data/**"]
       }
     }
   },

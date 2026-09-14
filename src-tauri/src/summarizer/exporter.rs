@@ -24,6 +24,22 @@ pub struct ReportLabels {
     pub print_btn: String,
 }
 
+/// Safely escapes HTML special characters to prevent Stored XSS attacks in exported reports.
+pub fn escape_html(input: &str) -> String {
+    let mut escaped = String::with_capacity(input.len());
+    for c in input.chars() {
+        match c {
+            '&' => escaped.push_str("&amp;"),
+            '<' => escaped.push_str("&lt;"),
+            '>' => escaped.push_str("&gt;"),
+            '"' => escaped.push_str("&quot;"),
+            '\'' => escaped.push_str("&#39;"),
+            _ => escaped.push(c),
+        }
+    }
+    escaped
+}
+
 static LABELS_MAP: OnceLock<HashMap<String, ReportLabels>> = OnceLock::new();
 
 impl ReportLabels {
@@ -387,19 +403,19 @@ body {
         // Header
         html.push_str("<div class=\"header\">\n");
         html.push_str("<div class=\"badge-app\">EchoMind AI Meeting Assistant</div>\n");
-        html.push_str(&format!("<h1>{}</h1>\n", record.title));
+        html.push_str(&format!("<h1>{}</h1>\n", escape_html(&record.title)));
         html.push_str("<div class=\"meta-row\">\n");
-        html.push_str(&format!("<div class=\"meta-item\">{}: <strong>{}</strong></div>\n", labels.date_label, record.date_formatted));
-        html.push_str(&format!("<div class=\"meta-item\">{}: <strong>{}</strong></div>\n", labels.duration_label, record.duration_formatted));
+        html.push_str(&format!("<div class=\"meta-item\">{}: <strong>{}</strong></div>\n", labels.date_label, escape_html(&record.date_formatted)));
+        html.push_str(&format!("<div class=\"meta-item\">{}: <strong>{}</strong></div>\n", labels.duration_label, escape_html(&record.duration_formatted)));
         if let Some(prov) = provider_str {
-            html.push_str(&format!("<div class=\"meta-item\">{}: <strong>{}</strong></div>\n", labels.model_label, prov));
+            html.push_str(&format!("<div class=\"meta-item\">{}: <strong>{}</strong></div>\n", labels.model_label, escape_html(prov)));
         }
         html.push_str("</div>\n</div>\n");
 
         // Goal
         if let Some(goal) = goal_opt {
             html.push_str(&format!("<div class=\"card\">\n<div class=\"card-title\">{}</div>\n", labels.meeting_goal_title));
-            html.push_str(&format!("<div class=\"goal-text\">{}</div>\n</div>\n", goal));
+            html.push_str(&format!("<div class=\"goal-text\">{}</div>\n</div>\n", escape_html(goal)));
         }
 
         // Highlights
@@ -407,7 +423,7 @@ body {
             if !highlights.is_empty() {
                 html.push_str(&format!("<div class=\"card\">\n<div class=\"card-title\">{}</div>\n<ul class=\"highlight-list\">\n", labels.highlights_title));
                 for h in highlights {
-                    html.push_str(&format!("<li>{}</li>\n", h));
+                    html.push_str(&format!("<li>{}</li>\n", escape_html(h)));
                 }
                 html.push_str("</ul>\n</div>\n");
             }
@@ -422,9 +438,9 @@ body {
                     html.push_str(&format!("<div class=\"action-item{}\">\n", completed_cls));
                     html.push_str("<div class=\"checkbox\"></div>\n");
                     html.push_str("<div class=\"action-content\">\n");
-                    html.push_str(&format!("<div>{}</div>\n", a.task));
+                    html.push_str(&format!("<div>{}</div>\n", escape_html(&a.task)));
                     if let Some(ref ass) = a.assignee {
-                        html.push_str(&format!("<span class=\"assignee-badge\">{}: {}</span>\n", labels.assignee_label, ass));
+                        html.push_str(&format!("<span class=\"assignee-badge\">{}: {}</span>\n", labels.assignee_label, escape_html(ass)));
                     }
                     html.push_str("</div>\n</div>\n");
                 }
@@ -437,7 +453,7 @@ body {
             if !phase1.is_empty() {
                 html.push_str(&format!("<div class=\"card\">\n<div class=\"card-title\">{}</div>\n<ul class=\"decision-list\">\n", labels.phase1_title));
                 for p in phase1 {
-                    html.push_str(&format!("<li>{}</li>\n", p));
+                    html.push_str(&format!("<li>{}</li>\n", escape_html(p)));
                 }
                 html.push_str("</ul>\n</div>\n");
             }
@@ -448,7 +464,7 @@ body {
             if !phase2.is_empty() {
                 html.push_str(&format!("<div class=\"card\">\n<div class=\"card-title\">{}</div>\n<ul class=\"decision-list\">\n", labels.phase2_title));
                 for p in phase2 {
-                    html.push_str(&format!("<li>{}</li>\n", p));
+                    html.push_str(&format!("<li>{}</li>\n", escape_html(p)));
                 }
                 html.push_str("</ul>\n</div>\n");
             }
@@ -460,9 +476,9 @@ body {
                 html.push_str(&format!("<div class=\"card\">\n<div class=\"card-title\">{}</div>\n", labels.detailed_topics_title));
                 for t in topics {
                     html.push_str("<div class=\"topic-card\">\n");
-                    html.push_str(&format!("<div class=\"topic-title\">{}</div>\n<ul style=\"padding-left:18px; font-size:13.5px; color:#334155;\">\n", t.topic_title));
+                    html.push_str(&format!("<div class=\"topic-title\">{}</div>\n<ul style=\"padding-left:18px; font-size:13.5px; color:#334155;\">\n", escape_html(&t.topic_title)));
                     for b in &t.bullet_points {
-                        html.push_str(&format!("<li style=\"margin-bottom:6px;\">{}</li>\n", b));
+                        html.push_str(&format!("<li style=\"margin-bottom:6px;\">{}</li>\n", escape_html(b)));
                     }
                     html.push_str("</ul>\n</div>\n");
                 }
@@ -475,7 +491,7 @@ body {
             if !parts.is_empty() {
                 html.push_str(&format!("<div class=\"card\">\n<div class=\"card-title\">{}</div>\n<div class=\"participants-tags\">\n", labels.participants_title));
                 for p in parts {
-                    html.push_str(&format!("<span class=\"participant-tag\">{}</span>\n", p));
+                    html.push_str(&format!("<span class=\"participant-tag\">{}</span>\n", escape_html(p)));
                 }
                 html.push_str("</div>\n</div>\n");
             }
@@ -793,5 +809,22 @@ body {
         body.push_str(&format!("---\n{}\n", labels.footer_text));
 
         (subject, body)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_escape_html_xss_protection() {
+        let xss_payload = "<script>alert('xss')</script> & \"quotes\" 'single'";
+        let escaped = escape_html(xss_payload);
+        assert!(!escaped.contains("<script>"));
+        assert!(!escaped.contains("</script>"));
+        assert!(escaped.contains("&lt;script&gt;"));
+        assert!(escaped.contains("&amp;"));
+        assert!(escaped.contains("&quot;"));
+        assert!(escaped.contains("&#39;"));
     }
 }
