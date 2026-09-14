@@ -1,4 +1,4 @@
-// EchoMind Interactive Landing Engine
+// EchoMind Interactive Landing Engine (Full Bilingual & OS-Aware)
 
 const translations = {
   tr: {
@@ -7,10 +7,12 @@ const translations = {
     navHardware: "Donanım",
     navDownload: "İndir",
     badgeRelease: "EchoMind v0.2.0 Yayında • Sıfır-Güven Mimarisi",
+    badgeProductHunt: "🚀 Product Hunt'ta Keşfedin",
     heroTitle: "Toplantılarınızı Donanım Gücüyle Dinleyen Hibrit Yapay Zekâ",
     heroSubtitle: "Apple Metal ve NVIDIA CUDA ile %100 yerel ve gizli çalışabilen, kurumsal DLP ve toplantılar arası semantik hafıza sunan yeni nesil masaüstü toplantı asistanı.",
-    btnDownloadWindows: "Windows İçin İndir (.exe)",
-    btnDownloadMac: "macOS İçin İndir (.dmg)",
+    btnDownloadWindows: "Windows (.exe İndir)",
+    btnDownloadMac: "macOS (.dmg İndir)",
+    btnDownloadGeneric: "Ücretsiz İndir (v0.2.0)",
     btnGithub: "GitHub Kaynak Kodu",
     islandStatus: "Canlı Toplantı • Dinamik Ada",
     islandTranscript: "Ahmet: \"Q3 hedeflerimiz için yerel model hızlandırmasını tamamladık.\"",
@@ -18,18 +20,37 @@ const translations = {
     secFeaturesSubtitle: "Tüm toplantı iş akışınızı gizlilikten ödün vermeden otomatikleştirin.",
     bentoHwTitle: "⚡ Donanım Farkındalıklı Hibrit Motor",
     bentoHwDesc: "Cihazınızın GPU (Metal, CUDA) ve CPU çekirdeklerini otomatik analiz ederek optimum Whisper modelini seçer.",
+    hwBtnApple: "🍏 Apple Silicon (Metal)",
+    hwBtnNvidia: "🟢 NVIDIA GeForce (CUDA)",
+    hwBtnIntel: "💻 Intel / AMD CPU",
+    hwSubApple: "M1/M2/M3/M4 Donanım Hızlandırma",
+    hwSubNvidia: "RTX 30/40 Serisi Tensor Çekirdekleri",
+    hwSubIntel: "AVX2 Vektör Komut Seti",
+    hwLabelEngine: "Hızlandırıcı Motor",
+    hwLabelModel: "Önerilen Model",
+    hwLabelSpeed: "Transkripsiyon Hızı",
     bentoSecTitle: "🛡️ Kurumsal Seviye Canlı DLP Koruması",
     bentoSecDesc: "Toplantı sırasında telaffuz edilen veya metne dökülen TCKN, Kredi Kartı (Luhn), IBAN ve API anahtarlarını anında maskeler.",
+    dlpPlaceholder: "Buraya test metni yazın... Örnek: TCKN 12345678901, Kart 4532890123456789 veya sk-live123456789abcdef",
     bentoMemTitle: "🧠 Toplantılar Arası Semantik Hafıza",
     bentoMemDesc: "Sadece anlık toplantıyı değil, aylar önceki konuşmaları da hatırlar. Doğal dilde soru sorarak kararlara ve alıntılara ulaşın.",
+    memQuery: "💬 \"Geçen ay bütçe için ne konuşulmuştu?\"",
+    memResult: "↳ 3 farklı toplantıdan 4 alıntı getirildi (14 Mayıs, 22 Haziran).",
     bentoAudioTitle: "✂️ 1-Tıkla Ses Kesiti & Mini Podcast Çalar",
     bentoAudioDesc: "Kritik tartışmaları 15-60 saniyelik ses kesiti (soundbite) olarak kırpın veya dahili ses çalarla özetleri dinleyin.",
-    dlpPlaceholder: "Buraya test metni yazın... Örnek: TCKN 12345678901, Kart 4532890123456789 veya sk-live123456789abcdef",
-    secDownloadTitle: "Hemen İndirin ve Başlayın",
-    secDownloadSubtitle: "Ücretsiz ve açık kaynaklı. Windows ve macOS işletim sistemleri için derlendi.",
-    winSetupDesc: "Windows 10/11 x64 İçin Standart Kurulum Paketi",
-    winMsiDesc: "Kurumsal Sistem Yöneticileri İçin Windows Installer",
-    macDmgDesc: "Apple Silicon (M1/M2/M3/M4) İşlemcili Mac'ler İçin Disk İmajı",
+    bentoDiarTitle: "🎙️ Konuşmacı Ayrıştırma & Analitik",
+    bentoDiarDesc: "Konuşmacıları frekanslarına göre tanır, hitaplardan isimlerini öğrenir ve toplantı denge skorunu hesaplar.",
+    secDownloadTitle: "Platformunuz İçin İndirin",
+    secDownloadSubtitle: "Ücretsiz ve açık kaynaklı. İşletim sisteminize uygun kurulum dosyasını seçebilirsiniz.",
+    winSetupTitle: "Windows Kurulum (.exe)",
+    winSetupDesc: "Windows 10/11 x64 için standart NSIS kurulum paketi.",
+    winMsiTitle: "Windows Installer (.msi)",
+    winMsiDesc: "Kurumsal sistem yöneticileri için Windows MSI paketi.",
+    macDmgTitle: "macOS Disk İmajı (.dmg)",
+    macDmgDesc: "Apple Silicon (M1/M2/M3/M4) işlemcili Mac bilgisayarlar için.",
+    btnDownloadWinExe: "İndir .exe (4.9 MB)",
+    btnDownloadWinMsi: "İndir .msi (7.0 MB)",
+    btnDownloadMacDmg: "İndir .dmg (8.4 MB)",
     footerText: "EchoMind © 2026. Açık Kaynaklı ve Sıfır-Güven Toplantı Zekâsı Platformu."
   },
   en: {
@@ -38,10 +59,12 @@ const translations = {
     navHardware: "Hardware",
     navDownload: "Download",
     badgeRelease: "EchoMind v0.2.0 Released • Zero-Trust Architecture",
+    badgeProductHunt: "🚀 Discover on Product Hunt",
     heroTitle: "Hardware-Aware Hybrid AI Meeting Intelligence",
     heroSubtitle: "A next-generation desktop meeting assistant that runs 100% locally with Apple Metal & NVIDIA CUDA, featuring enterprise DLP and cross-meeting semantic memory.",
     btnDownloadWindows: "Download for Windows (.exe)",
     btnDownloadMac: "Download for macOS (.dmg)",
+    btnDownloadGeneric: "Download Free (v0.2.0)",
     btnGithub: "GitHub Repository",
     islandStatus: "Live Meeting • Dynamic Island",
     islandTranscript: "Alex: \"We have finalized the on-device acceleration for Q3 goals.\"",
@@ -49,27 +72,109 @@ const translations = {
     secFeaturesSubtitle: "Automate your entire meeting intelligence workflow without compromising data privacy.",
     bentoHwTitle: "⚡ Hardware-Aware Hybrid Engine",
     bentoHwDesc: "Automatically analyzes GPU (Metal, CUDA) and CPU threads to recommend the optimal Whisper model with zero latency.",
+    hwBtnApple: "🍏 Apple Silicon (Metal)",
+    hwBtnNvidia: "🟢 NVIDIA GeForce (CUDA)",
+    hwBtnIntel: "💻 Intel / AMD CPU",
+    hwSubApple: "M1/M2/M3/M4 Hardware Acceleration",
+    hwSubNvidia: "RTX 30/40 Series Tensor Cores",
+    hwSubIntel: "AVX2 Vectorized Instruction Set",
+    hwLabelEngine: "Acceleration Engine",
+    hwLabelModel: "Recommended Model",
+    hwLabelSpeed: "Transcription Speed",
     bentoSecTitle: "🛡️ Real-Time Enterprise DLP Guard",
     bentoSecDesc: "Instantly redacts Turkish IDs, Luhn-validated Credit Cards, IBANs, and API credentials as they are transcribed.",
+    dlpPlaceholder: "Type sample text here... Example: CC 4532890123456789, National ID 12345678901, or API key sk-live123456789abcdef",
     bentoMemTitle: "🧠 Cross-Meeting Semantic Memory",
     bentoMemDesc: "Remembers discussions from months ago. Ask natural questions and jump straight to audio timestamp citations.",
+    memQuery: "💬 \"What did Sarah decide about the Q3 budget last month?\"",
+    memResult: "↳ Retrieved 4 citations across 3 past meetings (May 14, June 22).",
     bentoAudioTitle: "✂️ 1-Click Soundbite Clipper & Audio Memo Player",
     bentoAudioDesc: "Extract 15s-60s vital audio clips or listen to executive summaries through the integrated mini podcast player.",
-    dlpPlaceholder: "Type sample text here... Example: CC 4532890123456789, National ID 12345678901, or API key sk-live123456789abcdef",
-    secDownloadTitle: "Download and Get Started",
-    secDownloadSubtitle: "Free and open-source. Compiled natively for Windows and macOS.",
-    winSetupDesc: "Standard NSIS Installer for Windows 10/11 x64",
-    winMsiDesc: "Enterprise Windows MSI Package for Administrators",
-    macDmgDesc: "Native Apple Silicon Disk Image (M1/M2/M3/M4)",
+    bentoDiarTitle: "🎙️ Speaker Diarization & Analytics",
+    bentoDiarDesc: "Acoustically separates distinct speakers, learns names from context, and visualizes talk-to-listen balance scores.",
+    secDownloadTitle: "Download for Your Platform",
+    secDownloadSubtitle: "Free and open-source. Select the installer corresponding to your operating system.",
+    winSetupTitle: "Windows Setup (.exe)",
+    winSetupDesc: "Standard NSIS setup installer for Windows 10/11 x64.",
+    winMsiTitle: "Windows Installer (.msi)",
+    winMsiDesc: "Enterprise Windows MSI package for system administrators.",
+    macDmgTitle: "macOS Disk Image (.dmg)",
+    macDmgDesc: "Optimized for Apple Silicon (M1/M2/M3/M4) Macs.",
+    btnDownloadWinExe: "Download .exe (4.9 MB)",
+    btnDownloadWinMsi: "Download .msi (7.0 MB)",
+    btnDownloadMacDmg: "Download .dmg (8.4 MB)",
     footerText: "EchoMind © 2026. Open-Source Zero-Trust Meeting Intelligence Platform."
   }
 };
 
 let currentLang = 'tr';
+let currentHwKey = 'appleSilicon';
+
+// Hardware Profiles Data (Bilingual)
+const hwProfiles = {
+  appleSilicon: {
+    tr: {
+      engine: "Whisper.cpp (Apple Metal GPU / ANE)",
+      model: "Whisper Medium.en / Small.multilingual",
+      speed: "0.15x Gerçek Zamanlı (1 saatlik ses ~90 saniye)"
+    },
+    en: {
+      engine: "Whisper.cpp (Apple Metal GPU / ANE)",
+      model: "Whisper Medium.en / Small.multilingual",
+      speed: "0.15x Real-Time (1 hr audio in ~90 seconds)"
+    }
+  },
+  nvidiaRtx: {
+    tr: {
+      engine: "Whisper.cpp + CUDA 12.x",
+      model: "Whisper Large-v3 (FP16)",
+      speed: "0.08x Gerçek Zamanlı (1 saatlik ses ~45 saniye)"
+    },
+    en: {
+      engine: "Whisper.cpp + CUDA 12.x",
+      model: "Whisper Large-v3 (FP16)",
+      speed: "0.08x Real-Time (1 hr audio in ~45 seconds)"
+    }
+  },
+  intelCpu: {
+    tr: {
+      engine: "Whisper.cpp (AVX2 / FMA Vektörel)",
+      model: "Whisper Base / Small (Q5_1 Kuantize)",
+      speed: "0.45x Gerçek Zamanlı (1 saatlik ses ~4.5 dakika)"
+    },
+    en: {
+      engine: "Whisper.cpp (AVX2 / FMA Vectorized)",
+      model: "Whisper Base / Small (Q5_1 Quantized)",
+      speed: "0.45x Real-Time (1 hr audio in ~4.5 minutes)"
+    }
+  }
+};
+
+function updateHardwareDisplay() {
+  const profile = hwProfiles[currentHwKey][currentLang];
+  if (profile) {
+    const engineEl = document.getElementById('hwEngineVal');
+    const modelEl = document.getElementById('hwModelVal');
+    const speedEl = document.getElementById('hwSpeedVal');
+    if (engineEl) engineEl.textContent = profile.engine;
+    if (modelEl) modelEl.textContent = profile.model;
+    if (speedEl) speedEl.textContent = profile.speed;
+  }
+}
+
+function selectHardware(profileKey) {
+  currentHwKey = profileKey;
+  document.querySelectorAll('.hw-item-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.getAttribute('data-hw') === profileKey);
+  });
+  updateHardwareDisplay();
+}
 
 // Language Switcher Function
 function setLanguage(lang) {
   currentLang = lang;
+  document.documentElement.lang = lang;
+
   document.querySelectorAll('[data-i18n]').forEach(el => {
     const key = el.getAttribute('data-i18n');
     if (translations[lang] && translations[lang][key]) {
@@ -87,6 +192,15 @@ function setLanguage(lang) {
   const langBtn = document.getElementById('langToggleBtn');
   if (langBtn) {
     langBtn.innerHTML = lang === 'tr' ? '🌐 English' : '🌐 Türkçe';
+  }
+
+  updateHardwareDisplay();
+
+  // Re-run DLP simulation with current text
+  const dlpInput = document.getElementById('dlpInput');
+  const dlpOutput = document.getElementById('dlpOutput');
+  if (dlpInput && dlpOutput) {
+    dlpOutput.innerHTML = simulateDLP(dlpInput.value);
   }
 
   localStorage.setItem('echomind_lang', lang);
@@ -112,22 +226,22 @@ function simulateDLP(input) {
   });
 
   // TCKN (11 digits)
-  sanitized = sanitized.replace(/\b[1-9]\d{10}\b/g, (match) => {
+  sanitized = sanitized.replace(/\b[1-9]\d{10}\b/g, () => {
     return `<span class="redacted-tag">[REDACTED_TCKN]</span>`;
   });
 
   // IBAN (TR...)
-  sanitized = sanitized.replace(/\bTR\d{2}[0-9A-Z]{5,30}\b/gi, (match) => {
+  sanitized = sanitized.replace(/\bTR\d{2}[0-9A-Z]{5,30}\b/gi, () => {
     return `<span class="redacted-tag">[REDACTED_IBAN]</span>`;
   });
 
-  // API Keys (sk-..., gsk_..., AIzaSy..., Bearer)
+  // API Keys (sk-..., gsk_..., AIzaSy..., ghp_...)
   sanitized = sanitized.replace(/\b(sk-[a-zA-Z0-9_-]{20,}|gsk_[a-zA-Z0-9_-]{20,}|AIzaSy[a-zA-Z0-9_-]{33}|ghp_[a-zA-Z0-9]{36})\b/g, () => {
     return `<span class="redacted-tag">[REDACTED_API_KEY]</span>`;
   });
 
   // Email
-  sanitized = sanitized.replace(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g, (match) => {
+  sanitized = sanitized.replace(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g, () => {
     return `<span class="redacted-tag">[REDACTED_EMAIL]</span>`;
   });
 
@@ -153,44 +267,35 @@ function luhnCheck(val) {
   return (sum % 10) === 0;
 }
 
-// Hardware Simulation Data
-const hwProfiles = {
-  appleSilicon: {
-    engine: "Whisper.cpp (Apple Metal GPU / ANE)",
-    model: "Whisper Medium.en / Small.multilingual",
-    speed: "0.15x Real-Time (1 saatlik ses ~90 saniye)",
-    ram: "1.2 GB VRAM / 0% CPU Throttling"
-  },
-  nvidiaRtx: {
-    engine: "Whisper.cpp + CUDA 12.x",
-    model: "Whisper Large-v3 (FP16)",
-    speed: "0.08x Real-Time (1 saatlik ses ~45 saniye)",
-    ram: "2.4 GB VRAM / Tensor Core Active"
-  },
-  intelCpu: {
-    engine: "Whisper.cpp (AVX2 / FMA Vectorized)",
-    model: "Whisper Base / Small (Q5_1 Quantized)",
-    speed: "0.45x Real-Time (1 saatlik ses ~4.5 dakika)",
-    ram: "600 MB RAM / Eco-Mode Active"
-  }
-};
+// OS Detection for Hero CTAs
+function detectUserOS() {
+  const ua = window.navigator.userAgent.toLowerCase();
+  const isMac = ua.includes('mac') || ua.includes('darwin');
+  const isWindows = ua.includes('win');
 
-function selectHardware(profileKey) {
-  document.querySelectorAll('.hw-item-btn').forEach(btn => {
-    btn.classList.toggle('active', btn.getAttribute('data-hw') === profileKey);
-  });
+  const winBtn = document.getElementById('heroDownloadWin');
+  const macBtn = document.getElementById('heroDownloadMac');
 
-  const profile = hwProfiles[profileKey];
-  if (profile) {
-    document.getElementById('hwEngineVal').textContent = profile.engine;
-    document.getElementById('hwModelVal').textContent = profile.model;
-    document.getElementById('hwSpeedVal').textContent = profile.speed;
-    document.getElementById('hwRamVal').textContent = profile.ram;
+  if (winBtn && macBtn) {
+    if (isMac) {
+      macBtn.classList.remove('btn-secondary');
+      macBtn.classList.add('btn-primary');
+      winBtn.classList.remove('btn-primary');
+      winBtn.classList.add('btn-secondary');
+    } else if (isWindows) {
+      winBtn.classList.remove('btn-secondary');
+      winBtn.classList.add('btn-primary');
+      macBtn.classList.remove('btn-primary');
+      macBtn.classList.add('btn-secondary');
+    }
   }
 }
 
 // DOM Ready initialization
 document.addEventListener('DOMContentLoaded', () => {
+  // Detect OS for Smart CTA Highlighting
+  detectUserOS();
+
   // Init Language
   const savedLang = localStorage.getItem('echomind_lang') || 'tr';
   setLanguage(savedLang);
@@ -206,7 +311,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const dlpInput = document.getElementById('dlpInput');
   const dlpOutput = document.getElementById('dlpOutput');
   if (dlpInput && dlpOutput) {
-    // default sample text
     dlpInput.value = "Toplantıda müşteri TCKN: 10987654328 ve Kartı 4532890123456789 ile sk-live9876543210abcdef anahtarını onayladı.";
     dlpOutput.innerHTML = simulateDLP(dlpInput.value);
 
@@ -223,20 +327,29 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Dynamic Island Transcript Rotation
-  const transcripts = [
-    'Ahmet: "Q3 hedeflerimiz için yerel model hızlandırmasını tamamladık."',
-    'Sarah: "All confidential customer data is redacted via local DLP rules."',
-    'Can: "Geçen ayki toplantıda alınan bütçe kararlarını hafızadan getirdim."',
-    'Elena: "Soundbite exported in 250ms. No cloud transmission detected."'
-  ];
+  const transcripts = {
+    tr: [
+      'Ahmet: "Q3 hedeflerimiz için yerel model hızlandırmasını tamamladık."',
+      'Gizem: "Kullanıcı kredi kartı ve TCKN verileri DLP kuralıyla maskelendi."',
+      'Can: "Geçen ayki toplantıda alınan bütçe kararlarını hafızadan getirdim."',
+      'Selin: "Ses kesiti 250ms içinde dışa aktarıldı. Buluta veri iletilmedi."'
+    ],
+    en: [
+      'Alex: "We have finalized on-device acceleration for Q3 milestones."',
+      'Sarah: "Confidential customer cards and national IDs are redacted by DLP."',
+      'Michael: "Retrieved the budget consensus from last month\'s memory."',
+      'Elena: "Soundbite exported in 250ms with zero cloud transmission."'
+    ]
+  };
   let transcriptIdx = 0;
   const transcriptEl = document.getElementById('islandTranscriptText');
   if (transcriptEl) {
     setInterval(() => {
-      transcriptIdx = (transcriptIdx + 1) % transcripts.length;
+      const list = transcripts[currentLang] || transcripts.tr;
+      transcriptIdx = (transcriptIdx + 1) % list.length;
       transcriptEl.style.opacity = 0;
       setTimeout(() => {
-        transcriptEl.textContent = transcripts[transcriptIdx];
+        transcriptEl.textContent = list[transcriptIdx];
         transcriptEl.style.opacity = 1;
       }, 300);
     }, 4000);
