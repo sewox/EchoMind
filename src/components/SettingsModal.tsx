@@ -23,6 +23,7 @@ import {
   Globe,
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
+import { CredentialStore } from "../services/credentialStore";
 import { HardwareInfo, ModelStatus } from "../App";
 import {
   GROQ_MODELS,
@@ -131,9 +132,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         localStorage.getItem("echomind_selected_audio_device") || "default";
       setSelectedAudioDevice(savedDev);
 
-      setGroqKey(localStorage.getItem("echomind_groq_key") || "");
-      setGeminiKey(localStorage.getItem("echomind_gemini_key") || "");
-      setOpenaiKey(localStorage.getItem("echomind_openai_key") || "");
+      CredentialStore.get("echomind_groq_key").then((k) => setGroqKey(k || ""));
+      CredentialStore.get("echomind_gemini_key").then((k) => setGeminiKey(k || ""));
+      CredentialStore.get("echomind_openai_key").then((k) => setOpenaiKey(k || ""));
 
       setOllamaEndpoint(
         localStorage.getItem("echomind_ollama_endpoint") ||
@@ -243,9 +244,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   const handleSaveKeys = () => {
-    localStorage.setItem("echomind_groq_key", groqKey.trim());
-    localStorage.setItem("echomind_gemini_key", geminiKey.trim());
-    localStorage.setItem("echomind_openai_key", openaiKey.trim());
+    CredentialStore.set("echomind_groq_key", groqKey.trim());
+    CredentialStore.set("echomind_gemini_key", geminiKey.trim());
+    CredentialStore.set("echomind_openai_key", openaiKey.trim());
 
     localStorage.setItem(
       "echomind_ollama_endpoint",
@@ -807,6 +808,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <input
                   type={showKeys["groq"] ? "text" : "password"}
                   value={groqKey}
+                  autoComplete="off"
+                  spellCheck={false}
                   onChange={(e) => {
                     const val = e.target.value;
                     setGroqKey(val);
@@ -876,6 +879,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <input
                   type={showKeys["gemini"] ? "text" : "password"}
                   value={geminiKey}
+                  autoComplete="off"
+                  spellCheck={false}
                   onChange={(e) => {
                     const val = e.target.value;
                     setGeminiKey(val);
@@ -945,6 +950,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <input
                   type={showKeys["openai"] ? "text" : "password"}
                   value={openaiKey}
+                  autoComplete="off"
+                  spellCheck={false}
                   onChange={(e) => {
                     const val = e.target.value;
                     setOpenaiKey(val);

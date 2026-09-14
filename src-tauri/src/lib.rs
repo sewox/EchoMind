@@ -1,9 +1,12 @@
 pub mod audio;
 pub mod audio_clipper;
 pub mod cloud_transcriber;
+pub mod credentials;
 pub mod cross_memory;
 pub mod detector;
 pub mod diarization;
+pub mod dlp;
+pub mod encrypted_storage;
 pub mod hardware;
 pub mod importer;
 pub mod offline_engines;
@@ -13,6 +16,9 @@ pub mod security;
 pub mod storage;
 pub mod summarizer;
 pub mod transcriber;
+
+use credentials::{delete_secure_credential, get_secure_credential, save_secure_credential};
+use dlp::redact_sensitive_text;
 
 use audio::{
     get_audio_status, list_audio_devices, open_audio_midi_setup, start_audio_capture,
@@ -120,7 +126,11 @@ pub fn run() {
             unload_transcription_model,
             get_available_models,
             switch_transcription_model,
-            download_whisper_model
+            download_whisper_model,
+            save_secure_credential,
+            get_secure_credential,
+            delete_secure_credential,
+            redact_sensitive_text
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
