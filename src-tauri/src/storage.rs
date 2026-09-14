@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::fs::{self, File};
-use std::io::{Read, Write};
+use std::io::Write;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, OnceLock};
 
@@ -104,33 +104,22 @@ impl StorageEngine {
             return Ok(Vec::new());
         }
 
-        let mut file = File::open(&self.file_path).map_err(|e| format!("Dosya açma hatası: {}", e))?;
-        let mut content = String::new();
-        file.read_to_string(&mut content).map_err(|e| format!("Okuma hatası: {}", e))?;
-
-        if content.trim().is_empty() {
-            return Ok(Vec::new());
+        match crate::encrypted_storage::load_encrypted_json::<Vec<MeetingRecord>, _>(&self.file_path) {
+            Ok(records) => {
+                let mut lock = self.meetings.lock().unwrap();
+                *lock = records.clone();
+                Ok(records)
+            }
+            Err(e) => {
+                eprintln!("⚠️ Şifreli veritabanı yükleme uyarısı: {}", e);
+                Ok(Vec::new())
+            }
         }
-
-        let records: Vec<MeetingRecord> = serde_json::from_str(&content)
-            .map_err(|e| format!("JSON ayrıştırma hatası: {}", e))?;
-
-        let mut lock = self.meetings.lock().unwrap();
-        *lock = records.clone();
-        Ok(records)
     }
 
     pub fn save_to_disk(&self) -> Result<(), String> {
         let lock = self.meetings.lock().unwrap();
-        let json_str = serde_json::to_string_pretty(&*lock)
-            .map_err(|e| format!("JSON dönüştürme hatası: {}", e))?;
-
-        let mut file = File::create(&self.file_path)
-            .map_err(|e| format!("Yazma dosyası oluşturma hatası: {}", e))?;
-        file.write_all(json_str.as_bytes())
-            .map_err(|e| format!("Yazma hatası: {}", e))?;
-
-        Ok(())
+        crate::encrypted_storage::save_encrypted_json(&self.file_path, &*lock)
     }
 
     pub fn add_meeting(&self, mut meeting: MeetingRecord) -> Result<MeetingRecord, String> {

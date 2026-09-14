@@ -116,9 +116,10 @@ impl AudioClipper {
             .as_ref()
             .ok_or_else(|| "Bu toplantıya ait ses dosyası bulunmuyor.".to_string())?;
 
+        let safe_id: String = meeting_id.chars().filter(|c| c.is_alphanumeric() || *c == '-').collect();
         let input_path = PathBuf::from(audio_path_str);
         let soundbites_dir = get_storage_dir().join("soundbites");
-        let output_filename = format!("soundbite_{}_seg_{}.wav", meeting_id, segment_id);
+        let output_filename = format!("soundbite_{}_seg_{}.wav", safe_id, segment_id);
         let output_path = soundbites_dir.join(output_filename);
 
         Self::clip_to_wav(&input_path, start_ms, end_ms, &output_path)
