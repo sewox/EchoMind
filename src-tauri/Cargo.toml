@@ -1,6 +1,6 @@
 [package]
 name = "echomind"
-version = "0.1.0"
+version = "0.2.0"
 description = "EchoMind - Hardware-Aware Hybrid AI Meeting Assistant"
 authors = ["EchoMind Team"]
 edition = "2021"

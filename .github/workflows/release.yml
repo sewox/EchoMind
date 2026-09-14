@@ -6,6 +6,9 @@ on:
       - "v*"
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build-tauri:
     strategy:
@@ -50,6 +53,6 @@ jobs:
           tagName: v__VERSION__
           releaseName: "EchoMind AI Assistant v__VERSION__"
           releaseBody: "Otomatik EchoMind Kurulum Paketleri (macOS .dmg / Windows .msi & .exe)"
-          releaseDraft: true
+          releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
