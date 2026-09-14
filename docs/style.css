@@ -1,4 +1,4 @@
-/* EchoMind AI Assistant - Modern Aesthetic Landing Style */
+/* EchoMind AI Assistant - Modern Aesthetic Landing Style (Product Hunt Ready) */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 :root {
@@ -8,7 +8,7 @@
   --bg-card-hover: #152540;
   --bg-glass: rgba(15, 28, 48, 0.75);
   
-  --border-subtle: rgba(255, 255, 255, 0.07);
+  --border-subtle: rgba(255, 255, 255, 0.08);
   --border-glow: rgba(99, 102, 241, 0.3);
   --border-focus: rgba(16, 185, 129, 0.5);
   
@@ -22,6 +22,7 @@
   --accent-cyan: #06b6d4;
   --accent-rose: #f43f5e;
   --accent-amber: #f59e0b;
+  --accent-ph: #da552f;
   
   --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.3);
   --shadow-lg: 0 20px 40px -15px rgba(0, 0, 0, 0.6);
@@ -54,9 +55,9 @@ body {
   line-height: 1.6;
   overflow-x: hidden;
   background-image: 
-    radial-gradient(circle at 15% 15%, rgba(99, 102, 241, 0.08) 0%, transparent 40%),
-    radial-gradient(circle at 85% 60%, rgba(6, 182, 212, 0.06) 0%, transparent 45%),
-    radial-gradient(circle at 50% 90%, rgba(16, 185, 129, 0.05) 0%, transparent 40%);
+    radial-gradient(circle at 15% 15%, rgba(99, 102, 241, 0.09) 0%, transparent 45%),
+    radial-gradient(circle at 85% 60%, rgba(6, 182, 212, 0.07) 0%, transparent 50%),
+    radial-gradient(circle at 50% 90%, rgba(16, 185, 129, 0.06) 0%, transparent 45%);
   background-attachment: fixed;
 }
 
@@ -136,15 +137,15 @@ nav.navbar {
 .nav-actions {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
 }
 
 /* Language Toggle Button */
 .lang-toggle {
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid var(--border-subtle);
-  color: var(--text-secondary);
-  padding: 6px 14px;
+  color: var(--text-primary);
+  padding: 7px 16px;
   border-radius: var(--radius-full);
   font-size: 0.85rem;
   font-weight: 600;
@@ -156,9 +157,9 @@ nav.navbar {
 }
 
 .lang-toggle:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--text-primary);
-  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.25);
+  transform: translateY(-1px);
 }
 
 /* Buttons */
@@ -195,7 +196,7 @@ nav.navbar {
 }
 
 .btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.12);
   border-color: rgba(255, 255, 255, 0.2);
   transform: translateY(-2px);
 }
@@ -211,9 +212,38 @@ nav.navbar {
   border-radius: var(--radius-md);
 }
 
+/* Product Hunt Badge & Pill */
+.ph-badge-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  background: rgba(218, 85, 47, 0.12);
+  border: 1px solid rgba(218, 85, 47, 0.3);
+  border-radius: var(--radius-full);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #ff8a65;
+  margin-bottom: 24px;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.ph-badge-pill:hover {
+  background: rgba(218, 85, 47, 0.2);
+  border-color: rgba(218, 85, 47, 0.5);
+  transform: translateY(-1px);
+}
+
+.ph-badge-pill svg {
+  width: 16px;
+  height: 16px;
+  color: #da552f;
+}
+
 /* Hero Section */
 section.hero {
-  padding: 80px 0 60px;
+  padding: 70px 0 50px;
   text-align: center;
   position: relative;
 }
@@ -229,7 +259,7 @@ section.hero {
   font-size: 0.85rem;
   font-weight: 600;
   color: #a5b4fc;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 
 .badge-pulse {
@@ -248,12 +278,12 @@ section.hero {
 }
 
 .hero h1 {
-  font-size: clamp(2.5rem, 5vw, 4rem);
+  font-size: clamp(2.4rem, 5vw, 3.8rem);
   font-weight: 800;
   line-height: 1.15;
   letter-spacing: -0.03em;
   margin-bottom: 20px;
-  max-width: 900px;
+  max-width: 920px;
   margin-left: auto;
   margin-right: auto;
 }
@@ -265,9 +295,9 @@ section.hero {
 }
 
 .hero p.subtitle {
-  font-size: 1.2rem;
+  font-size: 1.15rem;
   color: var(--text-secondary);
-  max-width: 720px;
+  max-width: 760px;
   margin: 0 auto 36px;
   font-weight: 400;
 }
@@ -379,6 +409,7 @@ section.hero {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  transition: opacity 0.3s ease;
 }
 
 .island-badge {
@@ -392,7 +423,7 @@ section.hero {
 
 /* Bento Grid */
 section.bento-section {
-  padding: 60px 0 100px;
+  padding: 50px 0 90px;
 }
 
 .section-header {
@@ -587,14 +618,14 @@ section.bento-section {
 }
 
 .hw-stat-val {
-  font-size: 1.1rem;
+  font-size: 1.05rem;
   font-weight: 700;
   color: var(--accent-cyan);
 }
 
 /* Download Center */
 section.download-section {
-  padding: 80px 0;
+  padding: 70px 0;
   background: linear-gradient(180deg, transparent, rgba(15, 28, 48, 0.4) 50%, transparent);
 }
 
@@ -619,32 +650,24 @@ section.download-section {
   display: flex;
   flex-direction: column;
   align-items: center;
+  transition: all 0.3s ease;
 }
 
-.download-card.featured {
-  border-color: rgba(99, 102, 241, 0.4);
-  box-shadow: 0 0 30px rgba(99, 102, 241, 0.15);
-}
-
-.featured-badge {
-  position: absolute;
-  top: -12px;
-  background: linear-gradient(135deg, #6366f1, #06b6d4);
-  color: #fff;
-  font-size: 0.75rem;
-  font-weight: 700;
-  padding: 4px 12px;
-  border-radius: var(--radius-full);
+.download-card:hover {
+  background: var(--bg-card-hover);
+  border-color: rgba(99, 102, 241, 0.3);
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lg);
 }
 
 .platform-icon {
-  width: 56px;
-  height: 56px;
+  width: 52px;
+  height: 52px;
   margin-bottom: 18px;
 }
 
 .download-card h4 {
-  font-size: 1.3rem;
+  font-size: 1.25rem;
   font-weight: 700;
   margin-bottom: 6px;
 }
@@ -653,6 +676,7 @@ section.download-section {
   font-size: 0.85rem;
   color: var(--text-muted);
   margin-bottom: 24px;
+  min-height: 42px;
 }
 
 /* Footer */
