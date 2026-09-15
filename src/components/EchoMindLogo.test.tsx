@@ -9,7 +9,8 @@ describe("EchoMindLogo Component", () => {
     const { container } = render(<EchoMindLogo showTagline={true} />);
     expect(container.querySelector("img")).toBeInTheDocument();
     expect(screen.getByText("EchoMind")).toBeInTheDocument();
-    expect(screen.getByText("Serene Offline Assistant")).toBeInTheDocument();
+    expect(screen.getByText("EchoMind Offline Assistant")).toBeInTheDocument();
+    expect(screen.getByText("v0.2.0")).toBeInTheDocument();
   });
 });
 
