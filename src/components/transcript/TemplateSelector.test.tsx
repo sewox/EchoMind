@@ -30,7 +30,7 @@ describe("TemplateSelector Component", () => {
           onOpenCreateCustom={onOpenCreateCustom}
           onDeleteCustomTemplate={onDeleteCustomTemplate}
         />
-      </I18nProvider>
+      </I18nProvider>,
     );
 
     // Initial button text contains default template name
@@ -64,7 +64,7 @@ describe("TemplateSelector Component", () => {
           onOpenCreateCustom={onOpenCreateCustom}
           onDeleteCustomTemplate={onDeleteCustomTemplate}
         />
-      </I18nProvider>
+      </I18nProvider>,
     );
 
     const button = screen.getByRole("button", { name: /Yönetici Özeti/i });
@@ -74,7 +74,7 @@ describe("TemplateSelector Component", () => {
     fireEvent.click(sprintTpl);
 
     expect(onSelectTemplate).toHaveBeenCalledWith(
-      expect.objectContaining({ id: "sprint_planning" })
+      expect.objectContaining({ id: "sprint_planning" }),
     );
   });
 
@@ -92,11 +92,13 @@ describe("TemplateSelector Component", () => {
           onOpenCreateCustom={onOpenCreateCustom}
           onDeleteCustomTemplate={onDeleteCustomTemplate}
         />
-      </I18nProvider>
+      </I18nProvider>,
     );
 
     // Open dropdown
-    const button = screen.getByRole("button", { name: /Pazarlama Değerlendirmesi/i });
+    const button = screen.getByRole("button", {
+      name: /Pazarlama Değerlendirmesi/i,
+    });
     fireEvent.click(button);
 
     // Delete custom template
@@ -131,7 +133,7 @@ describe("TemplateSelector Component", () => {
           onOpenCreateCustom={vi.fn()}
           onDeleteCustomTemplate={vi.fn()}
         />
-      </I18nProvider>
+      </I18nProvider>,
     );
 
     // Open dropdown

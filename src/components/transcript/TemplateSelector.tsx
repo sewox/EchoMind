@@ -35,11 +35,15 @@ export const TemplateSelector: React.FC<TemplateSelectorProps> = ({
 
   const allTemplates = [...BUILTIN_TEMPLATES, ...customTemplates];
   const activeTemplate =
-    allTemplates.find((tpl) => tpl.id === selectedTemplateId) || BUILTIN_TEMPLATES[0];
+    allTemplates.find((tpl) => tpl.id === selectedTemplateId) ||
+    BUILTIN_TEMPLATES[0];
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
         setIsOpen(false);
       }
     };
@@ -121,7 +125,9 @@ export const TemplateSelector: React.FC<TemplateSelectorProps> = ({
                   <div className="flex-1 min-w-0">
                     <div className="font-semibold flex items-center justify-between">
                       <span className="truncate">{template.name}</span>
-                      {isSelected && <Check className="w-3.5 h-3.5 text-cyan-400 shrink-0" />}
+                      {isSelected && (
+                        <Check className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                      )}
                     </div>
                     <p className="text-[11px] text-slate-400 line-clamp-1 mt-0.5">
                       {template.description}
@@ -166,7 +172,9 @@ export const TemplateSelector: React.FC<TemplateSelectorProps> = ({
                           <Sliders className="w-3.5 h-3.5" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="font-semibold truncate">{template.name}</div>
+                          <div className="font-semibold truncate">
+                            {template.name}
+                          </div>
                           <p className="text-[11px] text-slate-400 line-clamp-1 mt-0.5">
                             {template.description}
                           </p>
@@ -201,7 +209,10 @@ export const TemplateSelector: React.FC<TemplateSelectorProps> = ({
               className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-gradient-to-r from-cyan-500/10 to-blue-500/10 hover:from-cyan-500/20 hover:to-blue-500/20 border border-cyan-500/30 text-cyan-300 hover:text-cyan-200 text-xs font-semibold transition-all shadow-sm"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>{t("summary.createCustomTemplate") || "+ Özel Prompt Şablonu Oluştur"}</span>
+              <span>
+                {t("summary.createCustomTemplate") ||
+                  "+ Özel Prompt Şablonu Oluştur"}
+              </span>
             </button>
           </div>
         </div>

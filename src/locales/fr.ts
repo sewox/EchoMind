@@ -64,13 +64,15 @@ export const fr: TranslationKeys = {
     fillerFilter: {
       toggle: "Fluidifier le Discours",
       activeBadge: "{count} tics de langage supprimés",
-      tooltipClean: "Nettoie les tics de langage ('euh', 'enfin', 'tu sais') et répétitions",
+      tooltipClean:
+        "Nettoie les tics de langage ('euh', 'enfin', 'tu sais') et répétitions",
       tooltipOriginal: "Revenir à la transcription brute",
     },
     analytics: {
       button: "Analytique de Réunion & Intervenants",
       modalTitle: "Analytique de Réunion & Intervenants",
-      modalSubtitle: "Temps de parole, score d'équilibre, MPM et observations IA",
+      modalSubtitle:
+        "Temps de parole, score d'équilibre, MPM et observations IA",
       balanceScore: "Score d'Équilibre",
       balanceScoreDesc: "Répartition équitable de la parole et de l'engagement",
       talkTime: "Parole Totale",
@@ -139,7 +141,8 @@ export const fr: TranslationKeys = {
     customTemplates: "Modèles Personnalisés",
     createCustomTemplate: "+ Créer un Modèle de Prompt",
     promptStudioTitle: "Studio de Prompts & Modèles",
-    promptStudioDesc: "Concevez des formats de résumé IA adaptés aux besoins de votre équipe.",
+    promptStudioDesc:
+      "Concevez des formats de résumé IA adaptés aux besoins de votre équipe.",
     templateNameLabel: "Nom du Modèle",
     templateDescLabel: "Description Courte",
     systemPromptLabel: "Prompt Système Personnalisé",
@@ -352,7 +355,8 @@ export const fr: TranslationKeys = {
   },
   updater: {
     modalTitle: "Nouvelle mise à jour disponible !",
-    modalSubtitle: "Les dernières fonctionnalités et améliorations de performances pour EchoMind sont prêtes.",
+    modalSubtitle:
+      "Les dernières fonctionnalités et améliorations de performances pour EchoMind sont prêtes.",
     newVersionBadge: "NOUVELLE VERSION",
     currentVersion: "Version actuelle",
     latestVersion: "Dernière version",
@@ -361,7 +365,8 @@ export const fr: TranslationKeys = {
     remindLater: "Me le rappeler plus tard",
     dontShowAgainForVersion: "Ne plus afficher cette version au démarrage",
     autoCheckToggle: "Vérifier automatiquement les mises à jour au démarrage",
-    autoCheckToggleDesc: "Vous avertit dès qu'une nouvelle version d'EchoMind est publiée.",
+    autoCheckToggleDesc:
+      "Vous avertit dès qu'une nouvelle version d'EchoMind est publiée.",
     checkNowButton: "Vérifier les mises à jour",
     checking: "Vérification en cours...",
     upToDate: "EchoMind est à jour",

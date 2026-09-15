@@ -10,7 +10,7 @@ describe("EchoMindLogo Component", () => {
     expect(container.querySelector("img")).toBeInTheDocument();
     expect(screen.getByText("EchoMind")).toBeInTheDocument();
     expect(screen.getByText("EchoMind Offline Assistant")).toBeInTheDocument();
-    expect(screen.getByText("v0.2.0")).toBeInTheDocument();
+    expect(screen.getByText("v0.2.1")).toBeInTheDocument();
   });
 });
 

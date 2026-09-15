@@ -12,7 +12,7 @@ describe("CustomTemplateModal Component", () => {
           onClose={vi.fn()}
           onSaveTemplate={vi.fn()}
         />
-      </I18nProvider>
+      </I18nProvider>,
     );
     expect(container.firstChild).toBeNull();
   });
@@ -28,27 +28,33 @@ describe("CustomTemplateModal Component", () => {
           onClose={onClose}
           onSaveTemplate={onSaveTemplate}
         />
-      </I18nProvider>
+      </I18nProvider>,
     );
 
     // Try submitting without name
     const submitBtn = screen.getByRole("button", { name: /Şablonu Kaydet/i });
     fireEvent.click(submitBtn);
-    expect(screen.getByText(/Lütfen bir şablon adı girin/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Lütfen bir şablon adı girin/i),
+    ).toBeInTheDocument();
 
     // Fill name and try submitting without prompt
     const nameInput = screen.getByPlaceholderText(/Örn: Haftalık Pazarlama/i);
     fireEvent.change(nameInput, { target: { value: "Pazarlama Raporu" } });
     fireEvent.click(submitBtn);
     expect(
-      screen.getByText(/Lütfen yapay zekaya verilecek sistem promptunu girin/i)
+      screen.getByText(/Lütfen yapay zekaya verilecek sistem promptunu girin/i),
     ).toBeInTheDocument();
 
     // Fill description & prompt, then submit
     const descInput = screen.getByPlaceholderText(/Örn: Kampanya metrikleri/i);
-    fireEvent.change(descInput, { target: { value: "Kreatif ve bütçe analizi" } });
+    fireEvent.change(descInput, {
+      target: { value: "Kreatif ve bütçe analizi" },
+    });
 
-    const promptTextarea = screen.getByPlaceholderText(/SEN KIDEMLİ BİR PAZARLAMA/i);
+    const promptTextarea = screen.getByPlaceholderText(
+      /SEN KIDEMLİ BİR PAZARLAMA/i,
+    );
     fireEvent.change(promptTextarea, {
       target: { value: "Özel pazarlama promptu yönergeleri..." },
     });
@@ -61,7 +67,7 @@ describe("CustomTemplateModal Component", () => {
         description: "Kreatif ve bütçe analizi",
         systemPrompt: "Özel pazarlama promptu yönergeleri...",
         isCustom: true,
-      })
+      }),
     );
     expect(onClose).toHaveBeenCalled();
   });
@@ -77,13 +83,15 @@ describe("CustomTemplateModal Component", () => {
           onClose={onClose}
           onSaveTemplate={onSaveTemplate}
         />
-      </I18nProvider>
+      </I18nProvider>,
     );
 
     const nameInput = screen.getByPlaceholderText(/Örn: Haftalık Pazarlama/i);
     fireEvent.change(nameInput, { target: { value: "Şablon" } });
 
-    const promptTextarea = screen.getByPlaceholderText(/SEN KIDEMLİ BİR PAZARLAMA/i);
+    const promptTextarea = screen.getByPlaceholderText(
+      /SEN KIDEMLİ BİR PAZARLAMA/i,
+    );
     fireEvent.change(promptTextarea, {
       target: { value: "Sistem promptu" },
     });
@@ -96,7 +104,7 @@ describe("CustomTemplateModal Component", () => {
         name: "Şablon",
         description: "Kullanıcı tanımlı özel prompt şablonu",
         systemPrompt: "Sistem promptu",
-      })
+      }),
     );
   });
 });

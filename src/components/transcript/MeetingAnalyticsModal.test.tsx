@@ -51,7 +51,7 @@ describe("MeetingAnalyticsModal Component", () => {
           onClose={vi.fn()}
           analytics={mockAnalytics}
         />
-      </I18nProvider>
+      </I18nProvider>,
     );
     expect(container.firstChild).toBeNull();
   });
@@ -66,22 +66,26 @@ describe("MeetingAnalyticsModal Component", () => {
           analytics={mockAnalytics}
           meetingTitle="Haftalık Değerlendirme"
         />
-      </I18nProvider>
+      </I18nProvider>,
     );
 
     // Header and meeting title
-    expect(screen.getByText(/Toplantı & Katılımcı Analitiği/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Toplantı & Katılımcı Analitiği/i),
+    ).toBeInTheDocument();
     expect(screen.getByText(/Haftalık Değerlendirme/i)).toBeInTheDocument();
 
     // Top metrics
     expect(screen.getByText("%85")).toBeInTheDocument();
-    expect(screen.getAllByText("Ahmet Yılmaz").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Ahmet Yılmaz").length).toBeGreaterThanOrEqual(
+      1,
+    );
     expect(screen.getByText("Mehmet Demir")).toBeInTheDocument();
     expect(screen.getByText("250")).toBeInTheDocument();
 
     // Insights
     expect(
-      screen.getByText(/Toplantıda konuşma süreleri dengeli dağılmış/i)
+      screen.getByText(/Toplantıda konuşma süreleri dengeli dağılmış/i),
     ).toBeInTheDocument();
 
     // Close button
@@ -116,10 +120,12 @@ describe("MeetingAnalyticsModal Component", () => {
           onClose={vi.fn()}
           analytics={singleSpeakerAnalytics}
         />
-      </I18nProvider>
+      </I18nProvider>,
     );
 
-    expect(screen.getByText(/Monolog \/ Baskın Konuşmacı/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Monolog \/ Baskın Konuşmacı/i),
+    ).toBeInTheDocument();
     expect(screen.getByText(/Tek konuşmacılı sunum/i)).toBeInTheDocument();
   });
 });
