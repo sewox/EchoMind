@@ -37,6 +37,7 @@ import { CloudPrivacyConfirmModal } from "./components/CloudPrivacyConfirmModal"
 import { DeleteConfirmModal } from "./components/DeleteConfirmModal";
 import { GlobalAssistantModal } from "./components/GlobalAssistantModal";
 import { CustomContextMenu } from "./components/CustomContextMenu";
+import { UpdateModal, UpdateCheckResult } from "./components/UpdateModal";
 import { EchoMindLogo } from "./components/EchoMindLogo";
 import { useI18n, SUPPORTED_LANGUAGES } from "./locales/i18nContext";
 import { useAudioRecording } from "./hooks/useAudioRecording";
@@ -169,6 +170,34 @@ export function App() {
   // Global Multi-Meeting AI Assistant state
   const [isGlobalAssistantOpen, setIsGlobalAssistantOpen] =
     useState<boolean>(false);
+
+  // Software Updater state
+  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState<boolean>(false);
+  const [updateCheckInfo, setUpdateCheckInfo] =
+    useState<UpdateCheckResult | null>(null);
+
+  // Automatic startup update checker
+  useEffect(() => {
+    const autoCheck =
+      localStorage.getItem("echomind_auto_check_updates") !== "false";
+    if (autoCheck) {
+      invoke<UpdateCheckResult>("check_for_updates")
+        .then((res) => {
+          if (res && res.is_update_available) {
+            const skippedVersion = localStorage.getItem(
+              "echomind_skip_update_version",
+            );
+            if (skippedVersion !== res.latest_version) {
+              setUpdateCheckInfo(res);
+              setIsUpdateModalOpen(true);
+            }
+          }
+        })
+        .catch(() => {
+          // Silent fallback on startup network error
+        });
+    }
+  }, []);
 
   // Global ⌘K / Ctrl+K keyboard shortcut
   useEffect(() => {
@@ -1112,6 +1141,17 @@ export function App() {
         onClose={() => setIsSettingsOpen(false)}
         hardware={hardware}
         modelStatus={modelStatus}
+        onOpenUpdateModal={(info) => {
+          setUpdateCheckInfo(info);
+          setIsUpdateModalOpen(true);
+        }}
+      />
+
+      {/* Software Update Notification Modal */}
+      <UpdateModal
+        isOpen={isUpdateModalOpen}
+        updateInfo={updateCheckInfo}
+        onClose={() => setIsUpdateModalOpen(false)}
       />
 
       {/* Model Hub Modal */}
