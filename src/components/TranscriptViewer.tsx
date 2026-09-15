@@ -390,39 +390,10 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
       if (isAutoTranscribing) return;
       isAutoTranscribing = true;
       try {
-        const activeEngine =
-          localStorage.getItem("echomind_active_engine") || "local";
-        let cloudProvider: string | null = null;
-        let apiKey: string | null = null;
-        let modelVersion: string | null = null;
-
-        if (activeEngine === "cloud_groq") {
-          cloudProvider = "groq";
-          apiKey = localStorage.getItem("echomind_groq_key") || null;
-          modelVersion =
-            localStorage.getItem("echomind_groq_model_version") ||
-            "whisper-large-v3-turbo";
-        } else if (activeEngine === "cloud_gemini") {
-          cloudProvider = "gemini";
-          apiKey = localStorage.getItem("echomind_gemini_key") || null;
-          modelVersion =
-            localStorage.getItem("echomind_gemini_model_version") ||
-            "gemini-1.5-flash";
-        } else if (activeEngine === "cloud_openai") {
-          cloudProvider = "openai";
-          apiKey = localStorage.getItem("echomind_openai_key") || null;
-          modelVersion =
-            localStorage.getItem("echomind_openai_model_version") ||
-            "whisper-1";
-        }
-
         const res = await invoke<TranscriptSegment[]>(
           "transcribe_audio_buffer",
           {
             language: selectedLanguage,
-            cloudProvider,
-            apiKey,
-            modelVersion,
           },
         );
         if (res && res.length > 0) {
