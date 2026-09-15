@@ -419,31 +419,24 @@ document.addEventListener("DOMContentLoaded", () => {
   const savedLang = localStorage.getItem("echomind_lang") || "tr";
   setLanguage(savedLang);
 
-  // Ensure initial DLP input & output are populated with the sample text
+  // Init DLP Sandbox Input & Output Elements
   const dlpInput = document.getElementById("dlpInput");
   const dlpOutput = document.getElementById("dlpOutput");
-  if (
-    dlpInput &&
-    dlpOutput &&
-    (!dlpInput.value || dlpInput.value.trim() === "")
-  ) {
-    dlpInput.value = sampleDlpTexts[savedLang] || sampleDlpTexts.tr;
+  if (dlpInput && dlpOutput) {
+    if (!dlpInput.value || dlpInput.value.trim() === "") {
+      dlpInput.value = sampleDlpTexts[savedLang] || sampleDlpTexts.tr;
+    }
     dlpOutput.innerHTML = simulateDLP(dlpInput.value);
+
+    dlpInput.addEventListener("input", (e) => {
+      dlpOutput.innerHTML = simulateDLP(e.target.value);
+    });
   }
 
   const langBtn = document.getElementById("langToggleBtn");
   if (langBtn) {
     langBtn.addEventListener("click", () => {
       setLanguage(currentLang === "tr" ? "en" : "tr");
-    });
-  }
-
-  // Init DLP Sandbox Listener
-  const dlpInput = document.getElementById("dlpInput");
-  const dlpOutput = document.getElementById("dlpOutput");
-  if (dlpInput && dlpOutput) {
-    dlpInput.addEventListener("input", (e) => {
-      dlpOutput.innerHTML = simulateDLP(e.target.value);
     });
   }
 
