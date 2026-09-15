@@ -30,6 +30,8 @@
 | **Windows (x64)** | `.exe` | Standart Windows Kurulum Paketi (NSIS) | [⬇️ **EchoMind_0.2.0_x64-setup.exe**](https://github.com/sewox/EchoMind/releases/download/v0.2.0/EchoMind_0.2.0_x64-setup.exe) |
 | **Windows (x64)** | `.msi` | Kurumsal Windows Installer | [⬇️ **EchoMind_0.2.0_x64_en-US.msi**](https://github.com/sewox/EchoMind/releases/download/v0.2.0/EchoMind_0.2.0_x64_en-US.msi) |
 | **macOS (Apple Silicon)** | `.dmg` | Apple Silicon (M1/M2/M3/M4) Disk İmajı | [⬇️ **EchoMind_0.2.0_aarch64.dmg**](https://github.com/sewox/EchoMind/releases/download/v0.2.0/EchoMind_0.2.0_aarch64.dmg) |
+| **Linux (Debian / Ubuntu)** | `.deb` | Debian, Ubuntu x64 Kurulum Paketi | [⬇️ **EchoMind_0.2.0_amd64.deb**](https://github.com/sewox/EchoMind/releases/download/v0.2.0/EchoMind_0.2.0_amd64.deb) |
+| **Linux (Taşınabilir / All)** | `.AppImage` | Bağımsız Çalıştırılabilir Linux Paketi | [⬇️ **EchoMind_0.2.0_amd64.AppImage**](https://github.com/sewox/EchoMind/releases/download/v0.2.0/EchoMind_0.2.0_amd64.AppImage) |
 
 ---
 
@@ -89,6 +91,8 @@ Zoom, Google Meet, Microsoft Teams ve yüz yüze toplantılarda konuşmacıları
 ### 1. Kurulum
 - **Windows:** İndirdiğiniz `EchoMind_0.2.0_x64-setup.exe` dosyasını çalıştırın ve kurulum sihirbazını takip edin.
 - **macOS:** İndirdiğiniz `EchoMind_0.2.0_aarch64.dmg` dosyasını açın ve `EchoMind` uygulamasını `Applications` klasörüne sürükleyin.
+- **Linux (Debian/Ubuntu):** `sudo dpkg -i EchoMind_0.2.0_amd64.deb` veya `sudo apt install ./EchoMind_0.2.0_amd64.deb`
+- **Linux (AppImage):** `chmod +x EchoMind_0.2.0_amd64.AppImage && ./EchoMind_0.2.0_amd64.AppImage`
 
 ### 2. İlk Çalıştırma & Ayarlar
 1. Uygulamayı açtığınızda **Donanım Algılayıcı (Smart Advisor)** donanımınızı tarayarak en uygun çalışma modunu önerir.

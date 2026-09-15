@@ -13,7 +13,8 @@
     "test": "bash scripts/test_with_timeout.sh",
     "test:frontend": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml"
+    "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml",
+    "test:live-meeting": "bash scripts/run_live_meeting_test.sh"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0",
