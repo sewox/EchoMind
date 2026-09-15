@@ -246,9 +246,11 @@
           <svg class="platform-icon" viewBox="0 0 24 24" fill="#0078D7"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>
           <h4 data-i18n="winSetupTitle">Windows Kurulum (.exe)</h4>
           <div class="file-info" data-i18n="winSetupDesc">Windows 10/11 x64 için standart NSIS kurulum paketi.</div>
-          <a href="https://github.com/sewox/EchoMind/releases/download/v0.2.0/EchoMind_0.2.0_x64-setup.exe" class="btn btn-primary" style="width: 100%;">
-            <span data-i18n="btnDownloadWinExe">İndir .exe (4.9 MB)</span>
-          </a>
+          <div class="download-action-wrap">
+            <a href="https://github.com/sewox/EchoMind/releases/download/v0.2.0/EchoMind_0.2.0_x64-setup.exe" class="btn btn-primary" style="width: 100%;">
+              <span data-i18n="btnDownloadWinExe">İndir .exe (4.9 MB)</span>
+            </a>
+          </div>
         </div>
 
         <!-- Windows MSI -->
@@ -256,9 +258,11 @@
           <svg class="platform-icon" viewBox="0 0 24 24" fill="#0078D7"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>
           <h4 data-i18n="winMsiTitle">Windows Installer (.msi)</h4>
           <div class="file-info" data-i18n="winMsiDesc">Kurumsal sistem yöneticileri için Windows MSI paketi.</div>
-          <a href="https://github.com/sewox/EchoMind/releases/download/v0.2.0/EchoMind_0.2.0_x64_en-US.msi" class="btn btn-secondary" style="width: 100%;">
-            <span data-i18n="btnDownloadWinMsi">İndir .msi (7.0 MB)</span>
-          </a>
+          <div class="download-action-wrap">
+            <a href="https://github.com/sewox/EchoMind/releases/download/v0.2.0/EchoMind_0.2.0_x64_en-US.msi" class="btn btn-secondary" style="width: 100%;">
+              <span data-i18n="btnDownloadWinMsi">İndir .msi (7.0 MB)</span>
+            </a>
+          </div>
         </div>
 
         <!-- macOS DMG -->
@@ -266,9 +270,11 @@
           <svg class="platform-icon" viewBox="0 0 24 24" fill="#f8fafc"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 7.05c.61-.75 1.04-1.8 0.92-2.85-.9.04-2.03.62-2.67 1.37-.56.65-1.06 1.71-.93 2.73 1.01.08 2.07-.5 2.68-1.25z"/></svg>
           <h4 data-i18n="macDmgTitle">macOS Disk İmajı (.dmg)</h4>
           <div class="file-info" data-i18n="macDmgDesc">Apple Silicon (M1/M2/M3/M4) işlemcili Mac bilgisayarlar için.</div>
-          <a href="https://github.com/sewox/EchoMind/releases/download/v0.2.0/EchoMind_0.2.0_aarch64.dmg" class="btn btn-secondary" style="width: 100%;">
-            <span data-i18n="btnDownloadMacDmg">İndir .dmg (8.4 MB)</span>
-          </a>
+          <div class="download-action-wrap">
+            <a href="https://github.com/sewox/EchoMind/releases/download/v0.2.0/EchoMind_0.2.0_aarch64.dmg" class="btn btn-secondary" style="width: 100%;">
+              <span data-i18n="btnDownloadMacDmg">İndir .dmg (8.4 MB)</span>
+            </a>
+          </div>
         </div>
 
         <!-- Linux Debian / Ubuntu (.deb) & AppImage -->
@@ -276,11 +282,11 @@
           <svg class="platform-icon" viewBox="0 0 24 24" fill="#E95420"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.667 8.082a1.697 1.697 0 1 1-3.394 0 1.697 1.697 0 0 1 3.394 0zM7.333 12a1.697 1.697 0 1 1-3.394 0 1.697 1.697 0 0 1 3.394 0zm10.334 3.918a1.697 1.697 0 1 1-3.394 0 1.697 1.697 0 0 1 3.394 0z"/></svg>
           <h4 data-i18n="linuxDistroTitle">Linux Dağıtımları (.deb / .AppImage)</h4>
           <div class="file-info" data-i18n="linuxDistroDesc">Ubuntu, Debian, Fedora ve Arch x64 için yerel paketler.</div>
-          <div style="display: flex; gap: 8px;">
-            <a href="https://github.com/sewox/EchoMind/releases/download/v0.2.0/EchoMind_0.2.0_amd64.deb" class="btn btn-primary" style="flex: 1; padding: 10px 8px; font-size: 0.85rem;">
-              <span>.deb İndir</span>
+          <div class="download-action-wrap" style="display: flex; gap: 8px;">
+            <a href="https://github.com/sewox/EchoMind/releases/download/v0.2.0/EchoMind_0.2.0_amd64.deb" class="btn btn-primary" style="flex: 1; padding: 10px 6px; font-size: 0.82rem; text-align: center;">
+              <span>.deb</span>
             </a>
-            <a href="https://github.com/sewox/EchoMind/releases/download/v0.2.0/EchoMind_0.2.0_amd64.AppImage" class="btn btn-secondary" style="flex: 1; padding: 10px 8px; font-size: 0.85rem;">
+            <a href="https://github.com/sewox/EchoMind/releases/download/v0.2.0/EchoMind_0.2.0_amd64.AppImage" class="btn btn-secondary" style="flex: 1; padding: 10px 6px; font-size: 0.82rem; text-align: center;">
               <span>.AppImage</span>
             </a>
           </div>
