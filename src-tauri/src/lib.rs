@@ -16,9 +16,11 @@ pub mod security;
 pub mod storage;
 pub mod summarizer;
 pub mod transcriber;
+pub mod updater;
 
 use credentials::{delete_secure_credential, get_secure_credential, save_secure_credential};
 use dlp::redact_sensitive_text;
+use updater::{check_for_updates, open_release_url};
 
 use audio::{
     get_audio_status, list_audio_devices, open_audio_midi_setup, start_audio_capture,
@@ -130,7 +132,9 @@ pub fn run() {
             save_secure_credential,
             get_secure_credential,
             delete_secure_credential,
-            redact_sensitive_text
+            redact_sensitive_text,
+            check_for_updates,
+            open_release_url
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

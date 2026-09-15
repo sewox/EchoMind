@@ -543,4 +543,96 @@ describe("SettingsModal Component", () => {
       expect.any(Object),
     );
   });
+
+  it("handles checking for updates when up to date, available, and on error", async () => {
+    const onOpenUpdateModal = vi.fn();
+    (invoke as any).mockImplementation((cmd: string) => {
+      if (cmd === "check_for_updates") {
+        return Promise.resolve({
+          is_update_available: false,
+          current_version: "0.2.0",
+          latest_version: "0.2.0",
+          release_name: "EchoMind v0.2.0",
+          release_notes: "",
+          published_at: "2026-09-15T00:00:00Z",
+          html_url: "https://github.com/sewox/EchoMind/releases/tag/v0.2.0",
+          assets: [],
+        });
+      }
+      return Promise.resolve();
+    });
+
+    render(
+      <I18nProvider>
+        <SettingsModal
+          {...defaultProps}
+          onOpenUpdateModal={onOpenUpdateModal}
+        />
+      </I18nProvider>,
+    );
+
+    // Switch to system / device tab
+    const systemTab = screen.getByRole("button", {
+      name: /Cihaz & Gizlilik/i,
+    });
+    fireEvent.click(systemTab);
+
+    // Toggle auto check updates
+    const autoUpdateToggle = screen.getByTestId("settings-auto-update-toggle");
+    expect(autoUpdateToggle).toBeChecked();
+    fireEvent.click(autoUpdateToggle);
+    expect(autoUpdateToggle).not.toBeChecked();
+    expect(localStorage.getItem("echomind_auto_check_updates")).toBe("false");
+
+    // Click Check Updates button (Up to date case)
+    const checkBtn = screen.getByTestId("settings-check-updates-btn");
+    await act(async () => {
+      fireEvent.click(checkBtn);
+    });
+
+    expect(invoke).toHaveBeenCalledWith("check_for_updates");
+    expect(
+      screen.getByText(/En güncel EchoMind sürümünü kullanıyorsunuz/i),
+    ).toBeInTheDocument();
+
+    // Now test when update IS available
+    (invoke as any).mockImplementation((cmd: string) => {
+      if (cmd === "check_for_updates") {
+        return Promise.resolve({
+          is_update_available: true,
+          current_version: "0.2.0",
+          latest_version: "0.3.0",
+          release_name: "EchoMind v0.3.0",
+          release_notes: "Cool features",
+          published_at: "2026-09-15T00:00:00Z",
+          html_url: "https://github.com/sewox/EchoMind/releases/tag/v0.3.0",
+          assets: [],
+        });
+      }
+      return Promise.resolve();
+    });
+
+    await act(async () => {
+      fireEvent.click(checkBtn);
+    });
+
+    expect(onOpenUpdateModal).toHaveBeenCalled();
+    expect(
+      screen.getByText(/Yeni Sürüm Mevcut/i),
+    ).toBeInTheDocument();
+
+    // Now test error case
+    (invoke as any).mockImplementation((cmd: string) => {
+      if (cmd === "check_for_updates") {
+        return Promise.reject(new Error("Network offline"));
+      }
+      return Promise.resolve();
+    });
+
+    await act(async () => {
+      fireEvent.click(checkBtn);
+    });
+
+    expect(screen.getByText(/Network offline/i)).toBeInTheDocument();
+  });
 });
