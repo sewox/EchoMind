@@ -1,367 +1,847 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="tr">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>EchoMind AI Assistant • Hardware-Aware Hybrid Meeting Intelligence</title>
-  
-  <!-- SEO & Social Meta -->
-  <meta name="description" content="EchoMind: Apple Metal and NVIDIA CUDA hardware-aware meeting assistant with zero-trust DLP masking, encrypted disk storage, and cross-meeting semantic memory.">
-  <meta name="keywords" content="EchoMind, AI Meeting Assistant, Whisper.cpp, Apple Metal, NVIDIA CUDA, Privacy-First, Zero Trust, DLP, Meeting Transcriber, macOS, Windows">
-  <meta name="author" content="EchoMind Team">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>
+      EchoMind AI Assistant • Hardware-Aware Hybrid Meeting Intelligence
+    </title>
 
-  <!-- Open Graph / Facebook -->
-  <meta property="og:type" content="website">
-  <meta property="og:url" content="https://sewox.github.io/EchoMind/">
-  <meta property="og:title" content="EchoMind AI Assistant • Hardware-Aware Hybrid Meeting Intelligence">
-  <meta property="og:description" content="100% on-device local transcription, real-time DLP redaction, and cross-meeting semantic memory.">
-  <meta property="og:image" content="https://sewox.github.io/EchoMind/assets/og-preview.png">
+    <!-- SEO & Social Meta -->
+    <meta
+      name="description"
+      content="EchoMind: Apple Metal and NVIDIA CUDA hardware-aware meeting assistant with zero-trust DLP masking, encrypted disk storage, and cross-meeting semantic memory."
+    />
+    <meta
+      name="keywords"
+      content="EchoMind, AI Meeting Assistant, Whisper.cpp, Apple Metal, NVIDIA CUDA, Privacy-First, Zero Trust, DLP, Meeting Transcriber, macOS, Windows"
+    />
+    <meta name="author" content="EchoMind Team" />
 
-  <!-- Twitter Card -->
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:url" content="https://sewox.github.io/EchoMind/">
-  <meta name="twitter:title" content="EchoMind AI Assistant • Hardware-Aware Meeting Platform">
-  <meta name="twitter:description" content="Private, hardware-accelerated AI meeting transcription and intelligence with Zero-Trust DLP.">
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://sewox.github.io/EchoMind/" />
+    <meta
+      property="og:title"
+      content="EchoMind AI Assistant • Hardware-Aware Hybrid Meeting Intelligence"
+    />
+    <meta
+      property="og:description"
+      content="100% on-device local transcription, real-time DLP redaction, and cross-meeting semantic memory."
+    />
+    <meta
+      property="og:image"
+      content="https://sewox.github.io/EchoMind/assets/og-preview.png"
+    />
 
-  <link rel="stylesheet" href="style.css">
-  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon.png">
-  <link rel="apple-touch-icon" href="assets/icon.png">
-</head>
-<body>
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="https://sewox.github.io/EchoMind/" />
+    <meta
+      name="twitter:title"
+      content="EchoMind AI Assistant • Hardware-Aware Meeting Platform"
+    />
+    <meta
+      name="twitter:description"
+      content="Private, hardware-accelerated AI meeting transcription and intelligence with Zero-Trust DLP."
+    />
 
-  <!-- Site Header -->
-  <header class="site-header">
-    <div class="container">
-      <nav class="navbar">
-        <a href="#" class="logo-area">
-          <img src="assets/echomind-icon.png" alt="EchoMind AI Logo" class="logo-img">
-          <span>EchoMind</span>
-        </a>
+    <link rel="stylesheet" href="style.css" />
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon.png" />
+    <link rel="apple-touch-icon" href="assets/icon.png" />
+  </head>
+  <body id="top">
+    <!-- Site Header -->
+    <header class="site-header">
+      <div class="container">
+        <nav class="navbar">
+          <a href="#top" class="logo-area">
+            <img
+              src="assets/echomind-icon.png"
+              alt="EchoMind AI Logo"
+              class="logo-img"
+            />
+            <span>EchoMind</span>
+          </a>
 
-        <ul class="nav-links">
-          <li><a href="#features" data-i18n="navFeatures">Özellikler</a></li>
-          <li><a href="#security" data-i18n="navSecurity">Güvenlik & DLP</a></li>
-          <li><a href="#hardware" data-i18n="navHardware">Donanım</a></li>
-          <li><a href="#download" data-i18n="navDownload">İndir</a></li>
-        </ul>
+          <ul class="nav-links">
+            <li><a href="#features" data-i18n="navFeatures">Özellikler</a></li>
+            <li>
+              <a href="#security" data-i18n="navSecurity">Güvenlik & DLP</a>
+            </li>
+            <li><a href="#hardware" data-i18n="navHardware">Donanım</a></li>
+            <li><a href="#download" data-i18n="navDownload">İndir</a></li>
+          </ul>
 
-        <div class="nav-actions">
-          <button id="langToggleBtn" class="lang-toggle">🌐 English</button>
-          <a href="https://github.com/sewox/EchoMind" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
-            <span>GitHub</span>
+          <div class="nav-actions">
+            <button id="langToggleBtn" class="lang-toggle">🌐 English</button>
+            <a
+              href="https://github.com/sewox/EchoMind"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="btn btn-secondary btn-sm"
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+              >
+                <path
+                  d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"
+                />
+              </svg>
+              <span>GitHub</span>
+            </a>
+          </div>
+        </nav>
+      </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero">
+      <div class="container">
+        <!-- Product Hunt / Release Badge -->
+        <div
+          style="
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            flex-wrap: wrap;
+          "
+        >
+          <a
+            href="https://www.producthunt.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="ph-badge-pill"
+          >
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <path
+                d="M13.6 8.4h-3.2v3.6h3.2c1 0 1.8-.8 1.8-1.8s-.8-1.8-1.8-1.8zm0-3.6H6.8v14.4h3.6v-3.6h3.2c3 0 5.4-2.4 5.4-5.4S16.6 4.8 13.6 4.8z"
+              />
+            </svg>
+            <span data-i18n="badgeProductHunt"
+              >🚀 Product Hunt'ta Keşfedin</span
+            >
+          </a>
+
+          <div class="badge-pill">
+            <span class="badge-pulse"></span>
+            <span data-i18n="badgeRelease"
+              >EchoMind v0.2.0 Yayında • Sıfır-Güven Mimarisi</span
+            >
+          </div>
+        </div>
+
+        <h1 class="gradient-text" data-i18n="heroTitle">
+          Toplantılarınızı Donanım Gücüyle Dinleyen Hibrit Yapay Zekâ
+        </h1>
+
+        <p class="subtitle" data-i18n="heroSubtitle">
+          Apple Metal ve NVIDIA CUDA ile %100 yerel ve gizli çalışabilen,
+          kurumsal DLP ve toplantılar arası semantik hafıza sunan yeni nesil
+          masaüstü toplantı asistanı.
+        </p>
+
+        <div class="hero-actions">
+          <a
+            id="heroDownloadWin"
+            href="https://github.com/sewox/EchoMind/releases/download/v0.2.0/EchoMind_0.2.0_x64-setup.exe"
+            class="btn btn-primary btn-lg"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+              <path
+                d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"
+              />
+            </svg>
+            <span data-i18n="btnDownloadWindows">Windows (.exe İndir)</span>
+          </a>
+          <a
+            id="heroDownloadMac"
+            href="https://github.com/sewox/EchoMind/releases/download/v0.2.0/EchoMind_0.2.0_aarch64.dmg"
+            class="btn btn-secondary btn-lg"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+              <path
+                d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 7.05c.61-.75 1.04-1.8 0.92-2.85-.9.04-2.03.62-2.67 1.37-.56.65-1.06 1.71-.93 2.73 1.01.08 2.07-.5 2.68-1.25z"
+              />
+            </svg>
+            <span data-i18n="btnDownloadMac">macOS (.dmg İndir)</span>
           </a>
         </div>
-      </nav>
-    </div>
-  </header>
 
-  <!-- Hero Section -->
-  <section class="hero">
-    <div class="container">
-      
-      <!-- Product Hunt / Release Badge -->
-      <div style="display: flex; justify-content: center; gap: 12px; flex-wrap: wrap;">
-        <a href="https://www.producthunt.com" target="_blank" rel="noopener noreferrer" class="ph-badge-pill">
-          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M13.6 8.4h-3.2v3.6h3.2c1 0 1.8-.8 1.8-1.8s-.8-1.8-1.8-1.8zm0-3.6H6.8v14.4h3.6v-3.6h3.2c3 0 5.4-2.4 5.4-5.4S16.6 4.8 13.6 4.8z"/></svg>
-          <span data-i18n="badgeProductHunt">🚀 Product Hunt'ta Keşfedin</span>
-        </a>
-
-        <div class="badge-pill">
-          <span class="badge-pulse"></span>
-          <span data-i18n="badgeRelease">EchoMind v0.2.0 Yayında • Sıfır-Güven Mimarisi</span>
-        </div>
-      </div>
-
-      <h1 class="gradient-text" data-i18n="heroTitle">
-        Toplantılarınızı Donanım Gücüyle Dinleyen Hibrit Yapay Zekâ
-      </h1>
-
-      <p class="subtitle" data-i18n="heroSubtitle">
-        Apple Metal ve NVIDIA CUDA ile %100 yerel ve gizli çalışabilen, kurumsal DLP ve toplantılar arası semantik hafıza sunan yeni nesil masaüstü toplantı asistanı.
-      </p>
-
-      <div class="hero-actions">
-        <a id="heroDownloadWin" href="https://github.com/sewox/EchoMind/releases/download/v0.2.0/EchoMind_0.2.0_x64-setup.exe" class="btn btn-primary btn-lg">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>
-          <span data-i18n="btnDownloadWindows">Windows (.exe İndir)</span>
-        </a>
-        <a id="heroDownloadMac" href="https://github.com/sewox/EchoMind/releases/download/v0.2.0/EchoMind_0.2.0_aarch64.dmg" class="btn btn-secondary btn-lg">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 7.05c.61-.75 1.04-1.8 0.92-2.85-.9.04-2.03.62-2.67 1.37-.56.65-1.06 1.71-.93 2.73 1.01.08 2.07-.5 2.68-1.25z"/></svg>
-          <span data-i18n="btnDownloadMac">macOS (.dmg İndir)</span>
-        </a>
-      </div>
-
-      <!-- Dynamic Island Interactive HUD Mockup -->
-      <div class="island-preview-wrapper">
-        <div class="mockup-header">
-          <div class="mockup-dots">
-            <span></span><span></span><span></span>
-          </div>
-          <div class="mockup-title" data-i18n="hudTitle">EchoMind Kayan HUD Arayüzü • macOS / Windows</div>
-          <div class="island-badge" data-i18n="islandStatus">Canlı Toplantı • Dinamik Ada</div>
-        </div>
-
-        <div class="island-hud">
-          <div class="island-left">
-            <div class="island-waveforms">
-              <span></span><span></span><span></span><span></span><span></span>
+        <!-- Dynamic Island Interactive HUD Mockup -->
+        <div class="island-preview-wrapper">
+          <div class="mockup-header">
+            <div class="mockup-dots">
+              <span></span><span></span><span></span>
             </div>
-            <div class="island-text" id="islandTranscriptText" data-i18n="islandTranscript">
-              Ahmet: "Q3 hedeflerimiz için yerel model hızlandırmasını tamamladık."
+            <div class="mockup-title" data-i18n="hudTitle">
+              EchoMind Kayan HUD Arayüzü • macOS / Windows
+            </div>
+            <div class="island-badge" data-i18n="islandStatus">
+              Canlı Toplantı • Dinamik Ada
             </div>
           </div>
-          <div class="island-badge" style="background: rgba(99, 102, 241, 0.2); color: #a5b4fc;" data-i18n="islandEngineBadge">
-            Whisper Metal • 0.12x
-          </div>
-        </div>
-      </div>
 
-    </div>
-  </section>
-
-  <!-- Bento Grid Features Section -->
-  <section class="bento-section" id="features">
-    <div class="container">
-      <div class="section-header">
-        <h2 data-i18n="secFeaturesTitle">Neden EchoMind?</h2>
-        <p data-i18n="secFeaturesSubtitle">Tüm toplantı iş akışınızı gizlilikten ödün vermeden otomatikleştirin.</p>
-      </div>
-
-      <div class="bento-grid">
-        
-        <!-- Bento 1: Hardware-Aware Engine (Span 6) -->
-        <div class="bento-card col-6" id="hardware">
-          <div class="card-icon cyan">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6h-4M6 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-2"/><rect width="8" height="8" x="8" y="2" rx="1"/><path d="M12 14v4M8 18h8"/></svg>
-          </div>
-          <h3 data-i18n="bentoHwTitle">⚡ Donanım Farkındalıklı Hibrit Motor</h3>
-          <p data-i18n="bentoHwDesc">Cihazınızın GPU (Metal, CUDA) ve CPU çekirdeklerini otomatik analiz ederek optimum Whisper modelini seçer.</p>
-          
-          <!-- Interactive Hardware Simulator -->
-          <div class="hw-advisor-interactive">
-            <div class="hw-selector-list">
-              <button class="hw-item-btn active" data-hw="appleSilicon">
-                <span data-i18n="hwBtnApple">🍏 Apple Silicon (Metal)</span>
-                <small data-i18n="hwSubApple">M1/M2/M3/M4 Donanım Hızlandırma</small>
-              </button>
-              <button class="hw-item-btn" data-hw="nvidiaRtx">
-                <span data-i18n="hwBtnNvidia">🟢 NVIDIA GeForce (CUDA)</span>
-                <small data-i18n="hwSubNvidia">RTX 30/40 Serisi Tensor Çekirdekleri</small>
-              </button>
-              <button class="hw-item-btn" data-hw="intelCpu">
-                <span data-i18n="hwBtnIntel">💻 Intel / AMD CPU</span>
-                <small data-i18n="hwSubIntel">AVX2 Vektör Komut Seti</small>
-              </button>
-            </div>
-
-            <div class="hw-result-display">
-              <div class="hw-stat">
-                <div class="hw-stat-label" data-i18n="hwLabelEngine">Hızlandırıcı Motor</div>
-                <div class="hw-stat-val" id="hwEngineVal">Whisper.cpp (Apple Metal GPU / ANE)</div>
+          <div class="island-hud">
+            <div class="island-left">
+              <div class="island-waveforms">
+                <span></span><span></span><span></span><span></span
+                ><span></span>
               </div>
-              <div class="hw-stat">
-                <div class="hw-stat-label" data-i18n="hwLabelModel">Önerilen Model</div>
-                <div class="hw-stat-val" id="hwModelVal" style="color: var(--accent-emerald);">Whisper Medium.en / Small</div>
-              </div>
-              <div class="hw-stat">
-                <div class="hw-stat-label" data-i18n="hwLabelSpeed">Transkripsiyon Hızı</div>
-                <div class="hw-stat-val" id="hwSpeedVal" style="color: var(--text-primary); font-size: 0.95rem;">0.15x Gerçek Zamanlı (1 saatlik ses ~90 saniye)</div>
+              <div
+                class="island-text"
+                id="islandTranscriptText"
+                data-i18n="islandTranscript"
+              >
+                Ahmet: "Q3 hedeflerimiz için yerel model hızlandırmasını
+                tamamladık."
               </div>
             </div>
-          </div>
-        </div>
-
-        <!-- Bento 2: Zero-Trust & Live DLP Redaction (Span 6) -->
-        <div class="bento-card col-6" id="security">
-          <div class="card-icon emerald">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-          </div>
-          <h3 data-i18n="bentoSecTitle">🛡️ Kurumsal Seviye Canlı DLP Koruması</h3>
-          <p data-i18n="bentoSecDesc">Toplantı sırasında telaffuz edilen veya metne dökülen TCKN, Kredi Kartı (Luhn), IBAN ve API anahtarlarını anında maskeler.</p>
-          
-          <!-- Interactive DLP Sandbox -->
-          <div class="dlp-sandbox">
-            <textarea class="dlp-input-box" id="dlpInput" data-i18n-placeholder="dlpPlaceholder" placeholder="Buraya test metni yazın..."></textarea>
-            <div class="dlp-output-box" id="dlpOutput"></div>
-          </div>
-        </div>
-
-        <!-- Bento 3: Cross-Meeting Semantic Memory (Span 4) -->
-        <div class="bento-card col-4">
-          <div class="card-icon">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-          </div>
-          <h3 data-i18n="bentoMemTitle">🧠 Toplantılar Arası Semantik Hafıza</h3>
-          <p data-i18n="bentoMemDesc">Sadece anlık toplantıyı değil, aylar önceki konuşmaları da hatırlar. Doğal dilde soru sorarak kararlara ve alıntılara ulaşın.</p>
-          <div style="background: rgba(0,0,0,0.3); padding: 12px; border-radius: 8px; font-size: 0.85rem; border: 1px solid var(--border-subtle);">
-            <div style="color: var(--accent-cyan); font-weight: 600; margin-bottom: 4px;" data-i18n="memQuery">💬 "Geçen ay bütçe için ne konuşulmuştu?"</div>
-            <div style="color: var(--text-muted);" data-i18n="memResult">↳ 3 farklı toplantıdan 4 alıntı getirildi (14 Mayıs, 22 Haziran).</div>
-          </div>
-        </div>
-
-        <!-- Bento 4: 1-Click Soundbite & Podcast Player (Span 4) -->
-        <div class="bento-card col-4">
-          <div class="card-icon rose">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" x2="8.12" y1="4" y2="15.88"/><line x1="14.47" x2="20" y1="14.48" y2="20"/><line x1="8.12" x2="12" y1="8.12" y2="12"/></svg>
-          </div>
-          <h3 data-i18n="bentoAudioTitle">✂️ 1-Tıkla Ses Kesiti & Mini Podcast</h3>
-          <p data-i18n="bentoAudioDesc">Kritik tartışmaları 15-60 saniyelik ses kesiti (soundbite) olarak kırpın veya dahili ses çalarla özetleri dinleyin.</p>
-          <div style="background: rgba(0,0,0,0.3); padding: 12px; border-radius: 8px; display: flex; align-items: center; justify-content: space-between; border: 1px solid var(--border-subtle);">
-            <span style="font-size: 0.85rem; font-family: var(--font-mono); color: var(--text-primary);">🔊 soundbite_01.flac</span>
-            <span class="island-badge" style="background: rgba(244,63,94,0.2); color: #fda4af;">00:32 / 00:45</span>
-          </div>
-        </div>
-
-        <!-- Bento 5: Acoustic Diarization & Balance (Span 4) -->
-        <div class="bento-card col-4">
-          <div class="card-icon amber">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-          </div>
-          <h3 data-i18n="bentoDiarTitle">🎙️ Konuşmacı Ayrıştırma & Analitik</h3>
-          <p data-i18n="bentoDiarDesc">Konuşmacıları frekanslarına göre tanır, hitaplardan isimlerini öğrenir ve toplantı denge skorunu hesaplar.</p>
-          <div style="display: flex; gap: 6px; height: 10px; background: rgba(255,255,255,0.05); border-radius: 6px; overflow: hidden; margin-top: 16px;">
-            <div style="width: 60%; background: var(--accent-primary);" data-i18n-title="diarSpeaker1" title="Ahmet %60"></div>
-            <div style="width: 25%; background: var(--accent-cyan);" data-i18n-title="diarSpeaker2" title="Can %25"></div>
-            <div style="width: 15%; background: var(--accent-emerald);" data-i18n-title="diarSpeaker3" title="Selin %15"></div>
-          </div>
-        </div>
-
-        <!-- Bento 6: 3-Tier Hybrid AI Providers (Span 12 Full Width) -->
-        <div class="bento-card col-12" style="grid-column: span 12;">
-          <div class="card-icon" style="background: rgba(99, 102, 241, 0.2); color: var(--accent-primary);">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/><path d="M12 13v6M9 16l3 3 3-3"/></svg>
-          </div>
-          <h3 data-i18n="bentoProvidersTitle">🌐 3 Katmanlı Esnek Model Mimarisi: Yerel, Self-Hosted & Bulut Sağlayıcılar</h3>
-          <p data-i18n="bentoProvidersDesc">Sıfır bağımlılık: Donanımınızda %100 çevrimdışı çalışın, kendi yerel Ollama/vLLM sunucunuzu bağlayın veya kendi API anahtarınızla en güçlü bulut modellerini aracı komisyonsuz ve DLP korumasıyla kullanın.</p>
-          
-          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 20px;">
-            
-            <!-- Tier 1: Bare-Metal Local -->
-            <div style="background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.08); border-radius: var(--radius-md); padding: 18px; text-align: left;">
-              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-                <span style="background: rgba(6, 182, 212, 0.2); color: var(--accent-cyan); font-size: 0.75rem; font-weight: 700; padding: 3px 8px; border-radius: 999px;">KATMAN 1</span>
-                <strong style="color: var(--text-primary); font-size: 0.95rem;" data-i18n="tier1Title">💻 %100 Yerel (Bare-Metal)</strong>
-              </div>
-              <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 10px;" data-i18n="tier1Desc">Apple Metal GPU & NVIDIA CUDA ile Whisper.cpp çevrimdışı transkripsiyon. Sıfır bulut, sıfır abonelik.</p>
-              <div style="font-size: 0.75rem; font-family: var(--font-mono); color: var(--accent-emerald);">✔ Whisper Tiny/Base/Small/Medium</div>
+            <div
+              class="island-badge"
+              style="background: rgba(99, 102, 241, 0.2); color: #a5b4fc"
+              data-i18n="islandEngineBadge"
+            >
+              Whisper Metal • 0.12x
             </div>
+          </div>
+        </div>
+      </div>
+    </section>
 
-            <!-- Tier 2: Self-Hosted LLMs -->
-            <div style="background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.08); border-radius: var(--radius-md); padding: 18px; text-align: left;">
-              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-                <span style="background: rgba(16, 185, 129, 0.2); color: var(--accent-emerald); font-size: 0.75rem; font-weight: 700; padding: 3px 8px; border-radius: 999px;">KATMAN 2</span>
-                <strong style="color: var(--text-primary); font-size: 0.95rem;" data-i18n="tier2Title">🏠 Kendi LLM Sunucun (Ollama)</strong>
-              </div>
-              <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 10px;" data-i18n="tier2Desc">Yerel ağınızdaki Ollama, vLLM, LocalAI veya OpenAI-uyumlu sunucuları tek tıkla entegre edin.</p>
-              <div style="font-size: 0.75rem; font-family: var(--font-mono); color: var(--accent-cyan);">✔ Llama 3, Gemma 2, Mistral, Qwen</div>
+    <!-- Bento Grid Features Section -->
+    <section class="bento-section" id="features">
+      <div class="container">
+        <div class="section-header">
+          <h2 data-i18n="secFeaturesTitle">Neden EchoMind?</h2>
+          <p data-i18n="secFeaturesSubtitle">
+            Tüm toplantı iş akışınızı gizlilikten ödün vermeden
+            otomatikleştirin.
+          </p>
+        </div>
+
+        <div class="bento-grid">
+          <!-- Bento 1: Hardware-Aware Engine (Span 6) -->
+          <div class="bento-card col-6" id="hardware">
+            <div class="card-icon cyan">
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path
+                  d="M18 6h-4M6 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-2"
+                />
+                <rect width="8" height="8" x="8" y="2" rx="1" />
+                <path d="M12 14v4M8 18h8" />
+              </svg>
             </div>
+            <h3 data-i18n="bentoHwTitle">
+              ⚡ Donanım Farkındalıklı Hibrit Motor
+            </h3>
+            <p data-i18n="bentoHwDesc">
+              Cihazınızın GPU (Metal, CUDA) ve CPU çekirdeklerini otomatik
+              analiz ederek optimum Whisper modelini seçer.
+            </p>
 
-            <!-- Tier 3: Public Cloud Providers -->
-            <div style="background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.08); border-radius: var(--radius-md); padding: 18px; text-align: left;">
-              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-                <span style="background: rgba(99, 102, 241, 0.2); color: var(--accent-primary); font-size: 0.75rem; font-weight: 700; padding: 3px 8px; border-radius: 999px;">KATMAN 3</span>
-                <strong style="color: var(--text-primary); font-size: 0.95rem;" data-i18n="tier3Title">☁️ Genel Sağlayıcılar (Kendi API Anahtarınla)</strong>
+            <!-- Interactive Hardware Simulator -->
+            <div class="hw-advisor-interactive">
+              <div class="hw-selector-list">
+                <button class="hw-item-btn active" data-hw="appleSilicon">
+                  <span data-i18n="hwBtnApple">🍏 Apple Silicon (Metal)</span>
+                  <small data-i18n="hwSubApple"
+                    >M1/M2/M3/M4 Donanım Hızlandırma</small
+                  >
+                </button>
+                <button class="hw-item-btn" data-hw="nvidiaRtx">
+                  <span data-i18n="hwBtnNvidia">🟢 NVIDIA GeForce (CUDA)</span>
+                  <small data-i18n="hwSubNvidia"
+                    >RTX 30/40 Serisi Tensor Çekirdekleri</small
+                  >
+                </button>
+                <button class="hw-item-btn" data-hw="intelCpu">
+                  <span data-i18n="hwBtnIntel">💻 Intel / AMD CPU</span>
+                  <small data-i18n="hwSubIntel">AVX2 Vektör Komut Seti</small>
+                </button>
               </div>
-              <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 10px;" data-i18n="tier3Desc">Abonelik ödemeden kendi API anahtarınızla OpenAI, Google Gemini ve Groq. İstemci taraflı DLP ile sansürlenir.</p>
-              <div style="font-size: 0.75rem; font-family: var(--font-mono); color: #a5b4fc;">✔ GPT-4o, Gemini 1.5, Groq (70B)</div>
+
+              <div class="hw-result-display">
+                <div class="hw-stat">
+                  <div class="hw-stat-label" data-i18n="hwLabelEngine">
+                    Hızlandırıcı Motor
+                  </div>
+                  <div class="hw-stat-val" id="hwEngineVal">
+                    Whisper.cpp (Apple Metal GPU / ANE)
+                  </div>
+                </div>
+                <div class="hw-stat">
+                  <div class="hw-stat-label" data-i18n="hwLabelModel">
+                    Önerilen Model
+                  </div>
+                  <div
+                    class="hw-stat-val"
+                    id="hwModelVal"
+                    style="color: var(--accent-emerald)"
+                  >
+                    Whisper Medium.en / Small
+                  </div>
+                </div>
+                <div class="hw-stat">
+                  <div class="hw-stat-label" data-i18n="hwLabelSpeed">
+                    Transkripsiyon Hızı
+                  </div>
+                  <div
+                    class="hw-stat-val"
+                    id="hwSpeedVal"
+                    style="color: var(--text-primary); font-size: 0.95rem"
+                  >
+                    0.15x Gerçek Zamanlı (1 saatlik ses ~90 saniye)
+                  </div>
+                </div>
+              </div>
             </div>
+          </div>
 
+          <!-- Bento 2: Zero-Trust & Live DLP Redaction (Span 6) -->
+          <div class="bento-card col-6" id="security">
+            <div class="card-icon emerald">
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              </svg>
+            </div>
+            <h3 data-i18n="bentoSecTitle">
+              🛡️ Kurumsal Seviye Canlı DLP Koruması
+            </h3>
+            <p data-i18n="bentoSecDesc">
+              Toplantı sırasında telaffuz edilen veya metne dökülen TCKN, Kredi
+              Kartı (Luhn), IBAN ve API anahtarlarını anında maskeler.
+            </p>
+
+            <!-- Interactive DLP Sandbox -->
+            <div class="dlp-sandbox">
+              <textarea
+                class="dlp-input-box"
+                id="dlpInput"
+                data-i18n-placeholder="dlpPlaceholder"
+                placeholder="Buraya test metni yazın..."
+              ></textarea>
+              <div class="dlp-output-box" id="dlpOutput"></div>
+            </div>
+          </div>
+
+          <!-- Bento 3: Cross-Meeting Semantic Memory (Span 4) -->
+          <div class="bento-card col-4">
+            <div class="card-icon">
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <path d="M12 6v6l4 2" />
+              </svg>
+            </div>
+            <h3 data-i18n="bentoMemTitle">
+              🧠 Toplantılar Arası Semantik Hafıza
+            </h3>
+            <p data-i18n="bentoMemDesc">
+              Sadece anlık toplantıyı değil, aylar önceki konuşmaları da
+              hatırlar. Doğal dilde soru sorarak kararlara ve alıntılara ulaşın.
+            </p>
+            <div
+              style="
+                background: rgba(0, 0, 0, 0.3);
+                padding: 12px;
+                border-radius: 8px;
+                font-size: 0.85rem;
+                border: 1px solid var(--border-subtle);
+              "
+            >
+              <div
+                style="
+                  color: var(--accent-cyan);
+                  font-weight: 600;
+                  margin-bottom: 4px;
+                "
+                data-i18n="memQuery"
+              >
+                💬 "Geçen ay bütçe için ne konuşulmuştu?"
+              </div>
+              <div style="color: var(--text-muted)" data-i18n="memResult">
+                ↳ 3 farklı toplantıdan 4 alıntı getirildi (14 Mayıs, 22
+                Haziran).
+              </div>
+            </div>
+          </div>
+
+          <!-- Bento 4: 1-Click Soundbite & Podcast Player (Span 4) -->
+          <div class="bento-card col-4">
+            <div class="card-icon rose">
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <circle cx="6" cy="6" r="3" />
+                <circle cx="6" cy="18" r="3" />
+                <line x1="20" x2="8.12" y1="4" y2="15.88" />
+                <line x1="14.47" x2="20" y1="14.48" y2="20" />
+                <line x1="8.12" x2="12" y1="8.12" y2="12" />
+              </svg>
+            </div>
+            <h3 data-i18n="bentoAudioTitle">
+              ✂️ 1-Tıkla Ses Kesiti & Mini Podcast
+            </h3>
+            <p data-i18n="bentoAudioDesc">
+              Kritik tartışmaları 15-60 saniyelik ses kesiti (soundbite) olarak
+              kırpın veya dahili ses çalarla özetleri dinleyin.
+            </p>
+            <div
+              style="
+                background: rgba(0, 0, 0, 0.3);
+                padding: 12px;
+                border-radius: 8px;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                border: 1px solid var(--border-subtle);
+              "
+            >
+              <span
+                style="
+                  font-size: 0.85rem;
+                  font-family: var(--font-mono);
+                  color: var(--text-primary);
+                "
+                >🔊 soundbite_01.flac</span
+              >
+              <span
+                class="island-badge"
+                style="background: rgba(244, 63, 94, 0.2); color: #fda4af"
+                >00:32 / 00:45</span
+              >
+            </div>
+          </div>
+
+          <!-- Bento 5: Acoustic Diarization & Balance (Span 4) -->
+          <div class="bento-card col-4">
+            <div class="card-icon amber">
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+              </svg>
+            </div>
+            <h3 data-i18n="bentoDiarTitle">
+              🎙️ Konuşmacı Ayrıştırma & Analitik
+            </h3>
+            <p data-i18n="bentoDiarDesc">
+              Konuşmacıları frekanslarına göre tanır, hitaplardan isimlerini
+              öğrenir ve toplantı denge skorunu hesaplar.
+            </p>
+            <div
+              style="
+                display: flex;
+                gap: 6px;
+                height: 10px;
+                background: rgba(255, 255, 255, 0.05);
+                border-radius: 6px;
+                overflow: hidden;
+                margin-top: 16px;
+              "
+            >
+              <div
+                style="width: 60%; background: var(--accent-primary)"
+                data-i18n-title="diarSpeaker1"
+                title="Ahmet %60"
+              ></div>
+              <div
+                style="width: 25%; background: var(--accent-cyan)"
+                data-i18n-title="diarSpeaker2"
+                title="Can %25"
+              ></div>
+              <div
+                style="width: 15%; background: var(--accent-emerald)"
+                data-i18n-title="diarSpeaker3"
+                title="Selin %15"
+              ></div>
+            </div>
+          </div>
+
+          <!-- Bento 6: 3-Tier Hybrid AI Providers (Span 12 Full Width) -->
+          <div class="bento-card col-12" style="grid-column: span 12">
+            <div
+              class="card-icon"
+              style="
+                background: rgba(99, 102, 241, 0.2);
+                color: var(--accent-primary);
+              "
+            >
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" />
+                <path d="M12 13v6M9 16l3 3 3-3" />
+              </svg>
+            </div>
+            <h3 data-i18n="bentoProvidersTitle">
+              🌐 3 Katmanlı Esnek Model Mimarisi: Yerel, Self-Hosted & Bulut
+              Sağlayıcılar
+            </h3>
+            <p data-i18n="bentoProvidersDesc">
+              Sıfır bağımlılık: Donanımınızda %100 çevrimdışı çalışın, kendi
+              yerel Ollama/vLLM sunucunuzu bağlayın veya kendi API anahtarınızla
+              en güçlü bulut modellerini aracı komisyonsuz ve DLP korumasıyla
+              kullanın.
+            </p>
+
+            <div class="tier-cards-grid">
+              <!-- Tier 1: Bare-Metal Local -->
+              <div class="tier-card-item">
+                <div
+                  style="
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    margin-bottom: 8px;
+                  "
+                >
+                  <span
+                    style="
+                      background: rgba(6, 182, 212, 0.2);
+                      color: var(--accent-cyan);
+                      font-size: 0.75rem;
+                      font-weight: 700;
+                      padding: 3px 8px;
+                      border-radius: 999px;
+                    "
+                    >KATMAN 1</span
+                  >
+                  <strong
+                    style="color: var(--text-primary); font-size: 0.95rem"
+                    data-i18n="tier1Title"
+                    >💻 %100 Yerel (Bare-Metal)</strong
+                  >
+                </div>
+                <p
+                  style="
+                    font-size: 0.82rem;
+                    color: var(--text-muted);
+                    margin-bottom: 10px;
+                  "
+                  data-i18n="tier1Desc"
+                >
+                  Apple Metal GPU & NVIDIA CUDA ile Whisper.cpp çevrimdışı
+                  transkripsiyon. Sıfır bulut, sıfır abonelik.
+                </p>
+                <div
+                  style="
+                    font-size: 0.75rem;
+                    font-family: var(--font-mono);
+                    color: var(--accent-emerald);
+                  "
+                >
+                  ✔ Whisper Tiny/Base/Small/Medium
+                </div>
+              </div>
+
+              <!-- Tier 2: Self-Hosted LLMs -->
+              <div class="tier-card-item">
+                <div
+                  style="
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    margin-bottom: 8px;
+                  "
+                >
+                  <span
+                    style="
+                      background: rgba(16, 185, 129, 0.2);
+                      color: var(--accent-emerald);
+                      font-size: 0.75rem;
+                      font-weight: 700;
+                      padding: 3px 8px;
+                      border-radius: 999px;
+                    "
+                    >KATMAN 2</span
+                  >
+                  <strong
+                    style="color: var(--text-primary); font-size: 0.95rem"
+                    data-i18n="tier2Title"
+                    >🏠 Kendi LLM Sunucun (Ollama)</strong
+                  >
+                </div>
+                <p
+                  style="
+                    font-size: 0.82rem;
+                    color: var(--text-muted);
+                    margin-bottom: 10px;
+                  "
+                  data-i18n="tier2Desc"
+                >
+                  Yerel ağınızdaki Ollama, vLLM, LocalAI veya OpenAI-uyumlu
+                  sunucuları tek tıkla entegre edin.
+                </p>
+                <div
+                  style="
+                    font-size: 0.75rem;
+                    font-family: var(--font-mono);
+                    color: var(--accent-cyan);
+                  "
+                >
+                  ✔ Llama 3, Gemma 2, Mistral, Qwen
+                </div>
+              </div>
+
+              <!-- Tier 3: Public Cloud Providers -->
+              <div class="tier-card-item">
+                <div
+                  style="
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    margin-bottom: 8px;
+                  "
+                >
+                  <span
+                    style="
+                      background: rgba(99, 102, 241, 0.2);
+                      color: var(--accent-primary);
+                      font-size: 0.75rem;
+                      font-weight: 700;
+                      padding: 3px 8px;
+                      border-radius: 999px;
+                    "
+                    >KATMAN 3</span
+                  >
+                  <strong
+                    style="color: var(--text-primary); font-size: 0.95rem"
+                    data-i18n="tier3Title"
+                    >☁️ Genel Sağlayıcılar (Kendi API Anahtarınla)</strong
+                  >
+                </div>
+                <p
+                  style="
+                    font-size: 0.82rem;
+                    color: var(--text-muted);
+                    margin-bottom: 10px;
+                  "
+                  data-i18n="tier3Desc"
+                >
+                  Abonelik ödemeden kendi API anahtarınızla OpenAI, Google
+                  Gemini ve Groq. İstemci taraflı DLP ile sansürlenir.
+                </p>
+                <div
+                  style="
+                    font-size: 0.75rem;
+                    font-family: var(--font-mono);
+                    color: #a5b4fc;
+                  "
+                >
+                  ✔ GPT-4o, Gemini 1.5, Groq (70B)
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Download Center Section -->
+    <section class="download-section" id="download">
+      <div class="container">
+        <div class="section-header">
+          <h2 data-i18n="secDownloadTitle">Platformunuz İçin İndirin</h2>
+          <p data-i18n="secDownloadSubtitle">
+            Ücretsiz ve açık kaynaklı. İşletim sisteminize uygun kurulum
+            dosyasını seçebilirsiniz.
+          </p>
+        </div>
+
+        <div class="download-cards-grid">
+          <!-- Windows Setup Exe -->
+          <div class="download-card">
+            <svg class="platform-icon" viewBox="0 0 24 24" fill="#0078D7">
+              <path
+                d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"
+              />
+            </svg>
+            <h4 data-i18n="winSetupTitle">Windows Kurulum (.exe)</h4>
+            <div class="file-info" data-i18n="winSetupDesc">
+              Windows 10/11 x64 için standart NSIS kurulum paketi.
+            </div>
+            <div class="download-action-wrap">
+              <a
+                href="https://github.com/sewox/EchoMind/releases/download/v0.2.0/EchoMind_0.2.0_x64-setup.exe"
+                class="btn btn-primary"
+                style="width: 100%"
+              >
+                <span data-i18n="btnDownloadWinExe">İndir .exe (4.9 MB)</span>
+              </a>
+            </div>
+          </div>
+
+          <!-- Windows MSI -->
+          <div class="download-card">
+            <svg class="platform-icon" viewBox="0 0 24 24" fill="#0078D7">
+              <path
+                d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"
+              />
+            </svg>
+            <h4 data-i18n="winMsiTitle">Windows Installer (.msi)</h4>
+            <div class="file-info" data-i18n="winMsiDesc">
+              Kurumsal sistem yöneticileri için Windows MSI paketi.
+            </div>
+            <div class="download-action-wrap">
+              <a
+                href="https://github.com/sewox/EchoMind/releases/download/v0.2.0/EchoMind_0.2.0_x64_en-US.msi"
+                class="btn btn-secondary"
+                style="width: 100%"
+              >
+                <span data-i18n="btnDownloadWinMsi">İndir .msi (7.0 MB)</span>
+              </a>
+            </div>
+          </div>
+
+          <!-- macOS DMG -->
+          <div class="download-card">
+            <svg class="platform-icon" viewBox="0 0 24 24" fill="#f8fafc">
+              <path
+                d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 7.05c.61-.75 1.04-1.8 0.92-2.85-.9.04-2.03.62-2.67 1.37-.56.65-1.06 1.71-.93 2.73 1.01.08 2.07-.5 2.68-1.25z"
+              />
+            </svg>
+            <h4 data-i18n="macDmgTitle">macOS Disk İmajı (.dmg)</h4>
+            <div class="file-info" data-i18n="macDmgDesc">
+              Apple Silicon (M1/M2/M3/M4) işlemcili Mac bilgisayarlar için.
+            </div>
+            <div class="download-action-wrap">
+              <a
+                href="https://github.com/sewox/EchoMind/releases/download/v0.2.0/EchoMind_0.2.0_aarch64.dmg"
+                class="btn btn-secondary"
+                style="width: 100%"
+              >
+                <span data-i18n="btnDownloadMacDmg">İndir .dmg (8.4 MB)</span>
+              </a>
+            </div>
+          </div>
+
+          <!-- Linux Debian / Ubuntu (.deb) & AppImage -->
+          <div class="download-card">
+            <svg class="platform-icon" viewBox="0 0 24 24" fill="#E95420">
+              <path
+                d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.667 8.082a1.697 1.697 0 1 1-3.394 0 1.697 1.697 0 0 1 3.394 0zM7.333 12a1.697 1.697 0 1 1-3.394 0 1.697 1.697 0 0 1 3.394 0zm10.334 3.918a1.697 1.697 0 1 1-3.394 0 1.697 1.697 0 0 1 3.394 0z"
+              />
+            </svg>
+            <h4 data-i18n="linuxDistroTitle">
+              Linux Dağıtımları (.deb / .AppImage)
+            </h4>
+            <div class="file-info" data-i18n="linuxDistroDesc">
+              Ubuntu, Debian, Fedora ve Arch x64 için yerel paketler.
+            </div>
+            <div class="download-action-wrap" style="display: flex; gap: 8px">
+              <a
+                href="https://github.com/sewox/EchoMind/releases/download/v0.2.0/EchoMind_0.2.0_amd64.deb"
+                class="btn btn-primary"
+                style="
+                  flex: 1;
+                  padding: 10px 6px;
+                  font-size: 0.82rem;
+                  text-align: center;
+                "
+              >
+                <span>.deb</span>
+              </a>
+              <a
+                href="https://github.com/sewox/EchoMind/releases/download/v0.2.0/EchoMind_0.2.0_amd64.AppImage"
+                class="btn btn-secondary"
+                style="
+                  flex: 1;
+                  padding: 10px 6px;
+                  font-size: 0.82rem;
+                  text-align: center;
+                "
+              >
+                <span>.AppImage</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Site Footer -->
+    <footer class="site-footer">
+      <div class="container">
+        <div class="footer-content">
+          <div class="logo-area" style="font-size: 1.1rem">
+            <img
+              src="assets/echomind-icon.png"
+              alt="EchoMind AI Logo"
+              class="logo-img logo-img-footer"
+            />
+            <span>EchoMind AI Assistant</span>
+          </div>
+
+          <div class="footer-links">
+            <a href="https://github.com/sewox/EchoMind/releases" target="_blank"
+              >Releases</a
+            >
+            <a
+              href="https://github.com/sewox/EchoMind/blob/main/README.md"
+              target="_blank"
+              >Docs</a
+            >
+            <a
+              href="https://github.com/sewox/EchoMind/blob/main/LICENSE"
+              target="_blank"
+              >License</a
+            >
+            <a href="https://github.com/sewox/EchoMind" target="_blank"
+              >GitHub</a
+            >
           </div>
         </div>
 
-      </div>
-    </div>
-  </section>
-
-  <!-- Download Center Section -->
-  <section class="download-section" id="download">
-    <div class="container">
-      <div class="section-header">
-        <h2 data-i18n="secDownloadTitle">Platformunuz İçin İndirin</h2>
-        <p data-i18n="secDownloadSubtitle">Ücretsiz ve açık kaynaklı. İşletim sisteminize uygun kurulum dosyasını seçebilirsiniz.</p>
-      </div>
-
-      <div class="download-cards-grid">
-        
-        <!-- Windows Setup Exe -->
-        <div class="download-card">
-          <svg class="platform-icon" viewBox="0 0 24 24" fill="#0078D7"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>
-          <h4 data-i18n="winSetupTitle">Windows Kurulum (.exe)</h4>
-          <div class="file-info" data-i18n="winSetupDesc">Windows 10/11 x64 için standart NSIS kurulum paketi.</div>
-          <div class="download-action-wrap">
-            <a href="https://github.com/sewox/EchoMind/releases/download/v0.2.0/EchoMind_0.2.0_x64-setup.exe" class="btn btn-primary" style="width: 100%;">
-              <span data-i18n="btnDownloadWinExe">İndir .exe (4.9 MB)</span>
-            </a>
-          </div>
-        </div>
-
-        <!-- Windows MSI -->
-        <div class="download-card">
-          <svg class="platform-icon" viewBox="0 0 24 24" fill="#0078D7"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>
-          <h4 data-i18n="winMsiTitle">Windows Installer (.msi)</h4>
-          <div class="file-info" data-i18n="winMsiDesc">Kurumsal sistem yöneticileri için Windows MSI paketi.</div>
-          <div class="download-action-wrap">
-            <a href="https://github.com/sewox/EchoMind/releases/download/v0.2.0/EchoMind_0.2.0_x64_en-US.msi" class="btn btn-secondary" style="width: 100%;">
-              <span data-i18n="btnDownloadWinMsi">İndir .msi (7.0 MB)</span>
-            </a>
-          </div>
-        </div>
-
-        <!-- macOS DMG -->
-        <div class="download-card">
-          <svg class="platform-icon" viewBox="0 0 24 24" fill="#f8fafc"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 7.05c.61-.75 1.04-1.8 0.92-2.85-.9.04-2.03.62-2.67 1.37-.56.65-1.06 1.71-.93 2.73 1.01.08 2.07-.5 2.68-1.25z"/></svg>
-          <h4 data-i18n="macDmgTitle">macOS Disk İmajı (.dmg)</h4>
-          <div class="file-info" data-i18n="macDmgDesc">Apple Silicon (M1/M2/M3/M4) işlemcili Mac bilgisayarlar için.</div>
-          <div class="download-action-wrap">
-            <a href="https://github.com/sewox/EchoMind/releases/download/v0.2.0/EchoMind_0.2.0_aarch64.dmg" class="btn btn-secondary" style="width: 100%;">
-              <span data-i18n="btnDownloadMacDmg">İndir .dmg (8.4 MB)</span>
-            </a>
-          </div>
-        </div>
-
-        <!-- Linux Debian / Ubuntu (.deb) & AppImage -->
-        <div class="download-card">
-          <svg class="platform-icon" viewBox="0 0 24 24" fill="#E95420"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.667 8.082a1.697 1.697 0 1 1-3.394 0 1.697 1.697 0 0 1 3.394 0zM7.333 12a1.697 1.697 0 1 1-3.394 0 1.697 1.697 0 0 1 3.394 0zm10.334 3.918a1.697 1.697 0 1 1-3.394 0 1.697 1.697 0 0 1 3.394 0z"/></svg>
-          <h4 data-i18n="linuxDistroTitle">Linux Dağıtımları (.deb / .AppImage)</h4>
-          <div class="file-info" data-i18n="linuxDistroDesc">Ubuntu, Debian, Fedora ve Arch x64 için yerel paketler.</div>
-          <div class="download-action-wrap" style="display: flex; gap: 8px;">
-            <a href="https://github.com/sewox/EchoMind/releases/download/v0.2.0/EchoMind_0.2.0_amd64.deb" class="btn btn-primary" style="flex: 1; padding: 10px 6px; font-size: 0.82rem; text-align: center;">
-              <span>.deb</span>
-            </a>
-            <a href="https://github.com/sewox/EchoMind/releases/download/v0.2.0/EchoMind_0.2.0_amd64.AppImage" class="btn btn-secondary" style="flex: 1; padding: 10px 6px; font-size: 0.82rem; text-align: center;">
-              <span>.AppImage</span>
-            </a>
-          </div>
-        </div>
-
-      </div>
-    </div>
-  </section>
-
-  <!-- Site Footer -->
-  <footer class="site-footer">
-    <div class="container">
-      <div class="footer-content">
-        <div class="logo-area" style="font-size: 1.1rem;">
-          <img src="assets/echomind-icon.png" alt="EchoMind AI Logo" class="logo-img logo-img-footer">
-          <span>EchoMind AI Assistant</span>
-        </div>
-
-        <div class="footer-links">
-          <a href="https://github.com/sewox/EchoMind/releases" target="_blank">Releases</a>
-          <a href="https://github.com/sewox/EchoMind/blob/main/README.md" target="_blank">Docs</a>
-          <a href="https://github.com/sewox/EchoMind/blob/main/LICENSE" target="_blank">License</a>
-          <a href="https://github.com/sewox/EchoMind" target="_blank">GitHub</a>
+        <div class="footer-bottom" data-i18n="footerText">
+          EchoMind © 2026. Açık Kaynaklı ve Sıfır-Güven Toplantı Zekâsı
+          Platformu.
         </div>
       </div>
+    </footer>
 
-      <div class="footer-bottom" data-i18n="footerText">
-        EchoMind © 2026. Açık Kaynaklı ve Sıfır-Güven Toplantı Zekâsı Platformu.
-      </div>
-    </div>
-  </footer>
-
-  <script src="app.js"></script>
-</body>
+    <script src="app.js"></script>
+  </body>
 </html>
