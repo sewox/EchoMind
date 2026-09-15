@@ -1087,7 +1087,10 @@ describe("App Top-Level Integration", () => {
           unique_speakers: ["Ali"],
         });
       }
-      if (cmd === "search_cross_meeting_memory" || cmd === "global_search_meetings") {
+      if (
+        cmd === "search_cross_meeting_memory" ||
+        cmd === "global_search_meetings"
+      ) {
         return Promise.resolve([
           {
             meeting_id: "mtg-app-1",

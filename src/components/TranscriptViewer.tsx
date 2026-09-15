@@ -129,15 +129,18 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>(() => {
     return localStorage.getItem("echomind_selected_template") || "general";
   });
-  const [customTemplates, setCustomTemplates] = useState<MeetingTemplate[]>(() => {
-    try {
-      const saved = localStorage.getItem("echomind_custom_templates");
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
-  const [isCustomTemplateModalOpen, setIsCustomTemplateModalOpen] = useState<boolean>(false);
+  const [customTemplates, setCustomTemplates] = useState<MeetingTemplate[]>(
+    () => {
+      try {
+        const saved = localStorage.getItem("echomind_custom_templates");
+        return saved ? JSON.parse(saved) : [];
+      } catch {
+        return [];
+      }
+    },
+  );
+  const [isCustomTemplateModalOpen, setIsCustomTemplateModalOpen] =
+    useState<boolean>(false);
 
   const handleSelectTemplate = (template: MeetingTemplate) => {
     setSelectedTemplateId(template.id);
@@ -163,15 +166,21 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
   };
 
   // Speech De-filler & Fluency Filter State
-  const [isFillerFilterActive, setIsFillerFilterActive] = useState<boolean>(() => {
-    return localStorage.getItem("echomind_filler_filter_active") === "true";
-  });
-  const [cleanedSegmentsMap, setCleanedSegmentsMap] = useState<Record<number, string>>({});
+  const [isFillerFilterActive, setIsFillerFilterActive] = useState<boolean>(
+    () => {
+      return localStorage.getItem("echomind_filler_filter_active") === "true";
+    },
+  );
+  const [cleanedSegmentsMap, setCleanedSegmentsMap] = useState<
+    Record<number, string>
+  >({});
   const [fillersRemovedCount, setFillersRemovedCount] = useState<number>(0);
 
   // Meeting Analytics Modal State
-  const [isAnalyticsModalOpen, setIsAnalyticsModalOpen] = useState<boolean>(false);
-  const [meetingAnalytics, setMeetingAnalytics] = useState<MeetingAnalytics | null>(null);
+  const [isAnalyticsModalOpen, setIsAnalyticsModalOpen] =
+    useState<boolean>(false);
+  const [meetingAnalytics, setMeetingAnalytics] =
+    useState<MeetingAnalytics | null>(null);
   const [isLoadingAnalytics, setIsLoadingAnalytics] = useState<boolean>(false);
 
   const handleOpenAnalytics = async () => {
@@ -179,9 +188,12 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
     setIsLoadingAnalytics(true);
     try {
       if (selectedPastMeeting?.id) {
-        const res = await invoke<MeetingAnalytics>("get_meeting_analytics_by_id", {
-          meetingId: selectedPastMeeting.id,
-        });
+        const res = await invoke<MeetingAnalytics>(
+          "get_meeting_analytics_by_id",
+          {
+            meetingId: selectedPastMeeting.id,
+          },
+        );
         setMeetingAnalytics(res);
       } else {
         const res = await invoke<MeetingAnalytics>("get_meeting_analytics", {
@@ -568,7 +580,8 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
 
       const allTemplates = [...BUILTIN_TEMPLATES, ...customTemplates];
       const activeTpl =
-        allTemplates.find((t) => t.id === selectedTemplateId) || BUILTIN_TEMPLATES[0];
+        allTemplates.find((t) => t.id === selectedTemplateId) ||
+        BUILTIN_TEMPLATES[0];
 
       const summaryRes = await invoke<SummaryResult>(
         "generate_meeting_summary",
@@ -736,7 +749,11 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
       try {
         if (selectedPastMeeting?.id) {
           const res = await invoke<{
-            segments: Array<{ id: number; cleaned_text: string; removed_fillers_count: number }>;
+            segments: Array<{
+              id: number;
+              cleaned_text: string;
+              removed_fillers_count: number;
+            }>;
             total_fillers_removed: number;
           }>("filter_meeting_filler_words", {
             meetingId: selectedPastMeeting.id,
@@ -755,10 +772,13 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
           let totalCount = 0;
           const map: Record<number, string> = {};
           for (const seg of segments) {
-            const [cleaned, count] = await invoke<[string, number]>("clean_transcript_text", {
-              rawText: seg.text,
-              langCode: selectedLanguage || seg.language || null,
-            });
+            const [cleaned, count] = await invoke<[string, number]>(
+              "clean_transcript_text",
+              {
+                rawText: seg.text,
+                langCode: selectedLanguage || seg.language || null,
+              },
+            );
             map[seg.id] = cleaned;
             totalCount += count;
           }
@@ -932,7 +952,11 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
                   title={t("transcript.analytics.modalSubtitle")}
                 >
                   <BarChart3 className="w-3.5 h-3.5 text-indigo-400" />
-                  <span>{isLoadingAnalytics ? "..." : t("transcript.analytics.button")}</span>
+                  <span>
+                    {isLoadingAnalytics
+                      ? "..."
+                      : t("transcript.analytics.button")}
+                  </span>
                 </button>
               )}
 

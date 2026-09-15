@@ -55,12 +55,16 @@ describe("Senior QA Edge-Case & Chaos / Monkey Testing Suite", () => {
       );
 
       // Tab switching should never crash
-      const reportTab = screen.getByRole("button", { name: /Toplantı Raporu/i });
+      const reportTab = screen.getByRole("button", {
+        name: /Toplantı Raporu/i,
+      });
       await act(async () => {
         fireEvent.click(reportTab);
       });
 
-      const tasksTab = screen.queryByRole("button", { name: /Görevler & Kararlar/i });
+      const tasksTab = screen.queryByRole("button", {
+        name: /Görevler & Kararlar/i,
+      });
       if (tasksTab) {
         await act(async () => {
           fireEvent.click(tasksTab);
@@ -84,9 +88,17 @@ describe("Senior QA Edge-Case & Chaos / Monkey Testing Suite", () => {
       );
 
       // Cycle all export tabs
-      const tabs = ["Markdown", "HTML", "Slack & Teams", "Takip E-Postası", "Görevler (CSV/MD)"];
+      const tabs = [
+        "Markdown",
+        "HTML",
+        "Slack & Teams",
+        "Takip E-Postası",
+        "Görevler (CSV/MD)",
+      ];
       for (const tabName of tabs) {
-        const tabBtn = screen.queryByRole("button", { name: new RegExp(tabName, "i") });
+        const tabBtn = screen.queryByRole("button", {
+          name: new RegExp(tabName, "i"),
+        });
         if (tabBtn) {
           await act(async () => {
             fireEvent.click(tabBtn);
@@ -144,8 +156,12 @@ describe("Senior QA Edge-Case & Chaos / Monkey Testing Suite", () => {
         </I18nProvider>,
       );
 
-      const titleInput = screen.getByPlaceholderText(/Örn: Haftalık Pazarlama Değerlendirmesi/i);
-      const promptInput = screen.getByPlaceholderText(/SEN KIDEMLİ BİR PAZARLAMA/i);
+      const titleInput = screen.getByPlaceholderText(
+        /Örn: Haftalık Pazarlama Değerlendirmesi/i,
+      );
+      const promptInput = screen.getByPlaceholderText(
+        /SEN KIDEMLİ BİR PAZARLAMA/i,
+      );
       const saveBtn = screen.getByRole("button", { name: /Şablonu Kaydet/i });
 
       // Test 1: Empty input submission should be prevented (disabled or ignored)
@@ -191,10 +207,7 @@ describe("Senior QA Edge-Case & Chaos / Monkey Testing Suite", () => {
 
       render(
         <I18nProvider>
-          <GlobalAssistantModal
-            isOpen={true}
-            onClose={vi.fn()}
-          />
+          <GlobalAssistantModal isOpen={true} onClose={vi.fn()} />
         </I18nProvider>,
       );
 
@@ -202,7 +215,9 @@ describe("Senior QA Edge-Case & Chaos / Monkey Testing Suite", () => {
       const searchTab = screen.getByRole("button", { name: /Ara\.\.\./i });
       fireEvent.click(searchTab);
 
-      const searchInput = screen.getByPlaceholderText(/Tüm toplantı başlıkları/i);
+      const searchInput = screen.getByPlaceholderText(
+        /Tüm toplantı başlıkları/i,
+      );
 
       for (const query of adversarialStrings) {
         await act(async () => {
@@ -291,8 +306,12 @@ describe("Senior QA Edge-Case & Chaos / Monkey Testing Suite", () => {
       );
 
       const streamTab = screen.getByRole("button", { name: /Konuşma Akışı/i });
-      const reportTab = screen.getByRole("button", { name: /Toplantı Raporu/i });
-      const tasksTab = screen.getByRole("button", { name: /Görevler & Kararlar/i });
+      const reportTab = screen.getByRole("button", {
+        name: /Toplantı Raporu/i,
+      });
+      const tasksTab = screen.getByRole("button", {
+        name: /Görevler & Kararlar/i,
+      });
 
       // Rapid cycle 10 times
       for (let i = 0; i < 10; i++) {
@@ -303,7 +322,9 @@ describe("Senior QA Edge-Case & Chaos / Monkey Testing Suite", () => {
         });
       }
 
-      expect(screen.getByText("Hızlı geçiş testi yapılıyor.")).toBeInTheDocument();
+      expect(
+        screen.getByText("Hızlı geçiş testi yapılıyor."),
+      ).toBeInTheDocument();
     });
   });
 
@@ -313,7 +334,9 @@ describe("Senior QA Edge-Case & Chaos / Monkey Testing Suite", () => {
   describe("4. IPC & Network Failure Resilience", () => {
     it("gracefully catches all backend IPC rejections across all features", async () => {
       // Backend is down / throwing errors on every invoke
-      (invoke as any).mockRejectedValue(new Error("IPC Network Bridge Disconnected"));
+      (invoke as any).mockRejectedValue(
+        new Error("IPC Network Bridge Disconnected"),
+      );
 
       const mockPastMeeting: any = {
         id: "m-fail",
@@ -350,7 +373,9 @@ describe("Senior QA Edge-Case & Chaos / Monkey Testing Suite", () => {
       );
 
       // 1. Cleaner toggle with backend error
-      const cleanerBtn = screen.queryByRole("button", { name: /Konuşmayı Netleştir/i });
+      const cleanerBtn = screen.queryByRole("button", {
+        name: /Konuşmayı Netleştir/i,
+      });
       if (cleanerBtn) {
         await act(async () => {
           fireEvent.click(cleanerBtn);
@@ -366,7 +391,9 @@ describe("Senior QA Edge-Case & Chaos / Monkey Testing Suite", () => {
       }
 
       // 3. Analytics button with backend error
-      const analyticsBtn = screen.queryByRole("button", { name: /Katılımcı & Toplantı Analitiği/i });
+      const analyticsBtn = screen.queryByRole("button", {
+        name: /Katılımcı & Toplantı Analitiği/i,
+      });
       if (analyticsBtn) {
         await act(async () => {
           fireEvent.click(analyticsBtn);

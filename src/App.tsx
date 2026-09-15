@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import {
@@ -176,7 +176,13 @@ export function App() {
   const [updateCheckInfo, setUpdateCheckInfo] =
     useState<UpdateCheckResult | null>(null);
 
-  // Automatic startup update checker
+  const selectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (selectTimeoutRef.current) clearTimeout(selectTimeoutRef.current);
+    };
+  }, []);
   useEffect(() => {
     const autoCheck =
       localStorage.getItem("echomind_auto_check_updates") !== "false";
@@ -472,12 +478,19 @@ export function App() {
 
   const handleSelectPastMeeting = (mtg: MeetingRecord) => {
     if (selectedMeeting?.id === mtg.id) return;
+    if (selectTimeoutRef.current) clearTimeout(selectTimeoutRef.current);
     setIsLoadingMeeting(true);
     // Non-blocking transition to prevent freezing
-    setTimeout(() => {
+    selectTimeoutRef.current = setTimeout(() => {
       setSelectedMeeting(mtg);
       setIsLoadingMeeting(false);
     }, 40);
+  };
+
+  const handleReturnToLiveSession = () => {
+    if (selectTimeoutRef.current) clearTimeout(selectTimeoutRef.current);
+    setIsLoadingMeeting(false);
+    setSelectedMeeting(null);
   };
 
   const executeAudioImport = async (
@@ -936,7 +949,7 @@ export function App() {
                 {t("sidebar.title")} ({filteredMeetings.length})
               </h2>
               <button
-                onClick={() => setSelectedMeeting(null)}
+                onClick={handleReturnToLiveSession}
                 className="p-1 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition"
                 title={t("sidebar.liveSession")}
               >
@@ -1106,7 +1119,7 @@ export function App() {
               selectedLanguage={selectedLanguage}
               onLanguageChange={setSelectedLanguage}
               selectedPastMeeting={selectedMeeting}
-              onReturnToLiveSession={() => setSelectedMeeting(null)}
+              onReturnToLiveSession={handleReturnToLiveSession}
               onMeetingUpdated={(m) => {
                 setSelectedMeeting(m);
                 fetchPastMeetings();
