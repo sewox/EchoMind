@@ -56,8 +56,8 @@ EchoMind, kullanıcılarına tam model özgürlüğü ve sıfır bağımlılık 
 - **Katman 2: Kendi Yerel/Ağ LLM Sunucun (Self-Hosted Ollama & vLLM):**
   - Kendi bilgisayarınızda veya yerel ağınızda (LAN/Sunucu) koşan **Ollama (`http://localhost:11434`)**, **vLLM**, **LocalAI** veya özel **OpenAI-uyumlu uç noktaları** tek tıkla bağlayın.
   - `Llama 3`, `Gemma 2`, `Mistral`, `Qwen` gibi açık kaynaklı LLM'lerle sınırsız ve gizli toplantı özeti ve analiz üretin.
-- **Katman 3: Genel Bulut Sağlayıcıları (BYOK - Bring Your Own Key):**
-  - Kendi API anahtarınızla ultra hızlı analiz için **Google Gemini (1.5 Pro / Flash)**, **Groq (Llama 3 70B & Whisper-v3)** ve **OpenAI (GPT-4o / Whisper Cloud)** modellerini kullanın.
+- **Katman 3: Genel Bulut Sağlayıcıları (Kendi API Anahtarınla / BYOK):**
+  - Aylık aracı abonelik ücreti ödemeden, kendi API anahtarınızla ultra hızlı analiz için **Google Gemini (1.5 Pro / Flash)**, **Groq (Llama 3 70B & Whisper-v3)** ve **OpenAI (GPT-4o / Whisper Cloud)** modellerini kullanın.
   - **İstemci Taraflı DLP Güvencesi:** Buluta gönderilmeden önce tüm hassas veriler (TCKN, Kredi Kartı, API anahtarları, şifreler) cihazınızda maskelenir (`[REDACTED]`), böylece bulut sağlayıcılarına asla ham şirket sırları gitmez.
 
 ### 2. 🛡️ Kurumsal Seviye Güvenlik & DLP Koruması (Zero-Trust Architecture)
@@ -142,8 +142,8 @@ EchoMind offers total freedom over how and where your audio and LLM intelligence
 - **Tier 2: Self-Hosted LLMs (Local Ollama, vLLM & Custom Servers):**
   - Seamlessly connect to your local or private network **Ollama (`http://localhost:11434`)**, **vLLM**, **LocalAI**, or custom **OpenAI-compatible server**.
   - Run unrestricted private meeting summaries with open-weights models like `Llama 3`, `Gemma 2`, `Mistral`, or `Qwen`.
-- **Tier 3: Public Cloud Providers (BYOK - Bring Your Own Key):**
-  - Connect your own API keys for **Google Gemini (1.5 Pro / Flash)**, **Groq (Llama 3 70B Ultra-Fast & Whisper-v3)**, and **OpenAI (GPT-4o)**.
+- **Tier 3: Public Cloud Providers (Bring Your Own Key / BYOK):**
+  - Connect your own API keys for **Google Gemini (1.5 Pro / Flash)**, **Groq (Llama 3 70B Ultra-Fast & Whisper-v3)**, and **OpenAI (GPT-4o)** with zero middleman SaaS markup.
   - **Client-Side DLP Assurance:** All sensitive credentials, card numbers, IBANs, and IDs are sanitized *before* reaching external APIs.
 
 ### 2. 🛡️ Enterprise Zero-Trust Security & DLP Guard
