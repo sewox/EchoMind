@@ -27,11 +27,11 @@
 
 | Platform | Format | Açıklama / Description | İndirme / Download |
 | :--- | :--- | :--- | :--- |
-| **Windows (x64)** | `.exe` | Standart Windows Kurulum Paketi (NSIS) | [⬇️ **EchoMind_0.2.0_x64-setup.exe**](https://github.com/sewox/EchoMind/releases/download/v0.2.0/EchoMind_0.2.0_x64-setup.exe) |
-| **Windows (x64)** | `.msi` | Kurumsal Windows Installer | [⬇️ **EchoMind_0.2.0_x64_en-US.msi**](https://github.com/sewox/EchoMind/releases/download/v0.2.0/EchoMind_0.2.0_x64_en-US.msi) |
-| **macOS (Apple Silicon)** | `.dmg` | Apple Silicon (M1/M2/M3/M4) Disk İmajı | [⬇️ **EchoMind_0.2.0_aarch64.dmg**](https://github.com/sewox/EchoMind/releases/download/v0.2.0/EchoMind_0.2.0_aarch64.dmg) |
-| **Linux (Debian / Ubuntu)** | `.deb` | Debian, Ubuntu x64 Kurulum Paketi | [⬇️ **EchoMind_0.2.0_amd64.deb**](https://github.com/sewox/EchoMind/releases/download/v0.2.0/EchoMind_0.2.0_amd64.deb) |
-| **Linux (Taşınabilir / All)** | `.AppImage` | Bağımsız Çalıştırılabilir Linux Paketi | [⬇️ **EchoMind_0.2.0_amd64.AppImage**](https://github.com/sewox/EchoMind/releases/download/v0.2.0/EchoMind_0.2.0_amd64.AppImage) |
+| **Windows (x64)** | `.exe` | Standart Windows Kurulum Paketi (NSIS) | [⬇️ **EchoMind_0.2.1_x64-setup.exe**](https://github.com/sewox/EchoMind/releases/download/v0.2.1/EchoMind_0.2.1_x64-setup.exe) |
+| **Windows (x64)** | `.msi` | Kurumsal Windows Installer | [⬇️ **EchoMind_0.2.1_x64_en-US.msi**](https://github.com/sewox/EchoMind/releases/download/v0.2.1/EchoMind_0.2.1_x64_en-US.msi) |
+| **macOS (Apple Silicon)** | `.dmg` | Apple Silicon (M1/M2/M3/M4) Disk İmajı | [⬇️ **EchoMind_0.2.1_aarch64.dmg**](https://github.com/sewox/EchoMind/releases/download/v0.2.1/EchoMind_0.2.1_aarch64.dmg) |
+| **Linux (Debian / Ubuntu)** | `.deb` | Debian, Ubuntu x64 Kurulum Paketi | [⬇️ **EchoMind_0.2.1_amd64.deb**](https://github.com/sewox/EchoMind/releases/download/v0.2.1/EchoMind_0.2.1_amd64.deb) |
+| **Linux (Taşınabilir / All)** | `.AppImage` | Bağımsız Çalıştırılabilir Linux Paketi | [⬇️ **EchoMind_0.2.1_amd64.AppImage**](https://github.com/sewox/EchoMind/releases/download/v0.2.1/EchoMind_0.2.1_amd64.AppImage) |
 
 ---
 
@@ -179,8 +179,8 @@ EchoMind offers total freedom over how and where your audio and LLM intelligence
 ## 🛠️ Quick Start Guide
 
 ### 1. Installation
-- **Windows:** Download and run [`EchoMind_0.2.0_x64-setup.exe`](https://github.com/sewox/EchoMind/releases/download/v0.2.0/EchoMind_0.2.0_x64-setup.exe).
-- **macOS:** Download [`EchoMind_0.2.0_aarch64.dmg`](https://github.com/sewox/EchoMind/releases/download/v0.2.0/EchoMind_0.2.0_aarch64.dmg) and drag `EchoMind` to your `Applications` folder.
+- **Windows:** Download and run [`EchoMind_0.2.1_x64-setup.exe`](https://github.com/sewox/EchoMind/releases/download/v0.2.1/EchoMind_0.2.1_x64-setup.exe).
+- **macOS:** Download [`EchoMind_0.2.1_aarch64.dmg`](https://github.com/sewox/EchoMind/releases/download/v0.2.1/EchoMind_0.2.1_aarch64.dmg) and drag `EchoMind` to your `Applications` folder.
 
 ### 2. Getting Started
 1. Launch the app and allow the **Smart Advisor** to detect your hardware.
