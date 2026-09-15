@@ -40,7 +40,7 @@ export const EchoMindLogo: React.FC<{
         </div>
         {showTagline && (
           <span className="text-[11px] text-slate-400 tracking-normal">
-            EchoMind Offline Assistant
+            Serene Offline Assistant
           </span>
         )}
       </div>
