@@ -316,6 +316,25 @@ export interface TranslationKeys {
     autoStopToggleDesc: string;
     ignoredAppsTitle: string;
   };
+  updater?: {
+    modalTitle: string;
+    modalSubtitle: string;
+    newVersionBadge: string;
+    currentVersion: string;
+    latestVersion: string;
+    releaseNotes: string;
+    downloadAndUpdate: string;
+    remindLater: string;
+    dontShowAgainForVersion: string;
+    autoCheckToggle: string;
+    autoCheckToggleDesc: string;
+    checkNowButton: string;
+    checking: string;
+    upToDate: string;
+    upToDateDesc: string;
+    updateAvailable: string;
+    updateError: string;
+  };
 }
 
 export type SupportedLanguage = "tr" | "en" | "de" | "fr" | "es";

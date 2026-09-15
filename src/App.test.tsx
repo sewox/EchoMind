@@ -2446,4 +2446,57 @@ describe("App Top-Level Integration", () => {
       ).toBeNull();
     }
   });
+
+  it("handles automatic startup update check and opens UpdateModal when available", async () => {
+    (invoke as any).mockImplementation((cmd: string) => {
+      if (cmd === "get_all_meetings") return Promise.resolve(mockPastMeetings);
+      if (cmd === "get_hardware_info")
+        return Promise.resolve({
+          os_name: "macOS",
+          os_version: "15.0",
+          cpu_brand: "Apple M3 Max",
+          cpu_cores: 16,
+          total_ram_gb: 36,
+          gpu_name: "Apple M3 Max (Metal)",
+          metal_supported: true,
+          cuda_supported: false,
+          avx2_supported: true,
+        });
+      if (cmd === "get_model_status")
+        return Promise.resolve({
+          model_name: "whisper-small",
+          is_loaded: true,
+          is_downloading: false,
+          download_progress: 100,
+          hardware_acceleration: "Metal (Apple Silicon)",
+        });
+      if (cmd === "get_audio_status")
+        return Promise.resolve({ is_recording: false, mic_level: 0 });
+      if (cmd === "start_meeting_detector") return Promise.resolve();
+      if (cmd === "check_for_updates") {
+        return Promise.resolve({
+          is_update_available: true,
+          current_version: "0.2.0",
+          latest_version: "0.4.0",
+          release_name: "EchoMind v0.4.0",
+          release_notes: "Super update",
+          published_at: "2026-09-15T00:00:00Z",
+          html_url: "https://github.com/sewox/EchoMind/releases/tag/v0.4.0",
+          assets: [],
+        });
+      }
+      return Promise.resolve();
+    });
+
+    render(
+      <I18nProvider>
+        <App />
+      </I18nProvider>,
+    );
+
+    expect(
+      await screen.findByTestId("update-modal-backdrop"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("v0.4.0")).toBeInTheDocument();
+  });
 });

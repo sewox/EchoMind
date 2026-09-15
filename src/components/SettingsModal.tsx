@@ -32,6 +32,8 @@ import {
 } from "./ModelHubModalConstants";
 import { useI18n, SUPPORTED_LANGUAGES } from "../locales/i18nContext";
 
+import { UpdateCheckResult } from "./UpdateModal";
+
 export interface AudioDeviceInfo {
   name: string;
   is_default: boolean;
@@ -45,6 +47,7 @@ interface SettingsModalProps {
   onClose: () => void;
   hardware: HardwareInfo | null;
   modelStatus: ModelStatus | null;
+  onOpenUpdateModal?: (info: UpdateCheckResult) => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -52,6 +55,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onClose,
   hardware,
   modelStatus,
+  onOpenUpdateModal,
 }) => {
   const { t, language, setLanguage } = useI18n();
   const [activeTab, setActiveTab] = useState<
@@ -110,6 +114,42 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     openai: false,
   });
   const [savedSuccess, setSavedSuccess] = useState<boolean>(false);
+
+  // Software Updater State
+  const [autoCheckUpdates, setAutoCheckUpdates] = useState<boolean>(true);
+  const [updateStatus, setUpdateStatus] = useState<{
+    state: "idle" | "checking" | "upToDate" | "updateAvailable" | "error";
+    version?: string;
+    message?: string;
+  }>({ state: "idle" });
+
+  const handleCheckUpdates = async () => {
+    setUpdateStatus({ state: "checking" });
+    try {
+      const res = await invoke<UpdateCheckResult>("check_for_updates");
+      if (res.is_update_available) {
+        setUpdateStatus({
+          state: "updateAvailable",
+          version: res.latest_version,
+        });
+        if (onOpenUpdateModal) {
+          onOpenUpdateModal(res);
+        }
+      } else {
+        setUpdateStatus({
+          state: "upToDate",
+          version: res.current_version,
+        });
+      }
+    } catch (err: unknown) {
+      const errorMsg =
+        err instanceof Error ? err.message : String(err) || "Update check failed";
+      setUpdateStatus({
+        state: "error",
+        message: errorMsg,
+      });
+    }
+  };
 
   const fetchAudioDevices = async () => {
     setIsLoadingDevices(true);
@@ -178,6 +218,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       const suppressed =
         localStorage.getItem("echomind_suppress_cloud_warning") === "true";
       setAskCloudConfirm(!suppressed);
+
+      const autoCheck =
+        localStorage.getItem("echomind_auto_check_updates") !== "false";
+      setAutoCheckUpdates(autoCheck);
+      setUpdateStatus({ state: "idle" });
 
       // Fetch meeting detector status & settings
       invoke<any>("get_detector_status")
@@ -693,6 +738,102 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <span className="text-slate-200">
                   Kristal Netliğinde Stüdyo Sesi
                 </span>
+              </div>
+            </div>
+
+            {/* Software Updates Section */}
+            <div className="p-3.5 rounded-xl bg-slate-950/60 border border-cyan-500/30 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-white flex items-center gap-1.5 font-semibold text-xs">
+                  <Sparkles className="w-4 h-4 text-cyan-400" />
+                  {t("updater.checkNowButton") || "Uygulama Güncellemeleri"}
+                </span>
+                <span className="text-[10px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 px-2 py-0.5 rounded-full font-bold">
+                  v0.2.0
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between text-[11px] pt-1 border-t border-slate-800/80">
+                <div>
+                  <span className="text-slate-200 font-medium block">
+                    {t("updater.autoCheckToggle") ||
+                      "Açılışta Güncellemeleri Otomatik Denetle"}
+                  </span>
+                  <span className="text-slate-400 text-[10px]">
+                    {t("updater.autoCheckToggleDesc") ||
+                      "Yeni bir EchoMind sürümü yayınlandığında açılışta bilgilendirir."}
+                  </span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={autoCheckUpdates}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setAutoCheckUpdates(checked);
+                    localStorage.setItem(
+                      "echomind_auto_check_updates",
+                      String(checked),
+                    );
+                  }}
+                  className="w-4 h-4 rounded border-slate-700 bg-slate-800 text-cyan-600 focus:ring-0 cursor-pointer"
+                  data-testid="settings-auto-update-toggle"
+                />
+              </div>
+
+              {/* Check for Updates Action & Feedback */}
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800/80">
+                <div>
+                  {updateStatus.state === "upToDate" && (
+                    <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400 font-medium">
+                      <Check className="w-3.5 h-3.5" />
+                      {t("updater.upToDateDesc", {
+                        version: updateStatus.version || "v0.2.0",
+                      }) || "EchoMind güncel (v0.2.0)."}
+                    </span>
+                  )}
+                  {updateStatus.state === "updateAvailable" && (
+                    <span className="inline-flex items-center gap-1 text-[11px] text-cyan-300 font-bold animate-pulse">
+                      <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                      {t("updater.updateAvailable", {
+                        version: updateStatus.version || "",
+                      }) || `Yeni sürüm mevcut (v${updateStatus.version})`}
+                    </span>
+                  )}
+                  {updateStatus.state === "error" && (
+                    <span className="inline-flex items-center gap-1 text-[11px] text-rose-400 font-medium">
+                      <AlertTriangle className="w-3.5 h-3.5" />
+                      {updateStatus.message ||
+                        t("updater.updateError") ||
+                        "Güncelleme denetlenemedi."}
+                    </span>
+                  )}
+                  {updateStatus.state === "idle" && (
+                    <span className="text-[10px] text-slate-500">
+                      GitHub Releases üzerinden kontrol edilir.
+                    </span>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleCheckUpdates}
+                  disabled={updateStatus.state === "checking"}
+                  className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 hover:border-cyan-500/50 text-[11px] font-medium transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  data-testid="settings-check-updates-btn"
+                >
+                  <RefreshCw
+                    className={`w-3.5 h-3.5 ${
+                      updateStatus.state === "checking"
+                        ? "animate-spin text-cyan-400"
+                        : "text-slate-400"
+                    }`}
+                  />
+                  <span>
+                    {updateStatus.state === "checking"
+                      ? t("updater.checking") || "Denetleniyor..."
+                      : t("updater.checkNowButton") || "Güncellemeleri Denetle"}
+                  </span>
+                </button>
               </div>
             </div>
           </div>
