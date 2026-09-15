@@ -1,5 +1,10 @@
 // EchoMind Interactive Landing Engine (Full Bilingual & OS-Aware)
 
+const sampleDlpTexts = {
+  tr: "Toplantıda müşteri TCKN: 10987654328 ve Kartı 4532890123456789 ile sk-live9876543210abcdef anahtarını onayladı.",
+  en: "In the meeting, customer ID: 10987654328 and Card: 4532890123456789 with API Key sk-live9876543210abcdef were confirmed."
+};
+
 const translations = {
   tr: {
     navFeatures: "Özellikler",
@@ -12,10 +17,10 @@ const translations = {
     heroSubtitle: "Apple Metal ve NVIDIA CUDA ile %100 yerel ve gizli çalışabilen, kurumsal DLP ve toplantılar arası semantik hafıza sunan yeni nesil masaüstü toplantı asistanı.",
     btnDownloadWindows: "Windows (.exe İndir)",
     btnDownloadMac: "macOS (.dmg İndir)",
-    btnDownloadGeneric: "Ücretsiz İndir (v0.2.0)",
     btnGithub: "GitHub Kaynak Kodu",
+    hudTitle: "EchoMind Kayan HUD Arayüzü • macOS / Windows",
     islandStatus: "Canlı Toplantı • Dinamik Ada",
-    islandTranscript: "Ahmet: \"Q3 hedeflerimiz için yerel model hızlandırmasını tamamladık.\"",
+    islandEngineBadge: "Whisper Metal • 0.12x",
     secFeaturesTitle: "Neden EchoMind?",
     secFeaturesSubtitle: "Tüm toplantı iş akışınızı gizlilikten ödün vermeden otomatikleştirin.",
     bentoHwTitle: "⚡ Donanım Farkındalıklı Hibrit Motor",
@@ -36,10 +41,13 @@ const translations = {
     bentoMemDesc: "Sadece anlık toplantıyı değil, aylar önceki konuşmaları da hatırlar. Doğal dilde soru sorarak kararlara ve alıntılara ulaşın.",
     memQuery: "💬 \"Geçen ay bütçe için ne konuşulmuştu?\"",
     memResult: "↳ 3 farklı toplantıdan 4 alıntı getirildi (14 Mayıs, 22 Haziran).",
-    bentoAudioTitle: "✂️ 1-Tıkla Ses Kesiti & Mini Podcast Çalar",
+    bentoAudioTitle: "✂️ 1-Tıkla Ses Kesiti & Mini Podcast",
     bentoAudioDesc: "Kritik tartışmaları 15-60 saniyelik ses kesiti (soundbite) olarak kırpın veya dahili ses çalarla özetleri dinleyin.",
     bentoDiarTitle: "🎙️ Konuşmacı Ayrıştırma & Analitik",
     bentoDiarDesc: "Konuşmacıları frekanslarına göre tanır, hitaplardan isimlerini öğrenir ve toplantı denge skorunu hesaplar.",
+    diarSpeaker1: "Ahmet %60",
+    diarSpeaker2: "Can %25",
+    diarSpeaker3: "Selin %15",
     secDownloadTitle: "Platformunuz İçin İndirin",
     secDownloadSubtitle: "Ücretsiz ve açık kaynaklı. İşletim sisteminize uygun kurulum dosyasını seçebilirsiniz.",
     winSetupTitle: "Windows Kurulum (.exe)",
@@ -64,10 +72,10 @@ const translations = {
     heroSubtitle: "A next-generation desktop meeting assistant that runs 100% locally with Apple Metal & NVIDIA CUDA, featuring enterprise DLP and cross-meeting semantic memory.",
     btnDownloadWindows: "Download for Windows (.exe)",
     btnDownloadMac: "Download for macOS (.dmg)",
-    btnDownloadGeneric: "Download Free (v0.2.0)",
     btnGithub: "GitHub Repository",
+    hudTitle: "EchoMind Floating HUD Overlay • macOS / Windows",
     islandStatus: "Live Meeting • Dynamic Island",
-    islandTranscript: "Alex: \"We have finalized the on-device acceleration for Q3 goals.\"",
+    islandEngineBadge: "Whisper Metal • 0.12x",
     secFeaturesTitle: "Why Choose EchoMind?",
     secFeaturesSubtitle: "Automate your entire meeting intelligence workflow without compromising data privacy.",
     bentoHwTitle: "⚡ Hardware-Aware Hybrid Engine",
@@ -92,6 +100,9 @@ const translations = {
     bentoAudioDesc: "Extract 15s-60s vital audio clips or listen to executive summaries through the integrated mini podcast player.",
     bentoDiarTitle: "🎙️ Speaker Diarization & Analytics",
     bentoDiarDesc: "Acoustically separates distinct speakers, learns names from context, and visualizes talk-to-listen balance scores.",
+    diarSpeaker1: "Alex 60%",
+    diarSpeaker2: "John 25%",
+    diarSpeaker3: "Sarah 15%",
     secDownloadTitle: "Download for Your Platform",
     secDownloadSubtitle: "Free and open-source. Select the installer corresponding to your operating system.",
     winSetupTitle: "Windows Setup (.exe)",
@@ -182,6 +193,13 @@ function setLanguage(lang) {
     }
   });
 
+  document.querySelectorAll('[data-i18n-title]').forEach(el => {
+    const key = el.getAttribute('data-i18n-title');
+    if (translations[lang] && translations[lang][key]) {
+      el.title = translations[lang][key];
+    }
+  });
+
   document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
     const key = el.getAttribute('data-i18n-placeholder');
     if (translations[lang] && translations[lang][key]) {
@@ -196,11 +214,26 @@ function setLanguage(lang) {
 
   updateHardwareDisplay();
 
-  // Re-run DLP simulation with current text
+  // Switch DLP sample text if user hasn't typed custom text, or update current
   const dlpInput = document.getElementById('dlpInput');
   const dlpOutput = document.getElementById('dlpOutput');
   if (dlpInput && dlpOutput) {
+    // If input matches one of the sample texts or is empty, switch to the new language sample
+    const isDefaultSample = !dlpInput.value || 
+      dlpInput.value === sampleDlpTexts.tr || 
+      dlpInput.value === sampleDlpTexts.en;
+
+    if (isDefaultSample) {
+      dlpInput.value = sampleDlpTexts[lang];
+    }
     dlpOutput.innerHTML = simulateDLP(dlpInput.value);
+  }
+
+  // Update Dynamic Island Transcript immediately on lang switch
+  const transcriptEl = document.getElementById('islandTranscriptText');
+  if (transcriptEl) {
+    const list = (lang === 'tr' ? transcripts.tr : transcripts.en);
+    transcriptEl.textContent = list[0];
   }
 
   localStorage.setItem('echomind_lang', lang);
@@ -216,7 +249,12 @@ function simulateDLP(input) {
 
   let sanitized = input;
 
-  // Credit Card (13-19 digits, Luhn check)
+  // 1. API Keys (sk-..., gsk_..., AIzaSy..., ghp_...)
+  sanitized = sanitized.replace(/\b(sk-[a-zA-Z0-9_-]{20,}|gsk_[a-zA-Z0-9_-]{20,}|AIzaSy[a-zA-Z0-9_-]{33}|ghp_[a-zA-Z0-9]{36})\b/g, () => {
+    return `<span class="redacted-tag">[REDACTED_API_KEY]</span>`;
+  });
+
+  // 2. Credit Card (13-19 digits, Luhn check)
   sanitized = sanitized.replace(/\b(?:\d[ -]*?){13,19}\b/g, (match) => {
     const cleaned = match.replace(/[\s-]/g, '');
     if (luhnCheck(cleaned)) {
@@ -225,27 +263,22 @@ function simulateDLP(input) {
     return match;
   });
 
-  // TCKN (11 digits)
+  // 3. TCKN (11 digits)
   sanitized = sanitized.replace(/\b[1-9]\d{10}\b/g, () => {
     return `<span class="redacted-tag">[REDACTED_TCKN]</span>`;
   });
 
-  // IBAN (TR...)
+  // 4. IBAN (TR...)
   sanitized = sanitized.replace(/\bTR\d{2}[0-9A-Z]{5,30}\b/gi, () => {
     return `<span class="redacted-tag">[REDACTED_IBAN]</span>`;
   });
 
-  // API Keys (sk-..., gsk_..., AIzaSy..., ghp_...)
-  sanitized = sanitized.replace(/\b(sk-[a-zA-Z0-9_-]{20,}|gsk_[a-zA-Z0-9_-]{20,}|AIzaSy[a-zA-Z0-9_-]{33}|ghp_[a-zA-Z0-9]{36})\b/g, () => {
-    return `<span class="redacted-tag">[REDACTED_API_KEY]</span>`;
-  });
-
-  // Email
+  // 5. Email
   sanitized = sanitized.replace(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g, () => {
     return `<span class="redacted-tag">[REDACTED_EMAIL]</span>`;
   });
 
-  // Phone numbers
+  // 6. Phone numbers
   sanitized = sanitized.replace(/(?:\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b/g, () => {
     return `<span class="redacted-tag">[REDACTED_PHONE]</span>`;
   });
@@ -291,12 +324,28 @@ function detectUserOS() {
   }
 }
 
+// Dynamic Island Transcripts
+const transcripts = {
+  tr: [
+    'Ahmet: "Q3 hedeflerimiz için yerel model hızlandırmasını tamamladık."',
+    'Gizem: "Kullanıcı kredi kartı ve TCKN verileri DLP kuralıyla maskelendi."',
+    'Can: "Geçen ayki toplantıda alınan bütçe kararlarını hafızadan getirdim."',
+    'Selin: "Ses kesiti 250ms içinde dışa aktarıldı. Buluta veri iletilmedi."'
+  ],
+  en: [
+    'Alex: "We have finalized on-device acceleration for Q3 milestones."',
+    'Sarah: "Confidential customer cards and national IDs are redacted by DLP."',
+    'Michael: "Retrieved the budget consensus from last month\'s memory."',
+    'Elena: "Soundbite exported in 250ms with zero cloud transmission."'
+  ]
+};
+
 // DOM Ready initialization
 document.addEventListener('DOMContentLoaded', () => {
   // Detect OS for Smart CTA Highlighting
   detectUserOS();
 
-  // Init Language
+  // Init Language (check localStorage or default 'tr')
   const savedLang = localStorage.getItem('echomind_lang') || 'tr';
   setLanguage(savedLang);
 
@@ -311,9 +360,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const dlpInput = document.getElementById('dlpInput');
   const dlpOutput = document.getElementById('dlpOutput');
   if (dlpInput && dlpOutput) {
-    dlpInput.value = "Toplantıda müşteri TCKN: 10987654328 ve Kartı 4532890123456789 ile sk-live9876543210abcdef anahtarını onayladı.";
-    dlpOutput.innerHTML = simulateDLP(dlpInput.value);
-
     dlpInput.addEventListener('input', (e) => {
       dlpOutput.innerHTML = simulateDLP(e.target.value);
     });
@@ -327,20 +373,6 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Dynamic Island Transcript Rotation
-  const transcripts = {
-    tr: [
-      'Ahmet: "Q3 hedeflerimiz için yerel model hızlandırmasını tamamladık."',
-      'Gizem: "Kullanıcı kredi kartı ve TCKN verileri DLP kuralıyla maskelendi."',
-      'Can: "Geçen ayki toplantıda alınan bütçe kararlarını hafızadan getirdim."',
-      'Selin: "Ses kesiti 250ms içinde dışa aktarıldı. Buluta veri iletilmedi."'
-    ],
-    en: [
-      'Alex: "We have finalized on-device acceleration for Q3 milestones."',
-      'Sarah: "Confidential customer cards and national IDs are redacted by DLP."',
-      'Michael: "Retrieved the budget consensus from last month\'s memory."',
-      'Elena: "Soundbite exported in 250ms with zero cloud transmission."'
-    ]
-  };
   let transcriptIdx = 0;
   const transcriptEl = document.getElementById('islandTranscriptText');
   if (transcriptEl) {
