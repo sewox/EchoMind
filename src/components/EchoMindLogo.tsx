@@ -35,12 +35,12 @@ export const EchoMindLogo: React.FC<{
             EchoMind
           </span>
           <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-400 font-normal border border-white/5">
-            v0.1.0
+            v0.2.0
           </span>
         </div>
         {showTagline && (
           <span className="text-[11px] text-slate-400 tracking-normal">
-            Serene Offline Assistant
+            EchoMind Offline Assistant
           </span>
         )}
       </div>
