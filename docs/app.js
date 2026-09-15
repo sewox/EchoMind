@@ -8,7 +8,6 @@ const sampleDlpTexts = {
 const translations = {
   tr: {
     navFeatures: "Özellikler",
-    navShowcase: "Arayüz",
     navSecurity: "Güvenlik & DLP",
     navHardware: "Donanım",
     navDownload: "İndir",
@@ -23,25 +22,6 @@ const translations = {
     hudTitle: "EchoMind Kayan HUD Arayüzü • macOS / Windows",
     islandStatus: "Canlı Toplantı • Dinamik Ada",
     islandEngineBadge: "Whisper Metal • 0.12x",
-    secShowcaseTitle: "✨ EchoMind Masaüstü Arayüzü",
-    secShowcaseSubtitle:
-      "Gizlilik odaklı, sıfır gecikmeli ve donanım hızlandırmalı modern toplantı arayüzünü inceleyin.",
-    tabShowcaseTrans: "🎙️ Canlı Transkripsiyon",
-    tabShowcaseSummary: "📊 Akıllı Özet & Analitik",
-    tabShowcaseMemory: "🧠 Semantik Hafıza",
-    tabShowcaseHw: "⚡ Donanım Ayarları",
-    showcaseBadgeLocal: "%100 Yerel Motor",
-    showcaseBadgeSummary: "Otomatik Yapay Zekâ Analitiği",
-    showcaseBadgeMemory: "Vektörel Semantik Arama",
-    showcaseBadgeHw: "Apple Metal & NVIDIA CUDA",
-    captionTrans:
-      "Toplantı sırasında konuşmacıları anlık tanır, Whisper Metal/CUDA ile yerel çözümler ve hassas DLP verilerini maskeler.",
-    captionSummary:
-      "Toplantı bittiğinde kararları, aksiyon maddelerini ve konuşmacı dengesini otomatik olarak özetler ve grafiğe döker.",
-    captionMemory:
-      "Tüm geçmiş toplantılarınızda doğal dille semantik arama yapın ve ilgili ses kesitine doğrudan zıplayın.",
-    captionHw:
-      "Cihazınızın GPU (Metal, CUDA) ve CPU kaynaklarına göre Whisper modellerini tek tıkla yapılandırın.",
     secFeaturesTitle: "Neden EchoMind?",
     secFeaturesSubtitle:
       "Tüm toplantı iş akışınızı gizlilikten ödün vermeden otomatikleştirin.",
@@ -109,7 +89,6 @@ const translations = {
   },
   en: {
     navFeatures: "Features",
-    navShowcase: "Showcase",
     navSecurity: "Security & DLP",
     navHardware: "Hardware",
     navDownload: "Download",
@@ -124,25 +103,6 @@ const translations = {
     hudTitle: "EchoMind Floating HUD Overlay • macOS / Windows",
     islandStatus: "Live Meeting • Dynamic Island",
     islandEngineBadge: "Whisper Metal • 0.12x",
-    secShowcaseTitle: "✨ EchoMind Desktop Experience",
-    secShowcaseSubtitle:
-      "Explore the privacy-first, zero-latency, and hardware-accelerated modern meeting interface.",
-    tabShowcaseTrans: "🎙️ Live Transcription",
-    tabShowcaseSummary: "📊 Smart Summary & Analytics",
-    tabShowcaseMemory: "🧠 Semantic Memory",
-    tabShowcaseHw: "⚡ Hardware Settings",
-    showcaseBadgeLocal: "100% On-Device Engine",
-    showcaseBadgeSummary: "Automated AI Analytics",
-    showcaseBadgeMemory: "Vector Semantic Search",
-    showcaseBadgeHw: "Apple Metal & NVIDIA CUDA",
-    captionTrans:
-      "Separates speakers in real time, transcribes locally via Whisper Metal/CUDA, and masks sensitive DLP credentials.",
-    captionSummary:
-      "Automatically extracts decisions, action items, and speaker participation balance immediately after the meeting.",
-    captionMemory:
-      "Search seamlessly across all previous meetings using natural language queries with instant audio timestamp links.",
-    captionHw:
-      "Easily configure Whisper model sizes and hardware acceleration targets tailored to your system's GPU and CPU cores.",
     secFeaturesTitle: "Why Choose EchoMind?",
     secFeaturesSubtitle:
       "Automate your entire meeting intelligence workflow without compromising data privacy.",
@@ -330,11 +290,6 @@ function setLanguage(lang) {
     transcriptEl.textContent = list[0];
   }
 
-  // Update Showcase Gallery texts on lang switch
-  if (typeof selectShowcaseTab === "function") {
-    selectShowcaseTab(currentShowcaseKey);
-  }
-
   localStorage.setItem("echomind_lang", lang);
 }
 
@@ -506,120 +461,4 @@ document.addEventListener("DOMContentLoaded", () => {
       }, 300);
     }, 4000);
   }
-
-  // Init Showcase Gallery Tabs
-  document.querySelectorAll(".showcase-tab-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      selectShowcaseTab(btn.getAttribute("data-showcase"));
-    });
-  });
 });
-
-let currentShowcaseKey = "transcription";
-
-const showcaseData = {
-  transcription: {
-    img: "assets/screenshots/showcase-live-transcription.png",
-    title: {
-      tr: "EchoMind AI Assistant • Canlı Toplantı & Transkripsiyon Odası",
-      en: "EchoMind AI Assistant • Live Meeting Room & Transcription",
-    },
-    badge: {
-      tr: "%100 Yerel Motor",
-      en: "100% On-Device Engine",
-    },
-    caption: {
-      tr: "Toplantı sırasında konuşmacıları anlık tanır, Whisper Metal/CUDA ile yerel çözümler ve hassas DLP verilerini maskeler.",
-      en: "Separates speakers in real time, transcribes locally via Whisper Metal/CUDA, and masks sensitive DLP credentials.",
-    },
-    tag: {
-      tr: "Apple Metal & NVIDIA CUDA",
-      en: "Apple Metal & NVIDIA CUDA",
-    },
-  },
-  summary: {
-    img: "assets/screenshots/showcase-meeting-summary.png",
-    title: {
-      tr: "EchoMind AI Assistant • Yönetici Özeti & Aksiyon Maddeleri",
-      en: "EchoMind AI Assistant • Executive Summary & Action Items",
-    },
-    badge: {
-      tr: "Otomatik Yapay Zekâ Analitiği",
-      en: "Automated AI Analytics",
-    },
-    caption: {
-      tr: "Toplantı bittiğinde kararları, aksiyon maddelerini ve konuşmacı dengesini otomatik olarak özetler ve grafiğe döker.",
-      en: "Automatically extracts decisions, action items, and speaker participation balance immediately after the meeting.",
-    },
-    tag: {
-      tr: "Konuşmacı Ayrıştırma & Kararlar",
-      en: "Speaker Diarization & Decisions",
-    },
-  },
-  memory: {
-    img: "assets/screenshots/showcase-semantic-memory.png",
-    title: {
-      tr: "EchoMind AI Assistant • Toplantılar Arası Semantik Arama",
-      en: "EchoMind AI Assistant • Cross-Meeting Semantic Memory",
-    },
-    badge: {
-      tr: "Vektörel Semantik Arama",
-      en: "Vector Semantic Search",
-    },
-    caption: {
-      tr: "Tüm geçmiş toplantılarınızda doğal dille semantik arama yapın ve ilgili ses kesitine doğrudan zıplayın.",
-      en: "Search seamlessly across all previous meetings using natural language queries with instant audio timestamp links.",
-    },
-    tag: {
-      tr: "Semantik Hafıza & Ses Kesiti",
-      en: "Semantic Memory & Soundbites",
-    },
-  },
-  hardware: {
-    img: "assets/screenshots/showcase-hardware-settings.png",
-    title: {
-      tr: "EchoMind AI Assistant • Donanım Hızlandırma & Model Seçici",
-      en: "EchoMind AI Assistant • Hardware Acceleration & Model Selector",
-    },
-    badge: {
-      tr: "Donanım Farkındalıklı",
-      en: "Hardware-Aware",
-    },
-    caption: {
-      tr: "Cihazınızın GPU (Metal, CUDA) ve CPU kaynaklarına göre Whisper modellerini tek tıkla yapılandırın.",
-      en: "Easily configure Whisper model sizes and hardware acceleration targets tailored to your system's GPU and CPU cores.",
-    },
-    tag: {
-      tr: "Metal • CUDA • AVX2",
-      en: "Metal • CUDA • AVX2",
-    },
-  },
-};
-
-function selectShowcaseTab(key) {
-  if (!showcaseData[key]) return;
-  currentShowcaseKey = key;
-
-  document.querySelectorAll(".showcase-tab-btn").forEach((btn) => {
-    btn.classList.toggle("active", btn.getAttribute("data-showcase") === key);
-  });
-
-  const data = showcaseData[key];
-  const imgEl = document.getElementById("showcaseMainImg");
-  const titleEl = document.getElementById("showcaseWinTitle");
-  const badgeEl = document.getElementById("showcaseWinBadge");
-  const captionEl = document.getElementById("showcaseCaptionText");
-  const tagEl = document.getElementById("showcaseCaptionTag");
-
-  if (imgEl) {
-    imgEl.style.opacity = "0.4";
-    setTimeout(() => {
-      imgEl.src = data.img;
-      imgEl.style.opacity = "1";
-    }, 150);
-  }
-  if (titleEl) titleEl.textContent = data.title[currentLang];
-  if (badgeEl) badgeEl.textContent = data.badge[currentLang];
-  if (captionEl) captionEl.textContent = data.caption[currentLang];
-  if (tagEl) tagEl.textContent = data.tag[currentLang];
-}
