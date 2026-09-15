@@ -349,6 +349,24 @@ pub fn save_current_meeting(
         }
     }
 
+    // If segments are empty but we have audio, transcribe immediately to guarantee zero data loss
+    if deduplicated_segments.is_empty() && raw_pcm_buffer.len() >= 16000 {
+        if let Ok(auto_segs) = transcriber.transcribe_pcm(&raw_pcm_buffer, "auto") {
+            for seg in auto_segs {
+                let is_dup = deduplicated_segments.iter().any(|existing| {
+                    existing.start_time_ms == seg.start_time_ms
+                        && existing.end_time_ms == seg.end_time_ms
+                        && existing.text.trim() == seg.text.trim()
+                });
+                if !is_dup {
+                    let mut s = seg;
+                    s.id = deduplicated_segments.len() + 1;
+                    deduplicated_segments.push(s);
+                }
+            }
+        }
+    }
+
     let meeting = MeetingRecord {
         id,
         title: if title.trim().is_empty() {
