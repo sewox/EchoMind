@@ -1,6 +1,6 @@
 [package]
 name = "echomind"
-version = "0.2.1"
+version = "0.2.2"
 description = "EchoMind - Hardware-Aware Hybrid AI Meeting Assistant"
 authors = ["EchoMind Team"]
 edition = "2021"
@@ -8,6 +8,14 @@ edition = "2021"
 [lib]
 name = "echomind_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
+
+[[bin]]
+name = "echomind"
+path = "src/main.rs"
+
+[[example]]
+name = "live_meeting_stress_tester"
+path = "examples/live_meeting_stress_tester.rs"
 
 [build-dependencies]
 tauri-build = { version = "2.0.5", features = [] }

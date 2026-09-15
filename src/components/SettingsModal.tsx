@@ -755,7 +755,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   {t("updater.checkNowButton") || "Uygulama Güncellemeleri"}
                 </span>
                 <span className="text-[10px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 px-2 py-0.5 rounded-full font-bold">
-                  v0.2.1
+                  v0.2.2
                 </span>
               </div>
 
@@ -774,14 +774,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   type="checkbox"
                   checked={autoCheckUpdates}
                   onChange={(e) => {
-                    const checked = e.target.checked;
-                    setAutoCheckUpdates(checked);
+                    const val = e.target.checked;
+                    setAutoCheckUpdates(val);
                     localStorage.setItem(
                       "echomind_auto_check_updates",
-                      String(checked),
+                      val ? "true" : "false",
                     );
                   }}
-                  className="w-4 h-4 rounded border-slate-700 bg-slate-800 text-cyan-600 focus:ring-0 cursor-pointer"
+                  className="rounded border-slate-700 bg-slate-900 text-cyan-500 focus:ring-cyan-500/50 w-4 h-4 cursor-pointer"
                   data-testid="settings-auto-update-toggle"
                 />
               </div>
@@ -793,8 +793,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400 font-medium">
                       <Check className="w-3.5 h-3.5" />
                       {t("updater.upToDateDesc", {
-                        version: updateStatus.version || "v0.2.1",
-                      }) || "EchoMind güncel (v0.2.1)."}
+                        version: updateStatus.version || "v0.2.2",
+                      }) || "EchoMind güncel (v0.2.2)."}
                     </span>
                   )}
                   {updateStatus.state === "updateAvailable" && (

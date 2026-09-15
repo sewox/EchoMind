@@ -633,4 +633,28 @@ describe("SettingsModal Component", () => {
 
     expect(screen.getByText(/Network offline/i)).toBeInTheDocument();
   });
+
+  it("handles switching between language and api keys tabs and selects language", () => {
+    render(
+      <I18nProvider>
+        <SettingsModal {...defaultProps} />
+      </I18nProvider>,
+    );
+
+    // Switch to language tab
+    const langTab = screen.getByRole("button", { name: /Arayüz Dili/i });
+    fireEvent.click(langTab);
+    expect(screen.getByText(/Tüm menüler, butonlar ve rapor şablonları/i)).toBeInTheDocument();
+
+    // Select English
+    const enBtn = screen.getAllByText("English")[0];
+    fireEvent.click(enBtn);
+
+    // Switch to API Keys tab
+    const apiTab = screen.getByRole("button", {
+      name: /AI Services|Yapay Zeka Servisleri/i,
+    });
+    fireEvent.click(apiTab);
+    expect(screen.getByText(/Özel Yerel LLM/i)).toBeInTheDocument();
+  });
 });
