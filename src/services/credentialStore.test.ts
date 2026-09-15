@@ -16,7 +16,9 @@ describe("CredentialStore Service", () => {
     vi.mocked(invoke).mockResolvedValueOnce("sk-encrypted-vault-secret");
 
     const result = await CredentialStore.get("echomind_openai_key");
-    expect(invoke).toHaveBeenCalledWith("get_secure_credential", { keyName: "echomind_openai_key" });
+    expect(invoke).toHaveBeenCalledWith("get_secure_credential", {
+      keyName: "echomind_openai_key",
+    });
     expect(result).toBe("sk-encrypted-vault-secret");
   });
 
@@ -36,7 +38,9 @@ describe("CredentialStore Service", () => {
       keyName: "echomind_gemini_key",
       keyValue: "AIzaSy_secure_gemini",
     });
-    expect(localStorage.getItem("echomind_gemini_key")).toBe("AIzaSy_secure_gemini");
+    expect(localStorage.getItem("echomind_gemini_key")).toBe(
+      "AIzaSy_secure_gemini",
+    );
   });
 
   it("handles empty key removal gracefully", async () => {
@@ -52,7 +56,9 @@ describe("CredentialStore Service", () => {
     localStorage.setItem("echomind_key", "to_delete");
 
     await CredentialStore.delete("echomind_key");
-    expect(invoke).toHaveBeenCalledWith("delete_secure_credential", { keyName: "echomind_key" });
+    expect(invoke).toHaveBeenCalledWith("delete_secure_credential", {
+      keyName: "echomind_key",
+    });
     expect(localStorage.getItem("echomind_key")).toBeNull();
   });
 });

@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from "@tauri-apps/api/core";
 
 export interface DlpConfig {
   redact_credit_cards: boolean;
@@ -22,7 +22,7 @@ export const DEFAULT_DLP_CONFIG: DlpConfig = {
  * Validates whether a number string satisfies Luhn checksum algorithm (Credit Cards).
  */
 export function isLuhnValid(numberStr: string): boolean {
-  const digits = numberStr.replace(/\D/g, '').split('').map(Number);
+  const digits = numberStr.replace(/\D/g, "").split("").map(Number);
   if (digits.length < 13 || digits.length > 19) {
     return false;
   }
@@ -49,7 +49,7 @@ export function isLuhnValid(numberStr: string): boolean {
  * Validates Turkish National ID (TCKN) checksum algorithm.
  */
 export function isTcknValid(numberStr: string): boolean {
-  const digits = numberStr.replace(/\D/g, '').split('').map(Number);
+  const digits = numberStr.replace(/\D/g, "").split("").map(Number);
   if (digits.length !== 11 || digits[0] === 0) {
     return false;
   }
@@ -80,16 +80,21 @@ const API_KEY_REGEXES = [
   /\bBearer\s+([a-zA-Z0-9_.-]{20,})\b/gi,
 ];
 
-const IBAN_REGEX = /\bTR[0-9]{2}[\s]?[0-9]{4}[\s]?[0-9]{4}[\s]?[0-9]{4}[\s]?[0-9]{4}[\s]?[0-9]{4}[\s]?[0-9]{2}\b/g;
+const IBAN_REGEX =
+  /\bTR[0-9]{2}[\s]?[0-9]{4}[\s]?[0-9]{4}[\s]?[0-9]{4}[\s]?[0-9]{4}[\s]?[0-9]{4}[\s]?[0-9]{2}\b/g;
 const EMAIL_REGEX = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
-const PHONE_REGEX = /(?:\+?90[\s.-]?)?(?:\(?0?5\d{2}\)?[\s.-]?)\d{3}[\s.-]?\d{2}[\s.-]?\d{2}\b/g;
+const PHONE_REGEX =
+  /(?:\+?90[\s.-]?)?(?:\(?0?5\d{2}\)?[\s.-]?)\d{3}[\s.-]?\d{2}[\s.-]?\d{2}\b/g;
 const DIGIT_CHUNK_REGEX = /\b(?:\d[\s.-]?){11,19}\b/g;
 
 /**
  * Client-side fast DLP redaction utility
  */
-export function redactSensitiveData(text: string, config: Partial<DlpConfig> = {}): string {
-  if (!text) return '';
+export function redactSensitiveData(
+  text: string,
+  config: Partial<DlpConfig> = {},
+): string {
+  if (!text) return "";
 
   const cfg = { ...DEFAULT_DLP_CONFIG, ...config };
   let result = text;
@@ -97,24 +102,33 @@ export function redactSensitiveData(text: string, config: Partial<DlpConfig> = {
   // 1. API Keys
   if (cfg.redact_api_keys) {
     for (const regex of API_KEY_REGEXES) {
-      result = result.replace(regex, '[REDACTED: API_KEY]');
+      result = result.replace(regex, "[REDACTED: API_KEY]");
     }
   }
 
   // 2. IBAN
   if (cfg.redact_iban) {
-    result = result.replace(IBAN_REGEX, '[REDACTED: IBAN]');
+    result = result.replace(IBAN_REGEX, "[REDACTED: IBAN]");
   }
 
   // 3. Credit Cards & TCKN with algorithmic checks
   if (cfg.redact_credit_cards || cfg.redact_tckn) {
     result = result.replace(DIGIT_CHUNK_REGEX, (match) => {
-      const cleanDigits = match.replace(/\D/g, '');
-      if (cfg.redact_tckn && cleanDigits.length === 11 && isTcknValid(cleanDigits)) {
-        return '[REDACTED: TCKN]';
+      const cleanDigits = match.replace(/\D/g, "");
+      if (
+        cfg.redact_tckn &&
+        cleanDigits.length === 11 &&
+        isTcknValid(cleanDigits)
+      ) {
+        return "[REDACTED: TCKN]";
       }
-      if (cfg.redact_credit_cards && cleanDigits.length >= 13 && cleanDigits.length <= 19 && isLuhnValid(cleanDigits)) {
-        return '[REDACTED: CREDIT_CARD]';
+      if (
+        cfg.redact_credit_cards &&
+        cleanDigits.length >= 13 &&
+        cleanDigits.length <= 19 &&
+        isLuhnValid(cleanDigits)
+      ) {
+        return "[REDACTED: CREDIT_CARD]";
       }
       return match;
     });
@@ -122,12 +136,12 @@ export function redactSensitiveData(text: string, config: Partial<DlpConfig> = {
 
   // 4. Email
   if (cfg.redact_emails) {
-    result = result.replace(EMAIL_REGEX, '[REDACTED: EMAIL]');
+    result = result.replace(EMAIL_REGEX, "[REDACTED: EMAIL]");
   }
 
   // 5. Phone
   if (cfg.redact_phones) {
-    result = result.replace(PHONE_REGEX, '[REDACTED: PHONE]');
+    result = result.replace(PHONE_REGEX, "[REDACTED: PHONE]");
   }
 
   return result;
@@ -138,10 +152,10 @@ export function redactSensitiveData(text: string, config: Partial<DlpConfig> = {
  */
 export async function redactSensitiveDataNative(
   text: string,
-  config?: Partial<DlpConfig>
+  config?: Partial<DlpConfig>,
 ): Promise<string> {
   try {
-    return await invoke<string>('redact_sensitive_text', {
+    return await invoke<string>("redact_sensitive_text", {
       text,
       config: config ? { ...DEFAULT_DLP_CONFIG, ...config } : null,
     });

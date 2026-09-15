@@ -36,8 +36,10 @@ export const MeetingAnalyticsModal: React.FC<MeetingAnalyticsModalProps> = ({
   };
 
   const getScoreColor = (score: number) => {
-    if (score >= 80) return "text-emerald-400 bg-emerald-500/10 border-emerald-500/20";
-    if (score >= 50) return "text-amber-400 bg-amber-500/10 border-amber-500/20";
+    if (score >= 80)
+      return "text-emerald-400 bg-emerald-500/10 border-emerald-500/20";
+    if (score >= 50)
+      return "text-amber-400 bg-amber-500/10 border-amber-500/20";
     return "text-rose-400 bg-rose-500/10 border-rose-500/20";
   };
 
@@ -75,7 +77,10 @@ export const MeetingAnalyticsModal: React.FC<MeetingAnalyticsModalProps> = ({
               <BarChart3 className="w-5 h-5" />
             </div>
             <div>
-              <h2 id="analytics-modal-title" className="text-lg font-bold text-white flex items-center gap-2">
+              <h2
+                id="analytics-modal-title"
+                className="text-lg font-bold text-white flex items-center gap-2"
+              >
                 {t("transcript.analytics.modalTitle")}
               </h2>
               <p className="text-xs text-slate-400">
@@ -105,7 +110,9 @@ export const MeetingAnalyticsModal: React.FC<MeetingAnalyticsModalProps> = ({
                   <Award className="w-4 h-4 text-indigo-400" />
                   {t("transcript.analytics.balanceScore")}
                 </span>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${getScoreColor(analytics.meeting_balance_score)}`}>
+                <span
+                  className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${getScoreColor(analytics.meeting_balance_score)}`}
+                >
                   {getScoreBadgeText(analytics.meeting_balance_score)}
                 </span>
               </div>
@@ -135,7 +142,9 @@ export const MeetingAnalyticsModal: React.FC<MeetingAnalyticsModalProps> = ({
               <div className="w-full bg-slate-700/60 rounded-full h-2.5 overflow-hidden flex my-2">
                 <div
                   className="bg-cyan-500 h-full transition-all duration-500"
-                  style={{ width: `${Math.max(0, 100 - analytics.silence_percentage)}%` }}
+                  style={{
+                    width: `${Math.max(0, 100 - analytics.silence_percentage)}%`,
+                  }}
                   title={`${t("transcript.analytics.talkTime")}: %${(100 - analytics.silence_percentage).toFixed(1)}`}
                 />
                 <div
@@ -145,7 +154,10 @@ export const MeetingAnalyticsModal: React.FC<MeetingAnalyticsModalProps> = ({
                 />
               </div>
               <div className="flex items-center justify-between text-[11px] text-slate-400">
-                <span>{t("transcript.analytics.silenceTime")}: %{analytics.silence_percentage.toFixed(0)}</span>
+                <span>
+                  {t("transcript.analytics.silenceTime")}: %
+                  {analytics.silence_percentage.toFixed(0)}
+                </span>
                 <span>{formatSecs(analytics.total_duration_seconds)}</span>
               </div>
             </div>
@@ -165,11 +177,15 @@ export const MeetingAnalyticsModal: React.FC<MeetingAnalyticsModalProps> = ({
                 <span className="text-3xl font-extrabold text-white">
                   {analytics.average_wpm}
                 </span>
-                <span className="text-xs text-slate-400">{t("transcript.analytics.wpm")}</span>
+                <span className="text-xs text-slate-400">
+                  {t("transcript.analytics.wpm")}
+                </span>
               </div>
               <div className="flex items-center justify-between text-[11px] text-slate-400 mt-2">
                 <span>{t("transcript.analytics.totalWords")}:</span>
-                <span className="font-semibold text-slate-200">{analytics.total_words.toLocaleString()}</span>
+                <span className="font-semibold text-slate-200">
+                  {analytics.total_words.toLocaleString()}
+                </span>
               </div>
             </div>
           </div>
@@ -179,12 +195,17 @@ export const MeetingAnalyticsModal: React.FC<MeetingAnalyticsModalProps> = ({
             <div className="flex items-center justify-between border-b border-slate-700/40 pb-3">
               <h3 className="text-sm font-semibold text-white flex items-center gap-2">
                 <Users className="w-4 h-4 text-indigo-400" />
-                {t("transcript.analytics.speakerStatsTitle")} ({analytics.speaker_stats.length})
+                {t("transcript.analytics.speakerStatsTitle")} (
+                {analytics.speaker_stats.length})
               </h3>
               {analytics.dominant_speaker && (
                 <span className="text-xs text-slate-400 flex items-center gap-1">
                   <Award className="w-3.5 h-3.5 text-amber-400" />
-                  {t("transcript.analytics.dominantSpeaker")}: <strong className="text-slate-200">{analytics.dominant_speaker}</strong> (%{analytics.dominant_speaker_percentage.toFixed(0)})
+                  {t("transcript.analytics.dominantSpeaker")}:{" "}
+                  <strong className="text-slate-200">
+                    {analytics.dominant_speaker}
+                  </strong>{" "}
+                  (%{analytics.dominant_speaker_percentage.toFixed(0)})
                 </span>
               )}
             </div>
@@ -193,16 +214,26 @@ export const MeetingAnalyticsModal: React.FC<MeetingAnalyticsModalProps> = ({
               {analytics.speaker_stats.map((spk, idx) => {
                 const colorGradient = speakerColors[idx % speakerColors.length];
                 return (
-                  <div key={spk.speaker_id || idx} className="space-y-2 p-3 rounded-lg bg-slate-800/40 border border-slate-700/30">
+                  <div
+                    key={spk.speaker_id || idx}
+                    className="space-y-2 p-3 rounded-lg bg-slate-800/40 border border-slate-700/30"
+                  >
                     <div className="flex items-center justify-between text-xs">
                       <div className="flex items-center gap-2 font-medium text-slate-200">
-                        <div className={`w-3 h-3 rounded-full bg-gradient-to-r ${colorGradient}`} />
+                        <div
+                          className={`w-3 h-3 rounded-full bg-gradient-to-r ${colorGradient}`}
+                        />
                         <span>{spk.speaker_name}</span>
-                        <span className="text-slate-500 font-mono">({spk.segment_count} {t("transcript.analytics.segments")})</span>
+                        <span className="text-slate-500 font-mono">
+                          ({spk.segment_count}{" "}
+                          {t("transcript.analytics.segments")})
+                        </span>
                       </div>
                       <div className="flex items-center gap-3 font-mono text-slate-300">
                         <span>{formatSecs(spk.total_speech_seconds)}</span>
-                        <span className="font-bold text-white">%{spk.talk_percentage.toFixed(1)}</span>
+                        <span className="font-bold text-white">
+                          %{spk.talk_percentage.toFixed(1)}
+                        </span>
                       </div>
                     </div>
 
@@ -221,7 +252,8 @@ export const MeetingAnalyticsModal: React.FC<MeetingAnalyticsModalProps> = ({
                       </span>
                       {spk.longest_monologue_seconds > 0 && (
                         <span className="text-slate-500">
-                          {t("transcript.analytics.longestMonologue")}: {formatSecs(spk.longest_monologue_seconds)}
+                          {t("transcript.analytics.longestMonologue")}:{" "}
+                          {formatSecs(spk.longest_monologue_seconds)}
                         </span>
                       )}
                     </div>
@@ -240,7 +272,10 @@ export const MeetingAnalyticsModal: React.FC<MeetingAnalyticsModalProps> = ({
               </h3>
               <ul className="space-y-1.5">
                 {analytics.key_insights.map((insight, i) => (
-                  <li key={i} className="text-xs text-slate-300 flex items-start gap-2">
+                  <li
+                    key={i}
+                    className="text-xs text-slate-300 flex items-start gap-2"
+                  >
                     <span className="text-indigo-400 font-bold">•</span>
                     <span>{insight}</span>
                   </li>

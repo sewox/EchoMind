@@ -61,19 +61,23 @@ export const en: TranslationKeys = {
     retranscribeTooltip:
       "Re-process the meeting audio using a different AI model or provider",
     shareReport: "Export / Share",
-    shareReportTooltip: "Export meeting notes to PDF, Slack, Email, or Markdown",
+    shareReportTooltip:
+      "Export meeting notes to PDF, Slack, Email, or Markdown",
     fillerFilter: {
       toggle: "Polish Speech",
       activeBadge: "{count} fillers removed",
-      tooltipClean: "Clean filler words ('um', 'uh', 'you know') and stuttering",
+      tooltipClean:
+        "Clean filler words ('um', 'uh', 'you know') and stuttering",
       tooltipOriginal: "Switch back to raw transcript",
     },
     analytics: {
       button: "Meeting & Speaker Analytics",
       modalTitle: "Meeting & Speaker Analytics",
-      modalSubtitle: "Talk-to-listen ratios, balance score, WPM, and smart insights",
+      modalSubtitle:
+        "Talk-to-listen ratios, balance score, WPM, and smart insights",
       balanceScore: "Meeting Balance Score",
-      balanceScoreDesc: "Equitable distribution of speaking time and engagement",
+      balanceScoreDesc:
+        "Equitable distribution of speaking time and engagement",
       talkTime: "Total Speech",
       silenceTime: "Silence / Pause Time",
       totalWords: "Total Words",
@@ -141,7 +145,8 @@ export const en: TranslationKeys = {
     customTemplates: "Custom Templates",
     createCustomTemplate: "+ Create Custom Prompt Template",
     promptStudioTitle: "Custom Prompt & Template Studio",
-    promptStudioDesc: "Design tailored AI summary formats for your team workflows.",
+    promptStudioDesc:
+      "Design tailored AI summary formats for your team workflows.",
     templateNameLabel: "Template Name",
     templateDescLabel: "Short Description",
     systemPromptLabel: "Custom System Prompt & Role Instructions",
@@ -353,7 +358,8 @@ export const en: TranslationKeys = {
   },
   updater: {
     modalTitle: "New Update Available!",
-    modalSubtitle: "The latest features and performance enhancements for EchoMind are ready.",
+    modalSubtitle:
+      "The latest features and performance enhancements for EchoMind are ready.",
     newVersionBadge: "NEW VERSION",
     currentVersion: "Current Version",
     latestVersion: "Latest Version",
@@ -362,7 +368,8 @@ export const en: TranslationKeys = {
     remindLater: "Remind Me Later",
     dontShowAgainForVersion: "Don't show this version again on startup",
     autoCheckToggle: "Automatically Check for Updates on Startup",
-    autoCheckToggleDesc: "Notifies you when a new version of EchoMind is published.",
+    autoCheckToggleDesc:
+      "Notifies you when a new version of EchoMind is published.",
     checkNowButton: "Check for Updates",
     checking: "Checking...",
     upToDate: "EchoMind is Up to Date",

@@ -25,12 +25,15 @@ export const CustomTemplateModal: React.FC<CustomTemplateModalProps> = ({
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
-      setError(t("summary.templateNameRequired") || "Lütfen bir şablon adı girin.");
+      setError(
+        t("summary.templateNameRequired") || "Lütfen bir şablon adı girin.",
+      );
       return;
     }
     if (!systemPrompt.trim()) {
       setError(
-        t("summary.templatePromptRequired") || "Lütfen yapay zekaya verilecek sistem promptunu girin."
+        t("summary.templatePromptRequired") ||
+          "Lütfen yapay zekaya verilecek sistem promptunu girin.",
       );
       return;
     }
@@ -38,7 +41,8 @@ export const CustomTemplateModal: React.FC<CustomTemplateModalProps> = ({
     const newTemplate: MeetingTemplate = {
       id: `custom_${Date.now()}`,
       name: name.trim(),
-      description: description.trim() || "Kullanıcı tanımlı özel prompt şablonu",
+      description:
+        description.trim() || "Kullanıcı tanımlı özel prompt şablonu",
       icon: "Sliders",
       isCustom: true,
       systemPrompt: systemPrompt.trim(),
@@ -63,7 +67,8 @@ export const CustomTemplateModal: React.FC<CustomTemplateModalProps> = ({
             </div>
             <div>
               <h3 className="text-base sm:text-lg font-bold text-slate-100 flex items-center gap-2">
-                {t("summary.promptStudioTitle") || "Özel Prompt & Şablon Stüdyosu"}
+                {t("summary.promptStudioTitle") ||
+                  "Özel Prompt & Şablon Stüdyosu"}
                 <span className="px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase bg-cyan-500/15 text-cyan-300 rounded-full border border-cyan-500/30">
                   Yeni
                 </span>
@@ -126,7 +131,9 @@ export const CustomTemplateModal: React.FC<CustomTemplateModalProps> = ({
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <label className="text-xs font-semibold text-slate-300">
-                {t("summary.systemPromptLabel") || "Özel Sistem Promptu & Rol Yönergesi"} *
+                {t("summary.systemPromptLabel") ||
+                  "Özel Sistem Promptu & Rol Yönergesi"}{" "}
+                *
               </label>
               <span className="text-[10px] text-cyan-400 font-medium flex items-center gap-1">
                 <Sparkles className="w-3 h-3" /> JSON Çıktısı Otomatik Sağlanır

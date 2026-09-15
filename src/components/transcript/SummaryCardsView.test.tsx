@@ -69,8 +69,12 @@ describe("SummaryCardsView Component", () => {
       </I18nProvider>,
     );
 
-    expect(screen.getByText("Q3 Finansal hedefleri belirlemek")).toBeInTheDocument();
-    expect(screen.getByText("Yurt dışı depo yatırımı onaylandı")).toBeInTheDocument();
+    expect(
+      screen.getByText("Q3 Finansal hedefleri belirlemek"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Yurt dışı depo yatırımı onaylandı"),
+    ).toBeInTheDocument();
     expect(screen.getByText("Kira sözleşmesi imzalanacak")).toBeInTheDocument();
     expect(screen.getByText("Toplantı Şablonları:")).toBeInTheDocument();
     expect(screen.getByText("Bütçe Planlama")).toBeInTheDocument();

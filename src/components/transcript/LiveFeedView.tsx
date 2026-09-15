@@ -76,8 +76,9 @@ export const LiveFeedView: React.FC<LiveFeedViewProps> = ({
               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-cyan-500/20 border border-cyan-500/30 text-cyan-300 text-[10px] 2xl:text-xs font-semibold animate-in fade-in duration-200">
                 <Sparkles className="w-3 h-3 text-amber-400" />
                 <span>
-                  {t("transcript.fillerFilter.activeBadge", { count: fillersRemovedCount }) ||
-                    `${fillersRemovedCount} dolgu kelime temizlendi`}
+                  {t("transcript.fillerFilter.activeBadge", {
+                    count: fillersRemovedCount,
+                  }) || `${fillersRemovedCount} dolgu kelime temizlendi`}
                 </span>
               </span>
             )}
@@ -95,16 +96,22 @@ export const LiveFeedView: React.FC<LiveFeedViewProps> = ({
                 }`}
                 title={
                   isFillerFilterActive
-                    ? t("transcript.fillerFilter.tooltipOriginal") || "Ham transkripte dön"
-                    : t("transcript.fillerFilter.tooltipClean") || "Dolgu kelimeleri ve takılmaları temizle"
+                    ? t("transcript.fillerFilter.tooltipOriginal") ||
+                      "Ham transkripte dön"
+                    : t("transcript.fillerFilter.tooltipClean") ||
+                      "Dolgu kelimeleri ve takılmaları temizle"
                 }
               >
                 <Sparkles
                   className={`w-3.5 h-3.5 ${
-                    isFillerFilterActive ? "text-amber-300 fill-amber-300" : "text-slate-400"
+                    isFillerFilterActive
+                      ? "text-amber-300 fill-amber-300"
+                      : "text-slate-400"
                   }`}
                 />
-                <span>{t("transcript.fillerFilter.toggle") || "Konuşmayı Netleştir"}</span>
+                <span>
+                  {t("transcript.fillerFilter.toggle") || "Konuşmayı Netleştir"}
+                </span>
               </button>
             )}
 
@@ -249,7 +256,10 @@ export const LiveFeedView: React.FC<LiveFeedViewProps> = ({
                     <button
                       onClick={() => onClipSoundbite(seg)}
                       className="p-1 rounded-md text-slate-400 hover:text-amber-300 hover:bg-slate-800 transition"
-                      title={t("transcript.clipSoundbite") || "✂️ Ses Parçası Kırp (Soundbite)"}
+                      title={
+                        t("transcript.clipSoundbite") ||
+                        "✂️ Ses Parçası Kırp (Soundbite)"
+                      }
                     >
                       <Scissors className="w-3.5 h-3.5" />
                     </button>

@@ -64,7 +64,13 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   };
 
   const handleCopy = async (
-    type: "markdown" | "slack" | "tasks_md" | "followup_email" | "email_digest" | "transcript"
+    type:
+      | "markdown"
+      | "slack"
+      | "tasks_md"
+      | "followup_email"
+      | "email_digest"
+      | "transcript",
   ) => {
     try {
       let content = "";
@@ -86,11 +92,14 @@ export const ExportModal: React.FC<ExportModalProps> = ({
           customSummary: activeSummary || null,
         });
       } else if (type === "followup_email") {
-        const res = await invoke<FollowupEmailResult>("export_meeting_followup_email", {
-          meetingId,
-          customSummary: activeSummary || null,
-          langCode: langCode || null,
-        });
+        const res = await invoke<FollowupEmailResult>(
+          "export_meeting_followup_email",
+          {
+            meetingId,
+            customSummary: activeSummary || null,
+            langCode: langCode || null,
+          },
+        );
         content = `Subject: ${res.subject}\n\n${res.body}`;
       } else if (type === "email_digest") {
         content = await invoke<string>("export_meeting_email_digest", {
@@ -117,7 +126,15 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   };
 
   const handleSaveFile = async (
-    format: "html" | "md" | "slack" | "tasks_csv" | "tasks_md" | "email" | "json" | "txt"
+    format:
+      | "html"
+      | "md"
+      | "slack"
+      | "tasks_csv"
+      | "tasks_md"
+      | "email"
+      | "json"
+      | "txt",
   ) => {
     setIsSaving(format);
     try {
@@ -143,11 +160,14 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   const handleOpenEmailClient = async () => {
     setIsOpeningEmail(true);
     try {
-      const res = await invoke<FollowupEmailResult>("export_meeting_followup_email", {
-        meetingId,
-        customSummary: activeSummary || null,
-        langCode: langCode || null,
-      });
+      const res = await invoke<FollowupEmailResult>(
+        "export_meeting_followup_email",
+        {
+          meetingId,
+          customSummary: activeSummary || null,
+          langCode: langCode || null,
+        },
+      );
 
       if (res.mailto_url) {
         window.open(res.mailto_url, "_blank");

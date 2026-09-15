@@ -230,7 +230,8 @@ export const GlobalAssistantModal: React.FC<GlobalAssistantModalProps> = ({
   const handleGlobalSearch = async (term: string, speakerOverride?: string) => {
     const activeTerm = term;
     setSearchTerm(activeTerm);
-    const activeSpeaker = speakerOverride !== undefined ? speakerOverride : speakerFilter;
+    const activeSpeaker =
+      speakerOverride !== undefined ? speakerOverride : speakerFilter;
 
     if (!activeTerm.trim() && !activeSpeaker) {
       setSearchResults([]);
@@ -502,7 +503,9 @@ export const GlobalAssistantModal: React.FC<GlobalAssistantModalProps> = ({
                   </span>
                   <span className="flex items-center gap-1.5 text-slate-400">
                     <FileText className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>{memoryStats.total_words.toLocaleString()} Kelime</span>
+                    <span>
+                      {memoryStats.total_words.toLocaleString()} Kelime
+                    </span>
                   </span>
                 </div>
               </div>
@@ -620,7 +623,9 @@ export const GlobalAssistantModal: React.FC<GlobalAssistantModalProps> = ({
                             </h4>
                             {res.score > 0 && (
                               <span className="px-2 py-0.5 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 text-[10px] font-semibold">
-                                {res.score >= 50 ? "%95 Eşleşme" : `%${Math.min(90, res.score * 2)} Alaka`}
+                                {res.score >= 50
+                                  ? "%95 Eşleşme"
+                                  : `%${Math.min(90, res.score * 2)} Alaka`}
                               </span>
                             )}
                           </div>

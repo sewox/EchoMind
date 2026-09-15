@@ -66,15 +66,18 @@ export const tr: TranslationKeys = {
     fillerFilter: {
       toggle: "Konuşmayı Netleştir",
       activeBadge: "{count} dolgu kelime temizlendi",
-      tooltipClean: "Dolgu sesleri ('ııı', 'şey', 'yani') ve takılmaları temizler",
+      tooltipClean:
+        "Dolgu sesleri ('ııı', 'şey', 'yani') ve takılmaları temizler",
       tooltipOriginal: "Orijinal ham konuşma metnine dön",
     },
     analytics: {
       button: "Katılımcı & Toplantı Analitiği",
       modalTitle: "Toplantı & Katılımcı Analitiği",
-      modalSubtitle: "Konuşma süreleri, denge skoru, WPM ve toplantı içgörüleri",
+      modalSubtitle:
+        "Konuşma süreleri, denge skoru, WPM ve toplantı içgörüleri",
       balanceScore: "Toplantı Denge Skoru",
-      balanceScoreDesc: "Katılımcılar arasındaki söz hakkı ve etkileşim dengesi",
+      balanceScoreDesc:
+        "Katılımcılar arasındaki söz hakkı ve etkileşim dengesi",
       talkTime: "Toplam Konuşma",
       silenceTime: "Sessizlik / Düşünme Payı",
       totalWords: "Toplam Kelime",
@@ -141,13 +144,15 @@ export const tr: TranslationKeys = {
     customTemplates: "Özel Şablonlarınız",
     createCustomTemplate: "+ Özel Prompt Şablonu Oluştur",
     promptStudioTitle: "Özel Prompt & Şablon Stüdyosu",
-    promptStudioDesc: "Toplantılarınıza ve şirket süreçlerinize özel AI analiz formatı tasarlayın.",
+    promptStudioDesc:
+      "Toplantılarınıza ve şirket süreçlerinize özel AI analiz formatı tasarlayın.",
     templateNameLabel: "Şablon Adı",
     templateDescLabel: "Kısa Açıklama",
     systemPromptLabel: "Özel Sistem Promptu & Rol Yönergesi",
     saveTemplate: "Şablonu Kaydet",
     templateNameRequired: "Lütfen bir şablon adı girin.",
-    templatePromptRequired: "Lütfen yapay zekaya verilecek sistem promptunu girin.",
+    templatePromptRequired:
+      "Lütfen yapay zekaya verilecek sistem promptunu girin.",
   },
   retranscribe: {
     title: "Konuşmaları Yeniden Yazıya Dök",
@@ -356,7 +361,8 @@ export const tr: TranslationKeys = {
   },
   updater: {
     modalTitle: "Yeni Güncelleme Mevcut!",
-    modalSubtitle: "EchoMind'ın en yeni özellikleri ve performans geliştirmeleri hazır.",
+    modalSubtitle:
+      "EchoMind'ın en yeni özellikleri ve performans geliştirmeleri hazır.",
     newVersionBadge: "YENİ SÜRÜM",
     currentVersion: "Mevcut Sürüm",
     latestVersion: "En Son Sürüm",
@@ -365,7 +371,8 @@ export const tr: TranslationKeys = {
     remindLater: "Sonra Hatırlat",
     dontShowAgainForVersion: "Bu sürümü açılışta bir daha gösterme",
     autoCheckToggle: "Açılışta Güncellemeleri Otomatik Denetle",
-    autoCheckToggleDesc: "Yeni bir EchoMind sürümü yayınlandığında uygulama açılışında sizi bilgilendirir.",
+    autoCheckToggleDesc:
+      "Yeni bir EchoMind sürümü yayınlandığında uygulama açılışında sizi bilgilendirir.",
     checkNowButton: "Güncellemeleri Denetle",
     checking: "Denetleniyor...",
     upToDate: "EchoMind Güncel",

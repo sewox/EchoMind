@@ -143,7 +143,10 @@ describe("GlobalAssistantModal Component", () => {
 
   it("allows switching to global search tab, filtering by categories, and jumping to search results", async () => {
     (invoke as any).mockImplementation((cmd: string) => {
-      if (cmd === "search_cross_meeting_memory" || cmd === "global_search_meetings") {
+      if (
+        cmd === "search_cross_meeting_memory" ||
+        cmd === "global_search_meetings"
+      ) {
         return Promise.resolve(mockSearchResults);
       }
       if (cmd === "get_cross_meeting_memory_stats") {
