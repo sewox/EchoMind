@@ -66,6 +66,7 @@
 
           <ul class="nav-links">
             <li><a href="#features" data-i18n="navFeatures">Özellikler</a></li>
+            <li><a href="#showcase" data-i18n="navShowcase">Arayüz</a></li>
             <li>
               <a href="#security" data-i18n="navSecurity">Güvenlik & DLP</a>
             </li>
@@ -572,6 +573,79 @@
                   ✔ GPT-4o, Gemini 1.5, Groq (70B)
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Product Showcase Gallery Section -->
+    <section class="showcase-section" id="showcase">
+      <div class="container">
+        <div class="section-header">
+          <h2 data-i18n="secShowcaseTitle">✨ EchoMind Masaüstü Arayüzü</h2>
+          <p data-i18n="secShowcaseSubtitle">
+            Gizlilik odaklı, sıfır gecikmeli ve donanım hızlandırmalı modern
+            toplantı arayüzünü inceleyin.
+          </p>
+        </div>
+
+        <!-- Showcase Tabs -->
+        <div class="showcase-tabs">
+          <button class="showcase-tab-btn active" data-showcase="transcription">
+            <span data-i18n="tabShowcaseTrans">🎙️ Canlı Transkripsiyon</span>
+          </button>
+          <button class="showcase-tab-btn" data-showcase="summary">
+            <span data-i18n="tabShowcaseSummary"
+              >📊 Akıllı Özet & Analitik</span
+            >
+          </button>
+          <button class="showcase-tab-btn" data-showcase="memory">
+            <span data-i18n="tabShowcaseMemory">🧠 Semantik Hafıza</span>
+          </button>
+          <button class="showcase-tab-btn" data-showcase="hardware">
+            <span data-i18n="tabShowcaseHw">⚡ Donanım Ayarları</span>
+          </button>
+        </div>
+
+        <!-- Showcase Window Mockup -->
+        <div class="showcase-window-wrapper">
+          <div class="showcase-window-header">
+            <div class="showcase-dots">
+              <span></span><span></span><span></span>
+            </div>
+            <div class="showcase-window-title" id="showcaseWinTitle">
+              EchoMind AI Assistant • Live Meeting Room
+            </div>
+            <div
+              class="showcase-window-badge"
+              id="showcaseWinBadge"
+              data-i18n="showcaseBadgeLocal"
+            >
+              %100 Yerel Motor
+            </div>
+          </div>
+
+          <div class="showcase-img-container">
+            <img
+              src="assets/screenshots/showcase-live-transcription.png"
+              alt="EchoMind Masaüstü Arayüzü"
+              class="showcase-img"
+              id="showcaseMainImg"
+            />
+          </div>
+
+          <div class="showcase-caption-bar">
+            <div
+              class="showcase-caption-text"
+              id="showcaseCaptionText"
+              data-i18n="captionTrans"
+            >
+              Toplantı sırasında konuşmacıları anlık tanır, Whisper Metal/CUDA
+              ile yerel çözümler ve hassas DLP verilerini maskeler.
+            </div>
+            <div class="showcase-caption-tag" id="showcaseCaptionTag">
+              Apple Metal & NVIDIA CUDA
             </div>
           </div>
         </div>
