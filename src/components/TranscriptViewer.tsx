@@ -381,6 +381,34 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
     return () => clearInterval(interval);
   }, [isRecording, selectedPastMeeting]);
 
+  // Periodic background live transcription during recording
+  useEffect(() => {
+    if (!isRecording || selectedPastMeeting) return;
+
+    let isAutoTranscribing = false;
+    const transcribeInterval = setInterval(async () => {
+      if (isAutoTranscribing) return;
+      isAutoTranscribing = true;
+      try {
+        const res = await invoke<TranscriptSegment[]>(
+          "transcribe_audio_buffer",
+          {
+            language: selectedLanguage,
+          },
+        );
+        if (res && res.length > 0) {
+          setSegments(res);
+        }
+      } catch {
+        // Silent fallback during active recording
+      } finally {
+        isAutoTranscribing = false;
+      }
+    }, 15000);
+
+    return () => clearInterval(transcribeInterval);
+  }, [isRecording, selectedPastMeeting, selectedLanguage]);
+
   const handleTranscribeBuffer = async () => {
     setIsProcessing(true);
     try {
