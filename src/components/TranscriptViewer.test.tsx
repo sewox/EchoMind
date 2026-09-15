@@ -1659,7 +1659,9 @@ describe("TranscriptViewer Component", () => {
     expect(writeTextSpy).toHaveBeenCalled();
 
     // Retranscribe modal open from live view
-    const retranscribeBtns = screen.queryAllByTitle(/yeniden çözümler|baştan çözümleyin/i);
+    const retranscribeBtns = screen.queryAllByTitle(
+      /yeniden çözümler|baştan çözümleyin/i,
+    );
     if (retranscribeBtns.length > 0) {
       await act(async () => {
         fireEvent.click(retranscribeBtns[0]);
@@ -1808,7 +1810,9 @@ describe("TranscriptViewer Component", () => {
       fireEvent.click(summaryTab);
     });
 
-    const retranscribeBtns = screen.getAllByTitle(/yeniden çözümler|baştan çözümleyin/i);
+    const retranscribeBtns = screen.getAllByTitle(
+      /yeniden çözümler|baştan çözümleyin/i,
+    );
     if (retranscribeBtns.length > 0) {
       await act(async () => {
         fireEvent.click(retranscribeBtns[0]);
@@ -2420,7 +2424,9 @@ describe("TranscriptViewer Component", () => {
     });
 
     // Open template selector dropdown
-    const tplDropdownBtn = screen.getByRole("button", { name: /Yönetici Özeti/i });
+    const tplDropdownBtn = screen.getByRole("button", {
+      name: /Yönetici Özeti/i,
+    });
     await act(async () => {
       fireEvent.click(tplDropdownBtn);
     });
@@ -2431,11 +2437,15 @@ describe("TranscriptViewer Component", () => {
       fireEvent.click(sprintTpl);
     });
 
-    expect(localStorage.getItem("echomind_selected_template")).toBe("sprint_planning");
+    expect(localStorage.getItem("echomind_selected_template")).toBe(
+      "sprint_planning",
+    );
 
     // Open custom template modal
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /Sprint & Teknik Planlama/i }));
+      fireEvent.click(
+        screen.getByRole("button", { name: /Sprint & Teknik Planlama/i }),
+      );
     });
     const createCustomBtn = screen.getByRole("button", {
       name: /\+ Özel Prompt Şablonu Oluştur/i,
@@ -2446,7 +2456,9 @@ describe("TranscriptViewer Component", () => {
 
     // Fill and save custom template
     const nameInput = screen.getByPlaceholderText(/Örn: Haftalık Pazarlama/i);
-    const promptInput = screen.getByPlaceholderText(/SEN KIDEMLİ BİR PAZARLAMA/i);
+    const promptInput = screen.getByPlaceholderText(
+      /SEN KIDEMLİ BİR PAZARLAMA/i,
+    );
     await act(async () => {
       fireEvent.change(nameInput, { target: { value: "Test Şablonu" } });
       fireEvent.change(promptInput, { target: { value: "Özel test promptu" } });
@@ -2494,8 +2506,16 @@ describe("TranscriptViewer Component", () => {
       if (cmd === "filter_meeting_filler_words") {
         return Promise.resolve({
           segments: [
-            { id: 1, cleaned_text: "Depo yatırımı için onay alındı.", removed_fillers_count: 2 },
-            { id: 2, cleaned_text: "Lojistik maliyetleri %15 azalacak.", removed_fillers_count: 1 },
+            {
+              id: 1,
+              cleaned_text: "Depo yatırımı için onay alındı.",
+              removed_fillers_count: 2,
+            },
+            {
+              id: 2,
+              cleaned_text: "Lojistik maliyetleri %15 azalacak.",
+              removed_fillers_count: 1,
+            },
           ],
           total_fillers_removed: 3,
           original_word_count: 12,
@@ -2514,14 +2534,19 @@ describe("TranscriptViewer Component", () => {
       </I18nProvider>,
     );
 
-    const toggleFilterBtn = screen.getByRole("button", { name: /Konuşmayı Netleştir/i });
+    const toggleFilterBtn = screen.getByRole("button", {
+      name: /Konuşmayı Netleştir/i,
+    });
     expect(toggleFilterBtn).toBeInTheDocument();
 
     await act(async () => {
       fireEvent.click(toggleFilterBtn);
     });
 
-    expect(invoke).toHaveBeenCalledWith("filter_meeting_filler_words", expect.any(Object));
+    expect(invoke).toHaveBeenCalledWith(
+      "filter_meeting_filler_words",
+      expect.any(Object),
+    );
     expect(localStorage.getItem("echomind_filler_filter_active")).toBe("true");
 
     // Test live session cleaner flow (selectedPastMeeting is null)
@@ -2546,14 +2571,18 @@ describe("TranscriptViewer Component", () => {
     );
 
     await act(async () => {
-      const toggleBtn = screen.getByRole("button", { name: /Konuşmayı Netleştir/i });
+      const toggleBtn = screen.getByRole("button", {
+        name: /Konuşmayı Netleştir/i,
+      });
       fireEvent.click(toggleBtn);
     });
 
     // Test error branch handling
     (invoke as any).mockRejectedValueOnce(new Error("Cleaner failed"));
     await act(async () => {
-      const toggleBtn = screen.getByRole("button", { name: /Konuşmayı Netleştir/i });
+      const toggleBtn = screen.getByRole("button", {
+        name: /Konuşmayı Netleştir/i,
+      });
       fireEvent.click(toggleBtn);
     });
 
@@ -2613,7 +2642,9 @@ describe("TranscriptViewer Component", () => {
       </I18nProvider>,
     );
 
-    const analyticsBtn = screen.getByRole("button", { name: /Katılımcı & Toplantı Analitiği/i });
+    const analyticsBtn = screen.getByRole("button", {
+      name: /Katılımcı & Toplantı Analitiği/i,
+    });
     expect(analyticsBtn).toBeInTheDocument();
 
     await act(async () => {
@@ -2624,7 +2655,9 @@ describe("TranscriptViewer Component", () => {
       meetingId: "mtg-001",
     });
 
-    expect(screen.getByText(/Toplantı & Katılımcı Analitiği/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Toplantı & Katılımcı Analitiği/i),
+    ).toBeInTheDocument();
     expect(screen.getByText("%95")).toBeInTheDocument();
 
     unmount();
@@ -2664,7 +2697,9 @@ describe("TranscriptViewer Component", () => {
       endMs: 5000,
     });
 
-    expect(screen.getByText(/soundbite_mtg-001_seg_1.wav/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/soundbite_mtg-001_seg_1.wav/i),
+    ).toBeInTheDocument();
 
     unmount();
   });
@@ -2694,4 +2729,3 @@ describe("TranscriptViewer Component", () => {
     unmount();
   });
 });
-

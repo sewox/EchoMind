@@ -20,7 +20,8 @@ const mockUpdateInfo: UpdateCheckResult = {
     {
       name: "EchoMind-0.3.0.dmg",
       size: 154000000,
-      download_url: "https://github.com/sewox/EchoMind/releases/download/v0.3.0/EchoMind.dmg",
+      download_url:
+        "https://github.com/sewox/EchoMind/releases/download/v0.3.0/EchoMind.dmg",
       content_type: "application/octet-stream",
     },
   ],
@@ -51,7 +52,9 @@ describe("UpdateModal Component", () => {
       onClose: vi.fn(),
     });
 
-    expect(screen.queryByTestId("update-modal-backdrop")).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("update-modal-backdrop"),
+    ).not.toBeInTheDocument();
 
     rerender(
       <I18nProvider>
@@ -59,7 +62,9 @@ describe("UpdateModal Component", () => {
       </I18nProvider>,
     );
 
-    expect(screen.queryByTestId("update-modal-backdrop")).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("update-modal-backdrop"),
+    ).not.toBeInTheDocument();
   });
 
   it("renders version information and release notes correctly", () => {
@@ -136,7 +141,9 @@ describe("UpdateModal Component", () => {
     fireEvent.click(updateBtn);
 
     await waitFor(() => {
-      expect(localStorage.getItem("echomind_skip_update_version")).toBe("0.3.0");
+      expect(localStorage.getItem("echomind_skip_update_version")).toBe(
+        "0.3.0",
+      );
       expect(onClose).toHaveBeenCalled();
     });
   });

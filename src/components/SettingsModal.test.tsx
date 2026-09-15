@@ -617,9 +617,7 @@ describe("SettingsModal Component", () => {
     });
 
     expect(onOpenUpdateModal).toHaveBeenCalled();
-    expect(
-      screen.getByText(/Yeni Sürüm Mevcut/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Yeni Sürüm Mevcut/i)).toBeInTheDocument();
 
     // Now test error case
     (invoke as any).mockImplementation((cmd: string) => {

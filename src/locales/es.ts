@@ -72,7 +72,8 @@ export const es: TranslationKeys = {
     analytics: {
       button: "Analítica de Reunión y Participantes",
       modalTitle: "Analítica de Reunión y Participantes",
-      modalSubtitle: "Tiempos de habla, puntuación de equilibrio, PPM e ideas de IA",
+      modalSubtitle:
+        "Tiempos de habla, puntuación de equilibrio, PPM e ideas de IA",
       balanceScore: "Puntuación de Equilibrio",
       balanceScoreDesc: "Distribución equitativa del tiempo de intervención",
       talkTime: "Habla Total",
@@ -144,7 +145,8 @@ export const es: TranslationKeys = {
     customTemplates: "Plantillas Personalizadas",
     createCustomTemplate: "+ Crear Plantilla de Prompt",
     promptStudioTitle: "Estudio de Prompts & Plantillas",
-    promptStudioDesc: "Diseñe formatos de resumen con IA adaptados a los flujos de su equipo.",
+    promptStudioDesc:
+      "Diseñe formatos de resumen con IA adaptados a los flujos de su equipo.",
     templateNameLabel: "Nombre de la Plantilla",
     templateDescLabel: "Descripción Corta",
     systemPromptLabel: "Prompt del Sistema Personalizado",
@@ -355,7 +357,8 @@ export const es: TranslationKeys = {
   },
   updater: {
     modalTitle: "¡Nueva actualización disponible!",
-    modalSubtitle: "Las últimas funciones y mejoras de rendimiento para EchoMind están listas.",
+    modalSubtitle:
+      "Las últimas funciones y mejoras de rendimiento para EchoMind están listas.",
     newVersionBadge: "NUEVA VERSIÓN",
     currentVersion: "Versión actual",
     latestVersion: "Última versión",
@@ -364,11 +367,13 @@ export const es: TranslationKeys = {
     remindLater: "Recordármelo más tarde",
     dontShowAgainForVersion: "No volver a mostrar esta versión al iniciar",
     autoCheckToggle: "Buscar actualizaciones automáticamente al iniciar",
-    autoCheckToggleDesc: "Le notifica cuando se publica una nueva versión de EchoMind.",
+    autoCheckToggleDesc:
+      "Le notifica cuando se publica una nueva versión de EchoMind.",
     checkNowButton: "Buscar actualizaciones",
     checking: "Comprobando...",
     upToDate: "EchoMind está actualizado",
-    upToDateDesc: "Está utilizando la versión más reciente de EchoMind ({version}).",
+    upToDateDesc:
+      "Está utilizando la versión más reciente de EchoMind ({version}).",
     updateAvailable: "Nueva versión disponible ({version})",
     updateError: "No se pudo conectar con el servidor de actualizaciones.",
   },

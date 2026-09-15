@@ -48,7 +48,9 @@ describe("AudioMemoPlayer Component", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    (global as any).SpeechSynthesisUtterance = class extends MockSpeechSynthesisUtterance {
+    (global as any).SpeechSynthesisUtterance = class extends (
+      MockSpeechSynthesisUtterance
+    ) {
       constructor(text: string) {
         super(text);
         mockUtteranceInstance = this;
@@ -66,7 +68,7 @@ describe("AudioMemoPlayer Component", () => {
     const { container } = render(
       <I18nProvider>
         <AudioMemoPlayer summary={null} />
-      </I18nProvider>
+      </I18nProvider>,
     );
     expect(container.firstChild).toBeNull();
   });
@@ -79,7 +81,7 @@ describe("AudioMemoPlayer Component", () => {
           meetingTitle="Sprint Demo"
           langCode="tr"
         />
-      </I18nProvider>
+      </I18nProvider>,
     );
 
     expect(screen.getByText(/Sesli Bülteni Dinle/i)).toBeInTheDocument();
@@ -94,7 +96,7 @@ describe("AudioMemoPlayer Component", () => {
           meetingTitle="Sprint Demo"
           langCode="tr"
         />
-      </I18nProvider>
+      </I18nProvider>,
     );
 
     const playBtn = screen.getByRole("button", { name: /Dinle/i });
@@ -162,7 +164,7 @@ describe("AudioMemoPlayer Component", () => {
           meetingTitle="Q3 Planning"
           langCode="en"
         />
-      </I18nProvider>
+      </I18nProvider>,
     );
 
     const playBtn = screen.getByRole("button", { name: /Dinle/i });
@@ -206,11 +208,8 @@ describe("AudioMemoPlayer Component", () => {
 
     render(
       <I18nProvider>
-        <AudioMemoPlayer
-          summary={emptySummary}
-          langCode="tr"
-        />
-      </I18nProvider>
+        <AudioMemoPlayer summary={emptySummary} langCode="tr" />
+      </I18nProvider>,
     );
 
     const playBtn = screen.getByRole("button", { name: /Dinle/i });
@@ -225,11 +224,8 @@ describe("AudioMemoPlayer Component", () => {
 
     render(
       <I18nProvider>
-        <AudioMemoPlayer
-          summary={mockSummary}
-          langCode="tr"
-        />
-      </I18nProvider>
+        <AudioMemoPlayer summary={mockSummary} langCode="tr" />
+      </I18nProvider>,
     );
 
     const playBtn = screen.getByRole("button", { name: /Dinle/i });

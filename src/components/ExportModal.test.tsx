@@ -100,7 +100,9 @@ describe("ExportModal Component", () => {
     ).toBeInTheDocument();
 
     // 3. Download buttons (html, md, tasks_csv, slack, txt, json)
-    const downloadBtns = screen.getAllByRole("button", { name: /İndir|\.txt|\.json/i });
+    const downloadBtns = screen.getAllByRole("button", {
+      name: /İndir|\.txt|\.json/i,
+    });
     for (const btn of downloadBtns) {
       await act(async () => {
         fireEvent.click(btn);
@@ -216,7 +218,9 @@ describe("ExportModal Component", () => {
     await act(async () => {
       fireEvent.click(openEmailBtn);
     });
-    expect(screen.getByText(/E-posta istemcisi açılamadı/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/E-posta istemcisi açılamadı/i),
+    ).toBeInTheDocument();
 
     // Print error
     const printBtn = screen.getByRole("button", {

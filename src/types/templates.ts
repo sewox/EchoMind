@@ -2,7 +2,13 @@ export interface MeetingTemplate {
   id: string;
   name: string;
   description: string;
-  icon: "Sparkles" | "UserCheck" | "Layers" | "TrendingUp" | "Lightbulb" | "Sliders";
+  icon:
+    | "Sparkles"
+    | "UserCheck"
+    | "Layers"
+    | "TrendingUp"
+    | "Lightbulb"
+    | "Sliders";
   isCustom?: boolean;
   systemPrompt?: string;
 }
@@ -23,7 +29,8 @@ export const BUILTIN_TEMPLATES: MeetingTemplate[] = [
   {
     id: "sprint_planning",
     name: "Sprint & Teknik Planlama",
-    description: "Sprint hedefleri, kullanıcı hikayeleri, mimari kararlar ve blocker'lar",
+    description:
+      "Sprint hedefleri, kullanıcı hikayeleri, mimari kararlar ve blocker'lar",
     icon: "Layers",
   },
   {

@@ -143,7 +143,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       }
     } catch (err: unknown) {
       const errorMsg =
-        err instanceof Error ? err.message : String(err) || "Update check failed";
+        err instanceof Error
+          ? err.message
+          : String(err) || "Update check failed";
       setUpdateStatus({
         state: "error",
         message: errorMsg,
@@ -173,8 +175,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       setSelectedAudioDevice(savedDev);
 
       CredentialStore.get("echomind_groq_key").then((k) => setGroqKey(k || ""));
-      CredentialStore.get("echomind_gemini_key").then((k) => setGeminiKey(k || ""));
-      CredentialStore.get("echomind_openai_key").then((k) => setOpenaiKey(k || ""));
+      CredentialStore.get("echomind_gemini_key").then((k) =>
+        setGeminiKey(k || ""),
+      );
+      CredentialStore.get("echomind_openai_key").then((k) =>
+        setOpenaiKey(k || ""),
+      );
 
       setOllamaEndpoint(
         localStorage.getItem("echomind_ollama_endpoint") ||

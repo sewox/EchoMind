@@ -91,15 +91,21 @@ describe("LiveFeedView Component", () => {
           {...defaultProps}
           isFillerFilterActive={true}
           fillersRemovedCount={3}
-          cleanedSegmentsMap={{ 1: "Bugünkü toplantının amacı Q3 bütçesini onaylamak." }}
+          cleanedSegmentsMap={{
+            1: "Bugünkü toplantının amacı Q3 bütçesini onaylamak.",
+          }}
         />
       </I18nProvider>,
     );
 
     expect(screen.getByText(/3 dolgu kelime temizlendi/i)).toBeInTheDocument();
-    expect(screen.getByText("Bugünkü toplantının amacı Q3 bütçesini onaylamak.")).toBeInTheDocument();
+    expect(
+      screen.getByText("Bugünkü toplantının amacı Q3 bütçesini onaylamak."),
+    ).toBeInTheDocument();
 
-    const filterBtn = screen.getByRole("button", { name: /Konuşmayı Netleştir/i });
+    const filterBtn = screen.getByRole("button", {
+      name: /Konuşmayı Netleştir/i,
+    });
     fireEvent.click(filterBtn);
     expect(defaultProps.onToggleFillerFilter).toHaveBeenCalled();
   });
@@ -111,7 +117,9 @@ describe("LiveFeedView Component", () => {
       </I18nProvider>,
     );
 
-    const editSpeakerBtn = screen.getByTitle(/Konuşmacı Adını Düzenle|İsmi Değiştir/i);
+    const editSpeakerBtn = screen.getByTitle(
+      /Konuşmacı Adını Düzenle|İsmi Değiştir/i,
+    );
     fireEvent.click(editSpeakerBtn);
     expect(defaultProps.onStartEditSpeaker).toHaveBeenCalledWith(
       "spk_1",
@@ -188,10 +196,7 @@ describe("LiveFeedView Component", () => {
     const handleClip = vi.fn();
     render(
       <I18nProvider>
-        <LiveFeedView
-          {...defaultProps}
-          onClipSoundbite={handleClip}
-        />
+        <LiveFeedView {...defaultProps} onClipSoundbite={handleClip} />
       </I18nProvider>,
     );
 

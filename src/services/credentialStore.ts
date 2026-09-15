@@ -8,7 +8,9 @@ import { invoke } from "@tauri-apps/api/core";
 export const CredentialStore = {
   async get(keyName: string): Promise<string> {
     try {
-      const val = await invoke<string | null>("get_secure_credential", { keyName });
+      const val = await invoke<string | null>("get_secure_credential", {
+        keyName,
+      });
       if (val !== null && val !== undefined) {
         return val;
       }

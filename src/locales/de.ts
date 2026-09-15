@@ -62,7 +62,8 @@ export const de: TranslationKeys = {
     retranscribeTooltip:
       "Audiodatei mit einem anderen KI-Modell erneut transkribieren",
     shareReport: "Bericht Teilen / Exportieren",
-    shareReportTooltip: "Meeting-Notizen als PDF, Slack, E-Mail oder Markdown exportieren",
+    shareReportTooltip:
+      "Meeting-Notizen als PDF, Slack, E-Mail oder Markdown exportieren",
     fillerFilter: {
       toggle: "Sprache Glätten",
       activeBadge: "{count} Füllwörter entfernt",
@@ -141,7 +142,8 @@ export const de: TranslationKeys = {
     customTemplates: "Eigene Vorlagen",
     createCustomTemplate: "+ Eigene Prompt-Vorlage Erstellen",
     promptStudioTitle: "Prompt & Vorlagen Studio",
-    promptStudioDesc: "Entwerfen Sie maßgeschneiderte KI-Zusammenfassungsformate für Ihre Teams.",
+    promptStudioDesc:
+      "Entwerfen Sie maßgeschneiderte KI-Zusammenfassungsformate für Ihre Teams.",
     templateNameLabel: "Vorlagenname",
     templateDescLabel: "Kurzbeschreibung",
     systemPromptLabel: "Eigener System-Prompt & Rollenanweisung",
@@ -352,7 +354,8 @@ export const de: TranslationKeys = {
   },
   updater: {
     modalTitle: "Neues Update verfügbar!",
-    modalSubtitle: "Die neuesten Funktionen und Leistungsverbesserungen für EchoMind stehen bereit.",
+    modalSubtitle:
+      "Die neuesten Funktionen und Leistungsverbesserungen für EchoMind stehen bereit.",
     newVersionBadge: "NEUE VERSION",
     currentVersion: "Aktuelle Version",
     latestVersion: "Neueste Version",
@@ -361,7 +364,8 @@ export const de: TranslationKeys = {
     remindLater: "Später erinnern",
     dontShowAgainForVersion: "Diese Version beim Start nicht mehr anzeigen",
     autoCheckToggle: "Beim Start automatisch nach Updates suchen",
-    autoCheckToggleDesc: "Benachrichtigt Sie, wenn eine neue EchoMind-Version veröffentlicht wird.",
+    autoCheckToggleDesc:
+      "Benachrichtigt Sie, wenn eine neue EchoMind-Version veröffentlicht wird.",
     checkNowButton: "Nach Updates suchen",
     checking: "Wird geprüft...",
     upToDate: "EchoMind ist auf dem neuesten Stand",
