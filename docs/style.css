@@ -620,12 +620,70 @@ section.bento-section {
   padding: 20px;
   text-align: left;
   transition: all 0.25s ease;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
 }
 
 .tier-card-item:hover {
   border-color: rgba(99, 102, 241, 0.35);
   transform: translateY(-2px);
   background: rgba(15, 28, 48, 0.5);
+}
+
+.tier-badge {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 3px 9px;
+  border-radius: 999px;
+  margin-bottom: 10px;
+  width: fit-content;
+  text-transform: uppercase;
+}
+
+.tier-badge-cyan {
+  background: rgba(6, 182, 212, 0.18);
+  color: var(--accent-cyan);
+  border: 1px solid rgba(6, 182, 212, 0.3);
+}
+
+.tier-badge-emerald {
+  background: rgba(16, 185, 129, 0.18);
+  color: var(--accent-emerald);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.tier-badge-indigo {
+  background: rgba(99, 102, 241, 0.18);
+  color: #a5b4fc;
+  border: 1px solid rgba(99, 102, 241, 0.3);
+}
+
+.tier-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+  line-height: 1.35;
+}
+
+.tier-desc {
+  font-size: 0.83rem;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+  line-height: 1.5;
+  flex-grow: 1;
+}
+
+.tier-feature {
+  font-size: 0.76rem;
+  font-family: var(--font-mono);
+  margin-top: auto;
+  font-weight: 500;
 }
 
 .bento-card h3 {
