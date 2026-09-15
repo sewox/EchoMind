@@ -181,4 +181,37 @@ describe("UpdateModal Component", () => {
 
     expect(onClose).toHaveBeenCalled();
   });
+
+  it("handles invoke open_release_url failure gracefully", async () => {
+    const onClose = vi.fn();
+    (invoke as any).mockRejectedValue(new Error("Browser failure"));
+
+    renderComponent({
+      isOpen: true,
+      updateInfo: mockUpdateInfo,
+      onClose,
+    });
+
+    const updateBtn = screen.getByTestId("update-now-btn");
+    fireEvent.click(updateBtn);
+
+    await waitFor(() => {
+      expect(invoke).toHaveBeenCalled();
+    });
+  });
+
+  it("handles empty published_at date string without errors", () => {
+    const noDateInfo: UpdateCheckResult = {
+      ...mockUpdateInfo,
+      published_at: "",
+    };
+
+    renderComponent({
+      isOpen: true,
+      updateInfo: noDateInfo,
+      onClose: vi.fn(),
+    });
+
+    expect(screen.getByTestId("update-modal-backdrop")).toBeInTheDocument();
+  });
 });

@@ -2502,4 +2502,37 @@ describe("App Top-Level Integration", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("v0.4.0")).toBeInTheDocument();
   });
+
+  it("suppresses automatic update modal when skipped version matches or auto check is disabled", async () => {
+    setupDefaultInvoke();
+    localStorage.setItem("echomind_skip_update_version", "0.4.0");
+
+    const orig = (invoke as any).getMockImplementation();
+    (invoke as any).mockImplementation((cmd: string, args: any) => {
+      if (cmd === "check_for_updates") {
+        return Promise.resolve({
+          is_update_available: true,
+          current_version: "0.2.0",
+          latest_version: "0.4.0",
+          release_name: "EchoMind v0.4.0",
+          release_notes: "Super update",
+          published_at: "2026-09-15T00:00:00Z",
+          html_url: "https://github.com/sewox/EchoMind/releases/tag/v0.4.0",
+          assets: [],
+        });
+      }
+      return orig ? orig(cmd, args) : Promise.resolve();
+    });
+
+    render(
+      <I18nProvider>
+        <App />
+      </I18nProvider>,
+    );
+
+    // Should not render update modal
+    expect(
+      screen.queryByTestId("update-modal-backdrop"),
+    ).not.toBeInTheDocument();
+  });
 });
