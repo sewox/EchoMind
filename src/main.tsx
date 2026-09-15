@@ -5,9 +5,14 @@ import { MeetingIslandWindow } from "./components/MeetingIslandWindow";
 import "./index.css";
 import { I18nProvider } from "./locales/i18nContext";
 
+import { ShowcaseDemo } from "./ShowcaseDemo";
+
 const isIslandView =
   typeof window !== "undefined" &&
   window.location.search.includes("view=island");
+
+const isDemoView =
+  typeof window !== "undefined" && window.location.search.includes("demo=");
 
 if (isIslandView && typeof document !== "undefined") {
   document.documentElement.style.backgroundColor = "transparent";
@@ -20,6 +25,8 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     {isIslandView ? (
       <MeetingIslandWindow />
+    ) : isDemoView ? (
+      <ShowcaseDemo />
     ) : (
       <I18nProvider>
         <App />
