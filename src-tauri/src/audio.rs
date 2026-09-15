@@ -428,11 +428,12 @@ fn process_audio_data(data: &[f32], src_sample_rate: u32, channels: u16, state_a
         }
     }
 
-    // Accumulate in 16kHz PCM buffer ONLY during active recording
+    // Accumulate in 16kHz PCM buffer ONLY during active recording (up to 2 hours)
     if state.is_recording {
         state.pcm_16k_buffer.extend_from_slice(&resampled_pcm);
-        if state.pcm_16k_buffer.len() > 2_880_000 {
-            let overflow = state.pcm_16k_buffer.len() - 2_880_000;
+        const MAX_BUFFER_SAMPLES: usize = 16000 * 3600 * 2; // 2 hours buffer (115,200,000 samples)
+        if state.pcm_16k_buffer.len() > MAX_BUFFER_SAMPLES {
+            let overflow = state.pcm_16k_buffer.len() - MAX_BUFFER_SAMPLES;
             state.pcm_16k_buffer.drain(0..overflow);
         }
     }

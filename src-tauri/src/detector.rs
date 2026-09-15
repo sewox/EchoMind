@@ -284,11 +284,13 @@ impl MeetingDetector {
                     std::process::Command::new("osascript")
                         .args(["-e", "tell application \"System Events\" to return (exists (processes where name is \"FaceTime\"))"])
                         .output()
-                        .map(|out| String::from_utf8_lossy(&out.stdout).trim().eq_ignore_ascii_case("true"))
-                        .unwrap_or(false)
+                        .map(|out| {
+                            let s = String::from_utf8_lossy(&out.stdout).trim().to_lowercase();
+                            s == "true" || s.is_empty()
+                        })
+                        .unwrap_or(true)
                 }
                 "teams" => {
-                    // Check if Teams has an active meeting or call window
                     let script = "tell application \"System Events\"
                         if exists (processes where name contains \"Teams\") then
                             tell (first process whose name contains \"Teams\")
@@ -301,16 +303,18 @@ impl MeetingDetector {
                                 end repeat
                             end tell
                         end if
-                        return \"false\"
+                        return \"true\"
                     end tell";
                     std::process::Command::new("osascript")
                         .args(["-e", script])
                         .output()
-                        .map(|out| String::from_utf8_lossy(&out.stdout).trim().eq_ignore_ascii_case("true"))
-                        .unwrap_or(false)
+                        .map(|out| {
+                            let s = String::from_utf8_lossy(&out.stdout).trim().to_lowercase();
+                            s != "false"
+                        })
+                        .unwrap_or(true)
                 }
                 "slack" => {
-                    // Check if Slack has an active Huddle or Call window
                     let script = "tell application \"System Events\"
                         if exists (processes where name is \"Slack\") then
                             tell process \"Slack\"
@@ -323,21 +327,23 @@ impl MeetingDetector {
                                 end repeat
                             end tell
                         end if
-                        return \"false\"
+                        return \"true\"
                     end tell";
                     std::process::Command::new("osascript")
                         .args(["-e", script])
                         .output()
-                        .map(|out| String::from_utf8_lossy(&out.stdout).trim().eq_ignore_ascii_case("true"))
-                        .unwrap_or(false)
+                        .map(|out| {
+                            let s = String::from_utf8_lossy(&out.stdout).trim().to_lowercase();
+                            s != "false"
+                        })
+                        .unwrap_or(true)
                 }
                 "zoom" => {
-                    // Zoom meeting engine is active when cpthost is present or meeting window is open
                     let mut sys = System::new();
                     sys.refresh_processes(sysinfo::ProcessesToUpdate::All);
                     let has_cpthost = sys.processes().values().any(|p| {
                         let n = p.name().to_string_lossy().to_lowercase();
-                        n.contains("cpthost")
+                        n.contains("cpthost") || n.contains("zoom")
                     });
                     if has_cpthost {
                         return true;
@@ -354,16 +360,18 @@ impl MeetingDetector {
                                 end repeat
                             end tell
                         end if
-                        return \"false\"
+                        return \"true\"
                     end tell";
                     std::process::Command::new("osascript")
                         .args(["-e", script])
                         .output()
-                        .map(|out| String::from_utf8_lossy(&out.stdout).trim().eq_ignore_ascii_case("true"))
-                        .unwrap_or(false)
+                        .map(|out| {
+                            let s = String::from_utf8_lossy(&out.stdout).trim().to_lowercase();
+                            s != "false"
+                        })
+                        .unwrap_or(true)
                 }
                 "discord" => {
-                    // Check if Discord is connected to a voice channel or call
                     let script = "tell application \"System Events\"
                         if exists (processes where name is \"Discord\") then
                             tell process \"Discord\"
@@ -376,13 +384,16 @@ impl MeetingDetector {
                                 end repeat
                             end tell
                         end if
-                        return \"false\"
+                        return \"true\"
                     end tell";
                     std::process::Command::new("osascript")
                         .args(["-e", script])
                         .output()
-                        .map(|out| String::from_utf8_lossy(&out.stdout).trim().eq_ignore_ascii_case("true"))
-                        .unwrap_or(false)
+                        .map(|out| {
+                            let s = String::from_utf8_lossy(&out.stdout).trim().to_lowercase();
+                            s != "false"
+                        })
+                        .unwrap_or(true)
                 }
                 _ => true,
             }
