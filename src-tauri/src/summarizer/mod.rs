@@ -918,6 +918,7 @@ mod tests {
             participants: Some(vec!["Sercan".to_string(), "Ramazan".to_string()]),
             engine_used: Some("Cihazda (Whisper Small)".to_string()),
             summary_provider: Some("EchoMind Özet".to_string()),
+            tags: None,
         };
 
         let markdown = SummarizerEngine::export_notes_markdown(&record, None, None);
@@ -953,6 +954,7 @@ mod tests {
             participants: Some(vec!["Ahmet".to_string(), "Mehmet".to_string()]),
             engine_used: None,
             summary_provider: None,
+            tags: None,
         };
 
         let meetings = vec![record];
@@ -1022,6 +1024,7 @@ mod tests {
             participants: Some(vec!["Alex".to_string()]),
             engine_used: None,
             summary_provider: None,
+            tags: None,
         };
 
         let translated_summary = SummaryResult {
@@ -1080,6 +1083,7 @@ mod tests {
             participants: Some(vec!["Emre".to_string(), "Can".to_string()]),
             engine_used: None,
             summary_provider: None,
+            tags: None,
         };
 
         let slack_md = SummarizerEngine::export_notes_slack_markdown(&record, None, Some("tr"));
@@ -1123,6 +1127,7 @@ mod tests {
             participants: None,
             engine_used: None,
             summary_provider: None,
+            tags: None,
         };
 
         let csv = SummarizerEngine::export_action_items_csv(&record, None);
@@ -1162,6 +1167,7 @@ mod tests {
             participants: Some(vec!["Burak".to_string(), "Zeynep".to_string()]),
             engine_used: None,
             summary_provider: None,
+            tags: None,
         };
 
         let email_res = SummarizerEngine::export_followup_email(&record, None, Some("tr"));

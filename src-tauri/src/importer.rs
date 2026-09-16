@@ -349,6 +349,7 @@ pub async fn import_audio_file(
             participants: Some(summary_res.participants),
             engine_used: Some(engine_label),
             summary_provider: Some(summary_res.provider_used),
+            tags: None,
         };
 
         let storage = crate::storage::get_global_storage();
