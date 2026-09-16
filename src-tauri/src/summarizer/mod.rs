@@ -523,6 +523,17 @@ pub async fn save_meeting_export_file(
             "csv" | "tasks_csv" => (SummarizerEngine::export_action_items_csv(target, summary_ref), "csv", "CSV Görev Listesi (*.csv)"),
             "tasks_md" => (SummarizerEngine::export_action_items_markdown(target, summary_ref), "md", "Markdown Görev Listesi (*.md)"),
             "email" | "digest" => (SummarizerEngine::export_notes_email_digest(target, summary_ref, lang_ref), "txt", "E-Posta Özeti (*.txt)"),
+            "ics" | "calendar" => (
+                MeetingExporter::export_calendar_ics(
+                    &format!("Follow-up: {}", target.title),
+                    &chrono::Utc::now().to_rfc3339(),
+                    30,
+                    &format!("Toplantı Takibi: {}\nEchoMind AI ile oluşturuldu.", target.title),
+                    None,
+                ),
+                "ics",
+                "iCalendar Takvim Daveti (*.ics)"
+            ),
             "json" => (serde_json::to_string_pretty(target).map_err(|e| e.to_string())?, "json", "JSON Verisi (*.json)"),
             _ => (
                 target.segments.iter().map(|s| format!("[{}] {}: {}", s.timestamp_formatted, s.speaker_name, s.text)).collect::<Vec<_>>().join("\n"),
@@ -544,6 +555,69 @@ pub async fn save_meeting_export_file(
     } else {
         Err("Kaydetme işlemi iptal edildi.".to_string())
     }
+}
+
+#[tauri::command]
+pub fn generate_meeting_ics(
+    meeting_title: String,
+    start_datetime_iso: String,
+    duration_minutes: Option<u32>,
+    description: Option<String>,
+    location: Option<String>,
+) -> Result<String, String> {
+    let dur = duration_minutes.unwrap_or(30);
+    let desc = description.unwrap_or_else(|| format!("EchoMind Takip Toplantısı: {}", meeting_title));
+    Ok(MeetingExporter::export_calendar_ics(
+        &meeting_title,
+        &start_datetime_iso,
+        dur,
+        &desc,
+        location.as_deref(),
+    ))
+}
+
+#[tauri::command]
+pub fn export_followup_bundle(
+    meeting_id: String,
+    custom_summary: Option<SummaryResult>,
+    lang_code: Option<String>,
+) -> Result<FollowUpBundle, String> {
+    let storage = StorageEngine::new();
+    let meetings_lock = storage.meetings.lock().unwrap();
+    let target = meetings_lock
+        .iter()
+        .find(|m| m.id == meeting_id)
+        .ok_or_else(|| format!("Toplantı bulunamadı: {}", meeting_id))?;
+
+    let lang_ref = lang_code.as_deref();
+    let summary_ref = custom_summary.as_ref();
+
+    let email_res = SummarizerEngine::export_followup_email(target, summary_ref, lang_ref);
+    let email_subject = email_res.subject;
+    let email_body = email_res.body;
+    let email_html = SummarizerEngine::export_notes_html(target, summary_ref, lang_ref);
+    let mailto_url = email_res.mailto_url;
+    let action_items_md = SummarizerEngine::export_action_items_markdown(target, summary_ref);
+    let action_items_csv = SummarizerEngine::export_action_items_csv(target, summary_ref);
+    let slack_md = SummarizerEngine::export_notes_slack_markdown(target, summary_ref, lang_ref);
+    let ics_content = MeetingExporter::export_calendar_ics(
+        &format!("Takip: {}", target.title),
+        &chrono::Utc::now().to_rfc3339(),
+        30,
+        &format!("EchoMind Takip Toplantısı - {}", target.title),
+        None,
+    );
+
+    Ok(FollowUpBundle {
+        email_subject,
+        email_body,
+        email_html,
+        mailto_url,
+        action_items_md,
+        action_items_csv,
+        slack_md,
+        ics_content,
+    })
 }
 
 #[tauri::command]

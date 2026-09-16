@@ -358,6 +358,44 @@ export interface TranslationKeys {
       features: string;
     };
   };
+  followUp?: {
+    modalTitle: string;
+    modalSubtitle: string;
+    tabs: {
+      email: string;
+      actions: string;
+      calendar: string;
+      slack: string;
+    };
+    tones: {
+      standard: string;
+      executive: string;
+      sales: string;
+      casual: string;
+    };
+    toneLabel: string;
+    emailSubject: string;
+    emailBody: string;
+    openInMailClient: string;
+    copyEmail: string;
+    copySubject: string;
+    copyBody: string;
+    actionItemsTitle: string;
+    actionItemsEmpty: string;
+    copyActionMarkdown: string;
+    copyActionCsv: string;
+    calendarTitle: string;
+    calendarDesc: string;
+    meetingTitleLabel: string;
+    eventDateLabel: string;
+    eventDurationLabel: string;
+    downloadIcs: string;
+    slackTitle: string;
+    copySlack: string;
+    toastCopied: string;
+    toastIcsDownloaded: string;
+    oneClickExportBundle: string;
+  };
 }
 
 export type SupportedLanguage = "tr" | "en" | "de" | "fr" | "es";

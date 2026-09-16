@@ -131,4 +131,14 @@ describe("I18nContext", () => {
     getItemSpy.mockRestore();
     setItemSpy.mockRestore();
   });
+
+  it("handles unsupported language in localStorage and fallback translation", () => {
+    localStorage.setItem("echomind_app_language", "unsupported_lang" as any);
+    render(
+      <I18nProvider>
+        <TestConsumer />
+      </I18nProvider>,
+    );
+    expect(screen.getByTestId("current-lang").textContent).toBe("tr");
+  });
 });
