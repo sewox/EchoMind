@@ -66,6 +66,9 @@ export interface AudioStatus {
   sample_rate: number;
   channels: number;
   buffered_samples: number;
+  is_loopback?: boolean;
+  has_loopback_device?: boolean;
+  active_device_name?: string | null;
 }
 
 export interface ModelStatus {

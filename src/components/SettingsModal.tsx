@@ -536,48 +536,97 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
             </div>
 
-            {/* Automatic Native System Audio & Mic Capture */}
-            <div className="p-4 rounded-xl bg-gradient-to-b from-cyan-950/20 to-slate-950/60 border border-cyan-500/20 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="p-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-400">
-                    <Sparkles className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-white text-xs">
-                      Akıllı Çift Yönlü Ses Kaydı (Otomatik Miksaj)
-                    </h4>
-                    <p className="text-[10px] text-slate-400">
-                      Ekstra sürücü veya sanal aygıt kurulumu gerektirmez
-                    </p>
-                  </div>
-                </div>
-                <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-medium text-[10px] flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                  Aktif & Optimize
-                </span>
-              </div>
+            {/* Dynamic System Audio & Loopback Status Card */}
+            {(() => {
+              const selectedDev = (audioDevices || []).find(
+                (d) => d.name === selectedAudioDevice,
+              );
+              const isLoopbackActive = selectedDev?.is_loopback ?? false;
+              const hasAnyLoopback = (audioDevices || []).some(
+                (d) => d.is_loopback,
+              );
 
-              <p className="text-slate-300 text-[11px] leading-relaxed">
-                EchoMind; Google Meet, Zoom, Teams ve Discord görüşmelerinde{" "}
-                <strong>
-                  kendi sesiniz ile toplantıdaki diğer katılımcıların sesini
-                </strong>{" "}
-                yerel işletim sistemi API'si üzerinden otomatik olarak
-                birleştirir ve net bir şekilde yazıya döker.
-              </p>
+              return (
+                <div className="p-4 rounded-xl bg-gradient-to-b from-slate-900/90 to-slate-950/80 border border-slate-800 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div
+                        className={`p-1.5 rounded-lg border ${
+                          isLoopbackActive
+                            ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+                            : "bg-cyan-500/10 border-cyan-500/20 text-cyan-400"
+                        }`}
+                      >
+                        {isLoopbackActive ? (
+                          <Volume2 className="w-4 h-4" />
+                        ) : (
+                          <Mic className="w-4 h-4" />
+                        )}
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-white text-xs">
+                          {isLoopbackActive
+                            ? "Sistem Sesi + Mikrofon (Çift Yönlü Kayıt Aktif)"
+                            : "Mikrofon Ses Kaydı"}
+                        </h4>
+                        <p className="text-[10px] text-slate-400">
+                          {isLoopbackActive
+                            ? "Sanal ses döngüsü (Loopback) devrede; karşı tarafın konuşmaları net kaydediliyor."
+                            : "Şu an doğrudan mikrofon girişiniz dinleniyor."}
+                        </p>
+                      </div>
+                    </div>
+                    <span
+                      className={`px-2 py-0.5 rounded-full font-medium text-[10px] flex items-center gap-1.5 ${
+                        isLoopbackActive
+                          ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400"
+                          : "bg-amber-500/10 border border-amber-500/20 text-amber-400"
+                      }`}
+                    >
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full ${
+                          isLoopbackActive ? "bg-emerald-400" : "bg-amber-400"
+                        }`}
+                      />
+                      {isLoopbackActive
+                        ? "Loopback Aktif"
+                        : "Sadece Mikrofon"}
+                    </span>
+                  </div>
 
-              <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-400 pt-1">
-                <div className="p-2 rounded-lg bg-slate-900/60 border border-slate-800 flex items-center gap-2">
-                  <Mic className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                  <span>Sizin Sesiniz: Seçili Giriş Aygıtı</span>
+                  {!isLoopbackActive && (
+                    <div className="p-3 rounded-lg bg-amber-950/20 border border-amber-500/20 text-amber-300 text-[11px] space-y-1.5 leading-relaxed">
+                      <p className="font-medium text-amber-200 flex items-center gap-1.5">
+                        <span>💡</span> Toplantıda Karşı Tarafın Sesini Kaydetme İpucu:
+                      </p>
+                      <p className="text-[10.5px] text-amber-300/90">
+                        Kulaklık kullandığınızda bilgisayarınızdan çalan diğer katılımcıların sesi standart mikrofona ulaşmaz. Karşı tarafın sesini de doğrudan yazıya dökmek için <strong>BlackHole (macOS)</strong>, <strong>VB-Cable</strong> veya <strong>Stereo Mix</strong> sanal aygıtını seçebilirsiniz.
+                      </p>
+                      {hasAnyLoopback && (
+                        <p className="text-[10px] text-emerald-300 font-semibold pt-0.5">
+                          ✓ Sisteminizde sanal ses aygıtı bulundu! Yukarıdaki listeden Loopback aygıtını seçebilirsiniz.
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-400 pt-1">
+                    <div className="p-2 rounded-lg bg-slate-900/60 border border-slate-800 flex items-center gap-2">
+                      <Mic className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                      <span>Sizin Sesiniz: Aktif Giriş</span>
+                    </div>
+                    <div className="p-2 rounded-lg bg-slate-900/60 border border-slate-800 flex items-center gap-2">
+                      <Volume2 className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                      <span>
+                        {isLoopbackActive
+                          ? "Sistem Sesi: Loopback Devrede"
+                          : "Sistem Sesi: Hoparlör/Ortam"}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <div className="p-2 rounded-lg bg-slate-900/60 border border-slate-800 flex items-center gap-2">
-                  <Volume2 className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                  <span>Katılımcılar: Otomatik Sistem Sesi</span>
-                </div>
-              </div>
-            </div>
+              );
+            })()}
           </div>
         )}
 

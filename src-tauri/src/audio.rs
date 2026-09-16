@@ -14,6 +14,9 @@ pub struct AudioStatus {
     pub sample_rate: u32,      // Standard 16000 Hz for Whisper
     pub channels: u16,         // 1 (Mono)
     pub buffered_samples: usize,
+    pub is_loopback: bool,     // Whether active device captures loopback/system audio
+    pub has_loopback_device: bool, // Whether any loopback device is available on the machine
+    pub active_device_name: Option<String>,
 }
 
 pub struct AudioState {
@@ -49,6 +52,7 @@ pub struct GlobalAudioEngine {
     pub state: SharedAudioState,
     pub stop_tx: Mutex<Option<Sender<()>>>,
     pub preview_tx: Mutex<Option<Sender<()>>>,
+    pub active_device_name: Mutex<Option<String>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -66,6 +70,7 @@ impl GlobalAudioEngine {
             state: Arc::new(Mutex::new(AudioState::default())),
             stop_tx: Mutex::new(None),
             preview_tx: Mutex::new(None),
+            active_device_name: Mutex::new(None),
         }
     }
 
@@ -121,8 +126,11 @@ impl GlobalAudioEngine {
             return Ok(()); // Already recording
         }
 
+        *self.active_device_name.lock().unwrap() = target_device_name.clone();
+
         let (tx, rx) = channel::<()>();
         let state_clone = Arc::clone(&self.state);
+        let target_device_for_thread = target_device_name;
 
         {
             let mut state = state_clone.lock().unwrap();
@@ -136,7 +144,7 @@ impl GlobalAudioEngine {
 
         thread::spawn(move || {
             let host = cpal::default_host();
-            let device = if let Some(ref target_name) = target_device_name {
+            let device = if let Some(ref target_name) = target_device_for_thread {
                 let mut found = None;
                 if let Ok(devices) = host.input_devices() {
                     for d in devices {
@@ -243,6 +251,7 @@ impl GlobalAudioEngine {
         }
 
         self.stop_preview()?;
+        *self.active_device_name.lock().unwrap() = target_device_name.clone();
 
         let (tx, rx) = channel::<()>();
         let state_clone = Arc::clone(&self.state);
@@ -339,6 +348,22 @@ impl GlobalAudioEngine {
 
     pub fn get_status(&self) -> AudioStatus {
         let state = self.state.lock().unwrap();
+        let dev_name = self.active_device_name.lock().unwrap().clone();
+        let devices = Self::list_devices();
+        let has_loopback = devices.iter().any(|d| d.is_loopback);
+        let is_loopback = match &dev_name {
+            Some(name) => devices
+                .iter()
+                .find(|d| d.name.eq_ignore_ascii_case(name))
+                .map(|d| d.is_loopback)
+                .unwrap_or(false),
+            None => devices
+                .iter()
+                .find(|d| d.is_default)
+                .map(|d| d.is_loopback)
+                .unwrap_or(false),
+        };
+
         AudioStatus {
             is_recording: state.is_recording,
             mic_level: (state.mic_level * 100.0).round() / 100.0,
@@ -347,6 +372,9 @@ impl GlobalAudioEngine {
             sample_rate: 16000,
             channels: 1,
             buffered_samples: state.pcm_16k_buffer.len(),
+            is_loopback,
+            has_loopback_device: has_loopback,
+            active_device_name: dev_name,
         }
     }
 
