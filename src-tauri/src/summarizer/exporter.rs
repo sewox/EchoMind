@@ -810,6 +810,79 @@ body {
 
         (subject, body)
     }
+
+    /// Generates a standard RFC 5545 iCalendar (.ics) event string for follow-up meetings.
+    pub fn export_calendar_ics(
+        meeting_title: &str,
+        start_datetime_iso: &str,
+        duration_minutes: u32,
+        description: &str,
+        location: Option<&str>,
+    ) -> String {
+        // Format ISO date (e.g. 2026-09-16T14:00:00) into iCalendar DTSTART (e.g. 20260916T140000Z)
+        let clean_start = start_datetime_iso
+            .replace('-', "")
+            .replace(':', "")
+            .replace(' ', "T");
+        let dtstart = if clean_start.contains('T') {
+            clean_start
+        } else {
+            format!("{}T090000", clean_start)
+        };
+
+        let uid = format!(
+            "echomind-{}@local",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(1000)
+        );
+        let loc = location.unwrap_or("EchoMind AI Meeting Room / Virtual");
+        let clean_desc = description.replace('\n', "\\n");
+        let clean_summary = meeting_title.replace('\n', " ");
+
+        format!(
+            "BEGIN:VCALENDAR\r\n\
+VERSION:2.0\r\n\
+PRODID:-//EchoMind AI Assistant//Follow-up Engine//EN\r\n\
+CALSCALE:GREGORIAN\r\n\
+METHOD:REQUEST\r\n\
+BEGIN:VEVENT\r\n\
+UID:{uid}\r\n\
+DTSTAMP:{dtstart}Z\r\n\
+DTSTART:{dtstart}\r\n\
+DURATION:PT{dur}M\r\n\
+SUMMARY:{summary}\r\n\
+DESCRIPTION:{desc}\r\n\
+LOCATION:{loc}\r\n\
+STATUS:CONFIRMED\r\n\
+BEGIN:VALARM\r\n\
+TRIGGER:-PT15M\r\n\
+ACTION:DISPLAY\r\n\
+DESCRIPTION:Reminder: {summary}\r\n\
+END:VALARM\r\n\
+END:VEVENT\r\n\
+END:VCALENDAR\r\n",
+            uid = uid,
+            dtstart = dtstart,
+            dur = duration_minutes,
+            summary = clean_summary,
+            desc = clean_desc,
+            loc = loc
+        )
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FollowUpBundle {
+    pub email_subject: String,
+    pub email_body: String,
+    pub email_html: String,
+    pub mailto_url: String,
+    pub action_items_md: String,
+    pub action_items_csv: String,
+    pub slack_md: String,
+    pub ics_content: String,
 }
 
 #[cfg(test)]
@@ -826,5 +899,21 @@ mod tests {
         assert!(escaped.contains("&amp;"));
         assert!(escaped.contains("&quot;"));
         assert!(escaped.contains("&#39;"));
+    }
+
+    #[test]
+    fn test_export_calendar_ics() {
+        let ics = MeetingExporter::export_calendar_ics(
+            "Sprint Planning Follow-up",
+            "2026-09-20T10:00:00",
+            45,
+            "Follow-up discussion on Q4 goals",
+            Some("Zoom"),
+        );
+        assert!(ics.contains("BEGIN:VCALENDAR"));
+        assert!(ics.contains("SUMMARY:Sprint Planning Follow-up"));
+        assert!(ics.contains("DURATION:PT45M"));
+        assert!(ics.contains("LOCATION:Zoom"));
+        assert!(ics.contains("END:VCALENDAR"));
     }
 }
