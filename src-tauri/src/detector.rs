@@ -179,15 +179,27 @@ impl MeetingDetector {
         // 2. Scan Browser-based Meetings (Google Meet, Teams Web, Zoom Web) via AppleScript on macOS
         #[cfg(target_os = "macos")]
         {
-            let browser_apps = vec![
-                "Google Chrome",
-                "Arc",
-                "Brave Browser",
-                "Microsoft Edge",
-                "Safari",
+            let browser_candidates = vec![
+                ("Google Chrome", vec!["chrome", "google chrome"]),
+                ("Arc", vec!["arc"]),
+                ("Brave Browser", vec!["brave", "brave browser"]),
+                ("Microsoft Edge", vec!["edge", "microsoft edge", "msedge"]),
+                ("Safari", vec!["safari"]),
             ];
 
-            for browser in browser_apps {
+            // Only query browsers that are actually running to avoid heavy osascript spawn overhead
+            let running_browsers: Vec<&str> = browser_candidates
+                .into_iter()
+                .filter(|(_browser_name, match_names)| {
+                    sys.processes().values().any(|p| {
+                        let pname = p.name().to_string_lossy().to_lowercase();
+                        match_names.iter().any(|m| pname == *m || pname.starts_with(m))
+                    })
+                })
+                .map(|(b, _)| b)
+                .collect();
+
+            for browser in running_browsers {
                 let script = if browser == "Safari" {
                     format!(
                         "tell application \"{}\" to if running then get {{name, URL}} of tabs of every window",
@@ -229,12 +241,22 @@ impl MeetingDetector {
                                 || meeting_code == "new"
                                 || meeting_code.starts_with("_meet")
                                 || titles_str.contains("ayrıldınız")
+                                || titles_str.contains("ayrıldın")
                                 || titles_str.contains("left the meeting")
                                 || titles_str.contains("left the call")
+                                || titles_str.contains("left the video call")
                                 || titles_str.contains("görüşme sonlandırıldı")
                                 || titles_str.contains("görüşmeden çıktınız")
+                                || titles_str.contains("toplantı sonlandırıldı")
+                                || titles_str.contains("toplantı bitti")
+                                || titles_str.contains("call ended")
                                 || titles_str.contains("katılmaya hazır")
-                                || titles_str.contains("ana sayfa");
+                                || titles_str.contains("ready to join")
+                                || titles_str.contains("ana sayfa")
+                                || titles_str.contains("rejoin")
+                                || titles_str.contains("tekrar katıl")
+                                || titles_str.contains("return to home screen")
+                                || titles_str.contains("ana ekrana dön");
 
                             let is_valid_room = !is_left_or_home && (meeting_code.contains('-') || meeting_code.len() >= 9);
 
@@ -471,7 +493,7 @@ impl MeetingDetector {
         let settings_clone = self.settings.clone();
 
         thread::spawn(move || {
-            println!("🔍 Toplantı ve Ses Algılama Servisi Başlatıldı (1.5s Hızlı Tepki).");
+            println!("🔍 Toplantı ve Ses Algılama Servisi Başlatıldı (1.0s Hızlı Tepki).");
             let mut last_detected_id = String::new();
             let mut consecutive_misses: u32 = 0;
             let mut previous_apps: Vec<MeetingAppInfo> = Vec::new();
@@ -483,7 +505,7 @@ impl MeetingDetector {
                 };
 
                 if !current_settings.enabled {
-                    thread::sleep(Duration::from_millis(1500));
+                    thread::sleep(Duration::from_millis(1000));
                     continue;
                 }
 
@@ -583,8 +605,8 @@ impl MeetingDetector {
                     previous_apps = filtered_active;
                 } else {
                     consecutive_misses += 1;
-                    // Debounce misses: end meeting after 3 consecutive empty cycles (4.5 seconds)
-                    if consecutive_misses >= 3 && !last_detected_id.is_empty() {
+                    // Debounce misses: end meeting after 2 consecutive empty cycles (max 2-3 seconds)
+                    if consecutive_misses >= 2 && !last_detected_id.is_empty() {
                         last_detected_id.clear();
                         {
                             let mut dismissed = get_dismissed_session().lock().unwrap();
@@ -603,11 +625,11 @@ impl MeetingDetector {
                                 let _ = island_win.hide();
                             }
                         }
-                        println!("🛑 Toplantı Sona Erdi (4.5s doğrulandı), bitiş sinyali iletildi.");
+                        println!("🛑 Toplantı Sona Erdi (< 3s doğrulandı), bitiş sinyali iletildi.");
                     }
                 }
 
-                thread::sleep(Duration::from_millis(1500));
+                thread::sleep(Duration::from_millis(1000));
             }
 
             println!("🛑 Toplantı Algılama Servisi Durduruldu.");

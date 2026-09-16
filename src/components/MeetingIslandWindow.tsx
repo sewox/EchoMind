@@ -34,6 +34,8 @@ const IslandContent: FC = () => {
     );
 
     const unlistenEnded = listen("meeting-ended", () => {
+      setAppInfo((prev) => ({ ...prev, is_running: false }));
+      setLatestSuggestion(null);
       invoke("hide_island_window").catch(() => {});
     });
 
