@@ -364,7 +364,16 @@ export const en: TranslationKeys = {
     currentVersion: "Current Version",
     latestVersion: "Latest Version",
     releaseNotes: "Release Notes & What's New",
-    downloadAndUpdate: "Update Now",
+    downloadAndUpdate: "Download & Install",
+    downloading: "Downloading Update...",
+    downloadProgress: "{percentage}% completed ({downloaded} MB / {total} MB)",
+    installing: "Verifying package and preparing installation...",
+    completed: "Installation Package Ready",
+    completedDesc:
+      "The update package has been launched. Finalizing installation...",
+    downloadFailed:
+      "Failed to download update. Please check your network connection.",
+    manualDownloadFallback: "Download from GitHub Directly",
     remindLater: "Remind Me Later",
     dontShowAgainForVersion: "Don't show this version again on startup",
     autoCheckToggle: "Automatically Check for Updates on Startup",

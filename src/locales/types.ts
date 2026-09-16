@@ -324,6 +324,13 @@ export interface TranslationKeys {
     latestVersion: string;
     releaseNotes: string;
     downloadAndUpdate: string;
+    downloading: string;
+    downloadProgress: string;
+    installing: string;
+    completed: string;
+    completedDesc: string;
+    downloadFailed: string;
+    manualDownloadFallback: string;
     remindLater: string;
     dontShowAgainForVersion: string;
     autoCheckToggle: string;

@@ -21,7 +21,7 @@ pub mod updater;
 
 use credentials::{delete_secure_credential, get_secure_credential, save_secure_credential};
 use dlp::redact_sensitive_text;
-use updater::{check_for_updates, open_release_url};
+use updater::{check_for_updates, download_and_install_update, open_release_url};
 
 use audio::{
     get_audio_status, list_audio_devices, open_audio_midi_setup, start_audio_capture,
@@ -136,6 +136,7 @@ pub fn run() {
             delete_secure_credential,
             redact_sensitive_text,
             check_for_updates,
+            download_and_install_update,
             open_release_url,
             generate_meeting_ics,
             export_followup_bundle,
