@@ -12,7 +12,7 @@ const translations = {
     navSecurity: "Güvenlik & DLP",
     navHardware: "Donanım",
     navDownload: "İndir",
-    badgeRelease: "EchoMind v0.2.0 Yayında • Sıfır-Güven Mimarisi",
+    badgeRelease: "EchoMind v0.2.3 Yayında • Sıfır-Güven Mimarisi",
     badgeProductHunt: "🚀 Product Hunt'ta Keşfedin",
     heroTitle: "Toplantılarınızı Donanım Gücüyle Dinleyen Hibrit Yapay Zekâ",
     heroSubtitle:
@@ -113,7 +113,7 @@ const translations = {
     navSecurity: "Security & DLP",
     navHardware: "Hardware",
     navDownload: "Download",
-    badgeRelease: "EchoMind v0.2.0 Released • Zero-Trust Architecture",
+    badgeRelease: "EchoMind v0.2.3 Released • Zero-Trust Architecture",
     badgeProductHunt: "🚀 Discover on Product Hunt",
     heroTitle: "Hardware-Aware Hybrid AI Meeting Intelligence",
     heroSubtitle:
