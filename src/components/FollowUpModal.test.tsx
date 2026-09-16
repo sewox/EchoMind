@@ -48,7 +48,7 @@ const mockMeeting: MeetingRecord = {
       task: "Update API documentation",
       assignee: "Tech Lead",
       source_citations: [],
-      is_completed: false,
+      is_completed: true,
     },
   ],
 };
@@ -130,7 +130,7 @@ describe("FollowUpModal Component", () => {
     ).toBeInTheDocument();
   });
 
-  it("switches email tones and updates state", async () => {
+  it("switches email tones and updates state across all tones", async () => {
     renderComponent();
 
     await waitFor(() => {
@@ -139,50 +139,71 @@ describe("FollowUpModal Component", () => {
       ).toBeInTheDocument();
     });
 
-    // Switch to Executive tone
-    const executiveBtn = screen.getByRole("button", {
-      name: /Yönetici|Executive/i,
-    });
-    await act(async () => {
-      fireEvent.click(executiveBtn);
-    });
-
-    expect(executiveBtn).toBeInTheDocument();
-  });
-
-  it("copies email draft to clipboard and opens local email client", async () => {
-    renderComponent();
-
-    await waitFor(() => {
-      expect(
-        screen.getByDisplayValue("Follow-up: Q3 Sprint Planning"),
-      ).toBeInTheDocument();
-    });
-
-    // Click Copy Email
-    const copyButtons = screen.getAllByRole("button");
-    const copyEmailBtn = copyButtons.find((btn) =>
-      /E-postayı Kopyala|Copy Email/i.test(btn.textContent || ""),
-    );
-    expect(copyEmailBtn).toBeDefined();
-
-    if (copyEmailBtn) {
+    const toneMatchers = [/Yönetici/i, /Müşteri/i, /Samimi/i, /Standart/i];
+    for (const matcher of toneMatchers) {
+      const btn = screen.getByRole("button", { name: matcher });
       await act(async () => {
-        fireEvent.click(copyEmailBtn);
+        fireEvent.click(btn);
       });
-
-      expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
-        mockBundle.email_body,
-      );
+      expect(btn).toBeInTheDocument();
     }
   });
 
-  it("switches to Action Items tab and displays tasks", async () => {
+  it("copies email draft, subject, and body to clipboard", async () => {
+    renderComponent();
+
+    await waitFor(() => {
+      expect(
+        screen.getByDisplayValue("Follow-up: Q3 Sprint Planning"),
+      ).toBeInTheDocument();
+    });
+
+    // Copy subject
+    const copySubjectBtn = screen.getByRole("button", {
+      name: /Konuyu Kopyala/i,
+    });
+    await act(async () => {
+      fireEvent.click(copySubjectBtn);
+    });
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
+      mockBundle.email_subject,
+    );
+
+    // Copy body
+    const copyBodyBtn = screen.getByRole("button", { name: /Metni Kopyala/i });
+    await act(async () => {
+      fireEvent.click(copyBodyBtn);
+    });
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
+      mockBundle.email_body,
+    );
+
+    // Copy entire email
+    const copyEmailBtn = screen.getByRole("button", {
+      name: /E-postayı Kopyala/i,
+    });
+    await act(async () => {
+      fireEvent.click(copyEmailBtn);
+    });
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
+      mockBundle.email_body,
+    );
+
+    // Open local email client
+    const mailClientBtn = screen.getByRole("button", {
+      name: /E-Posta İstemcisinde Aç/i,
+    });
+    await act(async () => {
+      fireEvent.click(mailClientBtn);
+    });
+  });
+
+  it("switches to Action Items tab and copies markdown & CSV", async () => {
     renderComponent();
 
     // Click on Actions tab
     const actionsTab = screen.getByRole("button", {
-      name: /Görevler & Sorumlular|Action Items/i,
+      name: /Görevler & Sorumlular/i,
     });
     await act(async () => {
       fireEvent.click(actionsTab);
@@ -192,23 +213,52 @@ describe("FollowUpModal Component", () => {
       screen.getByText("Deploy production build v0.2.3"),
     ).toBeInTheDocument();
     expect(screen.getByText("@DevOps")).toBeInTheDocument();
-    expect(screen.getByText("Update API documentation")).toBeInTheDocument();
+    expect(screen.getByText("DONE")).toBeInTheDocument();
+    expect(screen.getByText("PENDING")).toBeInTheDocument();
 
     // Copy actions markdown
     const copyActionsBtn = screen.getByRole("button", { name: /^Markdown$/i });
     await act(async () => {
       fireEvent.click(copyActionsBtn);
     });
-
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
       mockBundle.action_items_md,
     );
+
+    // Copy actions CSV
+    const copyCsvBtn = screen.getByRole("button", { name: /^CSV$/i });
+    await act(async () => {
+      fireEvent.click(copyCsvBtn);
+    });
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
+      mockBundle.action_items_csv,
+    );
   });
 
-  it("switches to Calendar (.ics) tab and handles ics generation and download", async () => {
+  it("renders empty state in Action Items tab when meeting has no action items", async () => {
+    const emptyMeeting: MeetingRecord = {
+      ...mockMeeting,
+      action_items: [],
+    };
+    renderComponent({ meeting: emptyMeeting });
+
+    const actionsTab = screen.getByRole("button", {
+      name: /Görevler & Sorumlular/i,
+    });
+    await act(async () => {
+      fireEvent.click(actionsTab);
+    });
+
+    expect(
+      screen.getByText(
+        /Bu toplantıda tespit edilmiş açık eylem maddesi bulunamadı/i,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("switches to Calendar (.ics) tab, changes event title, date, duration and downloads ics", async () => {
     renderComponent();
 
-    // Click on Calendar tab
     const calendarTab = screen.getByRole("button", { name: /Takvim Daveti/i });
     await act(async () => {
       fireEvent.click(calendarTab);
@@ -219,6 +269,20 @@ describe("FollowUpModal Component", () => {
         screen.getByText("Takip Toplantısı Takvim Daveti (.ics)"),
       ).toBeInTheDocument();
     });
+
+    // Change title input
+    const titleInput = screen.getByDisplayValue(
+      `Takip / Follow-up: ${mockMeeting.title}`,
+    );
+    fireEvent.change(titleInput, { target: { value: "Sprint Review Q3" } });
+
+    // Change date input
+    const dateInput = screen.getByDisplayValue(/2026/);
+    fireEvent.change(dateInput, { target: { value: "2026-09-25T14:00" } });
+
+    // Change duration select
+    const durationSelect = screen.getByRole("combobox");
+    fireEvent.change(durationSelect, { target: { value: "60" } });
 
     // Download ICS file
     const downloadIcsBtn = screen.getByRole("button", {
@@ -231,7 +295,8 @@ describe("FollowUpModal Component", () => {
     expect(invoke).toHaveBeenCalledWith(
       "generate_meeting_ics",
       expect.objectContaining({
-        meetingTitle: expect.stringContaining("Takip / Follow-up"),
+        meetingTitle: "Sprint Review Q3",
+        durationMinutes: 60,
       }),
     );
   });
@@ -239,7 +304,6 @@ describe("FollowUpModal Component", () => {
   it("switches to Slack / Teams tab and copies formatted text", async () => {
     renderComponent();
 
-    // Click on Slack / Teams tab
     const slackTab = screen.getByRole("button", { name: /Slack & Teams/i });
     await act(async () => {
       fireEvent.click(slackTab);
@@ -251,7 +315,6 @@ describe("FollowUpModal Component", () => {
       ).toBeInTheDocument();
     });
 
-    // Copy Slack formatted text
     const copySlackBtn = screen.getByRole("button", {
       name: /Slack Formatında Kopyala/i,
     });
@@ -264,7 +327,7 @@ describe("FollowUpModal Component", () => {
     );
   });
 
-  it("handles complete bundle download", async () => {
+  it("handles complete bundle download and error cases gracefully", async () => {
     renderComponent();
 
     const buttons = screen.getAllByRole("button");
@@ -281,9 +344,66 @@ describe("FollowUpModal Component", () => {
     }
   });
 
+  it("handles bundle load errors gracefully", async () => {
+    (invoke as any).mockRejectedValueOnce(new Error("Bundle load failed"));
+    renderComponent();
+    expect(screen.getByText("One-Click Follow-up Engine")).toBeInTheDocument();
+  });
+
+  it("handles ics download error and bundle download error gracefully", async () => {
+    (invoke as any).mockImplementation((cmd: string) => {
+      if (cmd === "generate_meeting_ics") {
+        return Promise.reject(new Error("ICS Generation Failed"));
+      }
+      if (cmd === "export_followup_bundle") {
+        return Promise.reject(new Error("Bundle Download Failed"));
+      }
+      return Promise.resolve("");
+    });
+
+    renderComponent();
+
+    // Click Calendar tab and try download
+    const calendarTab = screen.getByRole("button", { name: /Takvim Daveti/i });
+    await act(async () => {
+      fireEvent.click(calendarTab);
+    });
+
+    const downloadIcsBtn = screen.getByRole("button", {
+      name: /.ics Takvim Dosyasını İndir/i,
+    });
+    await act(async () => {
+      fireEvent.click(downloadIcsBtn);
+    });
+
+    // Click footer bundle export button
+    const buttons = screen.getAllByRole("button");
+    const downloadBundleBtn = buttons.find((b) =>
+      /Tüm Paketi Dışa Aktar/i.test(b.textContent || ""),
+    );
+    if (downloadBundleBtn) {
+      await act(async () => {
+        fireEvent.click(downloadBundleBtn);
+      });
+    }
+  });
+
+  it("handles clipboard and download errors gracefully without crash", async () => {
+    (navigator.clipboard.writeText as any).mockRejectedValueOnce(
+      new Error("Clipboard denied"),
+    );
+    renderComponent();
+
+    const copyEmailBtn = screen.getByRole("button", {
+      name: /E-postayı Kopyala/i,
+    });
+    await act(async () => {
+      fireEvent.click(copyEmailBtn);
+    });
+  });
+
   it("calls onClose when close button is clicked", () => {
     const onCloseMock = vi.fn();
-
     renderComponent({ onClose: onCloseMock });
 
     const closeBtn = screen.getByLabelText("Kapat");

@@ -967,10 +967,10 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
                 <button
                   onClick={() => setIsFollowUpModalOpen(true)}
                   className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white text-xs font-semibold shadow-md shadow-indigo-900/30 transition flex items-center gap-1.5 shrink-0"
-                  title={t("followUp.title") || "Follow-up Engine"}
+                  title={t("followUp.modalTitle") || "Follow-up Engine"}
                 >
                   <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                  <span>{t("followUp.title") || "Follow-up"}</span>
+                  <span>{t("followUp.modalTitle") || "Follow-up"}</span>
                 </button>
               )}
 
@@ -1141,10 +1141,10 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
               onClick={() => setIsFollowUpModalOpen(true)}
               disabled={segments.length === 0}
               className="px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-medium text-xs shadow-md shadow-indigo-900/30 transition flex items-center gap-1.5 disabled:opacity-30"
-              title={t("followUp.title") || "Follow-up Engine"}
+              title={t("followUp.modalTitle") || "Follow-up Engine"}
             >
               <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-              <span>{t("followUp.title") || "Follow-up"}</span>
+              <span>{t("followUp.modalTitle") || "Follow-up"}</span>
             </button>
           )}
 
