@@ -811,6 +811,59 @@ body {
         (subject, body)
     }
 
+    /// Safely formats an ISO datetime string into RFC 5545 UTC iCalendar format (YYYYMMDDTHHMMSSZ).
+    /// Strips any fractional seconds (.123, .000) and normalizes timezone offsets.
+    pub fn format_rfc5545_datetime(iso_str: &str) -> String {
+        let trimmed = iso_str.trim();
+        // Remove trailing Z or timezone offsets first
+        let without_z = trimmed.trim_end_matches('Z').trim_end_matches('z');
+        // Split on + or - after index 10 for timezone offsets (e.g. 2026-09-20T10:00:00+03:00)
+        let main_part = if without_z.len() > 10 {
+            if let Some(pos) = without_z[10..].find('+').or_else(|| without_z[10..].find('-')) {
+                &without_z[..10 + pos]
+            } else {
+                without_z
+            }
+        } else {
+            without_z
+        };
+
+        // Split off fractional seconds (e.g. 10:00:00.123 -> 10:00:00)
+        let clean_datetime = if let Some(dot_pos) = main_part.find('.') {
+            &main_part[..dot_pos]
+        } else {
+            main_part
+        };
+
+        let digits: String = clean_datetime.chars().filter(|c| c.is_ascii_digit()).collect();
+        if digits.len() >= 14 {
+            // YYYYMMDDHHMMSS -> YYYYMMDDTHHMMSSZ
+            format!("{}T{}Z", &digits[..8], &digits[8..14])
+        } else if digits.len() >= 8 {
+            // YYYYMMDD -> YYYYMMDDT090000Z
+            format!("{}T090000Z", &digits[..8])
+        } else {
+            // Fallback to current UTC time
+            chrono::Utc::now().format("%Y%m%dT%H%M%SZ").to_string()
+        }
+    }
+
+    /// Escapes text values according to RFC 5545 Section 3.3.11.
+    pub fn escape_rfc5545_text(input: &str) -> String {
+        let mut out = String::with_capacity(input.len() + 16);
+        for c in input.chars() {
+            match c {
+                '\\' => out.push_str("\\\\"),
+                ';' => out.push_str("\\;"),
+                ',' => out.push_str("\\,"),
+                '\n' => out.push_str("\\n"),
+                '\r' => {},
+                _ => out.push(c),
+            }
+        }
+        out
+    }
+
     /// Generates a standard RFC 5545 iCalendar (.ics) event string for follow-up meetings.
     pub fn export_calendar_ics(
         meeting_title: &str,
@@ -819,27 +872,19 @@ body {
         description: &str,
         location: Option<&str>,
     ) -> String {
-        // Format ISO date (e.g. 2026-09-16T14:00:00) into iCalendar DTSTART (e.g. 20260916T140000Z)
-        let clean_start = start_datetime_iso
-            .replace('-', "")
-            .replace(':', "")
-            .replace(' ', "T");
-        let dtstart = if clean_start.contains('T') {
-            clean_start
-        } else {
-            format!("{}T090000", clean_start)
-        };
+        let dtstart = Self::format_rfc5545_datetime(start_datetime_iso);
+        let dtstamp = chrono::Utc::now().format("%Y%m%dT%H%M%SZ").to_string();
 
-        let uid = format!(
-            "echomind-{}@local",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_nanos())
-                .unwrap_or(1000)
-        );
+        let uid_nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(1000);
+        let uid = format!("echomind-{}@ai-assistant.local", uid_nanos);
+
         let loc = location.unwrap_or("EchoMind AI Meeting Room / Virtual");
-        let clean_desc = description.replace('\n', "\\n");
-        let clean_summary = meeting_title.replace('\n', " ");
+        let clean_desc = Self::escape_rfc5545_text(description);
+        let clean_summary = Self::escape_rfc5545_text(meeting_title);
+        let clean_loc = Self::escape_rfc5545_text(loc);
 
         format!(
             "BEGIN:VCALENDAR\r\n\
@@ -849,7 +894,7 @@ CALSCALE:GREGORIAN\r\n\
 METHOD:REQUEST\r\n\
 BEGIN:VEVENT\r\n\
 UID:{uid}\r\n\
-DTSTAMP:{dtstart}Z\r\n\
+DTSTAMP:{dtstamp}\r\n\
 DTSTART:{dtstart}\r\n\
 DURATION:PT{dur}M\r\n\
 SUMMARY:{summary}\r\n\
@@ -864,11 +909,12 @@ END:VALARM\r\n\
 END:VEVENT\r\n\
 END:VCALENDAR\r\n",
             uid = uid,
+            dtstamp = dtstamp,
             dtstart = dtstart,
             dur = duration_minutes,
             summary = clean_summary,
             desc = clean_desc,
-            loc = loc
+            loc = clean_loc
         )
     }
 }
@@ -904,16 +950,34 @@ mod tests {
     #[test]
     fn test_export_calendar_ics() {
         let ics = MeetingExporter::export_calendar_ics(
-            "Sprint Planning Follow-up",
-            "2026-09-20T10:00:00",
+            "Sprint Planning Follow-up, Review & Retro",
+            "2026-09-20T10:00:00.123456+03:00",
             45,
-            "Follow-up discussion on Q4 goals",
-            Some("Zoom"),
+            "Follow-up discussion on Q4 goals;\nNext steps.",
+            Some("Zoom Room, HQ"),
         );
         assert!(ics.contains("BEGIN:VCALENDAR"));
-        assert!(ics.contains("SUMMARY:Sprint Planning Follow-up"));
+        assert!(ics.contains("SUMMARY:Sprint Planning Follow-up\\, Review & Retro"));
+        assert!(ics.contains("DTSTART:20260920T100000Z"));
         assert!(ics.contains("DURATION:PT45M"));
-        assert!(ics.contains("LOCATION:Zoom"));
+        assert!(ics.contains("LOCATION:Zoom Room\\, HQ"));
+        assert!(ics.contains("DESCRIPTION:Follow-up discussion on Q4 goals\\;\\nNext steps."));
         assert!(ics.contains("END:VCALENDAR"));
+    }
+
+    #[test]
+    fn test_format_rfc5545_datetime() {
+        assert_eq!(
+            MeetingExporter::format_rfc5545_datetime("2026-09-20T10:00:00.000Z"),
+            "20260920T100000Z"
+        );
+        assert_eq!(
+            MeetingExporter::format_rfc5545_datetime("2026-09-20 14:30:45"),
+            "20260920T143045Z"
+        );
+        assert_eq!(
+            MeetingExporter::format_rfc5545_datetime("2026-09-20"),
+            "20260920T090000Z"
+        );
     }
 }

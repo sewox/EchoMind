@@ -6,6 +6,66 @@ use super::types::SummaryResult;
 pub struct LocalSummaryExtractor;
 
 impl LocalSummaryExtractor {
+    /// Cleans and sanitizes raw conversational speech fragments into clear, professional action items.
+    pub fn clean_action_task(raw_text: &str, is_english: bool) -> String {
+        let trimmed = raw_text.trim();
+        if trimmed.is_empty() {
+            return String::new();
+        }
+
+        // Remove conversational filler prefixes
+        let mut cleaned = trimmed.to_string();
+        let prefixes_tr = [
+            "ben bunu ", "ben ", "biz bunu ", "biz ", "sen bunu ", "lütfen ", "bence ", "aslında ",
+            "hocam ", "arkadaşlar ", "tabii ki ", "şöyle yapalım: ", "şey, ", "yani "
+        ];
+        let prefixes_en = [
+            "i will ", "we will ", "we should ", "i think we should ", "let's ", "please ",
+            "can you ", "basically, ", "so, ", "you know, ", "i'll ", "we'll "
+        ];
+
+        let prefixes = if is_english { &prefixes_en[..] } else { &prefixes_tr[..] };
+        for p in prefixes {
+            if cleaned.to_lowercase().starts_with(p) {
+                cleaned = cleaned[p.len()..].trim().to_string();
+                break;
+            }
+        }
+
+        if cleaned.is_empty() {
+            cleaned = trimmed.to_string();
+        }
+
+        // Ensure capitalized first letter
+        let mut chars = cleaned.chars();
+        match chars.next() {
+            None => String::new(),
+            Some(f) => f.to_uppercase().collect::<String>() + chars.as_str(),
+        }
+    }
+
+    /// Normalizes and cleans assignee names, stripping meaningless placeholders like @Fully, PENDING, null.
+    pub fn clean_assignee(raw_assignee: Option<&str>, _task_text: &str) -> Option<String> {
+        let ass = raw_assignee?.trim().trim_start_matches('@').trim();
+        if ass.is_empty() {
+            return None;
+        }
+
+        let lower = ass.to_lowercase();
+        let invalid_assignees = [
+            "fully", "pending", "null", "none", "tbd", "n/a", "na", "unknown",
+            "unassigned", "speaker", "speaker 1", "speaker 2", "speaker 3",
+            "konuşmacı", "konuşmacı 1", "konuşmacı 2", "belirsiz", "yok",
+            "all", "everyone", "team", "ekip", "herkes"
+        ];
+
+        if invalid_assignees.iter().any(|&inv| lower == inv || lower.starts_with("speaker_") || lower.starts_with("speaker ")) {
+            return None;
+        }
+
+        Some(ass.to_string())
+    }
+
     pub fn parse_rich_summary_json(
         parsed: &serde_json::Value,
         provider_name: &str,
@@ -29,14 +89,13 @@ impl LocalSummaryExtractor {
         let mut action_items: Vec<ActionItem> = Vec::new();
         if let Some(actions_arr) = parsed["action_items"].as_array() {
             for act in actions_arr {
-                let task = act["task"].as_str().unwrap_or("").trim().to_string();
+                let raw_task = act["task"].as_str().unwrap_or("").trim();
+                let task = Self::clean_action_task(raw_task, false);
                 if task.is_empty() {
                     continue;
                 }
-                let assignee = act["assignee"]
-                    .as_str()
-                    .map(|s| s.trim().to_string())
-                    .filter(|s| !s.is_empty() && s != "null");
+                let raw_assignee = act["assignee"].as_str();
+                let assignee = Self::clean_assignee(raw_assignee, &task);
                 let source_citations: Vec<usize> = act["source_citations"]
                     .as_array()
                     .map(|arr| arr.iter().filter_map(|v| v.as_u64().map(|n| n as usize)).collect())
@@ -199,13 +258,15 @@ impl LocalSummaryExtractor {
                 let prefix = if is_mostly_english { "Deferred item: " } else { "Gelecek aşamaya bırakılan: " };
                 phase2_deferred.push(format!("{}{}", prefix, seg.text));
             } else if is_action {
+                let cleaned_task = Self::clean_action_task(&seg.text, is_mostly_english);
+                let cleaned_assignee = Self::clean_assignee(Some(&seg.speaker_name), &cleaned_task);
                 action_items.push(ActionItem {
-                    task: seg.text.clone(),
-                    assignee: Some(seg.speaker_name.clone()),
+                    task: cleaned_task.clone(),
+                    assignee: cleaned_assignee,
                     source_citations: vec![idx + 1],
                     is_completed: false,
                 });
-                phase1_agreed.push(seg.text.clone());
+                phase1_agreed.push(cleaned_task);
             } else if seg.text.len() > 25 && key_highlights.len() < 8 {
                 key_highlights.push(seg.text.clone());
             }
@@ -266,5 +327,50 @@ impl LocalSummaryExtractor {
             provider_used: if is_mostly_english { "🔒 On-Device Fast Summary (Offline)".to_string() } else { "🔒 Cihaz İçi Hızlı Özet (Çevrimdışı)".to_string() },
             generation_time_ms: start_time.elapsed().as_millis() as u64,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_clean_action_task_prefixes() {
+        assert_eq!(
+            LocalSummaryExtractor::clean_action_task("ben bunu yarın hallederim", false),
+            "Yarın hallederim"
+        );
+        assert_eq!(
+            LocalSummaryExtractor::clean_action_task("i think we should prepare the deployment", true),
+            "Prepare the deployment"
+        );
+        assert_eq!(
+            LocalSummaryExtractor::clean_action_task("lütfen veritabanı yedeğini alın", false),
+            "Veritabanı yedeğini alın"
+        );
+    }
+
+    #[test]
+    fn test_clean_assignee_removes_invalid() {
+        assert_eq!(
+            LocalSummaryExtractor::clean_assignee(Some("@Fully"), "Task"),
+            None
+        );
+        assert_eq!(
+            LocalSummaryExtractor::clean_assignee(Some("PENDING"), "Task"),
+            None
+        );
+        assert_eq!(
+            LocalSummaryExtractor::clean_assignee(Some("Speaker 1"), "Task"),
+            None
+        );
+        assert_eq!(
+            LocalSummaryExtractor::clean_assignee(Some("@Ahmet"), "Task"),
+            Some("Ahmet".to_string())
+        );
+        assert_eq!(
+            LocalSummaryExtractor::clean_assignee(Some("Sarah Connor"), "Task"),
+            Some("Sarah Connor".to_string())
+        );
     }
 }
