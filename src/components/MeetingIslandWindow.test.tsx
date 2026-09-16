@@ -164,10 +164,10 @@ describe("MeetingIslandWindow Component", () => {
       suggestionListeners[suggestionListeners.length - 1]({
         payload: {
           id: "sug-island-1",
-          title: "Soru Önerisi",
-          content: "Detaylı maliyet dağılımını sorabilir miyiz?",
+          text: "Soru Önerisi",
+          rationale: "Detaylı maliyet dağılımını sorabilir miyiz?",
           category: "question",
-          confidence: 0.95,
+          timestamp_ms: 1000,
         },
       });
       await new Promise((r) => setTimeout(r, 20));
