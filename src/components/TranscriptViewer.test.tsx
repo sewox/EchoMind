@@ -2728,4 +2728,46 @@ describe("TranscriptViewer Component", () => {
 
     unmount();
   });
+
+  it("opens and closes One-Click Follow-up modal from toolbar", async () => {
+    (invoke as any).mockImplementation((cmd: string) => {
+      if (cmd === "export_followup_bundle") {
+        return Promise.resolve({
+          email_subject: "Follow-up Subject",
+          email_body: "Follow-up Body",
+          email_html: "<p>Follow-up</p>",
+          mailto_url: "mailto:",
+          action_items_md: "- [ ] Item",
+          action_items_csv: '"1","Item"',
+          slack_md: "*Slack*",
+          ics_content: "BEGIN:VCALENDAR\nEND:VCALENDAR",
+        });
+      }
+      return Promise.resolve();
+    });
+
+    const { unmount } = render(
+      <I18nProvider>
+        <TranscriptViewer {...defaultProps} />
+      </I18nProvider>,
+    );
+
+    const followUpBtns = screen.getAllByRole("button", { name: /Follow-up/i });
+    expect(followUpBtns.length).toBeGreaterThan(0);
+
+    await act(async () => {
+      fireEvent.click(followUpBtns[0]);
+    });
+
+    expect(
+      screen.getAllByText("One-Click Follow-up Engine").length,
+    ).toBeGreaterThan(0);
+
+    const closeBtn = screen.getByLabelText("Kapat");
+    await act(async () => {
+      fireEvent.click(closeBtn);
+    });
+
+    unmount();
+  });
 });

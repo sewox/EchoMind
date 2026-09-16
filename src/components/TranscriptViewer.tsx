@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { MeetingRecord, ActionItem, TopicBreakdown } from "../App";
 import { ExportModal } from "./ExportModal";
+import { FollowUpModal } from "./FollowUpModal";
 import { RetranscribeModal } from "./RetranscribeModal";
 import { AudioPlayerBar } from "./transcript/AudioPlayerBar";
 import { TasksDecisionsView } from "./transcript/TasksDecisionsView";
@@ -124,6 +125,8 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
 
   // Export Modal State
   const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
+  const [isFollowUpModalOpen, setIsFollowUpModalOpen] =
+    useState<boolean>(false);
 
   // Template & Custom Prompt Studio State
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>(() => {
@@ -960,6 +963,17 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
                 </button>
               )}
 
+              {segments.length > 0 && selectedPastMeeting && (
+                <button
+                  onClick={() => setIsFollowUpModalOpen(true)}
+                  className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white text-xs font-semibold shadow-md shadow-indigo-900/30 transition flex items-center gap-1.5 shrink-0"
+                  title={t("followUp.modalTitle") || "Follow-up Engine"}
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                  <span>{t("followUp.modalTitle") || "Follow-up"}</span>
+                </button>
+              )}
+
               {segments.length > 0 && (
                 <button
                   onClick={() => setIsExportModalOpen(true)}
@@ -1122,6 +1136,18 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
             <span>Kopyala</span>
           </button>
 
+          {selectedPastMeeting && (
+            <button
+              onClick={() => setIsFollowUpModalOpen(true)}
+              disabled={segments.length === 0}
+              className="px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-medium text-xs shadow-md shadow-indigo-900/30 transition flex items-center gap-1.5 disabled:opacity-30"
+              title={t("followUp.modalTitle") || "Follow-up Engine"}
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+              <span>{t("followUp.modalTitle") || "Follow-up"}</span>
+            </button>
+          )}
+
           <button
             onClick={() => setIsExportModalOpen(true)}
             disabled={segments.length === 0}
@@ -1143,6 +1169,16 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
           )}
         </div>
       </div>
+
+      {/* One-Click Follow-up Engine Modal */}
+      {selectedPastMeeting && (
+        <FollowUpModal
+          isOpen={isFollowUpModalOpen}
+          onClose={() => setIsFollowUpModalOpen(false)}
+          meeting={selectedPastMeeting}
+          summary={richSummary || null}
+        />
+      )}
 
       {/* Rich Export Suite Modal */}
       {selectedPastMeeting && (
