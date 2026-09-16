@@ -131,12 +131,24 @@ impl GlobalTranscriberEngine {
 
     pub fn cleanup_context(&self) {
         let mut lock = self.whisper_ctx.lock().unwrap();
-        *lock = None;
+        if let Some(ctx) = lock.take() {
+            // Explicitly drop WhisperContext so that Metal GPU memory buffers, command encoders, and device handles are safely torn down
+            drop(ctx);
+        }
         let mut state = self.state.lock().unwrap();
         state.is_model_loaded = false;
         state.model_display_name = "Whisper Small 244M (Bellekten Boşaltıldı)".to_string();
-        println!("Whisper GGML modeli bellekten boşaltıldı (RAM/GPU serbest bırakıldı).");
+        println!("Whisper GGML modeli bellekten boşaltıldı (Metal GPU ve RAM serbest bırakıldı).");
     }
+}
+
+impl Drop for GlobalTranscriberEngine {
+    fn drop(&mut self) {
+        self.cleanup_context();
+    }
+}
+
+impl GlobalTranscriberEngine {
 
     pub fn transcribe_pcm(&self, samples: &[f32], language: &str) -> Result<Vec<TranscriptSegment>, String> {
         if samples.is_empty() {

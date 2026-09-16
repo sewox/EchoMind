@@ -154,6 +154,8 @@ pub fn run() {
         .run(|_app_handle, event| {
             if let tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit = event {
                 transcriber::get_global_transcriber().cleanup_context();
+                audio::get_global_audio_engine().stop().ok();
+                audio::get_global_audio_engine().stop_preview().ok();
             }
         });
 }
