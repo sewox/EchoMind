@@ -290,6 +290,7 @@ mod tests {
                 participants: Some(vec!["Ahmet".to_string()]),
                 engine_used: None,
                 summary_provider: None,
+                tags: None,
             },
             MeetingRecord {
                 id: "m-2".to_string(),
@@ -322,6 +323,7 @@ mod tests {
                 participants: Some(vec!["Zeynep".to_string()]),
                 engine_used: None,
                 summary_provider: None,
+                tags: None,
             },
         ]
     }

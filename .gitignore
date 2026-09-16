@@ -20,6 +20,7 @@ models/*.bin
 
 # Local audio recordings & test data
 data/recordings/
+data/*.enc
 *.flac
 *.mp3
 *.wav

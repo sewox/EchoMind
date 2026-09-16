@@ -9,6 +9,7 @@ export function useMeetingManager() {
   );
   const [isLoadingMeeting, setIsLoadingMeeting] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [editingMeetingId, setEditingMeetingId] = useState<string | null>(null);
   const [editingTitleText, setEditingTitleText] = useState<string>("");
   const [meetingToDelete, setMeetingToDelete] = useState<MeetingRecord | null>(
@@ -18,7 +19,7 @@ export function useMeetingManager() {
   const fetchPastMeetings = async () => {
     try {
       const meetings = await invoke<MeetingRecord[]>("get_all_meetings");
-      setPastMeetings(meetings);
+      setPastMeetings(Array.isArray(meetings) ? meetings : []);
     } catch (err) {
       console.error("Failed to fetch past meetings:", err);
     }
@@ -32,7 +33,9 @@ export function useMeetingManager() {
     if (e) e.stopPropagation();
     try {
       await invoke("delete_meeting_by_id", { id, meetingId: id });
-      setPastMeetings((prev) => prev.filter((m) => m.id !== id));
+      setPastMeetings((prev) =>
+        Array.isArray(prev) ? prev.filter((m) => m.id !== id) : [],
+      );
       if (selectedMeeting?.id === id) {
         setSelectedMeeting(null);
       }
@@ -83,7 +86,11 @@ export function useMeetingManager() {
     try {
       await invoke("update_meeting_title", { meetingId, newTitle });
       setPastMeetings((prev) =>
-        prev.map((m) => (m.id === meetingId ? { ...m, title: newTitle } : m)),
+        Array.isArray(prev)
+          ? prev.map((m) =>
+              m.id === meetingId ? { ...m, title: newTitle } : m,
+            )
+          : [],
       );
       if (selectedMeeting?.id === meetingId) {
         setSelectedMeeting((prev) =>
@@ -102,16 +109,73 @@ export function useMeetingManager() {
     setEditingMeetingId(null);
   };
 
+  const handleAddMeetingTag = async (meetingId: string, tag: string) => {
+    const cleanTag = tag.trim();
+    if (!cleanTag) return;
+    try {
+      const updated = await invoke<MeetingRecord>("add_meeting_tag", {
+        meetingId,
+        tag: cleanTag,
+      });
+      setPastMeetings((prev) =>
+        Array.isArray(prev)
+          ? prev.map((m) => (m.id === meetingId ? updated : m))
+          : [updated],
+      );
+      if (selectedMeeting?.id === meetingId) {
+        setSelectedMeeting(updated);
+      }
+    } catch (err) {
+      console.error("Failed to add meeting tag:", err);
+    }
+  };
+
+  const handleRemoveMeetingTag = async (meetingId: string, tag: string) => {
+    try {
+      const updated = await invoke<MeetingRecord>("remove_meeting_tag", {
+        meetingId,
+        tag,
+      });
+      setPastMeetings((prev) =>
+        Array.isArray(prev)
+          ? prev.map((m) => (m.id === meetingId ? updated : m))
+          : [updated],
+      );
+      if (selectedMeeting?.id === meetingId) {
+        setSelectedMeeting(updated);
+      }
+    } catch (err) {
+      console.error("Failed to remove meeting tag:", err);
+    }
+  };
+
+  const allAvailableTags = useMemo(() => {
+    const tagSet = new Set<string>();
+    pastMeetings.forEach((m) => {
+      if (m.tags && Array.isArray(m.tags)) {
+        m.tags.forEach((t) => {
+          if (t && t.trim()) tagSet.add(t.trim());
+        });
+      }
+    });
+    return Array.from(tagSet).sort();
+  }, [pastMeetings]);
+
   const filteredMeetings = useMemo(() => {
-    if (!searchQuery.trim()) return pastMeetings;
+    let list = pastMeetings;
+    if (selectedTag) {
+      list = list.filter((m) => m.tags && m.tags.includes(selectedTag));
+    }
+    if (!searchQuery.trim()) return list;
     const q = searchQuery.toLowerCase();
-    return pastMeetings.filter(
+    return list.filter(
       (m) =>
         m.title.toLowerCase().includes(q) ||
         m.summary.toLowerCase().includes(q) ||
+        (m.tags && m.tags.some((t) => t.toLowerCase().includes(q))) ||
         m.segments.some((s) => s.text.toLowerCase().includes(q)),
     );
-  }, [pastMeetings, searchQuery]);
+  }, [pastMeetings, searchQuery, selectedTag]);
 
   return {
     pastMeetings,
@@ -122,6 +186,9 @@ export function useMeetingManager() {
     setIsLoadingMeeting,
     searchQuery,
     setSearchQuery,
+    selectedTag,
+    setSelectedTag,
+    allAvailableTags,
     editingMeetingId,
     editingTitleText,
     setEditingTitleText,
@@ -136,5 +203,7 @@ export function useMeetingManager() {
     handleStartEditMeetingTitle,
     handleSaveMeetingTitle,
     handleCancelEditMeetingTitle,
+    handleAddMeetingTag,
+    handleRemoveMeetingTag,
   };
 }

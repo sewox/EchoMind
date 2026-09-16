@@ -409,6 +409,36 @@ export interface TranslationKeys {
     noSuggestions: string;
     islandTooltip: string;
   };
+  tags?: {
+    title: string;
+    allTags: string;
+    addTag: string;
+    addTagPlaceholder: string;
+    removeTag: string;
+    autoTaggedBadge: string;
+    filterByTag: string;
+    noTags: string;
+    finance: string;
+    management: string;
+    tech: string;
+    design: string;
+    sales: string;
+    marketing: string;
+    hr: string;
+    sprint: string;
+    general: string;
+  };
+  relatedMeetings?: {
+    title: string;
+    subtitle: string;
+    viewMeeting: string;
+    similarityScore: string;
+    sharedTags: string;
+    sharedParticipants: string;
+    noRelatedMeetings: string;
+    noRelatedMeetingsDesc: string;
+    jumpToMeeting: string;
+  };
 }
 
 export type SupportedLanguage = "tr" | "en" | "de" | "fr" | "es";

@@ -2535,4 +2535,58 @@ describe("App Top-Level Integration", () => {
       screen.queryByTestId("update-modal-backdrop"),
     ).not.toBeInTheDocument();
   });
+
+  it("renders tag filter pills and filters past meetings by tag", async () => {
+    const taggedMeetings = [
+      {
+        ...mockPastMeetings[0],
+        id: "m-tag-1",
+        title: "Finans Raporu Toplantısı",
+        tags: ["Finans & Bütçe", "Yazılım & Teknoloji"],
+      },
+      {
+        ...mockPastMeetings[0],
+        id: "m-tag-2",
+        title: "Tasarım Toplantısı",
+        tags: ["Tasarım & UI/UX"],
+      },
+    ];
+
+    const orig = (invoke as any).getMockImplementation();
+    (invoke as any).mockImplementation((cmd: string, args: any) => {
+      if (cmd === "get_all_meetings") {
+        return Promise.resolve(taggedMeetings);
+      }
+      return orig ? orig(cmd, args) : Promise.resolve();
+    });
+
+    render(
+      <I18nProvider>
+        <App />
+      </I18nProvider>,
+    );
+
+    expect(
+      await screen.findByText("Finans Raporu Toplantısı"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Tasarım Toplantısı")).toBeInTheDocument();
+
+    // Click on "Finans & Bütçe" filter pill
+    const financePills = screen.getAllByText("Finans & Bütçe");
+    await act(async () => {
+      fireEvent.click(financePills[0]);
+    });
+
+    expect(screen.getByText("Finans Raporu Toplantısı")).toBeInTheDocument();
+    expect(screen.queryByText("Tasarım Toplantısı")).not.toBeInTheDocument();
+
+    // Click on "Tümü" filter pill
+    const allPill = screen.getByText(/Tümü/i);
+    await act(async () => {
+      fireEvent.click(allPill);
+    });
+
+    expect(screen.getByText("Finans Raporu Toplantısı")).toBeInTheDocument();
+    expect(screen.getByText("Tasarım Toplantısı")).toBeInTheDocument();
+  });
 });

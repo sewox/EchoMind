@@ -1,5 +1,6 @@
 pub mod audio;
 pub mod audio_clipper;
+pub mod auto_tagger;
 pub mod cloud_transcriber;
 pub mod credentials;
 pub mod cross_memory;
@@ -42,8 +43,9 @@ use player::{
     seek_native_audio, stop_native_audio,
 };
 use storage::{
-    delete_meeting_by_id, get_all_meetings, save_current_meeting, toggle_action_item_status,
-    update_meeting_speaker_name, update_meeting_title,
+    add_meeting_tag, delete_meeting_by_id, get_all_meetings, get_all_tags, get_related_meetings,
+    remove_meeting_tag, save_current_meeting, toggle_action_item_status, update_meeting_speaker_name,
+    update_meeting_title,
 };
 use summarizer::{
     ask_global_assistant, clean_transcript_text, enhance_meeting_transcript, export_followup_bundle,
@@ -137,7 +139,11 @@ pub fn run() {
             open_release_url,
             generate_meeting_ics,
             export_followup_bundle,
-            generate_live_suggestions
+            generate_live_suggestions,
+            add_meeting_tag,
+            remove_meeting_tag,
+            get_related_meetings,
+            get_all_tags
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

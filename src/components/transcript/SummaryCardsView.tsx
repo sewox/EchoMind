@@ -22,6 +22,8 @@ import { useI18n } from "../../locales/i18nContext";
 import { MeetingTemplate } from "../../types/templates";
 import { TemplateSelector } from "./TemplateSelector";
 import { AudioMemoPlayer } from "./AudioMemoPlayer";
+import { MeetingTagsBar } from "./MeetingTagsBar";
+import { RelatedMeetingsCard } from "./RelatedMeetingsCard";
 
 interface SummaryCardsViewProps {
   richSummary: SummaryResult | null;
@@ -39,6 +41,9 @@ interface SummaryCardsViewProps {
   onGenerateSummary: () => void;
   onOpenRetranscribe: () => void;
   onExportNotes: () => void;
+  onSelectMeeting?: (meetingId: string) => void;
+  onAddTag?: (meetingId: string, tag: string) => void;
+  onRemoveTag?: (meetingId: string, tag: string) => void;
 }
 
 export const SummaryCardsView: React.FC<SummaryCardsViewProps> = ({
@@ -57,6 +62,9 @@ export const SummaryCardsView: React.FC<SummaryCardsViewProps> = ({
   onGenerateSummary,
   onOpenRetranscribe,
   onExportNotes,
+  onSelectMeeting,
+  onAddTag,
+  onRemoveTag,
 }) => {
   const { t } = useI18n();
 
@@ -102,7 +110,9 @@ export const SummaryCardsView: React.FC<SummaryCardsViewProps> = ({
                 ))}
               </select>
               {isTranslating && (
-                <Loader2 className="w-3.5 h-3.5 animate-spin text-cyan-400 ml-2" />
+                <div className="absolute right-8 flex items-center gap-1.5 text-xs text-cyan-400">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                </div>
               )}
             </div>
           </div>
@@ -110,29 +120,44 @@ export const SummaryCardsView: React.FC<SummaryCardsViewProps> = ({
 
         {/* Action Buttons */}
         <div className="flex items-center gap-2 flex-wrap">
-          {selectedPastMeeting && (
+          {selectedPastMeeting && richSummary && (
             <button
-              onClick={onOpenRetranscribe}
-              className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-200 border border-slate-700 text-xs sm:text-sm font-medium transition flex items-center gap-1.5"
-              title={t("transcript.retranscribeTooltip")}
+              onClick={onGenerateSummary}
+              className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs sm:text-sm font-medium border border-slate-700 transition flex items-center gap-1.5"
+              title={t("summary.rebuildTooltip")}
             >
-              <RotateCw className="w-3.5 h-3.5 text-cyan-400" />
-              <span>{t("summary.changeModelAndRetranscribe")}</span>
+              <RotateCw className="w-3.5 h-3.5" />
+              <span>{t("summary.rebuildReport")}</span>
             </button>
           )}
-
-          {selectedPastMeeting && (
-            <button
-              onClick={onExportNotes}
-              className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-200 border border-slate-700 text-xs sm:text-sm font-medium transition flex items-center gap-1.5"
-              title={t("summary.downloadMarkdown")}
-            >
-              <Download className="w-3.5 h-3.5 text-cyan-400" />
-              <span>{t("summary.downloadMarkdown")}</span>
-            </button>
-          )}
+          <button
+            onClick={onOpenRetranscribe}
+            className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs sm:text-sm font-medium border border-slate-700 transition flex items-center gap-1.5"
+          >
+            <Wand2 className="w-3.5 h-3.5" />
+            <span>{t("summary.changeModelAndRetranscribe")}</span>
+          </button>
+          <button
+            onClick={onExportNotes}
+            className="px-3.5 py-1.5 rounded-xl bg-cyan-600/90 hover:bg-cyan-500 text-white text-xs sm:text-sm font-medium transition flex items-center gap-1.5 shadow-sm shadow-cyan-950"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>{t("summary.downloadMarkdown")}</span>
+          </button>
         </div>
       </div>
+
+      {/* Meeting Tags Bar */}
+      {selectedPastMeeting && (
+        <div className="p-3.5 px-4 rounded-xl bg-slate-900/60 border border-slate-800/80">
+          <MeetingTagsBar
+            tags={selectedPastMeeting.tags || []}
+            meetingId={selectedPastMeeting.id}
+            onAddTag={onAddTag}
+            onRemoveTag={onRemoveTag}
+          />
+        </div>
+      )}
 
       {/* 🎙️ AI Sesli Bülten (Audio Memo Podcast) */}
       {richSummary && (
@@ -342,6 +367,14 @@ export const SummaryCardsView: React.FC<SummaryCardsViewProps> = ({
             ))}
           </div>
         </div>
+      )}
+
+      {/* 8. 🔗 İlgili Geçmiş Toplantılar */}
+      {selectedPastMeeting && (
+        <RelatedMeetingsCard
+          meetingId={selectedPastMeeting.id}
+          onSelectMeeting={onSelectMeeting}
+        />
       )}
 
       {/* Default Placeholder if no summary is available */}

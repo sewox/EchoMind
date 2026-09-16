@@ -79,6 +79,9 @@ interface TranscriptViewerProps {
   selectedPastMeeting?: MeetingRecord | null;
   onReturnToLiveSession?: () => void;
   onMeetingUpdated?: (meeting: MeetingRecord) => void;
+  onSelectMeeting?: (meetingId: string) => void;
+  onAddTag?: (meetingId: string, tag: string) => void;
+  onRemoveTag?: (meetingId: string, tag: string) => void;
 }
 
 export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
@@ -89,6 +92,9 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
   selectedPastMeeting,
   onReturnToLiveSession,
   onMeetingUpdated,
+  onSelectMeeting,
+  onAddTag,
+  onRemoveTag,
 }) => {
   const { t } = useI18n();
   const [segments, setSegments] = useState<TranscriptSegment[]>([]);
@@ -1098,6 +1104,9 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
             onGenerateSummary={handleGenerateSummary}
             onOpenRetranscribe={() => setIsRetranscribeModalOpen(true)}
             onExportNotes={handleExportNotes}
+            onSelectMeeting={onSelectMeeting}
+            onAddTag={onAddTag}
+            onRemoveTag={onRemoveTag}
           />
         )}
 

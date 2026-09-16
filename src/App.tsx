@@ -106,7 +106,20 @@ export interface MeetingRecord {
   participants?: string[];
   engine_used?: string;
   summary_provider?: string;
+  tags?: string[];
 }
+
+export interface RelatedMeetingItem {
+  id: string;
+  title: string;
+  date_formatted: string;
+  similarity_score: number;
+  shared_tags: string[];
+  shared_participants: string[];
+  reason: string;
+}
+
+import { getTagColorClass } from "./components/transcript/MeetingTagsBar";
 
 export function App() {
   const { t, language, setLanguage } = useI18n();
@@ -129,6 +142,9 @@ export function App() {
     setIsLoadingMeeting,
     searchQuery,
     setSearchQuery,
+    selectedTag,
+    setSelectedTag,
+    allAvailableTags,
     editingMeetingId,
     editingTitleText,
     setEditingTitleText,
@@ -141,6 +157,8 @@ export function App() {
     handleStartEditMeetingTitle,
     handleSaveMeetingTitle,
     handleCancelEditMeetingTitle,
+    handleAddMeetingTag,
+    handleRemoveMeetingTag,
   } = useMeetingManager();
 
   const [meetingTitleInput, setMeetingTitleInput] = useState<string>("");
@@ -996,6 +1014,41 @@ export function App() {
               )}
             </div>
 
+            {/* Tag Filter Pills */}
+            {allAvailableTags.length > 0 && (
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                <button
+                  type="button"
+                  onClick={() => setSelectedTag(null)}
+                  className={`shrink-0 px-2.5 py-1 rounded-lg text-[11px] font-medium transition border ${
+                    selectedTag === null
+                      ? "bg-cyan-950/80 text-cyan-300 border-cyan-500/50 shadow-sm"
+                      : "bg-slate-900/60 text-slate-400 border-slate-800 hover:text-slate-200"
+                  }`}
+                >
+                  {t("tags.allTags") || "Tümü"}
+                </button>
+                {allAvailableTags.map((tName) => {
+                  const isSelected = selectedTag === tName;
+                  const colors = getTagColorClass(tName);
+                  return (
+                    <button
+                      key={tName}
+                      type="button"
+                      onClick={() => setSelectedTag(isSelected ? null : tName)}
+                      className={`shrink-0 px-2.5 py-1 rounded-lg text-[11px] font-medium transition border ${
+                        isSelected
+                          ? `${colors.bg} ${colors.text} ${colors.border} ring-1 ring-cyan-400`
+                          : "bg-slate-900/60 text-slate-400 border-slate-800 hover:text-slate-200"
+                      }`}
+                    >
+                      {tName}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
             {/* Meetings List */}
             <div className="space-y-2.5 overflow-y-auto flex-1 pr-1">
               {filteredMeetings.length === 0 ? (
@@ -1104,6 +1157,32 @@ export function App() {
                       </span>
                     </div>
 
+                    {/* Tags Badges */}
+                    {mtg.tags && mtg.tags.length > 0 && (
+                      <div className="flex items-center gap-1 mt-2 flex-wrap">
+                        {mtg.tags.map((tName, tIdx) => {
+                          const colors = getTagColorClass(tName);
+                          return (
+                            <span
+                              key={tIdx}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedTag(
+                                  selectedTag === tName ? null : tName,
+                                );
+                              }}
+                              className={`px-2 py-0.5 rounded text-[10px] font-medium border transition hover:opacity-80 ${colors.bg} ${colors.text} ${colors.border}`}
+                              title={
+                                t("tags.filterByTag") || "Etikete göre filtrele"
+                              }
+                            >
+                              {tName}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
+
                     {mtg.summary && (
                       <p className="text-[11px] 2xl:text-xs text-slate-400 line-clamp-2 mt-2 leading-relaxed">
                         {mtg.summary}
@@ -1128,6 +1207,12 @@ export function App() {
                 setSelectedMeeting(m);
                 fetchPastMeetings();
               }}
+              onSelectMeeting={(meetingId) => {
+                const found = pastMeetings.find((m) => m.id === meetingId);
+                if (found) setSelectedMeeting(found);
+              }}
+              onAddTag={handleAddMeetingTag}
+              onRemoveTag={handleRemoveMeetingTag}
             />
           </div>
         </div>
