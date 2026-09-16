@@ -17,6 +17,7 @@ import {
 import { MeetingRecord } from "../App";
 import { useI18n } from "../locales/i18nContext";
 import { usePrivacyMode } from "../hooks/usePrivacyMode";
+import { CredentialStore } from "../services/credentialStore";
 
 interface RetranscribeModalProps {
   isOpen: boolean;
@@ -62,38 +63,40 @@ export const RetranscribeModal: React.FC<RetranscribeModalProps> = ({
         }
       } else {
         // Auto-detect if user has cloud keys
-        const groqKey = localStorage.getItem("echomind_groq_key");
-        const openaiKey = localStorage.getItem("echomind_openai_key");
-        const geminiKey = localStorage.getItem("echomind_gemini_key");
+        Promise.all([
+          CredentialStore.get("echomind_groq_key"),
+          CredentialStore.get("echomind_openai_key"),
+          CredentialStore.get("echomind_gemini_key"),
+        ]).then(([groqKey, openaiKey, geminiKey]) => {
+          if (groqKey) {
+            setCloudProvider("groq");
+          } else if (openaiKey) {
+            setCloudProvider("openai");
+          } else if (geminiKey) {
+            setCloudProvider("gemini");
+          }
 
-        if (groqKey) {
-          setCloudProvider("groq");
-        } else if (openaiKey) {
-          setCloudProvider("openai");
-        } else if (geminiKey) {
-          setCloudProvider("gemini");
-        }
+          const activeEngine = localStorage.getItem("echomind_active_engine");
+          if (activeEngine && activeEngine.startsWith("cloud_")) {
+            setEngineType("cloud");
+          } else {
+            setEngineType("local");
+          }
 
-        const activeEngine = localStorage.getItem("echomind_active_engine");
-        if (activeEngine && activeEngine.startsWith("cloud_")) {
-          setEngineType("cloud");
-        } else {
-          setEngineType("local");
-        }
-
-        // Default to Ollama summary if available
-        const ollamaEndpoint = localStorage.getItem("echomind_ollama_endpoint");
-        if (ollamaEndpoint) {
-          setSummaryEngine("ollama");
-        } else if (geminiKey) {
-          setSummaryEngine("gemini");
-        } else if (openaiKey) {
-          setSummaryEngine("openai");
-        } else if (groqKey) {
-          setSummaryEngine("groq");
-        } else {
-          setSummaryEngine("heuristic");
-        }
+          // Default to Ollama summary if available
+          const ollamaEndpoint = localStorage.getItem("echomind_ollama_endpoint");
+          if (ollamaEndpoint) {
+            setSummaryEngine("ollama");
+          } else if (geminiKey) {
+            setSummaryEngine("gemini");
+          } else if (openaiKey) {
+            setSummaryEngine("openai");
+          } else if (groqKey) {
+            setSummaryEngine("groq");
+          } else {
+            setSummaryEngine("heuristic");
+          }
+        });
       }
 
       const activeModel =
@@ -121,17 +124,17 @@ export const RetranscribeModal: React.FC<RetranscribeModalProps> = ({
       if (engineType === "cloud") {
         cloudProv = cloudProvider;
         if (cloudProvider === "groq") {
-          apiKey = localStorage.getItem("echomind_groq_key");
+          apiKey = await CredentialStore.get("echomind_groq_key");
           modelVer =
             localStorage.getItem("echomind_groq_model_version") ||
             "whisper-large-v3-turbo";
         } else if (cloudProvider === "openai") {
-          apiKey = localStorage.getItem("echomind_openai_key");
+          apiKey = await CredentialStore.get("echomind_openai_key");
           modelVer =
             localStorage.getItem("echomind_openai_model_version") ||
             "whisper-1";
         } else if (cloudProvider === "gemini") {
-          apiKey = localStorage.getItem("echomind_gemini_key");
+          apiKey = await CredentialStore.get("echomind_gemini_key");
           modelVer =
             localStorage.getItem("echomind_gemini_model_version") ||
             "gemini-1.5-flash";
@@ -156,11 +159,11 @@ export const RetranscribeModal: React.FC<RetranscribeModalProps> = ({
       let customModel: string | null = null;
 
       if (summaryEngine === "gemini") {
-        sumApiKey = localStorage.getItem("echomind_gemini_key");
+        sumApiKey = await CredentialStore.get("echomind_gemini_key");
       } else if (summaryEngine === "openai") {
-        sumApiKey = localStorage.getItem("echomind_openai_key");
+        sumApiKey = await CredentialStore.get("echomind_openai_key");
       } else if (summaryEngine === "groq") {
-        sumApiKey = localStorage.getItem("echomind_groq_key");
+        sumApiKey = await CredentialStore.get("echomind_groq_key");
       } else if (summaryEngine === "ollama") {
         customEndpoint =
           localStorage.getItem("echomind_ollama_endpoint") ||

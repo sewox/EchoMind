@@ -23,6 +23,7 @@ import {
   OPENAI_MODELS,
 } from "./ModelHubModalConstants";
 import { useI18n } from "../locales/i18nContext";
+import { CredentialStore } from "../services/credentialStore";
 
 export interface ModelInfo {
   key: string;
@@ -155,7 +156,9 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
     if (onModelChanged) onModelChanged();
   };
 
-  const handleSelectCloudEngine = (engine: "groq" | "gemini" | "openai") => {
+  const handleSelectCloudEngine = async (
+    engine: "groq" | "gemini" | "openai",
+  ) => {
     const keyStorageMap: Record<string, string> = {
       groq: "echomind_groq_key",
       gemini: "echomind_gemini_key",
@@ -163,7 +166,7 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
     };
 
     const keyName = keyStorageMap[engine];
-    const storedKey = localStorage.getItem(keyName) || "";
+    const storedKey = await CredentialStore.get(keyName);
 
     if (!storedKey.trim()) {
       setInlineKeyTarget(engine);
@@ -191,7 +194,7 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
     if (onModelChanged) onModelChanged();
   };
 
-  const handleSaveInlineKeyAndActivate = (
+  const handleSaveInlineKeyAndActivate = async (
     engine: "groq" | "gemini" | "openai",
   ) => {
     const trimmed = inlineKeyValue.trim();
@@ -203,7 +206,7 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
       openai: "echomind_openai_key",
     };
 
-    localStorage.setItem(keyStorageMap[engine], trimmed);
+    await CredentialStore.set(keyStorageMap[engine], trimmed);
     const engineKey = `cloud_${engine}`;
     localStorage.setItem("echomind_active_engine", engineKey);
     setActiveEngine(engineKey);

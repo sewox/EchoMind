@@ -28,6 +28,7 @@ import { CustomTemplateModal } from "./transcript/CustomTemplateModal";
 import { MeetingAnalyticsModal } from "./transcript/MeetingAnalyticsModal";
 import { MeetingTemplate, BUILTIN_TEMPLATES } from "../types/templates";
 import { MeetingAnalytics } from "../types/analytics";
+import { CredentialStore } from "../services/credentialStore";
 import { SoundbiteResult } from "../types/soundbite";
 import { useI18n } from "../locales/i18nContext";
 import { useLiveSuggestions } from "../hooks/useLiveSuggestions";
@@ -452,19 +453,19 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
 
       if (activeEngine === "cloud_groq") {
         cloudProvider = "groq";
-        apiKey = localStorage.getItem("echomind_groq_key") || null;
+        apiKey = (await CredentialStore.get("echomind_groq_key")) || null;
         modelVersion =
           localStorage.getItem("echomind_groq_model_version") ||
           "whisper-large-v3-turbo";
       } else if (activeEngine === "cloud_gemini") {
         cloudProvider = "gemini";
-        apiKey = localStorage.getItem("echomind_gemini_key") || null;
+        apiKey = (await CredentialStore.get("echomind_gemini_key")) || null;
         modelVersion =
           localStorage.getItem("echomind_gemini_model_version") ||
           "gemini-1.5-flash";
       } else if (activeEngine === "cloud_openai") {
         cloudProvider = "openai";
-        apiKey = localStorage.getItem("echomind_openai_key") || null;
+        apiKey = (await CredentialStore.get("echomind_openai_key")) || null;
         modelVersion =
           localStorage.getItem("echomind_openai_model_version") || "whisper-1";
       }
@@ -584,13 +585,13 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
 
       if (activeEngine === "cloud_groq") {
         provider = "groq";
-        apiKey = localStorage.getItem("echomind_groq_key");
+        apiKey = await CredentialStore.get("echomind_groq_key");
       } else if (activeEngine === "cloud_gemini") {
         provider = "gemini";
-        apiKey = localStorage.getItem("echomind_gemini_key");
+        apiKey = await CredentialStore.get("echomind_gemini_key");
       } else if (activeEngine === "cloud_openai") {
         provider = "openai";
-        apiKey = localStorage.getItem("echomind_openai_key");
+        apiKey = await CredentialStore.get("echomind_openai_key");
       }
 
       const customEndpoint =
@@ -655,13 +656,13 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
 
       if (activeEngine === "cloud_groq") {
         provider = "groq";
-        apiKey = localStorage.getItem("echomind_groq_key");
+        apiKey = await CredentialStore.get("echomind_groq_key");
       } else if (activeEngine === "cloud_gemini") {
         provider = "gemini";
-        apiKey = localStorage.getItem("echomind_gemini_key");
+        apiKey = await CredentialStore.get("echomind_gemini_key");
       } else if (activeEngine === "cloud_openai") {
         provider = "openai";
-        apiKey = localStorage.getItem("echomind_openai_key");
+        apiKey = await CredentialStore.get("echomind_openai_key");
       }
 
       const customEndpoint =
@@ -705,13 +706,13 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
       let apiKey: string | null = null;
 
       if (activeEngine === "cloud_gemini") {
-        apiKey = localStorage.getItem("echomind_gemini_key");
+        apiKey = await CredentialStore.get("echomind_gemini_key");
       } else if (activeEngine === "cloud_groq") {
         provider = "groq";
-        apiKey = localStorage.getItem("echomind_groq_key");
+        apiKey = await CredentialStore.get("echomind_groq_key");
       } else if (activeEngine === "cloud_openai") {
         provider = "openai";
-        apiKey = localStorage.getItem("echomind_openai_key");
+        apiKey = await CredentialStore.get("echomind_openai_key");
       }
 
       const updated = await invoke<MeetingRecord>(

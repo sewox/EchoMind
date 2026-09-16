@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { useI18n } from "../locales/i18nContext";
 import { MemoryStats } from "../types/memory";
+import { CredentialStore } from "../services/credentialStore";
 
 export interface SearchMatch {
   match_type: string;
@@ -171,13 +172,13 @@ export const GlobalAssistantModal: React.FC<GlobalAssistantModalProps> = ({
 
       if (activeEngine === "cloud_groq") {
         provider = "groq";
-        apiKey = localStorage.getItem("echomind_groq_key");
+        apiKey = await CredentialStore.get("echomind_groq_key");
       } else if (activeEngine === "cloud_gemini") {
         provider = "gemini";
-        apiKey = localStorage.getItem("echomind_gemini_key");
+        apiKey = await CredentialStore.get("echomind_gemini_key");
       } else if (activeEngine === "cloud_openai") {
         provider = "openai";
-        apiKey = localStorage.getItem("echomind_openai_key");
+        apiKey = await CredentialStore.get("echomind_openai_key");
       }
 
       const customEndpoint =

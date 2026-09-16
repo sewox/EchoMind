@@ -298,10 +298,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
-  const handleSaveKeys = () => {
-    CredentialStore.set("echomind_groq_key", groqKey.trim());
-    CredentialStore.set("echomind_gemini_key", geminiKey.trim());
-    CredentialStore.set("echomind_openai_key", openaiKey.trim());
+  const handleSaveKeys = async () => {
+    await CredentialStore.set("echomind_groq_key", groqKey.trim());
+    await CredentialStore.set("echomind_gemini_key", geminiKey.trim());
+    await CredentialStore.set("echomind_openai_key", openaiKey.trim());
+
+    try {
+      await invoke("save_api_keys", {
+        groq: groqKey.trim(),
+        gemini: geminiKey.trim(),
+        openai: openaiKey.trim(),
+      });
+    } catch {}
 
     localStorage.setItem(
       "echomind_ollama_endpoint",
@@ -1097,7 +1105,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   onChange={(e) => {
                     const val = e.target.value;
                     setGroqKey(val);
-                    localStorage.setItem("echomind_groq_key", val.trim());
                   }}
                   placeholder="gsk_..."
                   className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs font-mono text-slate-200 pr-10 focus:outline-none focus:border-amber-500"
@@ -1168,7 +1175,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   onChange={(e) => {
                     const val = e.target.value;
                     setGeminiKey(val);
-                    localStorage.setItem("echomind_gemini_key", val.trim());
                   }}
                   placeholder="AIzaSy..."
                   className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs font-mono text-slate-200 pr-10 focus:outline-none focus:border-cyan-500"
@@ -1239,7 +1245,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   onChange={(e) => {
                     const val = e.target.value;
                     setOpenaiKey(val);
-                    localStorage.setItem("echomind_openai_key", val.trim());
                   }}
                   placeholder="sk-proj-..."
                   className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs font-mono text-slate-200 pr-10 focus:outline-none focus:border-emerald-500"

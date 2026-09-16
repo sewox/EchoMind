@@ -4,6 +4,7 @@ import App, { MeetingRecord } from "./App";
 import { I18nProvider } from "./locales/i18nContext";
 import { invoke } from "@tauri-apps/api/core";
 import { globalTestEventListeners } from "./test/setup";
+import { CredentialStore } from "./services/credentialStore";
 
 const mockPastMeetings: MeetingRecord[] = [
   {
@@ -48,6 +49,7 @@ describe("App Top-Level Integration", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    CredentialStore.clearCache();
   });
 
   const setupDefaultInvoke = () => {
@@ -853,7 +855,7 @@ describe("App Top-Level Integration", () => {
     ).toBeInTheDocument();
 
     // Set groq key in storage
-    localStorage.setItem("echomind_groq_key", "gsk_test_12345");
+    await CredentialStore.set("echomind_groq_key", "gsk_test_12345");
 
     // Switch to Cloud method
     const cloudMethodCard = screen.getByText(/Yüksek Hızlı Bulut Zekası/i);

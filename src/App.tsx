@@ -44,6 +44,7 @@ import { useI18n, SUPPORTED_LANGUAGES } from "./locales/i18nContext";
 import { useAudioRecording } from "./hooks/useAudioRecording";
 import { useMeetingManager } from "./hooks/useMeetingManager";
 import { useMeetingDetector, MeetingAppInfo } from "./hooks/useMeetingDetector";
+import { CredentialStore } from "./services/credentialStore";
 
 export interface HardwareInfo {
   os_name: string;
@@ -202,6 +203,11 @@ export function App() {
       if (selectTimeoutRef.current) clearTimeout(selectTimeoutRef.current);
     };
   }, []);
+  useEffect(() => {
+    // Automatically migrate any legacy plaintext localStorage API keys to the native encrypted vault
+    CredentialStore.migrateLegacyStorage().catch(() => {});
+  }, []);
+
   useEffect(() => {
     const autoCheck =
       localStorage.getItem("echomind_auto_check_updates") !== "false";
@@ -622,7 +628,7 @@ export function App() {
     );
   };
 
-  const handleAdvisorConfirm = (
+  const handleAdvisorConfirm = async (
     engine: "local" | "cloud_groq" | "cloud_gemini" | "cloud_openai",
     customApiKey?: string,
     modelVersion?: string,
@@ -642,15 +648,21 @@ export function App() {
     if (engine === "cloud_groq") {
       cloudProvider = "groq";
       apiKey =
-        customApiKey || localStorage.getItem("echomind_groq_key") || null;
+        customApiKey ||
+        (await CredentialStore.get("echomind_groq_key")) ||
+        null;
     } else if (engine === "cloud_gemini") {
       cloudProvider = "gemini";
       apiKey =
-        customApiKey || localStorage.getItem("echomind_gemini_key") || null;
+        customApiKey ||
+        (await CredentialStore.get("echomind_gemini_key")) ||
+        null;
     } else if (engine === "cloud_openai") {
       cloudProvider = "openai";
       apiKey =
-        customApiKey || localStorage.getItem("echomind_openai_key") || null;
+        customApiKey ||
+        (await CredentialStore.get("echomind_openai_key")) ||
+        null;
     }
 
     if (targetPath.startsWith("mtg_")) {
@@ -681,9 +693,9 @@ export function App() {
 
       const activeEngine =
         localStorage.getItem("echomind_active_engine") || "local";
-      const groqKey = localStorage.getItem("echomind_groq_key") || "";
-      const geminiKey = localStorage.getItem("echomind_gemini_key") || "";
-      const openaiKey = localStorage.getItem("echomind_openai_key") || "";
+      const groqKey = await CredentialStore.get("echomind_groq_key");
+      const geminiKey = await CredentialStore.get("echomind_gemini_key");
+      const openaiKey = await CredentialStore.get("echomind_openai_key");
 
       // If file is large (>12MB) and currently set to local mode,
       // present smart advisor recommendation

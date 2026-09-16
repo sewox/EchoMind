@@ -2,11 +2,13 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import { SmartAdvisorModal, PickedFileInfo } from "./SmartAdvisorModal";
 import { I18nProvider } from "../locales/i18nContext";
+import { CredentialStore } from "../services/credentialStore";
 
 describe("SmartAdvisorModal Component", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    CredentialStore.clearCache();
   });
 
   const mockFileInfo: PickedFileInfo = {
@@ -100,14 +102,19 @@ describe("SmartAdvisorModal Component", () => {
     );
   });
 
-  it("allows direct start when an API key already exists in localStorage", async () => {
-    localStorage.setItem("echomind_groq_key", "gsk_stored_key");
+  it("allows direct start when an API key already exists in vault", async () => {
+    await CredentialStore.set("echomind_groq_key", "gsk_stored_key");
 
     render(
       <I18nProvider>
         <SmartAdvisorModal {...defaultProps} />
       </I18nProvider>,
     );
+
+    // Allow useEffect to resolve keys
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 10));
+    });
 
     const cloudCard = screen
       .getByText("⚡ Yıldırım Hızı (Bulut)")
@@ -202,7 +209,8 @@ describe("SmartAdvisorModal Component", () => {
       fireEvent.click(startBtn);
     });
 
-    expect(localStorage.getItem("echomind_groq_key")).toBe("gsk_remember_key");
+    expect(CredentialStore.getSync("echomind_groq_key")).toBe("gsk_remember_key");
+    expect(localStorage.getItem("echomind_groq_key")).toBeNull();
     expect(localStorage.getItem("echomind_active_engine")).toBe("cloud_groq");
   });
 
@@ -236,9 +244,10 @@ describe("SmartAdvisorModal Component", () => {
       fireEvent.click(startBtn);
     });
 
-    expect(localStorage.getItem("echomind_gemini_key")).toBe(
+    expect(CredentialStore.getSync("echomind_gemini_key")).toBe(
       "AIzaSy_remember_gemini",
     );
+    expect(localStorage.getItem("echomind_gemini_key")).toBeNull();
     expect(defaultProps.onConfirm).toHaveBeenCalledWith(
       "cloud_gemini",
       "AIzaSy_remember_gemini",
