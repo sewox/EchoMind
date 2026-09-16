@@ -49,7 +49,7 @@ use summarizer::{
     ask_global_assistant, clean_transcript_text, enhance_meeting_transcript, export_followup_bundle,
     export_meeting_action_items_csv, export_meeting_action_items_markdown, export_meeting_email_digest,
     export_meeting_followup_email, export_meeting_notes, export_meeting_notes_html,
-    export_meeting_notes_slack, filter_meeting_filler_words, generate_meeting_ics,
+    export_meeting_notes_slack, filter_meeting_filler_words, generate_live_suggestions, generate_meeting_ics,
     generate_meeting_summary, get_meeting_analytics, get_meeting_analytics_by_id, global_search_meetings,
     open_meeting_html_report, save_meeting_export_file, test_ollama_connection, translate_meeting_summary,
 };
@@ -136,7 +136,8 @@ pub fn run() {
             check_for_updates,
             open_release_url,
             generate_meeting_ics,
-            export_followup_bundle
+            export_followup_bundle,
+            generate_live_suggestions
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

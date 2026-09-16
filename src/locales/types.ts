@@ -396,6 +396,19 @@ export interface TranslationKeys {
     toastIcsDownloaded: string;
     oneClickExportBundle: string;
   };
+  liveSuggestions?: {
+    title: string;
+    badge: string;
+    smartQuestion: string;
+    objectionHandling: string;
+    actionClue: string;
+    factCheck: string;
+    summaryNudge: string;
+    dismiss: string;
+    copyTooltip: string;
+    noSuggestions: string;
+    islandTooltip: string;
+  };
 }
 
 export type SupportedLanguage = "tr" | "en" | "de" | "fr" | "es";

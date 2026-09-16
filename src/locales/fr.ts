@@ -438,4 +438,17 @@ export const fr: TranslationKeys = {
     toastIcsDownloaded: "Événement calendrier (.ics) enregistré !",
     oneClickExportBundle: "Exporter le pack complet de suivi",
   },
+  liveSuggestions: {
+    title: "Suggestions Intelligentes en Direct",
+    badge: "Conseiller en Direct",
+    smartQuestion: "Suggestion de Question",
+    objectionHandling: "Traitement des Objections",
+    actionClue: "Indice d'Action / Décision",
+    factCheck: "Vérification des Faits / Données",
+    summaryNudge: "Conseil de Synthèse",
+    dismiss: "Fermer",
+    copyTooltip: "Copier la suggestion",
+    noSuggestions: "Aucune suggestion en direct pour le moment.",
+    islandTooltip: "Suggestion IA en direct disponible",
+  },
 };
