@@ -273,4 +273,18 @@ describe("RetranscribeModal Component", () => {
       }),
     );
   });
+
+  it("locks cloud options in paranoid mode", () => {
+    localStorage.setItem("echomind_privacy_mode", "paranoid");
+    render(
+      <I18nProvider>
+        <RetranscribeModal {...defaultProps} />
+      </I18nProvider>,
+    );
+
+    expect(screen.getByText(/Kilitli/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Paranoid Modda bulut motoru kilitlenmiştir/i),
+    ).toBeInTheDocument();
+  });
 });

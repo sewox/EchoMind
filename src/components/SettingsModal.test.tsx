@@ -644,7 +644,9 @@ describe("SettingsModal Component", () => {
     // Switch to language tab
     const langTab = screen.getByRole("button", { name: /Arayüz Dili/i });
     fireEvent.click(langTab);
-    expect(screen.getByText(/Tüm menüler, butonlar ve rapor şablonları/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Tüm menüler, butonlar ve rapor şablonları/i),
+    ).toBeInTheDocument();
 
     // Select English
     const enBtn = screen.getAllByText("English")[0];
@@ -656,5 +658,39 @@ describe("SettingsModal Component", () => {
     });
     fireEvent.click(apiTab);
     expect(screen.getByText(/Özel Yerel LLM/i)).toBeInTheDocument();
+  });
+
+  it("handles clicking privacy mode profiles in Device & Privacy tab", () => {
+    render(
+      <I18nProvider>
+        <SettingsModal {...defaultProps} />
+      </I18nProvider>,
+    );
+
+    // Switch to Device & Privacy tab
+    const systemTab = screen.getByRole("button", {
+      name: /Cihaz & Gizlilik|Donanım & Model/i,
+    });
+    fireEvent.click(systemTab);
+
+    const paranoidCard = screen.getByText(/Paranoid Mod/i).closest("button");
+    if (paranoidCard) {
+      fireEvent.click(paranoidCard);
+      expect(localStorage.getItem("echomind_privacy_mode")).toBe("paranoid");
+    }
+
+    const maxIntelCard = screen.getByText(/Maksimum Zeka/i).closest("button");
+    if (maxIntelCard) {
+      fireEvent.click(maxIntelCard);
+      expect(localStorage.getItem("echomind_privacy_mode")).toBe(
+        "max_intelligence",
+      );
+    }
+
+    const balancedCard = screen.getByText(/Dengeli Mod/i).closest("button");
+    if (balancedCard) {
+      fireEvent.click(balancedCard);
+      expect(localStorage.getItem("echomind_privacy_mode")).toBe("balanced");
+    }
   });
 });

@@ -380,4 +380,28 @@ export const tr: TranslationKeys = {
     updateAvailable: "Yeni Sürüm Mevcut ({version})",
     updateError: "Güncelleme denetlenirken bağlantı hatası oluştu.",
   },
+  privacyModes: {
+    title: "Gizlilik ve Güvenlik Profili",
+    subtitle:
+      "Veri izolasyonu ve yapay zeka işlem seviyesini tek tıkla belirleyin",
+    quickSwitch: "Güvenlik Profili",
+    paranoid: {
+      name: "Paranoid Mod",
+      badge: "Air-Gapped",
+      desc: "Sıfır Bulut. Yalnızca cihazınızdaki yerel Whisper ve Ollama modelleri çalışır. Maksimum DLP filtreleme.",
+      features: "%100 Çevrimdışı • Ağ İzolasyonu • Ultra DLP",
+    },
+    balanced: {
+      name: "Dengeli Mod",
+      badge: "Önerilen",
+      desc: "Yerel modeller öncelikli. Bulut yapay zeka sadece DLP maskelemesi sonrası kendi API anahtarlarınızla çalışır.",
+      features: "Yerel Öncelikli • DLP Korumalı BYOK • Hibrit Güç",
+    },
+    maxIntelligence: {
+      name: "Maksimum Zeka",
+      badge: "Yüksek Performans",
+      desc: "En gelişmiş bulut modelleri serbest. Tüm veriler dışarı çıkmadan önce otomatik DLP denetiminden geçer.",
+      features: "Gemini / GPT-4o / Groq • Zorunlu DLP • Şeffaf İletim",
+    },
+  },
 };
