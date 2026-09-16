@@ -11,8 +11,10 @@ import {
   Settings as SettingsIcon,
   Check,
   Globe,
+  Lock,
 } from "lucide-react";
 import { useI18n } from "../locales/i18nContext";
+import { usePrivacyMode } from "../hooks/usePrivacyMode";
 
 export interface PickedFileInfo {
   path: string;
@@ -42,6 +44,7 @@ export const SmartAdvisorModal: React.FC<SmartAdvisorModalProps> = ({
   onOpenSettings,
 }) => {
   const { t } = useI18n();
+  const { isParanoid } = usePrivacyMode();
   const [groqKey, setGroqKey] = useState<string>("");
   const [geminiKey, setGeminiKey] = useState<string>("");
   const [openaiKey, setOpenaiKey] = useState<string>("");
@@ -229,32 +232,65 @@ export const SmartAdvisorModal: React.FC<SmartAdvisorModalProps> = ({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {/* Cloud Option */}
           <button
-            onClick={handleSelectCloud}
-            className="p-4 rounded-xl border border-cyan-500/30 bg-gradient-to-b from-cyan-950/30 to-slate-900/80 hover:border-cyan-500/70 transition duration-200 text-left flex flex-col justify-between group shadow-lg hover:shadow-cyan-950/40 relative overflow-hidden"
+            onClick={isParanoid ? undefined : handleSelectCloud}
+            disabled={isParanoid}
+            className={`p-4 rounded-xl border text-left flex flex-col justify-between relative overflow-hidden transition duration-200 ${
+              isParanoid
+                ? "border-slate-800 bg-slate-950/40 opacity-50 cursor-not-allowed"
+                : "border-cyan-500/30 bg-gradient-to-b from-cyan-950/30 to-slate-900/80 hover:border-cyan-500/70 group shadow-lg hover:shadow-cyan-950/40 cursor-pointer"
+            }`}
           >
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <span className="p-1.5 rounded-lg bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
-                  <Zap className="w-4 h-4" />
+                <span
+                  className={`p-1.5 rounded-lg border ${
+                    isParanoid
+                      ? "bg-slate-800 text-slate-400 border-slate-700"
+                      : "bg-cyan-500/20 text-cyan-300 border-cyan-500/30"
+                  }`}
+                >
+                  {isParanoid ? (
+                    <Lock className="w-4 h-4 text-amber-400" />
+                  ) : (
+                    <Zap className="w-4 h-4" />
+                  )}
                 </span>
-                <span className="text-[10px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300">
-                  {t("smartAdvisor.cloudBadge")}
+                <span
+                  className={`text-[10px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded-full ${
+                    isParanoid
+                      ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                      : "bg-cyan-500/20 text-cyan-300"
+                  }`}
+                >
+                  {isParanoid
+                    ? "Air-Gapped Locked"
+                    : t("smartAdvisor.cloudBadge")}
                 </span>
               </div>
               <h4 className="text-sm font-semibold text-white group-hover:text-cyan-200 transition">
                 {t("smartAdvisor.cloudCardTitle")}
               </h4>
               <p className="text-[11px] text-slate-400 leading-snug">
-                {t("smartAdvisor.cloudCardDesc")}
+                {isParanoid
+                  ? "Paranoid mod aktif olduğu için tüm harici bulut API çağrıları kilitlenmiştir."
+                  : t("smartAdvisor.cloudCardDesc")}
               </p>
             </div>
-            <div className="mt-3 pt-2 border-t border-slate-800 flex items-center justify-between text-xs text-cyan-400 font-medium">
+            <div
+              className={`mt-3 pt-2 border-t border-slate-800 flex items-center justify-between text-xs font-medium ${
+                isParanoid ? "text-amber-400/80" : "text-cyan-400"
+              }`}
+            >
               <span>
-                {hasAnyKey
-                  ? t("smartAdvisor.startWithCloud")
-                  : t("smartAdvisor.startWithKey")}
+                {isParanoid
+                  ? "Paranoid Mod Devrede"
+                  : hasAnyKey
+                    ? t("smartAdvisor.startWithCloud")
+                    : t("smartAdvisor.startWithKey")}
               </span>
-              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition" />
+              {!isParanoid && (
+                <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition" />
+              )}
             </div>
           </button>
 

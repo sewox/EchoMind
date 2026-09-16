@@ -12,9 +12,11 @@ import {
   Loader2,
   ShieldCheck,
   AudioLines,
+  Lock,
 } from "lucide-react";
 import { MeetingRecord } from "../App";
 import { useI18n } from "../locales/i18nContext";
+import { usePrivacyMode } from "../hooks/usePrivacyMode";
 
 interface RetranscribeModalProps {
   isOpen: boolean;
@@ -30,6 +32,7 @@ export const RetranscribeModal: React.FC<RetranscribeModalProps> = ({
   onRetranscribeSuccess,
 }) => {
   const { t } = useI18n();
+  const { isParanoid } = usePrivacyMode();
   const [engineType, setEngineType] = useState<"local" | "cloud">("local");
   const [localModel, setLocalModel] = useState<string>("small");
   const [cloudProvider, setCloudProvider] = useState<
@@ -48,45 +51,56 @@ export const RetranscribeModal: React.FC<RetranscribeModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       setErrorMessage(null);
-      // Auto-detect if user has cloud keys
-      const groqKey = localStorage.getItem("echomind_groq_key");
-      const openaiKey = localStorage.getItem("echomind_openai_key");
-      const geminiKey = localStorage.getItem("echomind_gemini_key");
 
-      if (groqKey) {
-        setCloudProvider("groq");
-      } else if (openaiKey) {
-        setCloudProvider("openai");
-      } else if (geminiKey) {
-        setCloudProvider("gemini");
-      }
-
-      const activeEngine = localStorage.getItem("echomind_active_engine");
-      if (activeEngine && activeEngine.startsWith("cloud_")) {
-        setEngineType("cloud");
-      } else {
+      if (isParanoid) {
         setEngineType("local");
+        const ollamaEndpoint = localStorage.getItem("echomind_ollama_endpoint");
+        if (ollamaEndpoint) {
+          setSummaryEngine("ollama");
+        } else {
+          setSummaryEngine("heuristic");
+        }
+      } else {
+        // Auto-detect if user has cloud keys
+        const groqKey = localStorage.getItem("echomind_groq_key");
+        const openaiKey = localStorage.getItem("echomind_openai_key");
+        const geminiKey = localStorage.getItem("echomind_gemini_key");
+
+        if (groqKey) {
+          setCloudProvider("groq");
+        } else if (openaiKey) {
+          setCloudProvider("openai");
+        } else if (geminiKey) {
+          setCloudProvider("gemini");
+        }
+
+        const activeEngine = localStorage.getItem("echomind_active_engine");
+        if (activeEngine && activeEngine.startsWith("cloud_")) {
+          setEngineType("cloud");
+        } else {
+          setEngineType("local");
+        }
+
+        // Default to Ollama summary if available
+        const ollamaEndpoint = localStorage.getItem("echomind_ollama_endpoint");
+        if (ollamaEndpoint) {
+          setSummaryEngine("ollama");
+        } else if (geminiKey) {
+          setSummaryEngine("gemini");
+        } else if (openaiKey) {
+          setSummaryEngine("openai");
+        } else if (groqKey) {
+          setSummaryEngine("groq");
+        } else {
+          setSummaryEngine("heuristic");
+        }
       }
 
       const activeModel =
         localStorage.getItem("echomind_active_model") || "small";
       setLocalModel(activeModel);
-
-      // Default to Ollama summary if available
-      const ollamaEndpoint = localStorage.getItem("echomind_ollama_endpoint");
-      if (ollamaEndpoint) {
-        setSummaryEngine("ollama");
-      } else if (geminiKey) {
-        setSummaryEngine("gemini");
-      } else if (openaiKey) {
-        setSummaryEngine("openai");
-      } else if (groqKey) {
-        setSummaryEngine("groq");
-      } else {
-        setSummaryEngine("heuristic");
-      }
     }
-  }, [isOpen]);
+  }, [isOpen, isParanoid]);
 
   if (!isOpen) return null;
 
@@ -329,22 +343,36 @@ export const RetranscribeModal: React.FC<RetranscribeModalProps> = ({
 
                   <button
                     type="button"
-                    onClick={() => setEngineType("cloud")}
-                    className={`p-4 rounded-2xl border transition text-left flex items-start gap-3 ${
-                      engineType === "cloud"
-                        ? "bg-amber-500/15 border-amber-500/60 shadow-lg shadow-amber-950/40 text-amber-200"
-                        : "bg-slate-900/60 border-slate-800 hover:border-slate-700 text-slate-400"
+                    onClick={() => !isParanoid && setEngineType("cloud")}
+                    disabled={isParanoid}
+                    className={`p-4 rounded-2xl border transition text-left flex items-start gap-3 relative ${
+                      isParanoid
+                        ? "bg-slate-900/30 border-slate-800 opacity-40 cursor-not-allowed text-slate-500"
+                        : engineType === "cloud"
+                          ? "bg-amber-500/15 border-amber-500/60 shadow-lg shadow-amber-950/40 text-amber-200 cursor-pointer"
+                          : "bg-slate-900/60 border-slate-800 hover:border-slate-700 text-slate-400 cursor-pointer"
                     }`}
                   >
-                    <Zap
-                      className={`w-5 h-5 mt-0.5 ${engineType === "cloud" ? "text-amber-400" : "text-slate-500"}`}
-                    />
+                    {isParanoid ? (
+                      <Lock className="w-5 h-5 mt-0.5 text-amber-400/70" />
+                    ) : (
+                      <Zap
+                        className={`w-5 h-5 mt-0.5 ${engineType === "cloud" ? "text-amber-400" : "text-slate-500"}`}
+                      />
+                    )}
                     <div>
-                      <div className="text-sm font-bold text-white mb-0.5">
-                        {t("retranscribe.cloudCardTitle")}
+                      <div className="text-sm font-bold text-white mb-0.5 flex items-center gap-2">
+                        <span>{t("retranscribe.cloudCardTitle")}</span>
+                        {isParanoid && (
+                          <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 font-mono">
+                            Kilitli
+                          </span>
+                        )}
                       </div>
                       <div className="text-xs text-slate-400">
-                        {t("retranscribe.cloudCardDesc")}
+                        {isParanoid
+                          ? "Paranoid Modda bulut motoru kilitlenmiştir."
+                          : t("retranscribe.cloudCardDesc")}
                       </div>
                     </div>
                   </button>
@@ -494,18 +522,22 @@ export const RetranscribeModal: React.FC<RetranscribeModalProps> = ({
                     <option value="ollama">
                       {t("retranscribe.ollamaProvider")}
                     </option>
-                    <option value="gemini">
-                      {t("retranscribe.geminiProvider")}
-                    </option>
-                    <option value="openai">
-                      {t("retranscribe.openaiProvider")}
-                    </option>
-                    <option value="groq">
-                      {t("retranscribe.groqProvider")}
-                    </option>
                     <option value="heuristic">
                       {t("retranscribe.heuristicProvider")}
                     </option>
+                    {!isParanoid && (
+                      <>
+                        <option value="gemini">
+                          {t("retranscribe.geminiProvider")}
+                        </option>
+                        <option value="openai">
+                          {t("retranscribe.openaiProvider")}
+                        </option>
+                        <option value="groq">
+                          {t("retranscribe.groqProvider")}
+                        </option>
+                      </>
+                    )}
                   </select>
                 </div>
               </div>

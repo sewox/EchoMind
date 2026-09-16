@@ -377,4 +377,27 @@ export const en: TranslationKeys = {
     updateAvailable: "New Version Available ({version})",
     updateError: "Failed to connect to update server.",
   },
+  privacyModes: {
+    title: "Privacy & Security Profile",
+    subtitle: "Define data isolation and AI processing levels in one click",
+    quickSwitch: "Security Profile",
+    paranoid: {
+      name: "Paranoid Mode",
+      badge: "Air-Gapped",
+      desc: "Zero Cloud. Only on-device Whisper & Ollama models operate. Maximum strict DLP filtering.",
+      features: "100% Offline • Network Isolation • Ultra DLP",
+    },
+    balanced: {
+      name: "Balanced Mode",
+      badge: "Recommended",
+      desc: "Local-first default. Cloud AI is only used after DLP redaction with your own BYOK keys.",
+      features: "Local-First • Redacted BYOK • Hybrid Performance",
+    },
+    maxIntelligence: {
+      name: "Max Intelligence",
+      badge: "Peak Capability",
+      desc: "Top cloud models unrestricted. All transcripts undergo mandatory DLP checks before egress.",
+      features: "Gemini / GPT-4o / Groq • Mandatory DLP • Transparent Audit",
+    },
+  },
 };

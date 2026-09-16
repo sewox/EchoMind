@@ -4,9 +4,11 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { I18nProvider, useI18n } from "../locales/i18nContext";
 import { MeetingAppInfo } from "../hooks/useMeetingDetector";
+import { usePrivacyMode } from "../hooks/usePrivacyMode";
 
 const IslandContent: FC = () => {
   const { t } = useI18n();
+  const { isParanoid, isBalanced } = usePrivacyMode();
   const [appInfo, setAppInfo] = useState<MeetingAppInfo>({
     app_id: "meeting",
     display_name: "Google Meet",
@@ -101,6 +103,18 @@ const IslandContent: FC = () => {
               </span>
               <span className="text-[10px] font-medium text-emerald-400 bg-emerald-950/60 px-1.5 py-0.2 rounded border border-emerald-500/30">
                 Aktif
+              </span>
+              <span
+                data-testid="island-privacy-badge"
+                className={`text-[9px] font-mono px-1.5 py-0.2 rounded border ${
+                  isParanoid
+                    ? "bg-purple-950/80 text-purple-300 border-purple-500/40"
+                    : isBalanced
+                      ? "bg-emerald-950/80 text-emerald-300 border-emerald-500/40"
+                      : "bg-cyan-950/80 text-cyan-300 border-cyan-500/40"
+                }`}
+              >
+                {isParanoid ? "Air-Gapped" : isBalanced ? "DLP" : "Max AI"}
               </span>
             </div>
             <span className="text-[11px] text-slate-400 truncate">

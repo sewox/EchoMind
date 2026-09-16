@@ -374,4 +374,28 @@ export const fr: TranslationKeys = {
     updateAvailable: "Nouvelle version disponible ({version})",
     updateError: "Impossible de se connecter au serveur de mise à jour.",
   },
+  privacyModes: {
+    title: "Profil de Confidentialité & Sécurité",
+    subtitle:
+      "Définissez le niveau d'isolation des données et de traitement IA en un clic",
+    quickSwitch: "Profil de Sécurité",
+    paranoid: {
+      name: "Mode Paranoïaque",
+      badge: "Air-Gapped",
+      desc: "Zéro Cloud. Seuls les modèles Whisper et Ollama locaux fonctionnent sur votre appareil. DLP strict.",
+      features: "100% Hors Ligne • Isolation Réseau • Ultra DLP",
+    },
+    balanced: {
+      name: "Mode Équilibré",
+      badge: "Recommandé",
+      desc: "Priorité locale. L'IA Cloud n'intervient qu'après caviardage DLP avec vos propres clés API.",
+      features: "Local d'Abord • BYOK Protégé • Puissance Hybride",
+    },
+    maxIntelligence: {
+      name: "Intelligence Maximale",
+      badge: "Performance Ultime",
+      desc: "Meilleurs modèles Cloud débloqués. Vérification DLP obligatoire avant tout envoi de données.",
+      features: "Gemini / GPT-4o / Groq • DLP Obligatoire • Audit Transparent",
+    },
+  },
 };

@@ -373,4 +373,28 @@ export const de: TranslationKeys = {
     updateAvailable: "Neue Version verfügbar ({version})",
     updateError: "Verbindung zum Update-Server fehlgeschlagen.",
   },
+  privacyModes: {
+    title: "Datenschutz- & Sicherheitsprofil",
+    subtitle:
+      "Wählen Sie den gewünschten Grad an Datenisolation und KI-Verarbeitung",
+    quickSwitch: "Sicherheitsprofil",
+    paranoid: {
+      name: "Paranoid-Modus",
+      badge: "Air-Gapped",
+      desc: "Keine Cloud. Nur lokale Whisper- und Ollama-Modelle auf dem Gerät. Maximales DLP.",
+      features: "100% Offline • Netzwerk-Isolation • Ultra-DLP",
+    },
+    balanced: {
+      name: "Ausgewogener Modus",
+      badge: "Empfohlen",
+      desc: "Lokal bevorzugt. Cloud-KI nur nach DLP-Schwärzung mit eigenen BYOK-Schlüsseln.",
+      features: "Lokal-Zuerst • DLP-Geschütztes BYOK • Hybrid-Power",
+    },
+    maxIntelligence: {
+      name: "Maximale Intelligenz",
+      badge: "Höchstleistung",
+      desc: "Beste Cloud-Modelle freigeschaltet. Obligatorische DLP-Prüfung vor Datenversand.",
+      features: "Gemini / GPT-4o / Groq • Pflicht-DLP • Volle Transparenz",
+    },
+  },
 };
