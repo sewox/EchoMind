@@ -1,5 +1,9 @@
 use serde::{Deserialize, Serialize};
+use std::fs::File;
+use std::io::{Read, Write};
+use std::path::PathBuf;
 use std::time::Duration;
+use tauri::Emitter;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ReleaseAsset {
@@ -19,6 +23,15 @@ pub struct UpdateCheckResult {
     pub published_at: String,
     pub html_url: String,
     pub assets: Vec<ReleaseAsset>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateProgressPayload {
+    pub percentage: f64,
+    pub downloaded_bytes: u64,
+    pub total_bytes: u64,
+    pub status: String, // "downloading", "installing", "completed", "error"
+    pub error: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -45,7 +58,7 @@ pub fn is_version_newer(latest: &str, current: &str) -> bool {
     let parse_semver = |v: &str| -> (u32, u32, u32) {
         let clean = v.trim().trim_start_matches('v').trim_start_matches('V');
         let parts: Vec<&str> = clean.split('.').collect();
-        let major = parts.get(0).and_then(|p| p.parse::<u32>().ok()).unwrap_or(0);
+        let major = parts.first().and_then(|p| p.parse::<u32>().ok()).unwrap_or(0);
         let minor = parts.get(1).and_then(|p| p.parse::<u32>().ok()).unwrap_or(0);
         let patch = parts.get(2).and_then(|p| {
             // Handle pre-release tags like "0-beta"
@@ -65,6 +78,64 @@ pub fn is_version_newer(latest: &str, current: &str) -> bool {
         return l_min > c_min;
     }
     l_pat > c_pat
+}
+
+/// Detects the best matching binary asset for the current OS and architecture.
+pub fn select_best_asset(assets: &[ReleaseAsset]) -> Option<ReleaseAsset> {
+    if assets.is_empty() {
+        return None;
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        #[cfg(target_arch = "aarch64")]
+        {
+            if let Some(a) = assets.iter().find(|a| {
+                let n = a.name.to_lowercase();
+                (n.ends_with(".dmg") || n.ends_with(".app.tar.gz")) && (n.contains("aarch64") || n.contains("arm64"))
+            }) {
+                return Some(a.clone());
+            }
+        }
+
+        if let Some(a) = assets.iter().find(|a| a.name.to_lowercase().ends_with(".dmg")) {
+            return Some(a.clone());
+        }
+
+        if let Some(a) = assets.iter().find(|a| {
+            let n = a.name.to_lowercase();
+            n.ends_with(".app.tar.gz") || n.ends_with(".zip")
+        }) {
+            return Some(a.clone());
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        if let Some(a) = assets.iter().find(|a| {
+            let n = a.name.to_lowercase();
+            n.ends_with(".msi") || (n.ends_with(".exe") && n.contains("setup"))
+        }) {
+            return Some(a.clone());
+        }
+
+        if let Some(a) = assets.iter().find(|a| a.name.to_lowercase().ends_with(".exe")) {
+            return Some(a.clone());
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        if let Some(a) = assets.iter().find(|a| a.name.to_lowercase().ends_with(".appimage")) {
+            return Some(a.clone());
+        }
+        if let Some(a) = assets.iter().find(|a| a.name.to_lowercase().ends_with(".deb")) {
+            return Some(a.clone());
+        }
+    }
+
+    // Generic fallback: first downloadable archive or binary
+    assets.first().cloned()
 }
 
 #[tauri::command]
@@ -112,6 +183,190 @@ pub fn check_for_updates() -> Result<UpdateCheckResult, String> {
         html_url: release.html_url,
         assets,
     })
+}
+
+#[tauri::command]
+pub fn download_and_install_update(
+    app: tauri::AppHandle,
+    download_url: Option<String>,
+    filename: Option<String>,
+) -> Result<String, String> {
+    let target_url = match download_url {
+        Some(url) if !url.trim().is_empty() => url,
+        _ => {
+            let check = check_for_updates()?;
+            let asset = select_best_asset(&check.assets)
+                .ok_or_else(|| "Bu platform için uygun güncelleme paketi bulunamadı.".to_string())?;
+            asset.download_url
+        }
+    };
+
+    if !target_url.starts_with("https://github.com/") && !target_url.starts_with("https://objects.githubusercontent.com/") {
+        return Err("Güvenli olmayan güncelleme adresi.".to_string());
+    }
+
+    let raw_name = filename.unwrap_or_else(|| {
+        target_url.split('/').last().unwrap_or("echomind_update_package").to_string()
+    });
+    // Sanitize filename to prevent path traversal
+    let safe_filename: String = raw_name
+        .chars()
+        .filter(|c| c.is_alphanumeric() || *c == '.' || *c == '-' || *c == '_')
+        .collect();
+
+    let temp_dir = std::env::temp_dir().join("echomind_updates");
+    let _ = std::fs::create_dir_all(&temp_dir);
+    let target_path: PathBuf = temp_dir.join(&safe_filename);
+
+    // Initial progress emit
+    let _ = app.emit("update-download-progress", UpdateProgressPayload {
+        percentage: 0.0,
+        downloaded_bytes: 0,
+        total_bytes: 0,
+        status: "downloading".to_string(),
+        error: None,
+    });
+
+    let client = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(300))
+        .user_agent(format!("EchoMind-Updater/{}", env!("CARGO_PKG_VERSION")))
+        .build()
+        .map_err(|e| format!("İndirme istemcisi başlatılamadı: {}", e))?;
+
+    let mut response = client
+        .get(&target_url)
+        .header("Accept", "application/octet-stream")
+        .send()
+        .map_err(|e| format!("Güncelleme sunucusuna bağlanılamadı: {}", e))?;
+
+    if !response.status().is_success() {
+        let err_msg = format!("HTTP İndirme Hatası: {}", response.status());
+        let _ = app.emit("update-download-progress", UpdateProgressPayload {
+            percentage: 0.0,
+            downloaded_bytes: 0,
+            total_bytes: 0,
+            status: "error".to_string(),
+            error: Some(err_msg.clone()),
+        });
+        return Err(err_msg);
+    }
+
+    let total_size = response.content_length().unwrap_or(0);
+    let mut file = File::create(&target_path)
+        .map_err(|e| format!("Hedef dosya oluşturulamadı: {}", e))?;
+
+    let mut downloaded: u64 = 0;
+    let mut buffer = [0u8; 32768]; // 32KB chunks
+    let mut last_emit_percent = 0;
+
+    loop {
+        match response.read(&mut buffer) {
+            Ok(0) => break, // EOF
+            Ok(bytes_read) => {
+                file.write_all(&buffer[..bytes_read])
+                    .map_err(|e| format!("Dosyaya yazılırken hata oluştu: {}", e))?;
+                downloaded += bytes_read as u64;
+
+                let percent = if total_size > 0 {
+                    (downloaded as f64 / total_size as f64) * 100.0
+                } else {
+                    0.0
+                };
+
+                // Emit progress every 2% step or at the end to prevent IPC bottleneck
+                if (percent as u32) != last_emit_percent || downloaded == total_size {
+                    last_emit_percent = percent as u32;
+                    let _ = app.emit("update-download-progress", UpdateProgressPayload {
+                        percentage: (percent * 10.0).round() / 10.0,
+                        downloaded_bytes: downloaded,
+                        total_bytes: total_size,
+                        status: "downloading".to_string(),
+                        error: None,
+                    });
+                }
+            }
+            Err(e) => {
+                let err_msg = format!("İndirme sırasında kesinti: {}", e);
+                let _ = app.emit("update-download-progress", UpdateProgressPayload {
+                    percentage: 0.0,
+                    downloaded_bytes: downloaded,
+                    total_bytes: total_size,
+                    status: "error".to_string(),
+                    error: Some(err_msg.clone()),
+                });
+                return Err(err_msg);
+            }
+        }
+    }
+
+    let _ = file.flush();
+
+    // Notify ready to install
+    let _ = app.emit("update-download-progress", UpdateProgressPayload {
+        percentage: 100.0,
+        downloaded_bytes: downloaded,
+        total_bytes: total_size,
+        status: "installing".to_string(),
+        error: None,
+    });
+
+    let path_str = target_path.to_string_lossy().to_string();
+
+    // Execute platform specific installer/launcher
+    launch_installer(&target_path)?;
+
+    let _ = app.emit("update-download-progress", UpdateProgressPayload {
+        percentage: 100.0,
+        downloaded_bytes: downloaded,
+        total_bytes: total_size,
+        status: "completed".to_string(),
+        error: None,
+    });
+
+    Ok(path_str)
+}
+
+fn launch_installer(path: &PathBuf) -> Result<(), String> {
+    let _path_str = path.to_string_lossy();
+
+    #[cfg(target_os = "macos")]
+    {
+        // On macOS, open the .dmg or update file with the system default handler
+        std::process::Command::new("open")
+            .arg(path.as_os_str())
+            .spawn()
+            .map_err(|e| format!("macOS yükleyici açılamadı: {}", e))?;
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        if path_str.ends_with(".msi") {
+            std::process::Command::new("msiexec")
+                .args(["/i", &path_str, "/passive"])
+                .spawn()
+                .map_err(|e| format!("Windows MSI yükleyicisi başlatılamadı: {}", e))?;
+        } else {
+            std::process::Command::new(path.as_os_str())
+                .spawn()
+                .map_err(|e| format!("Windows yükleyicisi başlatılamadı: {}", e))?;
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if let Ok(metadata) = std::fs::metadata(path) {
+            let mut perms = metadata.permissions();
+            perms.set_mode(0o755);
+            let _ = std::fs::set_permissions(path, perms);
+        }
+
+        std::process::Command::new(path.as_os_str())
+            .spawn()
+            .map_err(|e| format!("Linux paketi başlatılamadı: {}", e))?;
+    }
+
+    Ok(())
 }
 
 #[tauri::command]
@@ -177,4 +432,33 @@ pub mod tests {
         assert!(open_release_url("".to_string()).is_err());
         assert!(open_release_url("https://github.com/sewox/EchoMind/releases".to_string()).is_ok());
     }
+
+    #[test]
+    fn test_select_best_asset_macos_or_fallback() {
+        let assets = vec![
+            ReleaseAsset {
+                name: "EchoMind_0.2.4_x64.deb".to_string(),
+                size: 1024,
+                download_url: "https://github.com/sewox/EchoMind/releases/deb".to_string(),
+                content_type: "application/octet-stream".to_string(),
+            },
+            ReleaseAsset {
+                name: "EchoMind_0.2.4_aarch64.dmg".to_string(),
+                size: 2048,
+                download_url: "https://github.com/sewox/EchoMind/releases/dmg".to_string(),
+                content_type: "application/octet-stream".to_string(),
+            },
+        ];
+
+        let selected = select_best_asset(&assets);
+        assert!(selected.is_some());
+        #[cfg(target_os = "macos")]
+        assert!(selected.unwrap().name.ends_with(".dmg"));
+    }
+
+    #[test]
+    fn test_select_best_asset_empty() {
+        assert!(select_best_asset(&[]).is_none());
+    }
 }
+

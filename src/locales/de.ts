@@ -360,7 +360,16 @@ export const de: TranslationKeys = {
     currentVersion: "Aktuelle Version",
     latestVersion: "Neueste Version",
     releaseNotes: "Versionshinweise & Neuigkeiten",
-    downloadAndUpdate: "Jetzt aktualisieren",
+    downloadAndUpdate: "Herunterladen & Installieren",
+    downloading: "Update wird heruntergeladen...",
+    downloadProgress:
+      "{percentage}% abgeschlossen ({downloaded} MB / {total} MB)",
+    installing: "Paket wird überprüft und vorbereitet...",
+    completed: "Installationspaket bereit",
+    completedDesc:
+      "Das Update wurde gestartet. Die Installation wird abgeschlossen...",
+    downloadFailed: "Fehler beim Herunterladen des Updates.",
+    manualDownloadFallback: "Direkt von GitHub herunterladen",
     remindLater: "Später erinnern",
     dontShowAgainForVersion: "Diese Version beim Start nicht mehr anzeigen",
     autoCheckToggle: "Beim Start automatisch nach Updates suchen",

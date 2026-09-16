@@ -367,7 +367,16 @@ export const tr: TranslationKeys = {
     currentVersion: "Mevcut Sürüm",
     latestVersion: "En Son Sürüm",
     releaseNotes: "Sürüm Notları & Yenilikler",
-    downloadAndUpdate: "Şimdi Güncelle",
+    downloadAndUpdate: "İndir ve Güncelle",
+    downloading: "Güncelleme İndiriliyor...",
+    downloadProgress: "%{percentage} tamamlandı ({downloaded} MB / {total} MB)",
+    installing: "Paket Doğrulanıyor ve Kuruluma Hazırlanıyor...",
+    completed: "Kurulum Dosyası Hazırlandı",
+    completedDesc:
+      "Uygulama yükleyicisi başlatıldı. Güncelleme tamamlanıyor...",
+    downloadFailed:
+      "Güncelleme indirilemedi. Lütfen bağlantınızı kontrol edin.",
+    manualDownloadFallback: "Doğrudan GitHub'dan İndir",
     remindLater: "Sonra Hatırlat",
     dontShowAgainForVersion: "Bu sürümü açılışta bir daha gösterme",
     autoCheckToggle: "Açılışta Güncellemeleri Otomatik Denetle",

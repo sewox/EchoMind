@@ -1,11 +1,30 @@
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import {
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+  act,
+} from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { UpdateModal, UpdateCheckResult } from "./UpdateModal";
 import { I18nProvider } from "../locales/i18nContext";
 import { invoke } from "@tauri-apps/api/core";
 
+let progressCallback: ((event: any) => void) | null = null;
+
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
+}));
+
+vi.mock("@tauri-apps/api/event", () => ({
+  listen: vi.fn((eventName: string, cb: (event: any) => void) => {
+    if (eventName === "update-download-progress") {
+      progressCallback = cb;
+    }
+    return Promise.resolve(() => {
+      progressCallback = null;
+    });
+  }),
 }));
 
 const mockUpdateInfo: UpdateCheckResult = {
@@ -31,6 +50,7 @@ describe("UpdateModal Component", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    progressCallback = null;
   });
 
   const renderComponent = (props: {
@@ -102,9 +122,9 @@ describe("UpdateModal Component", () => {
     ).toBeInTheDocument();
   });
 
-  it("triggers invoke open_release_url when Update Now is clicked", async () => {
+  it("triggers invoke download_and_install_update when Update Now is clicked", async () => {
     const onClose = vi.fn();
-    (invoke as any).mockResolvedValue(undefined);
+    (invoke as any).mockResolvedValue("/tmp/echomind_update.dmg");
 
     renderComponent({
       isOpen: true,
@@ -115,23 +135,93 @@ describe("UpdateModal Component", () => {
     const updateBtn = screen.getByTestId("update-now-btn");
     fireEvent.click(updateBtn);
 
-    expect(invoke).toHaveBeenCalledWith("open_release_url", {
-      url: "https://github.com/sewox/EchoMind/releases/tag/v0.3.0",
+    expect(invoke).toHaveBeenCalledWith("download_and_install_update", {
+      downloadUrl: null,
+      filename: null,
+    });
+  });
+
+  it("displays live download progress bar when update-download-progress events arrive", async () => {
+    (invoke as any).mockImplementation(() => new Promise(() => {})); // pending
+
+    renderComponent({
+      isOpen: true,
+      updateInfo: mockUpdateInfo,
+      onClose: vi.fn(),
     });
 
+    const updateBtn = screen.getByTestId("update-now-btn");
+    fireEvent.click(updateBtn);
+
+    expect(screen.getByTestId("update-progress-container")).toBeInTheDocument();
+
+    act(() => {
+      if (progressCallback) {
+        progressCallback({
+          payload: {
+            percentage: 45.5,
+            downloaded_bytes: 45500000,
+            total_bytes: 100000000,
+            status: "downloading",
+          },
+        });
+      }
+    });
+
+    expect(screen.getByText("45.5%")).toBeInTheDocument();
+    expect(screen.getByText(/43.4 MB \/ 95.4 MB/)).toBeInTheDocument();
+
+    // Progress completed event
+    act(() => {
+      if (progressCallback) {
+        progressCallback({
+          payload: {
+            percentage: 100.0,
+            downloaded_bytes: 100000000,
+            total_bytes: 100000000,
+            status: "completed",
+          },
+        });
+      }
+    });
+
+    expect(screen.getByText("100%")).toBeInTheDocument();
+  });
+
+  it("handles download error and presents manual GitHub fallback link", async () => {
+    (invoke as any).mockRejectedValue("Network error while downloading");
+
+    renderComponent({
+      isOpen: true,
+      updateInfo: mockUpdateInfo,
+      onClose: vi.fn(),
+    });
+
+    const updateBtn = screen.getByTestId("update-now-btn");
+    fireEvent.click(updateBtn);
+
     await waitFor(() => {
-      expect(onClose).toHaveBeenCalled();
+      expect(screen.getByTestId("update-error-banner")).toBeInTheDocument();
+      expect(
+        screen.getByText(/Network error while downloading/),
+      ).toBeInTheDocument();
+    });
+
+    const fallbackBtn = screen.getByText(/Doğrudan GitHub'dan İndir/i);
+    fireEvent.click(fallbackBtn);
+
+    expect(invoke).toHaveBeenCalledWith("open_release_url", {
+      url: "https://github.com/sewox/EchoMind/releases/tag/v0.3.0",
     });
   });
 
   it("saves dontShowAgain choice to localStorage when checked and Update Now is clicked", async () => {
-    const onClose = vi.fn();
     (invoke as any).mockResolvedValue(undefined);
 
     renderComponent({
       isOpen: true,
       updateInfo: mockUpdateInfo,
-      onClose,
+      onClose: vi.fn(),
     });
 
     const checkbox = screen.getByTestId("dont-show-update-checkbox");
@@ -140,12 +230,7 @@ describe("UpdateModal Component", () => {
     const updateBtn = screen.getByTestId("update-now-btn");
     fireEvent.click(updateBtn);
 
-    await waitFor(() => {
-      expect(localStorage.getItem("echomind_skip_update_version")).toBe(
-        "0.3.0",
-      );
-      expect(onClose).toHaveBeenCalled();
-    });
+    expect(localStorage.getItem("echomind_skip_update_version")).toBe("0.3.0");
   });
 
   it("saves dontShowAgain choice to localStorage when Remind Later is clicked", () => {
@@ -180,24 +265,6 @@ describe("UpdateModal Component", () => {
     fireEvent.click(closeBtn);
 
     expect(onClose).toHaveBeenCalled();
-  });
-
-  it("handles invoke open_release_url failure gracefully", async () => {
-    const onClose = vi.fn();
-    (invoke as any).mockRejectedValue(new Error("Browser failure"));
-
-    renderComponent({
-      isOpen: true,
-      updateInfo: mockUpdateInfo,
-      onClose,
-    });
-
-    const updateBtn = screen.getByTestId("update-now-btn");
-    fireEvent.click(updateBtn);
-
-    await waitFor(() => {
-      expect(invoke).toHaveBeenCalled();
-    });
   });
 
   it("handles empty published_at date string without errors", () => {
