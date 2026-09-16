@@ -175,6 +175,7 @@ mod e2e_qa_suite {
             participants: Some(vec!["Can".to_string()]),
             engine_used: Some("🔒 Yerel Whisper Small (244M)".to_string()),
             summary_provider: Some("🔒 Cihaz İçi Hızlı Özet".to_string()),
+            tags: None,
         };
 
         let md = crate::summarizer::SummarizerEngine::export_notes_markdown(&meeting, None, Some("tr"));
@@ -209,6 +210,7 @@ mod e2e_qa_suite {
                 participants: None,
                 engine_used: None,
                 summary_provider: None,
+                tags: None,
             }
         ];
 

@@ -57,6 +57,8 @@ pub struct MeetingRecord {
     pub engine_used: Option<String>,
     #[serde(default)]
     pub summary_provider: Option<String>,
+    #[serde(default)]
+    pub tags: Option<Vec<String>>,
 }
 
 pub struct StorageEngine {
@@ -129,6 +131,19 @@ impl StorageEngine {
 
         if meeting.key_decisions.is_empty() {
             meeting.key_decisions = extract_key_decisions(&meeting.segments);
+        }
+
+        // Auto-tagging if tags are empty
+        if meeting.tags.is_none() || meeting.tags.as_ref().map(|t| t.is_empty()).unwrap_or(false) {
+            let seg_texts: Vec<String> = meeting.segments.iter().map(|s| s.text.clone()).collect();
+            let auto_tags = crate::auto_tagger::AutoTagEngine::extract_tags(
+                &meeting.title,
+                &meeting.summary,
+                meeting.meeting_goal.as_deref(),
+                &meeting.key_decisions,
+                &seg_texts,
+            );
+            meeting.tags = Some(auto_tags);
         }
 
         {
@@ -390,6 +405,7 @@ pub fn save_current_meeting(
         participants: None,
         engine_used: Some("Cihazda (Whisper Small)".to_string()),
         summary_provider: Some("EchoMind Akıllı Özet".to_string()),
+        tags: None,
     };
 
     transcriber.clear_history();
@@ -435,6 +451,61 @@ pub fn update_meeting_title(id: String, new_title: String) -> Result<Vec<Meeting
 }
 
 #[tauri::command]
+pub fn add_meeting_tag(meeting_id: String, tag: String) -> Result<MeetingRecord, String> {
+    let clean_tag = tag.trim().to_string();
+    if clean_tag.is_empty() {
+        return Err("Etiket adı boş olamaz".to_string());
+    }
+
+    let storage = get_global_storage();
+    let mut lock = storage.meetings.lock().unwrap();
+    if let Some(mtg) = lock.iter_mut().find(|m| m.id == meeting_id) {
+        let mut tags = mtg.tags.clone().unwrap_or_default();
+        if !tags.iter().any(|t| t.eq_ignore_ascii_case(&clean_tag)) {
+            tags.push(clean_tag);
+            mtg.tags = Some(tags);
+        }
+        let updated = mtg.clone();
+        drop(lock);
+        storage.save_to_disk()?;
+        Ok(updated)
+    } else {
+        Err(format!("Toplantı bulunamadı: {}", meeting_id))
+    }
+}
+
+#[tauri::command]
+pub fn remove_meeting_tag(meeting_id: String, tag: String) -> Result<MeetingRecord, String> {
+    let clean_tag = tag.trim();
+    let storage = get_global_storage();
+    let mut lock = storage.meetings.lock().unwrap();
+    if let Some(mtg) = lock.iter_mut().find(|m| m.id == meeting_id) {
+        if let Some(mut tags) = mtg.tags.clone() {
+            tags.retain(|t| !t.eq_ignore_ascii_case(clean_tag));
+            mtg.tags = Some(tags);
+        }
+        let updated = mtg.clone();
+        drop(lock);
+        storage.save_to_disk()?;
+        Ok(updated)
+    } else {
+        Err(format!("Toplantı bulunamadı: {}", meeting_id))
+    }
+}
+
+#[tauri::command]
+pub fn get_related_meetings(meeting_id: String, limit: Option<usize>) -> Result<Vec<crate::auto_tagger::RelatedMeetingItem>, String> {
+    let storage = get_global_storage();
+    let all = storage.get_all();
+    if let Some(target) = all.iter().find(|m| m.id == meeting_id) {
+        let related = crate::auto_tagger::AutoTagEngine::find_related_meetings(target, &all, limit.unwrap_or(3));
+        Ok(related)
+    } else {
+        Err(format!("Toplantı bulunamadı: {}", meeting_id))
+    }
+}
+
+#[tauri::command]
 pub fn toggle_action_item_status(meeting_id: String, action_index: usize) -> Result<MeetingRecord, String> {
     let storage = get_global_storage();
     let mut lock = storage.meetings.lock().unwrap();
@@ -451,6 +522,25 @@ pub fn toggle_action_item_status(meeting_id: String, action_index: usize) -> Res
     } else {
         Err(format!("Toplantı bulunamadı: {}", meeting_id))
     }
+}
+
+#[tauri::command]
+pub fn get_all_tags() -> Vec<String> {
+    let storage = get_global_storage();
+    let all = storage.get_all();
+    let mut tags_set = std::collections::HashSet::new();
+    for m in all {
+        if let Some(tags) = m.tags {
+            for t in tags {
+                if !t.trim().is_empty() {
+                    tags_set.insert(t);
+                }
+            }
+        }
+    }
+    let mut list: Vec<String> = tags_set.into_iter().collect();
+    list.sort();
+    list
 }
 
 #[cfg(test)]
@@ -487,6 +577,7 @@ mod tests {
             participants: Some(vec!["Sercan".to_string()]),
             engine_used: Some("Cihazda (Whisper Small)".to_string()),
             summary_provider: Some("EchoMind".to_string()),
+            tags: Some(vec!["Finans & Bütçe".to_string()]),
         };
 
         let added = storage.add_meeting(sample_meeting).unwrap();
@@ -556,6 +647,7 @@ mod tests {
             participants: Some(vec!["Konuşmacı 1".to_string()]),
             engine_used: Some("Whisper".to_string()),
             summary_provider: Some("AI".to_string()),
+            tags: None,
         };
 
         // 1. Add meeting & get by id

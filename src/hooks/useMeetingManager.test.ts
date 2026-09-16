@@ -166,8 +166,94 @@ describe("useMeetingManager Hook", () => {
       await result.current.handleDeleteMeeting("m1");
       result.current.setEditingTitleText("Test");
       await result.current.handleSaveMeetingTitle("m1");
+      await result.current.handleAddMeetingTag("m1", "Etiket");
+      await result.current.handleRemoveMeetingTag("m1", "Etiket");
     });
 
     expect(result.current.editingMeetingId).toBeNull();
+  });
+
+  it("filters meetings by selected tag and computes allAvailableTags", async () => {
+    const taggedMeetings: MeetingRecord[] = [
+      {
+        ...mockMeetings[0],
+        tags: ["Finans & Bütçe", "Yazılım"],
+      },
+      {
+        ...mockMeetings[1],
+        tags: ["Tasarım & UI/UX"],
+      },
+    ];
+
+    (invoke as any).mockResolvedValue(taggedMeetings);
+
+    const { result } = renderHook(() => useMeetingManager());
+
+    await act(async () => {
+      await result.current.fetchPastMeetings();
+    });
+
+    expect(result.current.allAvailableTags).toEqual([
+      "Finans & Bütçe",
+      "Tasarım & UI/UX",
+      "Yazılım",
+    ]);
+
+    act(() => {
+      result.current.setSelectedTag("Finans & Bütçe");
+    });
+    expect(result.current.filteredMeetings.length).toBe(1);
+    expect(result.current.filteredMeetings[0].id).toBe("m1");
+
+    act(() => {
+      result.current.setSelectedTag(null);
+    });
+    expect(result.current.filteredMeetings.length).toBe(2);
+  });
+
+  it("adds and removes tags properly", async () => {
+    const updatedMeeting: MeetingRecord = {
+      ...mockMeetings[0],
+      tags: ["Finans & Bütçe", "Yeni Etiket"],
+    };
+    const removedMeeting: MeetingRecord = {
+      ...mockMeetings[0],
+      tags: ["Finans & Bütçe"],
+    };
+
+    (invoke as any).mockImplementation((cmd: string) => {
+      if (cmd === "get_all_meetings") return Promise.resolve(mockMeetings);
+      if (cmd === "add_meeting_tag") return Promise.resolve(updatedMeeting);
+      if (cmd === "remove_meeting_tag") return Promise.resolve(removedMeeting);
+      return Promise.resolve();
+    });
+
+    const { result } = renderHook(() => useMeetingManager());
+
+    await act(async () => {
+      await result.current.fetchPastMeetings();
+    });
+
+    act(() => {
+      result.current.setSelectedMeeting(mockMeetings[0]);
+    });
+
+    await act(async () => {
+      await result.current.handleAddMeetingTag("m1", "Yeni Etiket");
+    });
+
+    expect(invoke).toHaveBeenCalledWith("add_meeting_tag", {
+      meetingId: "m1",
+      tag: "Yeni Etiket",
+    });
+
+    await act(async () => {
+      await result.current.handleRemoveMeetingTag("m1", "Yeni Etiket");
+    });
+
+    expect(invoke).toHaveBeenCalledWith("remove_meeting_tag", {
+      meetingId: "m1",
+      tag: "Yeni Etiket",
+    });
   });
 });
