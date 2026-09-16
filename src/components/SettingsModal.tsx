@@ -4,6 +4,7 @@ import {
   Cpu,
   HardDrive,
   ShieldCheck,
+  ShieldAlert,
   Zap,
   Check,
   Key,
@@ -24,6 +25,7 @@ import {
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { CredentialStore } from "../services/credentialStore";
+import { usePrivacyMode } from "../hooks/usePrivacyMode";
 import { HardwareInfo, ModelStatus } from "../App";
 import {
   GROQ_MODELS,
@@ -58,6 +60,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onOpenUpdateModal,
 }) => {
   const { t, language, setLanguage } = useI18n();
+  const { setPrivacyMode, isParanoid, isBalanced, isMaxIntelligence } =
+    usePrivacyMode();
   const [activeTab, setActiveTab] = useState<
     "audio" | "system" | "apiKeys" | "language"
   >("audio");
@@ -572,6 +576,139 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         {/* Tab 1: System Info & Privacy */}
         {activeTab === "system" && (
           <div className="space-y-4 text-xs">
+            {/* Privacy Mode Profiles Selector */}
+            <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800 space-y-3">
+              <div className="flex items-center justify-between pb-1 border-b border-slate-800/80">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                  <span className="text-white font-semibold text-xs">
+                    {t("privacyModes.title") || "Gizlilik ve Güvenlik Profili"}
+                  </span>
+                </div>
+                <span className="text-[10px] text-slate-400">
+                  {t("privacyModes.subtitle") ||
+                    "Tek tıkla veri izolasyon seviyesini belirleyin"}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 pt-1">
+                {/* 1. Paranoid Mode */}
+                <div
+                  onClick={() => setPrivacyMode("paranoid")}
+                  data-testid="settings-privacy-paranoid"
+                  className={`p-3 rounded-xl border transition-all cursor-pointer relative flex flex-col justify-between gap-2 ${
+                    isParanoid
+                      ? "bg-purple-950/40 border-purple-500 shadow-md shadow-purple-950/40 text-white"
+                      : "bg-slate-900/60 border-slate-800 hover:border-slate-700 text-slate-300"
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-1.5">
+                        <ShieldAlert className="w-4 h-4 text-purple-400" />
+                        <span className="font-bold text-xs">
+                          {t("privacyModes.paranoid.name") || "Paranoid Mod"}
+                        </span>
+                      </div>
+                      <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                        Air-Gapped
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 leading-relaxed">
+                      {t("privacyModes.paranoid.desc") ||
+                        "Sıfır Bulut. Yalnızca yerel modeller ve ultra katı DLP."}
+                    </p>
+                  </div>
+                  <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[9px] font-medium text-purple-300/80">
+                    <span>
+                      {t("privacyModes.paranoid.features") ||
+                        "%100 Çevrimdışı • Ağ İzolasyonu"}
+                    </span>
+                    {isParanoid && (
+                      <Check className="w-3.5 h-3.5 text-purple-400" />
+                    )}
+                  </div>
+                </div>
+
+                {/* 2. Balanced Mode */}
+                <div
+                  onClick={() => setPrivacyMode("balanced")}
+                  data-testid="settings-privacy-balanced"
+                  className={`p-3 rounded-xl border transition-all cursor-pointer relative flex flex-col justify-between gap-2 ${
+                    isBalanced
+                      ? "bg-emerald-950/40 border-emerald-500 shadow-md shadow-emerald-950/40 text-white"
+                      : "bg-slate-900/60 border-slate-800 hover:border-slate-700 text-slate-300"
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-1.5">
+                        <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                        <span className="font-bold text-xs">
+                          {t("privacyModes.balanced.name") || "Dengeli Mod"}
+                        </span>
+                      </div>
+                      <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                        Önerilen
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 leading-relaxed">
+                      {t("privacyModes.balanced.desc") ||
+                        "Yerel öncelikli. Bulut sadece DLP maskelemesi sonrası."}
+                    </p>
+                  </div>
+                  <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[9px] font-medium text-emerald-300/80">
+                    <span>
+                      {t("privacyModes.balanced.features") ||
+                        "Yerel Öncelikli • DLP BYOK"}
+                    </span>
+                    {isBalanced && (
+                      <Check className="w-3.5 h-3.5 text-emerald-400" />
+                    )}
+                  </div>
+                </div>
+
+                {/* 3. Max Intelligence Mode */}
+                <div
+                  onClick={() => setPrivacyMode("max_intelligence")}
+                  data-testid="settings-privacy-max"
+                  className={`p-3 rounded-xl border transition-all cursor-pointer relative flex flex-col justify-between gap-2 ${
+                    isMaxIntelligence
+                      ? "bg-cyan-950/40 border-cyan-500 shadow-md shadow-cyan-950/40 text-white"
+                      : "bg-slate-900/60 border-slate-800 hover:border-slate-700 text-slate-300"
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-1.5">
+                        <Zap className="w-4 h-4 text-cyan-400" />
+                        <span className="font-bold text-xs">
+                          {t("privacyModes.maxIntelligence.name") ||
+                            "Maksimum Zeka"}
+                        </span>
+                      </div>
+                      <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                        Yüksek Hız
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 leading-relaxed">
+                      {t("privacyModes.maxIntelligence.desc") ||
+                        "En iyi modeller serbest. Zorunlu DLP denetimi."}
+                    </p>
+                  </div>
+                  <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[9px] font-medium text-cyan-300/80">
+                    <span>
+                      {t("privacyModes.maxIntelligence.features") ||
+                        "Gemini / GPT-4o • Zorunlu DLP"}
+                    </span>
+                    {isMaxIntelligence && (
+                      <Check className="w-3.5 h-3.5 text-cyan-400" />
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* Hardware summary */}
             <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-2">
               <div className="flex items-center justify-between">

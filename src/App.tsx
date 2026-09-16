@@ -39,6 +39,7 @@ import { GlobalAssistantModal } from "./components/GlobalAssistantModal";
 import { CustomContextMenu } from "./components/CustomContextMenu";
 import { UpdateModal, UpdateCheckResult } from "./components/UpdateModal";
 import { EchoMindLogo } from "./components/EchoMindLogo";
+import { PrivacyModeBadge } from "./components/PrivacyModeBadge";
 import { useI18n, SUPPORTED_LANGUAGES } from "./locales/i18nContext";
 import { useAudioRecording } from "./hooks/useAudioRecording";
 import { useMeetingManager } from "./hooks/useMeetingManager";
@@ -751,7 +752,7 @@ export function App() {
           <EchoMindLogo showTagline={true} />
 
           {/* Status Capsule */}
-          <div className="ml-4 px-3 py-1 rounded-full bg-white/5 border border-white/10 flex items-center gap-2 text-xs">
+          <div className="ml-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 flex items-center gap-2 text-xs">
             <span
               className={`w-2 h-2 rounded-full ${
                 isRecording
@@ -769,6 +770,9 @@ export function App() {
                   : t("nav.ready")}
             </span>
           </div>
+
+          {/* Privacy Security Profile Quick Switcher */}
+          <PrivacyModeBadge />
         </div>
 
         {/* Right Action: Language Switcher, Global Assistant, Model Hub & Settings */}

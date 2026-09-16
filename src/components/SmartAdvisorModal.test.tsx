@@ -281,4 +281,20 @@ describe("SmartAdvisorModal Component", () => {
 
     expect(container.firstChild).toBeNull();
   });
+
+  it("locks cloud option when Paranoid mode is active", () => {
+    localStorage.setItem("echomind_privacy_mode", "paranoid");
+    render(
+      <I18nProvider>
+        <SmartAdvisorModal {...defaultProps} />
+      </I18nProvider>,
+    );
+
+    expect(screen.getByText(/Air-Gapped Locked/i)).toBeInTheDocument();
+    expect(screen.getByText(/Paranoid Mod Devrede/i)).toBeInTheDocument();
+    const cloudBtn = screen
+      .getByText("⚡ Yıldırım Hızı (Bulut)")
+      .closest("button");
+    expect(cloudBtn).toBeDisabled();
+  });
 });

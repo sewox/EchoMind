@@ -335,6 +335,29 @@ export interface TranslationKeys {
     updateAvailable: string;
     updateError: string;
   };
+  privacyModes?: {
+    title: string;
+    subtitle: string;
+    quickSwitch: string;
+    paranoid: {
+      name: string;
+      badge: string;
+      desc: string;
+      features: string;
+    };
+    balanced: {
+      name: string;
+      badge: string;
+      desc: string;
+      features: string;
+    };
+    maxIntelligence: {
+      name: string;
+      badge: string;
+      desc: string;
+      features: string;
+    };
+  };
 }
 
 export type SupportedLanguage = "tr" | "en" | "de" | "fr" | "es";

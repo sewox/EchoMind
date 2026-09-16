@@ -377,4 +377,29 @@ export const es: TranslationKeys = {
     updateAvailable: "Nueva versión disponible ({version})",
     updateError: "No se pudo conectar con el servidor de actualizaciones.",
   },
+  privacyModes: {
+    title: "Perfil de Privacidad & Seguridad",
+    subtitle:
+      "Defina el nivel de aislamiento de datos y procesamiento de IA en un clic",
+    quickSwitch: "Perfil de Seguridad",
+    paranoid: {
+      name: "Modo Paranoico",
+      badge: "Air-Gapped",
+      desc: "Cero Nube. Solo los modelos locales Whisper y Ollama funcionan en su dispositivo. DLP estricto.",
+      features: "100% Fuera de Línea • Aislamiento de Red • Ultra DLP",
+    },
+    balanced: {
+      name: "Modo Equilibrado",
+      badge: "Recomendado",
+      desc: "Prioridad local. La IA en la nube solo se usa tras anonimización DLP con sus propias claves API.",
+      features: "Primero Local • BYOK con DLP • Potencia Híbrida",
+    },
+    maxIntelligence: {
+      name: "Máxima Inteligencia",
+      badge: "Máximo Rendimiento",
+      desc: "Los mejores modelos en la nube liberados. Inspección DLP obligatoria antes de la transmisión.",
+      features:
+        "Gemini / GPT-4o / Groq • DLP Obligatorio • Auditoría Transparente",
+    },
+  },
 };
