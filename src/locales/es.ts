@@ -442,4 +442,17 @@ export const es: TranslationKeys = {
     toastIcsDownloaded: "¡Evento de calendario (.ics) guardado!",
     oneClickExportBundle: "Exportar Paquete Completo",
   },
+  liveSuggestions: {
+    title: "Sugerencias Inteligentes en Vivo",
+    badge: "Asesor en Vivo",
+    smartQuestion: "Pregunta Sugerida",
+    objectionHandling: "Manejo de Objeciones",
+    actionClue: "Pista de Acción / Decisión",
+    factCheck: "Verificación de Hechos / Datos",
+    summaryNudge: "Consejo de Resumen",
+    dismiss: "Cerrar",
+    copyTooltip: "Copiar sugerencia",
+    noSuggestions: "No hay sugerencias en vivo disponibles por el momento.",
+    islandTooltip: "Sugerencia de IA en vivo disponible",
+  },
 };

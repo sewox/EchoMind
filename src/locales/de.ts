@@ -437,4 +437,17 @@ export const de: TranslationKeys = {
     toastIcsDownloaded: "Kalendereinladung (.ics) gespeichert!",
     oneClickExportBundle: "Gesamtes Follow-up-Paket exportieren",
   },
+  liveSuggestions: {
+    title: "Live-Smart-Vorschläge",
+    badge: "Live-Berater",
+    smartQuestion: "Nachfrage-Vorschlag",
+    objectionHandling: "Einwandbehandlung",
+    actionClue: "Aktions- / Entscheidungshinweis",
+    factCheck: "Fakten- & Datenprüfung",
+    summaryNudge: "Zusammenfassungs-Tipp",
+    dismiss: "Schließen",
+    copyTooltip: "Vorschlag kopieren",
+    noSuggestions: "Noch keine Live-Vorschläge verfügbar.",
+    islandTooltip: "Live-KI-Vorschlag verfügbar",
+  },
 };

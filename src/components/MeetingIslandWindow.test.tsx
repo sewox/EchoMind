@@ -146,4 +146,49 @@ describe("MeetingIslandWindow Component", () => {
       fireEvent.click(autoStartBtn);
     });
   });
+
+  it("handles live-suggestion-event and displays mini suggestion in Island", async () => {
+    const writeTextSpy = vi.spyOn(navigator.clipboard, "writeText");
+
+    render(<MeetingIslandWindow />);
+
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 20));
+    });
+
+    const suggestionListeners =
+      globalTestEventListeners["live-suggestion-event"] || [];
+    expect(suggestionListeners.length).toBeGreaterThan(0);
+
+    await act(async () => {
+      suggestionListeners[suggestionListeners.length - 1]({
+        payload: {
+          id: "sug-island-1",
+          title: "Soru Önerisi",
+          content: "Detaylı maliyet dağılımını sorabilir miyiz?",
+          category: "question",
+          confidence: 0.95,
+        },
+      });
+      await new Promise((r) => setTimeout(r, 20));
+    });
+
+    expect(screen.getByText("Soru Önerisi")).toBeInTheDocument();
+
+    // Copy suggestion
+    const copyBtn = screen.getByTitle(/Kopyala|Copy/i);
+    await act(async () => {
+      fireEvent.click(copyBtn);
+    });
+    expect(writeTextSpy).toHaveBeenCalledWith(
+      "Soru Önerisi\nDetaylı maliyet dağılımını sorabilir miyiz?",
+    );
+
+    // Dismiss suggestion
+    const dismissBtn = screen.getByTitle(/Kapat|Dismiss/i);
+    await act(async () => {
+      fireEvent.click(dismissBtn);
+    });
+    expect(screen.queryByText("Soru Önerisi")).not.toBeInTheDocument();
+  });
 });

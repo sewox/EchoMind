@@ -4,6 +4,7 @@ import { LiveFeedView } from "./LiveFeedView";
 import { I18nProvider } from "../../locales/i18nContext";
 import { TranscriptSegment } from "../TranscriptViewer";
 import { MeetingRecord } from "../../App";
+import { LiveSuggestionItem } from "../../types/suggestions";
 
 describe("LiveFeedView Component", () => {
   const mockSegments: TranscriptSegment[] = [
@@ -204,5 +205,84 @@ describe("LiveFeedView Component", () => {
     expect(clipBtn).toBeInTheDocument();
     fireEvent.click(clipBtn);
     expect(handleClip).toHaveBeenCalledWith(mockSegments[0]);
+  });
+
+  it("renders live smart suggestions and handles copy, dismiss, and clear actions", () => {
+    const onDismiss = vi.fn();
+    const onClear = vi.fn();
+    const writeTextSpy = vi.spyOn(navigator.clipboard, "writeText");
+
+    const mockSuggestions: LiveSuggestionItem[] = [
+      {
+        id: "sug-1",
+        category: "question",
+        text: "Bütçe aşım riski için yedek akçe ayrıldı mı?",
+        rationale: "Konuşmada maliyet ve bütçe konusu geçti.",
+        timestamp_ms: 1000,
+      },
+      {
+        id: "sug-2",
+        category: "objection",
+        text: "Alternatif teklifleri değerlendirdik mi?",
+        rationale: "Fiyat itirazını karşılamak için.",
+        timestamp_ms: 2000,
+      },
+      {
+        id: "sug-3",
+        category: "action",
+        text: "Sorumlu kişiyi belirleyelim.",
+        rationale: "Aksiyon maddesi tespit edildi.",
+        timestamp_ms: 3000,
+      },
+      {
+        id: "sug-4",
+        category: "insight",
+        text: "İlk aşama mutabakatını kaydedelim.",
+        rationale: "Toplantı ilerleyişi özeti.",
+        timestamp_ms: 4000,
+      },
+    ];
+
+    render(
+      <I18nProvider>
+        <LiveFeedView
+          {...defaultProps}
+          suggestions={mockSuggestions}
+          onDismissSuggestion={onDismiss}
+          onClearSuggestions={onClear}
+        />
+      </I18nProvider>,
+    );
+
+    expect(screen.getByTestId("live-suggestions-panel")).toBeInTheDocument();
+    expect(
+      screen.getByText("Bütçe aşım riski için yedek akçe ayrıldı mı?"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Alternatif teklifleri değerlendirdik mi?"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Sorumlu kişiyi belirleyelim."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("İlk aşama mutabakatını kaydedelim."),
+    ).toBeInTheDocument();
+
+    // Copy suggestion test
+    const copyBtns = screen.getAllByTitle(/Öneriyi kopyala|Copy/i);
+    fireEvent.click(copyBtns[0]);
+    expect(writeTextSpy).toHaveBeenCalledWith(
+      "Bütçe aşım riski için yedek akçe ayrıldı mı?\nKonuşmada maliyet ve bütçe konusu geçti.",
+    );
+
+    // Dismiss suggestion test
+    const dismissBtns = screen.getAllByTitle(/Kapat|Dismiss/i);
+    fireEvent.click(dismissBtns[0]);
+    expect(onDismiss).toHaveBeenCalledWith("sug-1");
+
+    // Clear all suggestions test
+    const clearBtn = screen.getByText(/Sil|Temizle|Delete/i);
+    fireEvent.click(clearBtn);
+    expect(onClear).toHaveBeenCalled();
   });
 });

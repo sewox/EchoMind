@@ -1,10 +1,11 @@
 import { FC, useEffect, useState } from "react";
-import { Mic, Zap, X, Video } from "lucide-react";
+import { Mic, Zap, X, Video, Sparkles, Copy, Check } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { I18nProvider, useI18n } from "../locales/i18nContext";
 import { MeetingAppInfo } from "../hooks/useMeetingDetector";
 import { usePrivacyMode } from "../hooks/usePrivacyMode";
+import { LiveSuggestionItem } from "../types/suggestions";
 
 const IslandContent: FC = () => {
   const { t } = useI18n();
@@ -16,6 +17,9 @@ const IslandContent: FC = () => {
     is_running: true,
     recommended_title: "Google Meet Toplantısı",
   });
+  const [latestSuggestion, setLatestSuggestion] =
+    useState<LiveSuggestionItem | null>(null);
+  const [copiedSuggestion, setCopiedSuggestion] = useState<boolean>(false);
 
   useEffect(() => {
     // Listen for meeting detection in the island overlay
@@ -33,6 +37,16 @@ const IslandContent: FC = () => {
       invoke("hide_island_window").catch(() => {});
     });
 
+    // Listen for live suggestion broadcasts
+    const unlistenSuggestion = listen<LiveSuggestionItem>(
+      "live-suggestion-event",
+      (event) => {
+        if (event.payload) {
+          setLatestSuggestion(event.payload);
+        }
+      },
+    );
+
     // Check status on mount
     invoke<any>("get_detector_status")
       .then((status) => {
@@ -45,6 +59,7 @@ const IslandContent: FC = () => {
     return () => {
       unlistenDetected.then((f) => f());
       unlistenEnded.then((f) => f());
+      unlistenSuggestion.then((f) => f());
     };
   }, []);
 
@@ -125,34 +140,71 @@ const IslandContent: FC = () => {
 
         {/* Right: Clean Action Buttons (NO pulse) */}
         <div className="flex items-center gap-2 shrink-0 pointer-events-auto">
-          <button
-            type="button"
-            onClick={handleAlwaysAutoStart}
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-medium text-slate-300 hover:text-white bg-slate-900 hover:bg-slate-800 border border-slate-700/80 transition active:scale-95 cursor-pointer"
-            title={t("detector.autoStartAlways")}
-          >
-            <Zap className="w-3 h-3 text-amber-400" />
-            <span className="hidden sm:inline text-[11px]">Otomatik</span>
-          </button>
+          {latestSuggestion ? (
+            <div className="flex items-center gap-1.5 bg-purple-950/80 border border-purple-500/40 px-2.5 py-1 rounded-xl">
+              <Sparkles className="w-3 h-3 text-amber-300 shrink-0" />
+              <span className="text-[11px] text-purple-200 truncate max-w-[120px]">
+                {latestSuggestion.text}
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(
+                    `${latestSuggestion.text}\n${latestSuggestion.rationale}`,
+                  );
+                  setCopiedSuggestion(true);
+                  setTimeout(() => setCopiedSuggestion(false), 2000);
+                }}
+                className="p-0.5 text-purple-300 hover:text-white transition"
+                title={t("liveSuggestions.copyTooltip") || "Kopyala"}
+              >
+                {copiedSuggestion ? (
+                  <Check className="w-3 h-3 text-emerald-400" />
+                ) : (
+                  <Copy className="w-3 h-3" />
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => setLatestSuggestion(null)}
+                className="p-0.5 text-slate-400 hover:text-white transition"
+                title={t("liveSuggestions.dismiss") || "Kapat"}
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={handleAlwaysAutoStart}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-medium text-slate-300 hover:text-white bg-slate-900 hover:bg-slate-800 border border-slate-700/80 transition active:scale-95 cursor-pointer"
+                title={t("detector.autoStartAlways")}
+              >
+                <Zap className="w-3 h-3 text-amber-400" />
+                <span className="hidden sm:inline text-[11px]">Otomatik</span>
+              </button>
 
-          <button
-            type="button"
-            onClick={handleStart}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white bg-cyan-600 hover:bg-cyan-500 border border-cyan-400/40 shadow-sm transition active:scale-95 cursor-pointer"
-            title={t("detector.startNow")}
-          >
-            <Mic className="w-3.5 h-3.5" />
-            <span>{t("detector.startNow")}</span>
-          </button>
+              <button
+                type="button"
+                onClick={handleStart}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white bg-cyan-600 hover:bg-cyan-500 border border-cyan-400/40 shadow-sm transition active:scale-95 cursor-pointer"
+                title={t("detector.startNow")}
+              >
+                <Mic className="w-3.5 h-3.5" />
+                <span>{t("detector.startNow")}</span>
+              </button>
 
-          <button
-            type="button"
-            onClick={handleDismiss}
-            className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800/80 transition cursor-pointer"
-            title={t("detector.dismiss")}
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
+              <button
+                type="button"
+                onClick={handleDismiss}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800/80 transition cursor-pointer"
+                title={t("detector.dismiss")}
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>
