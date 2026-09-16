@@ -7,6 +7,7 @@ pub mod exporter;
 pub mod rag;
 pub mod cleaner;
 pub mod analytics;
+pub mod suggestions;
 
 pub use types::*;
 pub use redaction::*;
@@ -17,6 +18,7 @@ pub use exporter::*;
 pub use rag::*;
 pub use cleaner::*;
 pub use analytics::*;
+pub use suggestions::*;
 
 use std::time::Instant;
 use crate::storage::{MeetingRecord, StorageEngine, get_storage_dir};
@@ -650,6 +652,17 @@ pub async fn enhance_meeting_transcript(
 #[tauri::command]
 pub fn global_search_meetings(query: String) -> Result<Vec<GlobalSearchResult>, String> {
     Ok(RAGEngine::global_search(&query))
+}
+
+#[tauri::command]
+pub fn generate_live_suggestions(
+    recent_segments: Vec<String>,
+    lang_code: Option<String>,
+) -> Result<Vec<LiveSuggestionItem>, String> {
+    Ok(LiveSuggestionEngine::extract_heuristic_suggestions(
+        &recent_segments,
+        lang_code.as_deref(),
+    ))
 }
 
 #[tauri::command]

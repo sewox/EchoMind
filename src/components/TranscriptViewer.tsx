@@ -30,6 +30,7 @@ import { MeetingTemplate, BUILTIN_TEMPLATES } from "../types/templates";
 import { MeetingAnalytics } from "../types/analytics";
 import { SoundbiteResult } from "../types/soundbite";
 import { useI18n } from "../locales/i18nContext";
+import { useLiveSuggestions } from "../hooks/useLiveSuggestions";
 
 export const SUMMARY_LANGUAGES = [
   { code: "tr", name: "Türkçe", flag: "🇹🇷", label: "Türkçe (Varsayılan)" },
@@ -97,6 +98,16 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
   const [activeTab, setActiveTab] = useState<
     "transcript" | "summary" | "actions"
   >("transcript");
+
+  // Live Smart Suggestions Hook
+  const {
+    suggestions: liveSuggestions,
+    dismissSuggestion,
+    clearSuggestions,
+  } = useLiveSuggestions({
+    isRecording,
+    segments,
+  });
   const [isGeneratingSummary, setIsGeneratingSummary] =
     useState<boolean>(false);
   const [isRetranscribeModalOpen, setIsRetranscribeModalOpen] =
@@ -1045,6 +1056,9 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
             isFillerFilterActive={isFillerFilterActive}
             fillersRemovedCount={fillersRemovedCount}
             cleanedSegmentsMap={cleanedSegmentsMap}
+            suggestions={liveSuggestions}
+            onDismissSuggestion={dismissSuggestion}
+            onClearSuggestions={clearSuggestions}
             onToggleFillerFilter={handleToggleFillerFilter}
             onRedactTranscript={handleRedactTranscript}
             onStartEditSpeaker={handleStartEditSpeaker}

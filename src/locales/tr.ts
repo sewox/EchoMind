@@ -445,4 +445,17 @@ export const tr: TranslationKeys = {
     toastIcsDownloaded: "Takvim daveti (.ics) kaydedildi!",
     oneClickExportBundle: "Tüm Paketi Dışa Aktar",
   },
+  liveSuggestions: {
+    title: "Canlı Akıllı Öneriler",
+    badge: "Canlı Asistan",
+    smartQuestion: "Soru Önerisi",
+    objectionHandling: "İtiraz Karşılama",
+    actionClue: "Aksiyon / Karar İpucu",
+    factCheck: "Bilgi / Veri Doğrulama",
+    summaryNudge: "Özet İpucu",
+    dismiss: "Kapat",
+    copyTooltip: "Öneriyi kopyala",
+    noSuggestions: "Henüz yeni bir canlı öneri bulunmuyor.",
+    islandTooltip: "Canlı yapay zeka önerisi mevcut",
+  },
 };
