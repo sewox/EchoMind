@@ -1,5 +1,67 @@
-/// EchoMind Security Guard Module
-/// Provides input sanitization, prompt injection defense, and data isolation for AI processing.
+use std::sync::atomic::{AtomicU8, Ordering};
+
+// 0: Paranoid (Zero-Cloud / Air-Gapped)
+// 1: Balanced (DLP Sanitized Cloud)
+// 2: MaxIntelligence (Full Cloud)
+static PRIVACY_MODE: AtomicU8 = AtomicU8::new(0); // Default to Paranoid (0) for air-gapped security
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum BackendPrivacyMode {
+    Paranoid = 0,
+    Balanced = 1,
+    MaxIntelligence = 2,
+}
+
+impl BackendPrivacyMode {
+    pub fn from_str_loose(s: &str) -> Self {
+        match s.trim().to_lowercase().as_str() {
+            "balanced" => BackendPrivacyMode::Balanced,
+            "max_intelligence" | "maxintelligence" => BackendPrivacyMode::MaxIntelligence,
+            _ => BackendPrivacyMode::Paranoid,
+        }
+    }
+
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            BackendPrivacyMode::Paranoid => "paranoid",
+            BackendPrivacyMode::Balanced => "balanced",
+            BackendPrivacyMode::MaxIntelligence => "max_intelligence",
+        }
+    }
+}
+
+pub fn get_global_privacy_mode() -> BackendPrivacyMode {
+    match PRIVACY_MODE.load(Ordering::SeqCst) {
+        1 => BackendPrivacyMode::Balanced,
+        2 => BackendPrivacyMode::MaxIntelligence,
+        _ => BackendPrivacyMode::Paranoid,
+    }
+}
+
+pub fn set_global_privacy_mode(mode: BackendPrivacyMode) {
+    PRIVACY_MODE.store(mode as u8, Ordering::SeqCst);
+}
+
+/// Enforces hard reject on any external cloud API call if Paranoid mode is active.
+pub fn check_cloud_access_allowed() -> Result<(), String> {
+    let mode = get_global_privacy_mode();
+    if mode == BackendPrivacyMode::Paranoid {
+        return Err("PARANOID_MODE_RESTRICTION: Paranoid Mode (Zero-Cloud / Air-Gapped) devrede. Bulut ve harici API erişimleri arka planda kesin olarak engellenmiştir.".to_string());
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn set_privacy_mode(mode: String) -> Result<String, String> {
+    let backend_mode = BackendPrivacyMode::from_str_loose(&mode);
+    set_global_privacy_mode(backend_mode);
+    Ok(backend_mode.as_str().to_string())
+}
+
+#[tauri::command]
+pub fn get_privacy_mode() -> Result<String, String> {
+    Ok(get_global_privacy_mode().as_str().to_string())
+}
 
 /// Sanitizes transcribed text to neutralize indirect prompt injection attempts embedded in speech audio.
 pub fn sanitize_transcript_text(text: &str) -> String {
@@ -219,6 +281,44 @@ mod tests {
         }
 
         let _ = std::fs::remove_file(file_path);
+    }
+
+    #[test]
+    fn test_paranoid_mode_hard_rejects_cloud_calls() {
+        // Set to Paranoid mode
+        set_global_privacy_mode(BackendPrivacyMode::Paranoid);
+        assert_eq!(get_global_privacy_mode(), BackendPrivacyMode::Paranoid);
+
+        let check = check_cloud_access_allowed();
+        assert!(check.is_err(), "Paranoid Mode must strictly reject cloud calls");
+        let err = check.unwrap_err();
+        assert!(err.contains("PARANOID_MODE_RESTRICTION"));
+
+        // Switch to Balanced mode -> Cloud calls allowed (with DLP)
+        set_global_privacy_mode(BackendPrivacyMode::Balanced);
+        assert_eq!(get_global_privacy_mode(), BackendPrivacyMode::Balanced);
+        assert!(check_cloud_access_allowed().is_ok());
+
+        // Switch to MaxIntelligence -> Cloud calls allowed
+        set_global_privacy_mode(BackendPrivacyMode::MaxIntelligence);
+        assert_eq!(get_global_privacy_mode(), BackendPrivacyMode::MaxIntelligence);
+        assert!(check_cloud_access_allowed().is_ok());
+
+        // Reset to default Paranoid for test isolation
+        set_global_privacy_mode(BackendPrivacyMode::Paranoid);
+    }
+
+    #[test]
+    fn test_privacy_mode_tauri_command_roundtrip() {
+        assert_eq!(set_privacy_mode("balanced".to_string()).unwrap(), "balanced");
+        assert_eq!(get_privacy_mode().unwrap(), "balanced");
+
+        assert_eq!(set_privacy_mode("max_intelligence".to_string()).unwrap(), "max_intelligence");
+        assert_eq!(get_privacy_mode().unwrap(), "max_intelligence");
+
+        assert_eq!(set_privacy_mode("paranoid".to_string()).unwrap(), "paranoid");
+        assert_eq!(get_privacy_mode().unwrap(), "paranoid");
+        assert!(check_cloud_access_allowed().is_err());
     }
 
     #[test]

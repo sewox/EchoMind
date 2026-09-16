@@ -109,6 +109,8 @@ STRICT CONTEXT & INTEGRITY PRESERVATION RULES:\n\
         target_lang: &str,
         start_time: Instant,
     ) -> Result<SummaryResult, String> {
+        crate::security::check_cloud_access_allowed()?;
+
         let full_prompt = format!("{}\n\n{}", system_prompt, user_prompt);
         let body = GeminiRequest {
             contents: vec![GeminiContent {
@@ -168,6 +170,11 @@ STRICT CONTEXT & INTEGRITY PRESERVATION RULES:\n\
         target_lang: &str,
         start_time: Instant,
     ) -> Result<SummaryResult, String> {
+        let is_local = endpoint.contains("127.0.0.1") || endpoint.contains("localhost");
+        if !is_local {
+            crate::security::check_cloud_access_allowed()?;
+        }
+
         let client = reqwest::blocking::Client::builder()
             .timeout(std::time::Duration::from_secs(60))
             .build()

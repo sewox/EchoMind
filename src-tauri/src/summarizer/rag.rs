@@ -233,6 +233,11 @@ impl RAGEngine {
         endpoint: &str,
         model: &str,
     ) -> Result<String, String> {
+        let is_local = endpoint.contains("127.0.0.1") || endpoint.contains("localhost");
+        if !is_local {
+            crate::security::check_cloud_access_allowed()?;
+        }
+
         let client = reqwest::blocking::Client::builder()
             .timeout(std::time::Duration::from_secs(60))
             .build()
@@ -282,6 +287,8 @@ KULLANICININ SORUSUNU BU VERİLERDEN YOLA ÇIKARAK AKICI, PROFESYONEL VE TÜRKÇ
         query: &str,
         api_key: &str,
     ) -> Result<String, String> {
+        crate::security::check_cloud_access_allowed()?;
+
         let client = reqwest::blocking::Client::builder()
             .timeout(std::time::Duration::from_secs(60))
             .build()

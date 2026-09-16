@@ -21,6 +21,7 @@ pub mod updater;
 
 use credentials::{delete_secure_credential, get_secure_credential, save_secure_credential};
 use dlp::redact_sensitive_text;
+use security::{get_privacy_mode, set_privacy_mode};
 use updater::{check_for_updates, download_and_install_update, open_release_url};
 
 use audio::{
@@ -138,6 +139,8 @@ pub fn run() {
             check_for_updates,
             download_and_install_update,
             open_release_url,
+            set_privacy_mode,
+            get_privacy_mode,
             generate_meeting_ics,
             export_followup_bundle,
             generate_live_suggestions,

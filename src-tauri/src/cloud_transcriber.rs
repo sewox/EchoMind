@@ -39,6 +39,9 @@ pub fn transcribe_audio_cloud(
     language: &str,
     model_version: Option<&str>,
 ) -> Result<Vec<TranscriptSegment>, String> {
+    // 🛡️ Security Gate: Enforce Paranoid Mode backend restriction
+    crate::security::check_cloud_access_allowed()?;
+
     if !audio_path.exists() {
         return Err(format!("Ses dosyası bulunamadı: {:?}", audio_path));
     }

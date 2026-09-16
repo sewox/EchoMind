@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import {
   PrivacyMode,
   PRIVACY_PROFILES,
@@ -21,11 +22,30 @@ export function usePrivacyMode() {
     return "balanced";
   });
 
+  const syncBackendPrivacyMode = useCallback((targetMode: PrivacyMode) => {
+    try {
+      const res = invoke("set_privacy_mode", { mode: targetMode });
+      if (res && typeof res.catch === "function") {
+        res.catch((err) => {
+          console.warn("Failed to sync privacy mode to Rust backend:", err);
+        });
+      }
+    } catch {
+      // Graceful fallback for non-promise mocked invoke environments
+    }
+  }, []);
+
   const setPrivacyMode = useCallback((newMode: PrivacyMode) => {
     localStorage.setItem(STORAGE_KEY, newMode);
     setModeState(newMode);
+    syncBackendPrivacyMode(newMode);
     window.dispatchEvent(new CustomEvent(EVENT_NAME, { detail: newMode }));
-  }, []);
+  }, [syncBackendPrivacyMode]);
+
+  useEffect(() => {
+    // Initial sync to Rust backend
+    syncBackendPrivacyMode(mode);
+  }, [mode, syncBackendPrivacyMode]);
 
   useEffect(() => {
     const handleStorage = (e: StorageEvent) => {

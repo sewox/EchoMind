@@ -154,6 +154,11 @@ YALNIZCA VE YALNIZCA AŞAĞIDAKİ GEÇERLİ JSON ŞEMASINDA YANIT VER:\n\
         custom_prompt: Option<&str>,
         start_time: Instant,
     ) -> Result<SummaryResult, String> {
+        let is_local_endpoint = endpoint.contains("127.0.0.1") || endpoint.contains("localhost");
+        if !is_local_endpoint {
+            crate::security::check_cloud_access_allowed()?;
+        }
+
         let dlp_cfg = crate::dlp::DlpConfig::default();
         let mut full_transcript = String::new();
         for (idx, seg) in segments.iter().enumerate() {
@@ -206,6 +211,8 @@ YALNIZCA VE YALNIZCA AŞAĞIDAKİ GEÇERLİ JSON ŞEMASINDA YANIT VER:\n\
         custom_prompt: Option<&str>,
         start_time: Instant,
     ) -> Result<SummaryResult, String> {
+        crate::security::check_cloud_access_allowed()?;
+
         let dlp_cfg = crate::dlp::DlpConfig::default();
         let mut full_transcript = String::new();
         for (idx, seg) in segments.iter().enumerate() {
