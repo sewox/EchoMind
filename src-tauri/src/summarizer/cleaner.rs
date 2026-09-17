@@ -1,7 +1,7 @@
+use crate::transcriber::TranscriptSegment;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::sync::OnceLock;
-use crate::transcriber::TranscriptSegment;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct CleanedSegment {
@@ -45,7 +45,8 @@ impl SpeechCleaner {
 
     fn get_de_filler_regex() -> &'static Regex {
         DE_FILLER_REGEX.get_or_init(|| {
-            Regex::new(r"(?i)\b(äh+|ähm+|halt|sozusagen|quasi|eigentlich|weisst\s+du|weißt\s+du)\b").unwrap()
+            Regex::new(r"(?i)\b(äh+|ähm+|halt|sozusagen|quasi|eigentlich|weisst\s+du|weißt\s+du)\b")
+                .unwrap()
         })
     }
 
@@ -81,7 +82,11 @@ impl SpeechCleaner {
         let mut prev_word_clean = String::new();
 
         for w in text.split_whitespace() {
-            let clean: String = w.chars().filter(|c| c.is_alphanumeric()).collect::<String>().to_lowercase();
+            let clean: String = w
+                .chars()
+                .filter(|c| c.is_alphanumeric())
+                .collect::<String>()
+                .to_lowercase();
             if !clean.is_empty() && clean == prev_word_clean {
                 removed_count += 1;
                 continue;
@@ -143,8 +148,12 @@ impl SpeechCleaner {
         }
 
         // 4. Clean punctuation spaces & multiple spaces
-        text = Self::get_punct_space_regex().replace_all(&text, "$1").to_string();
-        text = Self::get_multi_space_regex().replace_all(&text, " ").to_string();
+        text = Self::get_punct_space_regex()
+            .replace_all(&text, "$1")
+            .to_string();
+        text = Self::get_multi_space_regex()
+            .replace_all(&text, " ")
+            .to_string();
         text = text.trim().to_string();
 
         // 5. Capitalize first letter if needed
@@ -174,7 +183,8 @@ impl SpeechCleaner {
             let seg_orig_words = seg.text.split_whitespace().count();
             orig_words += seg_orig_words;
 
-            let (cleaned_text, removed) = Self::clean_text(&seg.text, lang_code.or(Some(&seg.language)));
+            let (cleaned_text, removed) =
+                Self::clean_text(&seg.text, lang_code.or(Some(&seg.language)));
             total_removed += removed;
 
             let seg_cleaned_words = cleaned_text.split_whitespace().count();
@@ -183,7 +193,11 @@ impl SpeechCleaner {
             cleaned_segments.push(CleanedSegment {
                 id: seg.id,
                 original_text: seg.text.clone(),
-                cleaned_text: if cleaned_text.is_empty() { seg.text.clone() } else { cleaned_text },
+                cleaned_text: if cleaned_text.is_empty() {
+                    seg.text.clone()
+                } else {
+                    cleaned_text
+                },
                 removed_fillers_count: removed,
             });
         }
@@ -203,7 +217,8 @@ mod tests {
 
     #[test]
     fn test_clean_turkish_fillers_and_stutters() {
-        let raw = "ııı Merhaba arkadaşlar, yani şey bugün bütçeyi bütçeyi onaylayacağız [müzik] hani.";
+        let raw =
+            "ııı Merhaba arkadaşlar, yani şey bugün bütçeyi bütçeyi onaylayacağız [müzik] hani.";
         let (cleaned, count) = SpeechCleaner::clean_text(raw, Some("tr"));
         assert!(!cleaned.contains("ııı"));
         assert!(!cleaned.contains("şey"));

@@ -122,11 +122,15 @@ describe("usePrivacyMode Hook", () => {
 
   it("syncs privacy mode to Rust backend on initialize and update", () => {
     const { result } = renderHook(() => usePrivacyMode());
-    expect(invoke).toHaveBeenCalledWith("set_privacy_mode", { mode: "balanced" });
+    expect(invoke).toHaveBeenCalledWith("set_privacy_mode", {
+      mode: "balanced",
+    });
 
     act(() => {
       result.current.setPrivacyMode("paranoid");
     });
-    expect(invoke).toHaveBeenCalledWith("set_privacy_mode", { mode: "paranoid" });
+    expect(invoke).toHaveBeenCalledWith("set_privacy_mode", {
+      mode: "paranoid",
+    });
   });
 });

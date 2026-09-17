@@ -56,7 +56,10 @@ export const CredentialStore = {
       if (legacyVal) {
         memoryVault[keyName] = legacyVal;
         // Persist to native vault and delete plaintext from storage
-        invoke("save_secure_credential", { keyName, keyValue: legacyVal }).catch(() => {});
+        invoke("save_secure_credential", {
+          keyName,
+          keyValue: legacyVal,
+        }).catch(() => {});
         localStorage.removeItem(keyName);
         return legacyVal;
       }
@@ -112,18 +115,48 @@ export const CredentialStore = {
   },
 
   /**
-   * Migrates all known legacy plaintext API keys from localStorage into the secure vault
+   * Migrates all legacy plaintext API keys from localStorage into the secure vault
+   * and completely purges all sensitive keys from WebKit localStorage.
    */
   async migrateLegacyStorage(): Promise<void> {
-    for (const key of KNOWN_KEY_NAMES) {
+    try {
+      const keysToPurge = new Set<string>(KNOWN_KEY_NAMES);
+
       try {
-        const legacyVal = localStorage.getItem(key);
-        if (legacyVal && legacyVal.trim()) {
-          await this.set(key, legacyVal.trim());
-          localStorage.removeItem(key);
+        for (const k of Object.keys(localStorage)) {
+          if (
+            k.toLowerCase().includes("key") ||
+            k.toLowerCase().includes("token") ||
+            k.toLowerCase().includes("secret")
+          ) {
+            keysToPurge.add(k);
+          }
         }
       } catch {}
+
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (
+            k &&
+            (k.toLowerCase().includes("key") ||
+              k.toLowerCase().includes("token") ||
+              k.toLowerCase().includes("secret"))
+          ) {
+            keysToPurge.add(k);
+          }
+        }
+      } catch {}
+
+      for (const k of Array.from(keysToPurge)) {
+        const val = localStorage.getItem(k);
+        if (val && val.trim()) {
+          await this.set(k, val.trim());
+        }
+        localStorage.removeItem(k);
+      }
+    } catch (err) {
+      console.error("Failed to migrate legacy credentials:", err);
     }
   },
 };
-

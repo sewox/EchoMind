@@ -1,6 +1,8 @@
-use regex::Regex;
+use super::types::{
+    GeminiContent, GeminiGenerationConfig, GeminiPart, GeminiRequest, GeminiResponse,
+};
 use crate::transcriber::TranscriptSegment;
-use super::types::{GeminiContent, GeminiGenerationConfig, GeminiPart, GeminiRequest, GeminiResponse};
+use regex::Regex;
 
 pub struct TranscriptRedactor;
 
@@ -52,7 +54,11 @@ impl TranscriptRedactor {
         let words: Vec<&str> = cleaned.split_whitespace().collect();
         let mut deduped: Vec<&str> = Vec::new();
         for w in words {
-            if deduped.last().map(|last| last.eq_ignore_ascii_case(w)).unwrap_or(false) {
+            if deduped
+                .last()
+                .map(|last| last.eq_ignore_ascii_case(w))
+                .unwrap_or(false)
+            {
                 continue;
             }
             deduped.push(w);
@@ -123,10 +129,16 @@ impl TranscriptRedactor {
                                 if let Some(candidates) = gemini_resp.candidates {
                                     if let Some(cand) = candidates.first() {
                                         if let Some(part) = cand.content.parts.first() {
-                                            let corrected_lines: Vec<&str> = part.text.lines().filter(|l| !l.trim().is_empty()).collect();
+                                            let corrected_lines: Vec<&str> = part
+                                                .text
+                                                .lines()
+                                                .filter(|l| !l.trim().is_empty())
+                                                .collect();
                                             for (i, line) in corrected_lines.iter().enumerate() {
                                                 if let Some(seg) = segments.get_mut(i) {
-                                                    if let Some((speaker, text)) = line.split_once(':') {
+                                                    if let Some((speaker, text)) =
+                                                        line.split_once(':')
+                                                    {
                                                         let clean_spk = speaker.trim().to_string();
                                                         if !clean_spk.is_empty() {
                                                             seg.speaker_name = clean_spk;

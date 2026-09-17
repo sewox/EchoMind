@@ -79,4 +79,3 @@ if (!window.URL.createObjectURL) {
 if (!window.URL.revokeObjectURL) {
   window.URL.revokeObjectURL = vi.fn();
 }
-

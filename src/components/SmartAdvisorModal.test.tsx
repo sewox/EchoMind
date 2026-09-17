@@ -209,7 +209,9 @@ describe("SmartAdvisorModal Component", () => {
       fireEvent.click(startBtn);
     });
 
-    expect(CredentialStore.getSync("echomind_groq_key")).toBe("gsk_remember_key");
+    expect(CredentialStore.getSync("echomind_groq_key")).toBe(
+      "gsk_remember_key",
+    );
     expect(localStorage.getItem("echomind_groq_key")).toBeNull();
     expect(localStorage.getItem("echomind_active_engine")).toBe("cloud_groq");
   });

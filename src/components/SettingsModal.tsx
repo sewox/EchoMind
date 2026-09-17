@@ -391,9 +391,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         : "Sistem";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200 cursor-pointer"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+    >
       <div
-        className="w-full max-w-xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-6 relative overflow-hidden flex flex-col gap-5 text-slate-100 max-h-[90vh] overflow-y-auto"
+        className="w-full max-w-xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-6 relative overflow-hidden flex flex-col gap-5 text-slate-100 max-h-[90vh] overflow-y-auto cursor-default"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -588,23 +595,29 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           isLoopbackActive ? "bg-emerald-400" : "bg-amber-400"
                         }`}
                       />
-                      {isLoopbackActive
-                        ? "Loopback Aktif"
-                        : "Sadece Mikrofon"}
+                      {isLoopbackActive ? "Loopback Aktif" : "Sadece Mikrofon"}
                     </span>
                   </div>
 
                   {!isLoopbackActive && (
                     <div className="p-3 rounded-lg bg-amber-950/20 border border-amber-500/20 text-amber-300 text-[11px] space-y-1.5 leading-relaxed">
                       <p className="font-medium text-amber-200 flex items-center gap-1.5">
-                        <span>💡</span> Toplantıda Karşı Tarafın Sesini Kaydetme İpucu:
+                        <span>💡</span> Toplantıda Karşı Tarafın Sesini Kaydetme
+                        İpucu:
                       </p>
                       <p className="text-[10.5px] text-amber-300/90">
-                        Kulaklık kullandığınızda bilgisayarınızdan çalan diğer katılımcıların sesi standart mikrofona ulaşmaz. Karşı tarafın sesini de doğrudan yazıya dökmek için <strong>BlackHole (macOS)</strong>, <strong>VB-Cable</strong> veya <strong>Stereo Mix</strong> sanal aygıtını seçebilirsiniz.
+                        Kulaklık kullandığınızda bilgisayarınızdan çalan diğer
+                        katılımcıların sesi standart mikrofona ulaşmaz. Karşı
+                        tarafın sesini de doğrudan yazıya dökmek için{" "}
+                        <strong>BlackHole (macOS)</strong>,{" "}
+                        <strong>VB-Cable</strong> veya{" "}
+                        <strong>Stereo Mix</strong> sanal aygıtını
+                        seçebilirsiniz.
                       </p>
                       {hasAnyLoopback && (
                         <p className="text-[10px] text-emerald-300 font-semibold pt-0.5">
-                          ✓ Sisteminizde sanal ses aygıtı bulundu! Yukarıdaki listeden Loopback aygıtını seçebilirsiniz.
+                          ✓ Sisteminizde sanal ses aygıtı bulundu! Yukarıdaki
+                          listeden Loopback aygıtını seçebilirsiniz.
                         </p>
                       )}
                     </div>
@@ -813,7 +826,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <div className="flex items-center justify-between text-slate-400">
                 <span>Veri Güvenliği:</span>
                 <span className="text-slate-200">
-                  Sesleriniz ve toplantılarınız asla dışarı gönderilmez.
+                  {isParanoid
+                    ? "Paranoid Mod: %100 Cihazınızda Gizli, sıfır bulut çıkışı."
+                    : "Yerel modellerde %100 gizli; bulut kullanımında açık onay istenir."}
                 </span>
               </div>
               {modelStatus && (
@@ -949,7 +964,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   {t("updater.checkNowButton") || "Uygulama Güncellemeleri"}
                 </span>
                 <span className="text-[10px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 px-2 py-0.5 rounded-full font-bold">
-                  v0.2.2
+                  v0.2.3
                 </span>
               </div>
 
@@ -987,8 +1002,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400 font-medium">
                       <Check className="w-3.5 h-3.5" />
                       {t("updater.upToDateDesc", {
-                        version: updateStatus.version || "v0.2.2",
-                      }) || "EchoMind güncel (v0.2.2)."}
+                        version: updateStatus.version || "v0.2.3",
+                      }) || "EchoMind güncel (v0.2.3)."}
                     </span>
                   )}
                   {updateStatus.state === "updateAvailable" && (
@@ -1133,6 +1148,26 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
               )}
             </div>
+
+            {isParanoid && (
+              <div
+                data-testid="settings-paranoid-cloud-banner"
+                className="p-3.5 rounded-xl bg-purple-950/60 border border-purple-500/40 text-purple-200 text-xs flex items-start gap-2.5 animate-in fade-in"
+              >
+                <ShieldAlert className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
+                <div>
+                  <div className="font-semibold text-purple-300">
+                    Air-Gapped / Paranoid Mod Aktif
+                  </div>
+                  <div className="text-[11px] text-purple-300/80 mt-0.5">
+                    Bu mod devredeyken harici bulut API çağrıları (Groq, Gemini,
+                    OpenAI) Rust backend seviyesinde tamamen engellenmiştir.
+                    Aşağıdaki anahtarlar yalnızca Dengeli veya Maksimum Zeka
+                    moduna geçtiğinizde etkinleşir.
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Groq Cloud */}
             <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-2.5">

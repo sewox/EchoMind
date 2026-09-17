@@ -154,8 +154,17 @@ mod tests {
 
     #[test]
     fn test_offline_engine_type_parsing() {
-        assert_eq!(OfflineEngineType::from_str("apple_speech"), OfflineEngineType::AppleSpeechNative);
-        assert_eq!(OfflineEngineType::from_str("sensevoice"), OfflineEngineType::SenseVoiceLocal);
-        assert_eq!(OfflineEngineType::from_str("whisper"), OfflineEngineType::WhisperLocal);
+        assert_eq!(
+            OfflineEngineType::from_str("apple_speech"),
+            OfflineEngineType::AppleSpeechNative
+        );
+        assert_eq!(
+            OfflineEngineType::from_str("sensevoice"),
+            OfflineEngineType::SenseVoiceLocal
+        );
+        assert_eq!(
+            OfflineEngineType::from_str("whisper"),
+            OfflineEngineType::WhisperLocal
+        );
     }
 }

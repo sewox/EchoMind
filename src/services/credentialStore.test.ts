@@ -43,7 +43,9 @@ describe("CredentialStore Service", () => {
     // Plaintext MUST NOT exist in localStorage
     expect(localStorage.getItem("echomind_gemini_key")).toBeNull();
     // But in-memory and get() must return the key
-    expect(CredentialStore.getSync("echomind_gemini_key")).toBe("AIzaSy_secure_gemini");
+    expect(CredentialStore.getSync("echomind_gemini_key")).toBe(
+      "AIzaSy_secure_gemini",
+    );
   });
 
   it("handles empty key removal gracefully", async () => {

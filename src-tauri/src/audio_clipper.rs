@@ -1,10 +1,10 @@
-use hound::{WavSpec, WavWriter, SampleFormat};
+use hound::{SampleFormat, WavSpec, WavWriter};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::importer::decode_audio_file_to_pcm16k;
-use crate::storage::{StorageEngine, get_storage_dir};
+use crate::storage::{get_storage_dir, StorageEngine};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SoundbiteResult {
@@ -26,7 +26,10 @@ impl AudioClipper {
         output_file_path: &Path,
     ) -> Result<SoundbiteResult, String> {
         if !input_file_path.exists() {
-            return Err(format!("Kaynak ses dosyası bulunamadı: {:?}", input_file_path));
+            return Err(format!(
+                "Kaynak ses dosyası bulunamadı: {:?}",
+                input_file_path
+            ));
         }
 
         if end_ms <= start_ms {
@@ -116,7 +119,10 @@ impl AudioClipper {
             .as_ref()
             .ok_or_else(|| "Bu toplantıya ait ses dosyası bulunmuyor.".to_string())?;
 
-        let safe_id: String = meeting_id.chars().filter(|c| c.is_alphanumeric() || *c == '-').collect();
+        let safe_id: String = meeting_id
+            .chars()
+            .filter(|c| c.is_alphanumeric() || *c == '-')
+            .collect();
         let input_path = PathBuf::from(audio_path_str);
         let soundbites_dir = get_storage_dir().join("soundbites");
         let output_filename = format!("soundbite_{}_seg_{}.wav", safe_id, segment_id);

@@ -84,7 +84,9 @@ export const RetranscribeModal: React.FC<RetranscribeModalProps> = ({
           }
 
           // Default to Ollama summary if available
-          const ollamaEndpoint = localStorage.getItem("echomind_ollama_endpoint");
+          const ollamaEndpoint = localStorage.getItem(
+            "echomind_ollama_endpoint",
+          );
           if (ollamaEndpoint) {
             setSummaryEngine("ollama");
           } else if (geminiKey) {
@@ -200,8 +202,18 @@ export const RetranscribeModal: React.FC<RetranscribeModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="relative w-full max-w-2xl rounded-3xl bg-gradient-to-b from-slate-900/95 via-[#0c162d]/95 to-slate-950/95 border border-cyan-500/30 shadow-2xl shadow-cyan-950/60 p-6 md:p-8 flex flex-col max-h-[90vh] overflow-y-auto">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200 cursor-pointer"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+    >
+      <div
+        className="relative w-full max-w-2xl rounded-3xl bg-gradient-to-b from-slate-900/95 via-[#0c162d]/95 to-slate-950/95 border border-cyan-500/30 shadow-2xl shadow-cyan-950/60 p-6 md:p-8 flex flex-col max-h-[90vh] overflow-y-auto cursor-default"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-slate-800/80 mb-6">
           <div className="flex items-center gap-3">

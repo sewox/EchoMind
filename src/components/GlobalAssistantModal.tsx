@@ -24,10 +24,12 @@ import {
   Users,
   Database,
   FileText,
+  ShieldAlert,
 } from "lucide-react";
 import { useI18n } from "../locales/i18nContext";
 import { MemoryStats } from "../types/memory";
 import { CredentialStore } from "../services/credentialStore";
+import { usePrivacyMode } from "../hooks/usePrivacyMode";
 
 export interface SearchMatch {
   match_type: string;
@@ -101,6 +103,7 @@ export const GlobalAssistantModal: React.FC<GlobalAssistantModalProps> = ({
   onSelectMeeting,
 }) => {
   const { t } = useI18n();
+  const { isParanoid } = usePrivacyMode();
   const [activeTab, setActiveTab] = useState<"chat" | "search">("chat");
   const [inputQuery, setInputQuery] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -170,7 +173,11 @@ export const GlobalAssistantModal: React.FC<GlobalAssistantModalProps> = ({
       let provider = "local";
       let apiKey: string | null = null;
 
-      if (activeEngine === "cloud_groq") {
+      if (isParanoid) {
+        // Paranoid Mode: 100% Air-Gapped Local RAG / deterministic engine
+        provider = "local";
+        apiKey = null;
+      } else if (activeEngine === "cloud_groq") {
         provider = "groq";
         apiKey = await CredentialStore.get("echomind_groq_key");
       } else if (activeEngine === "cloud_gemini") {
@@ -282,8 +289,18 @@ export const GlobalAssistantModal: React.FC<GlobalAssistantModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200 select-text">
-      <div className="relative w-full max-w-4xl h-[85vh] rounded-3xl bg-gradient-to-b from-slate-900/95 via-[#0b1428]/95 to-slate-950/95 border border-cyan-500/30 shadow-2xl shadow-cyan-950/60 flex flex-col overflow-hidden select-text">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200 select-text cursor-pointer"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+    >
+      <div
+        className="relative w-full max-w-4xl h-[85vh] rounded-3xl bg-gradient-to-b from-slate-900/95 via-[#0b1428]/95 to-slate-950/95 border border-cyan-500/30 shadow-2xl shadow-cyan-950/60 flex flex-col overflow-hidden select-text cursor-default"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Top Header */}
         <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between shrink-0 bg-slate-900/40 select-none">
           <div className="flex items-center gap-3">
@@ -295,9 +312,20 @@ export const GlobalAssistantModal: React.FC<GlobalAssistantModalProps> = ({
                 <h2 className="text-base md:text-lg font-bold text-white">
                   {t("assistant.title")}
                 </h2>
+                {isParanoid && (
+                  <span
+                    data-testid="assistant-airgapped-badge"
+                    className="flex items-center gap-1 text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-purple-950/80 border border-purple-500/40 text-purple-300"
+                  >
+                    <ShieldAlert className="w-3 h-3 text-purple-400" />
+                    <span>Air-Gapped</span>
+                  </span>
+                )}
               </div>
               <p className="text-xs text-slate-400">
-                {t("assistant.subtitle")}
+                {isParanoid
+                  ? "Paranoid Mod aktif: %100 çevrimdışı yerel motor ile sorgulanır."
+                  : t("assistant.subtitle")}
               </p>
             </div>
           </div>

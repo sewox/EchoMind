@@ -9,7 +9,11 @@ fn get_storage_key() -> Vec<u8> {
     let salt = b"EchoMind_DataAtRest_AES_ChaCha_SecureSalt_2025_#ZeroTrust!";
     let mut key = Vec::with_capacity(salt.len());
     for (i, &b) in salt.iter().enumerate() {
-        let u_byte = username.as_bytes().get(i % username.len()).copied().unwrap_or(0x37);
+        let u_byte = username
+            .as_bytes()
+            .get(i % username.len())
+            .copied()
+            .unwrap_or(0x37);
         let offset = (i as u8).wrapping_mul(7);
         key.push(b ^ u_byte ^ offset);
     }
@@ -37,8 +41,13 @@ pub fn write_encrypted_file<P: AsRef<Path>>(path: P, plaintext: &[u8]) -> Result
     output.extend_from_slice(MAGIC_HEADER);
     output.extend_from_slice(&ciphertext);
 
-    fs::write(path.as_ref(), output)
-        .map_err(|e| format!("Şifreli dosya yazma hatası ({}): {}", path.as_ref().display(), e))
+    fs::write(path.as_ref(), output).map_err(|e| {
+        format!(
+            "Şifreli dosya yazma hatası ({}): {}",
+            path.as_ref().display(),
+            e
+        )
+    })
 }
 
 /// Reads a file from disk. If it has the EchoMind magic header, decrypts it.
@@ -59,20 +68,24 @@ pub fn read_encrypted_file<P: AsRef<Path>>(path: P) -> Result<Vec<u8>, String> {
 }
 
 /// Serializes and writes data as encrypted JSON.
-pub fn save_encrypted_json<T: serde::Serialize, P: AsRef<Path>>(path: P, data: &T) -> Result<(), String> {
-    let json_bytes = serde_json::to_vec_pretty(data)
-        .map_err(|e| format!("JSON serialize hatası: {}", e))?;
+pub fn save_encrypted_json<T: serde::Serialize, P: AsRef<Path>>(
+    path: P,
+    data: &T,
+) -> Result<(), String> {
+    let json_bytes =
+        serde_json::to_vec_pretty(data).map_err(|e| format!("JSON serialize hatası: {}", e))?;
     write_encrypted_file(path, &json_bytes)
 }
 
 /// Reads encrypted JSON from disk and deserializes it.
-pub fn load_encrypted_json<T: serde::de::DeserializeOwned, P: AsRef<Path>>(path: P) -> Result<T, String> {
+pub fn load_encrypted_json<T: serde::de::DeserializeOwned, P: AsRef<Path>>(
+    path: P,
+) -> Result<T, String> {
     let plaintext = read_encrypted_file(path)?;
     if plaintext.is_empty() {
         return Err("Dosya boş".to_string());
     }
-    serde_json::from_slice(&plaintext)
-        .map_err(|e| format!("JSON deserialize hatası: {}", e))
+    serde_json::from_slice(&plaintext).map_err(|e| format!("JSON deserialize hatası: {}", e))
 }
 
 #[cfg(test)]

@@ -45,16 +45,18 @@ use player::{
 };
 use storage::{
     add_meeting_tag, delete_meeting_by_id, get_all_meetings, get_all_tags, get_related_meetings,
-    remove_meeting_tag, save_current_meeting, toggle_action_item_status, update_meeting_speaker_name,
-    update_meeting_title,
+    remove_meeting_tag, save_current_meeting, toggle_action_item_status,
+    update_meeting_speaker_name, update_meeting_title,
 };
 use summarizer::{
-    ask_global_assistant, clean_transcript_text, enhance_meeting_transcript, export_followup_bundle,
-    export_meeting_action_items_csv, export_meeting_action_items_markdown, export_meeting_email_digest,
-    export_meeting_followup_email, export_meeting_notes, export_meeting_notes_html,
-    export_meeting_notes_slack, filter_meeting_filler_words, generate_live_suggestions, generate_meeting_ics,
-    generate_meeting_summary, get_meeting_analytics, get_meeting_analytics_by_id, global_search_meetings,
-    open_meeting_html_report, save_meeting_export_file, test_ollama_connection, translate_meeting_summary,
+    ask_global_assistant, clean_transcript_text, enhance_meeting_transcript,
+    export_followup_bundle, export_meeting_action_items_csv, export_meeting_action_items_markdown,
+    export_meeting_email_digest, export_meeting_followup_email, export_meeting_notes,
+    export_meeting_notes_html, export_meeting_notes_slack, filter_meeting_filler_words,
+    generate_live_suggestions, generate_meeting_ics, generate_meeting_summary,
+    get_meeting_analytics, get_meeting_analytics_by_id, global_search_meetings,
+    open_meeting_html_report, save_meeting_export_file, test_ollama_connection,
+    translate_meeting_summary,
 };
 use transcriber::{
     clear_transcription_history, download_whisper_model, get_available_models, get_model_status,
@@ -149,6 +151,16 @@ pub fn run() {
             get_related_meetings,
             get_all_tags
         ])
+        .setup(|app| {
+            #[cfg(debug_assertions)]
+            {
+                use tauri::Manager;
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.open_devtools();
+                }
+            }
+            Ok(())
+        })
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|_app_handle, event| {

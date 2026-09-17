@@ -1,7 +1,7 @@
-use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
 use crate::storage::MeetingRecord;
 use crate::summarizer::rag::{GlobalSearchResult, SearchMatch};
+use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MemoryQueryOptions {
@@ -24,10 +24,12 @@ impl CrossMeetingMemoryEngine {
     /// Cleans and extracts search tokens
     pub fn tokenize(text: &str) -> Vec<String> {
         let stop_words: HashSet<&str> = [
-            "ve", "ile", "için", "icin", "ne", "neler", "bir", "bu", "şu", "su",
-            "da", "de", "mi", "mu", "mi?", "mu?", "var", "yok", "the", "and", "or",
-            "is", "are", "to", "in", "at", "for", "with", "a", "an", "on"
-        ].into_iter().collect();
+            "ve", "ile", "için", "icin", "ne", "neler", "bir", "bu", "şu", "su", "da", "de", "mi",
+            "mu", "mi?", "mu?", "var", "yok", "the", "and", "or", "is", "are", "to", "in", "at",
+            "for", "with", "a", "an", "on",
+        ]
+        .into_iter()
+        .collect();
 
         text.to_lowercase()
             .split(|c: char| !c.is_alphanumeric())
@@ -37,7 +39,10 @@ impl CrossMeetingMemoryEngine {
     }
 
     /// Performs deep cross-meeting semantic and keyword search
-    pub fn search(meetings: &[MeetingRecord], options: MemoryQueryOptions) -> Vec<GlobalSearchResult> {
+    pub fn search(
+        meetings: &[MeetingRecord],
+        options: MemoryQueryOptions,
+    ) -> Vec<GlobalSearchResult> {
         let tokens = Self::tokenize(&options.query);
         let q_lower = options.query.to_lowercase();
         let speaker_filter = options.speaker_filter.as_ref().map(|s| s.to_lowercase());
@@ -140,14 +145,22 @@ impl CrossMeetingMemoryEngine {
             if let Some(ref actions) = meeting.action_items {
                 for action in actions {
                     let task_lower = action.task.to_lowercase();
-                    let assignee_match = action.assignee.as_ref().map(|a| a.to_lowercase().contains(&q_lower)).unwrap_or(false);
+                    let assignee_match = action
+                        .assignee
+                        .as_ref()
+                        .map(|a| a.to_lowercase().contains(&q_lower))
+                        .unwrap_or(false);
 
                     if task_lower.contains(&q_lower) || assignee_match {
                         score += 25;
                         matches.push(SearchMatch {
                             match_type: "action_item".to_string(),
                             matched_text: action.task.clone(),
-                            snippet: format!("{}: {}", action.assignee.as_deref().unwrap_or("Atanmamış"), action.task),
+                            snippet: format!(
+                                "{}: {}",
+                                action.assignee.as_deref().unwrap_or("Atanmamış"),
+                                action.task
+                            ),
                             timestamp_formatted: None,
                             start_time_ms: None,
                             speaker_name: action.assignee.clone(),
@@ -229,7 +242,9 @@ impl CrossMeetingMemoryEngine {
 // ---------------------------------------------------------------------------
 
 #[tauri::command]
-pub async fn search_cross_meeting_memory(options: MemoryQueryOptions) -> Result<Vec<GlobalSearchResult>, String> {
+pub async fn search_cross_meeting_memory(
+    options: MemoryQueryOptions,
+) -> Result<Vec<GlobalSearchResult>, String> {
     let storage = crate::storage::get_global_storage();
     let meetings = storage.get_all();
     let results = CrossMeetingMemoryEngine::search(&meetings, options);
@@ -247,8 +262,8 @@ pub async fn get_cross_meeting_memory_stats() -> Result<MemoryStats, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::transcriber::TranscriptSegment;
     use crate::storage::ActionItem;
+    use crate::transcriber::TranscriptSegment;
 
     fn create_mock_meetings() -> Vec<MeetingRecord> {
         vec![
@@ -259,31 +274,27 @@ mod tests {
                 duration_seconds: 600,
                 duration_formatted: "10:00".to_string(),
                 audio_file_path: None,
-                segments: vec![
-                    TranscriptSegment {
-                        id: 1,
-                        speaker_id: "spk1".to_string(),
-                        speaker_name: "Ahmet".to_string(),
-                        start_time_ms: 0,
-                        end_time_ms: 5000,
-                        timestamp_formatted: "00:00 -> 00:05".to_string(),
-                        text: "Bulut sunucu maliyetlerini düşürmemiz gerekiyor.".to_string(),
-                        language: "tr".to_string(),
-                        confidence: 0.95,
-                    },
-                ],
+                segments: vec![TranscriptSegment {
+                    id: 1,
+                    speaker_id: "spk1".to_string(),
+                    speaker_name: "Ahmet".to_string(),
+                    start_time_ms: 0,
+                    end_time_ms: 5000,
+                    timestamp_formatted: "00:00 -> 00:05".to_string(),
+                    text: "Bulut sunucu maliyetlerini düşürmemiz gerekiyor.".to_string(),
+                    language: "tr".to_string(),
+                    confidence: 0.95,
+                }],
                 summary: "Bütçe kısıtlamaları ele alındı.".to_string(),
                 key_decisions: vec!["AWS yerine Hetzner sunucularına geçilecek.".to_string()],
                 meeting_goal: Some("Bulut maliyetlerini %30 optimize etmek".to_string()),
                 key_highlights: None,
-                action_items: Some(vec![
-                    ActionItem {
-                        task: "Hetzner benchmark testlerini yap".to_string(),
-                        assignee: Some("Ahmet".to_string()),
-                        source_citations: vec![1],
-                        is_completed: false,
-                    }
-                ]),
+                action_items: Some(vec![ActionItem {
+                    task: "Hetzner benchmark testlerini yap".to_string(),
+                    assignee: Some("Ahmet".to_string()),
+                    source_citations: vec![1],
+                    is_completed: false,
+                }]),
                 phase1_agreed: None,
                 phase2_deferred: None,
                 detailed_topics: None,
@@ -299,19 +310,17 @@ mod tests {
                 duration_seconds: 300,
                 duration_formatted: "05:00".to_string(),
                 audio_file_path: None,
-                segments: vec![
-                    TranscriptSegment {
-                        id: 1,
-                        speaker_id: "spk2".to_string(),
-                        speaker_name: "Zeynep".to_string(),
-                        start_time_ms: 0,
-                        end_time_ms: 4000,
-                        timestamp_formatted: "00:00 -> 00:04".to_string(),
-                        text: "Figma bileşenlerini Tailwind tokenlarına bağladık.".to_string(),
-                        language: "tr".to_string(),
-                        confidence: 0.98,
-                    },
-                ],
+                segments: vec![TranscriptSegment {
+                    id: 1,
+                    speaker_id: "spk2".to_string(),
+                    speaker_name: "Zeynep".to_string(),
+                    start_time_ms: 0,
+                    end_time_ms: 4000,
+                    timestamp_formatted: "00:00 -> 00:04".to_string(),
+                    text: "Figma bileşenlerini Tailwind tokenlarına bağladık.".to_string(),
+                    language: "tr".to_string(),
+                    confidence: 0.98,
+                }],
                 summary: "Yeni tasarım sistemi incelendi.".to_string(),
                 key_decisions: vec!["Dark mode varsayılan tema olacak.".to_string()],
                 meeting_goal: None,
@@ -341,11 +350,14 @@ mod tests {
     #[test]
     fn test_search_cross_meeting_memory() {
         let meetings = create_mock_meetings();
-        let results = CrossMeetingMemoryEngine::search(&meetings, MemoryQueryOptions {
-            query: "Hetzner".to_string(),
-            speaker_filter: None,
-            min_score: Some(10),
-        });
+        let results = CrossMeetingMemoryEngine::search(
+            &meetings,
+            MemoryQueryOptions {
+                query: "Hetzner".to_string(),
+                speaker_filter: None,
+                min_score: Some(10),
+            },
+        );
 
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].meeting_id, "m-1");
@@ -355,21 +367,27 @@ mod tests {
     #[test]
     fn test_search_with_speaker_filter() {
         let meetings = create_mock_meetings();
-        let results = CrossMeetingMemoryEngine::search(&meetings, MemoryQueryOptions {
-            query: "bileşen".to_string(),
-            speaker_filter: Some("Zeynep".to_string()),
-            min_score: Some(5),
-        });
+        let results = CrossMeetingMemoryEngine::search(
+            &meetings,
+            MemoryQueryOptions {
+                query: "bileşen".to_string(),
+                speaker_filter: Some("Zeynep".to_string()),
+                min_score: Some(5),
+            },
+        );
 
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].meeting_id, "m-2");
 
         // Filter for a non-existent speaker
-        let empty_results = CrossMeetingMemoryEngine::search(&meetings, MemoryQueryOptions {
-            query: "bileşen".to_string(),
-            speaker_filter: Some("Mehmet".to_string()),
-            min_score: Some(5),
-        });
+        let empty_results = CrossMeetingMemoryEngine::search(
+            &meetings,
+            MemoryQueryOptions {
+                query: "bileşen".to_string(),
+                speaker_filter: Some("Mehmet".to_string()),
+                min_score: Some(5),
+            },
+        );
         assert_eq!(empty_results.len(), 0);
     }
 

@@ -47,3 +47,7 @@ whisper-rs = { version = "0.16.0" }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows = { version = "0.58", features = ["Win32_System_SystemInformation", "Win32_Graphics_Direct3D11"] }
+
+[[example]]
+name = "qa_listen_20x"
+path = "examples/qa_listen_20x.rs"

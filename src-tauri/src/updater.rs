@@ -58,13 +58,22 @@ pub fn is_version_newer(latest: &str, current: &str) -> bool {
     let parse_semver = |v: &str| -> (u32, u32, u32) {
         let clean = v.trim().trim_start_matches('v').trim_start_matches('V');
         let parts: Vec<&str> = clean.split('.').collect();
-        let major = parts.first().and_then(|p| p.parse::<u32>().ok()).unwrap_or(0);
-        let minor = parts.get(1).and_then(|p| p.parse::<u32>().ok()).unwrap_or(0);
-        let patch = parts.get(2).and_then(|p| {
-            // Handle pre-release tags like "0-beta"
-            let num_part = p.split('-').next().unwrap_or("0");
-            num_part.parse::<u32>().ok()
-        }).unwrap_or(0);
+        let major = parts
+            .first()
+            .and_then(|p| p.parse::<u32>().ok())
+            .unwrap_or(0);
+        let minor = parts
+            .get(1)
+            .and_then(|p| p.parse::<u32>().ok())
+            .unwrap_or(0);
+        let patch = parts
+            .get(2)
+            .and_then(|p| {
+                // Handle pre-release tags like "0-beta"
+                let num_part = p.split('-').next().unwrap_or("0");
+                num_part.parse::<u32>().ok()
+            })
+            .unwrap_or(0);
         (major, minor, patch)
     };
 
@@ -92,13 +101,17 @@ pub fn select_best_asset(assets: &[ReleaseAsset]) -> Option<ReleaseAsset> {
         {
             if let Some(a) = assets.iter().find(|a| {
                 let n = a.name.to_lowercase();
-                (n.ends_with(".dmg") || n.ends_with(".app.tar.gz")) && (n.contains("aarch64") || n.contains("arm64"))
+                (n.ends_with(".dmg") || n.ends_with(".app.tar.gz"))
+                    && (n.contains("aarch64") || n.contains("arm64"))
             }) {
                 return Some(a.clone());
             }
         }
 
-        if let Some(a) = assets.iter().find(|a| a.name.to_lowercase().ends_with(".dmg")) {
+        if let Some(a) = assets
+            .iter()
+            .find(|a| a.name.to_lowercase().ends_with(".dmg"))
+        {
             return Some(a.clone());
         }
 
@@ -119,17 +132,26 @@ pub fn select_best_asset(assets: &[ReleaseAsset]) -> Option<ReleaseAsset> {
             return Some(a.clone());
         }
 
-        if let Some(a) = assets.iter().find(|a| a.name.to_lowercase().ends_with(".exe")) {
+        if let Some(a) = assets
+            .iter()
+            .find(|a| a.name.to_lowercase().ends_with(".exe"))
+        {
             return Some(a.clone());
         }
     }
 
     #[cfg(target_os = "linux")]
     {
-        if let Some(a) = assets.iter().find(|a| a.name.to_lowercase().ends_with(".appimage")) {
+        if let Some(a) = assets
+            .iter()
+            .find(|a| a.name.to_lowercase().ends_with(".appimage"))
+        {
             return Some(a.clone());
         }
-        if let Some(a) = assets.iter().find(|a| a.name.to_lowercase().ends_with(".deb")) {
+        if let Some(a) = assets
+            .iter()
+            .find(|a| a.name.to_lowercase().ends_with(".deb"))
+        {
             return Some(a.clone());
         }
     }
@@ -166,12 +188,19 @@ pub fn check_for_updates() -> Result<UpdateCheckResult, String> {
     let latest_version = release.tag_name.trim_start_matches('v').to_string();
     let is_update_available = is_version_newer(&latest_version, &current_version);
 
-    let assets = release.assets.unwrap_or_default().into_iter().map(|a| ReleaseAsset {
-        name: a.name,
-        size: a.size,
-        download_url: a.browser_download_url,
-        content_type: a.content_type.unwrap_or_else(|| "application/octet-stream".to_string()),
-    }).collect();
+    let assets = release
+        .assets
+        .unwrap_or_default()
+        .into_iter()
+        .map(|a| ReleaseAsset {
+            name: a.name,
+            size: a.size,
+            download_url: a.browser_download_url,
+            content_type: a
+                .content_type
+                .unwrap_or_else(|| "application/octet-stream".to_string()),
+        })
+        .collect();
 
     Ok(UpdateCheckResult {
         is_update_available,
@@ -195,18 +224,25 @@ pub fn download_and_install_update(
         Some(url) if !url.trim().is_empty() => url,
         _ => {
             let check = check_for_updates()?;
-            let asset = select_best_asset(&check.assets)
-                .ok_or_else(|| "Bu platform için uygun güncelleme paketi bulunamadı.".to_string())?;
+            let asset = select_best_asset(&check.assets).ok_or_else(|| {
+                "Bu platform için uygun güncelleme paketi bulunamadı.".to_string()
+            })?;
             asset.download_url
         }
     };
 
-    if !target_url.starts_with("https://github.com/") && !target_url.starts_with("https://objects.githubusercontent.com/") {
+    if !target_url.starts_with("https://github.com/")
+        && !target_url.starts_with("https://objects.githubusercontent.com/")
+    {
         return Err("Güvenli olmayan güncelleme adresi.".to_string());
     }
 
     let raw_name = filename.unwrap_or_else(|| {
-        target_url.split('/').last().unwrap_or("echomind_update_package").to_string()
+        target_url
+            .split('/')
+            .last()
+            .unwrap_or("echomind_update_package")
+            .to_string()
     });
     // Sanitize filename to prevent path traversal
     let safe_filename: String = raw_name
@@ -219,13 +255,16 @@ pub fn download_and_install_update(
     let target_path: PathBuf = temp_dir.join(&safe_filename);
 
     // Initial progress emit
-    let _ = app.emit("update-download-progress", UpdateProgressPayload {
-        percentage: 0.0,
-        downloaded_bytes: 0,
-        total_bytes: 0,
-        status: "downloading".to_string(),
-        error: None,
-    });
+    let _ = app.emit(
+        "update-download-progress",
+        UpdateProgressPayload {
+            percentage: 0.0,
+            downloaded_bytes: 0,
+            total_bytes: 0,
+            status: "downloading".to_string(),
+            error: None,
+        },
+    );
 
     let client = reqwest::blocking::Client::builder()
         .timeout(Duration::from_secs(300))
@@ -241,19 +280,22 @@ pub fn download_and_install_update(
 
     if !response.status().is_success() {
         let err_msg = format!("HTTP İndirme Hatası: {}", response.status());
-        let _ = app.emit("update-download-progress", UpdateProgressPayload {
-            percentage: 0.0,
-            downloaded_bytes: 0,
-            total_bytes: 0,
-            status: "error".to_string(),
-            error: Some(err_msg.clone()),
-        });
+        let _ = app.emit(
+            "update-download-progress",
+            UpdateProgressPayload {
+                percentage: 0.0,
+                downloaded_bytes: 0,
+                total_bytes: 0,
+                status: "error".to_string(),
+                error: Some(err_msg.clone()),
+            },
+        );
         return Err(err_msg);
     }
 
     let total_size = response.content_length().unwrap_or(0);
-    let mut file = File::create(&target_path)
-        .map_err(|e| format!("Hedef dosya oluşturulamadı: {}", e))?;
+    let mut file =
+        File::create(&target_path).map_err(|e| format!("Hedef dosya oluşturulamadı: {}", e))?;
 
     let mut downloaded: u64 = 0;
     let mut buffer = [0u8; 32768]; // 32KB chunks
@@ -276,24 +318,30 @@ pub fn download_and_install_update(
                 // Emit progress every 2% step or at the end to prevent IPC bottleneck
                 if (percent as u32) != last_emit_percent || downloaded == total_size {
                     last_emit_percent = percent as u32;
-                    let _ = app.emit("update-download-progress", UpdateProgressPayload {
-                        percentage: (percent * 10.0).round() / 10.0,
-                        downloaded_bytes: downloaded,
-                        total_bytes: total_size,
-                        status: "downloading".to_string(),
-                        error: None,
-                    });
+                    let _ = app.emit(
+                        "update-download-progress",
+                        UpdateProgressPayload {
+                            percentage: (percent * 10.0).round() / 10.0,
+                            downloaded_bytes: downloaded,
+                            total_bytes: total_size,
+                            status: "downloading".to_string(),
+                            error: None,
+                        },
+                    );
                 }
             }
             Err(e) => {
                 let err_msg = format!("İndirme sırasında kesinti: {}", e);
-                let _ = app.emit("update-download-progress", UpdateProgressPayload {
-                    percentage: 0.0,
-                    downloaded_bytes: downloaded,
-                    total_bytes: total_size,
-                    status: "error".to_string(),
-                    error: Some(err_msg.clone()),
-                });
+                let _ = app.emit(
+                    "update-download-progress",
+                    UpdateProgressPayload {
+                        percentage: 0.0,
+                        downloaded_bytes: downloaded,
+                        total_bytes: total_size,
+                        status: "error".to_string(),
+                        error: Some(err_msg.clone()),
+                    },
+                );
                 return Err(err_msg);
             }
         }
@@ -302,26 +350,32 @@ pub fn download_and_install_update(
     let _ = file.flush();
 
     // Notify ready to install
-    let _ = app.emit("update-download-progress", UpdateProgressPayload {
-        percentage: 100.0,
-        downloaded_bytes: downloaded,
-        total_bytes: total_size,
-        status: "installing".to_string(),
-        error: None,
-    });
+    let _ = app.emit(
+        "update-download-progress",
+        UpdateProgressPayload {
+            percentage: 100.0,
+            downloaded_bytes: downloaded,
+            total_bytes: total_size,
+            status: "installing".to_string(),
+            error: None,
+        },
+    );
 
     let path_str = target_path.to_string_lossy().to_string();
 
     // Execute platform specific installer/launcher
     launch_installer(&target_path)?;
 
-    let _ = app.emit("update-download-progress", UpdateProgressPayload {
-        percentage: 100.0,
-        downloaded_bytes: downloaded,
-        total_bytes: total_size,
-        status: "completed".to_string(),
-        error: None,
-    });
+    let _ = app.emit(
+        "update-download-progress",
+        UpdateProgressPayload {
+            percentage: 100.0,
+            downloaded_bytes: downloaded,
+            total_bytes: total_size,
+            status: "completed".to_string(),
+            error: None,
+        },
+    );
 
     Ok(path_str)
 }
@@ -372,7 +426,9 @@ fn launch_installer(path: &PathBuf) -> Result<(), String> {
 #[tauri::command]
 pub fn open_release_url(url: String) -> Result<(), String> {
     let clean_url = url.trim();
-    if clean_url.is_empty() || (!clean_url.starts_with("https://github.com/") && !clean_url.starts_with("https://")) {
+    if clean_url.is_empty()
+        || (!clean_url.starts_with("https://github.com/") && !clean_url.starts_with("https://"))
+    {
         return Err("Geçersiz veya güvensiz URL formatı".to_string());
     }
 
@@ -461,4 +517,3 @@ pub mod tests {
         assert!(select_best_asset(&[]).is_none());
     }
 }
-

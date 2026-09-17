@@ -15,7 +15,10 @@ mod e2e_qa_suite {
         let empty_path = temp_dir.join("zero_byte.mp3");
         let _ = File::create(&empty_path);
         let res_empty = crate::importer::decode_audio_file_to_pcm16k(&empty_path);
-        assert!(res_empty.is_err(), "0-baytlık dosya hata döndürmeli, çökmemeli");
+        assert!(
+            res_empty.is_err(),
+            "0-baytlık dosya hata döndürmeli, çökmemeli"
+        );
 
         // Case 2: Corrupted Random Noise Header
         let corrupt_path = temp_dir.join("corrupted_header.mp3");
@@ -24,16 +27,24 @@ mod e2e_qa_suite {
             let _ = f.write_all(&random_bytes);
         }
         let res_corrupt = crate::importer::decode_audio_file_to_pcm16k(&corrupt_path);
-        assert!(res_corrupt.is_err(), "Bozuk başlıklı dosya güvenle yakalanmalı");
+        assert!(
+            res_corrupt.is_err(),
+            "Bozuk başlıklı dosya güvenle yakalanmalı"
+        );
 
         // Case 3: Truncated MP3 with valid header but cut off
         let truncated_path = temp_dir.join("truncated.mp3");
         if let Ok(mut f) = File::create(&truncated_path) {
-            let id3_stub = [0x49, 0x44, 0x33, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0A, 0xFF, 0xFB, 0x90, 0x64];
+            let id3_stub = [
+                0x49, 0x44, 0x33, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0A, 0xFF, 0xFB, 0x90, 0x64,
+            ];
             let _ = f.write_all(&id3_stub);
         }
         let res_trunc = crate::importer::decode_audio_file_to_pcm16k(&truncated_path);
-        println!("Truncated audio handled gracefully: {:?}", res_trunc.is_ok() || res_trunc.is_err());
+        println!(
+            "Truncated audio handled gracefully: {:?}",
+            res_trunc.is_ok() || res_trunc.is_err()
+        );
 
         // Cleanup
         let _ = std::fs::remove_dir_all(&temp_dir);
@@ -61,7 +72,11 @@ mod e2e_qa_suite {
 
                 let total_secs = pcm.len() as f64 / 16000.0;
                 println!("\n✅ [QA DECODE] {}:", fname);
-                println!("   - Süre: {:.1} sn ({:.2} dk)", total_secs, total_secs / 60.0);
+                println!(
+                    "   - Süre: {:.1} sn ({:.2} dk)",
+                    total_secs,
+                    total_secs / 60.0
+                );
                 println!("   - Çözme Süresi: {:.2?}", decode_dur);
                 println!("   - Toplam 16kHz Örnek: {}", pcm.len());
 
@@ -69,8 +84,14 @@ mod e2e_qa_suite {
                 let peak_before = pcm.iter().fold(0.0f32, |m, &x| m.max(x.abs()));
                 crate::audio::normalize_audio_samples(&mut pcm);
                 let peak_after = pcm.iter().fold(0.0f32, |m, &x| m.max(x.abs()));
-                println!("   - Normalizasyon Tepe Değeri: {:.2} -> {:.2}", peak_before, peak_after);
-                assert!(peak_after <= 1.0, "Tepe genlik 1.0'ı aşmamalı (clipping koruması)");
+                println!(
+                    "   - Normalizasyon Tepe Değeri: {:.2} -> {:.2}",
+                    peak_before, peak_after
+                );
+                assert!(
+                    peak_after <= 1.0,
+                    "Tepe genlik 1.0'ı aşmamalı (clipping koruması)"
+                );
             }
         }
     }
@@ -90,11 +111,22 @@ mod e2e_qa_suite {
         }
 
         let chunks = crate::transcriber::split_audio_at_natural_pauses(&mock_audio, 16000, 180);
-        assert!(!chunks.is_empty(), "Doğal duraklama bölümleri oluşturulmalı");
-        println!("\n✅ [QA VAD SLICE] 10 dakikalık ses {} parçaya bölündü.", chunks.len());
+        assert!(
+            !chunks.is_empty(),
+            "Doğal duraklama bölümleri oluşturulmalı"
+        );
+        println!(
+            "\n✅ [QA VAD SLICE] 10 dakikalık ses {} parçaya bölündü.",
+            chunks.len()
+        );
 
         for (idx, (offset_ms, samples)) in chunks.iter().enumerate() {
-            println!("   - Parça {}: Başlangıç offset: {} ms, Örnek: {}", idx + 1, offset_ms, samples.len());
+            println!(
+                "   - Parça {}: Başlangıç offset: {} ms, Örnek: {}",
+                idx + 1,
+                offset_ms,
+                samples.len()
+            );
         }
     }
 
@@ -128,7 +160,10 @@ mod e2e_qa_suite {
         crate::diarization::resolve_speaker_names(&mut segments);
         println!("\n✅ [QA DIARIZATION] Hitap çözümleme sonuçları:");
         for s in &segments {
-            println!("   - [{}] {} (ID: {}) -> \"{}\"", s.timestamp_formatted, s.speaker_name, s.speaker_id, s.text);
+            println!(
+                "   - [{}] {} (ID: {}) -> \"{}\"",
+                s.timestamp_formatted, s.speaker_name, s.speaker_id, s.text
+            );
         }
 
         // Konuşmacı 1'in hitap ettiği karşı taraf Konuşmacı 2 "Ahmet Bey" olmalıdır.
@@ -144,31 +179,29 @@ mod e2e_qa_suite {
             duration_seconds: 360,
             duration_formatted: "06:00".to_string(),
             audio_file_path: None,
-            segments: vec![
-                crate::transcriber::TranscriptSegment {
-                    id: 1,
-                    speaker_id: "Konuşmacı 1".to_string(),
-                    speaker_name: "Can".to_string(),
-                    start_time_ms: 0,
-                    end_time_ms: 5000,
-                    timestamp_formatted: "00:00 -> 00:05".to_string(),
-                    text: "Sistemin uçtan uca testlerini başlatalım.".to_string(),
-                    language: "tr".to_string(),
-                    confidence: 0.98,
-                }
-            ],
-            summary: "Toplantıda uçtan uca sistem testleri ve kalite güvence adımları değerlendirildi.".to_string(),
+            segments: vec![crate::transcriber::TranscriptSegment {
+                id: 1,
+                speaker_id: "Konuşmacı 1".to_string(),
+                speaker_name: "Can".to_string(),
+                start_time_ms: 0,
+                end_time_ms: 5000,
+                timestamp_formatted: "00:00 -> 00:05".to_string(),
+                text: "Sistemin uçtan uca testlerini başlatalım.".to_string(),
+                language: "tr".to_string(),
+                confidence: 0.98,
+            }],
+            summary:
+                "Toplantıda uçtan uca sistem testleri ve kalite güvence adımları değerlendirildi."
+                    .to_string(),
             key_decisions: vec!["Tüm offline motorlar test edilecek ve onaylanacak.".to_string()],
             meeting_goal: Some("QA testlerinin eksiksiz tamamlanması.".to_string()),
             key_highlights: Some(vec!["Sıfır halüsinasyon garantisi sağlandı.".to_string()]),
-            action_items: Some(vec![
-                crate::storage::ActionItem {
-                    task: "Performans metriklerini raporla".to_string(),
-                    assignee: Some("Can".to_string()),
-                    source_citations: vec![1],
-                    is_completed: false,
-                }
-            ]),
+            action_items: Some(vec![crate::storage::ActionItem {
+                task: "Performans metriklerini raporla".to_string(),
+                assignee: Some("Can".to_string()),
+                source_citations: vec![1],
+                is_completed: false,
+            }]),
             phase1_agreed: Some(vec!["Whisper ve Apple Speech entegrasyonu".to_string()]),
             phase2_deferred: Some(vec![]),
             detailed_topics: Some(vec![]),
@@ -178,11 +211,13 @@ mod e2e_qa_suite {
             tags: None,
         };
 
-        let md = crate::summarizer::SummarizerEngine::export_notes_markdown(&meeting, None, Some("tr"));
+        let md =
+            crate::summarizer::SummarizerEngine::export_notes_markdown(&meeting, None, Some("tr"));
         assert!(md.contains("QA Strateji ve Mimari Toplantısı"));
         assert!(md.contains("Sistemin uçtan uca testlerini başlatalım."));
 
-        let html = crate::summarizer::SummarizerEngine::export_notes_html(&meeting, None, Some("tr"));
+        let html =
+            crate::summarizer::SummarizerEngine::export_notes_html(&meeting, None, Some("tr"));
         assert!(html.contains("<!DOCTYPE html>"));
         assert!(html.contains("QA Strateji ve Mimari Toplantısı"));
         println!("\n✅ [QA EXPORT] Markdown ve HTML rapor şablonları başarıyla üretildi.");
@@ -190,29 +225,27 @@ mod e2e_qa_suite {
 
     #[test]
     fn test_qa_07_adversarial_memory_search_inputs() {
-        let meetings = vec![
-            crate::storage::MeetingRecord {
-                id: "adv-1".to_string(),
-                title: "Güvenlik İnceleme Toplantısı".to_string(),
-                date_formatted: "14.09.2026".to_string(),
-                duration_seconds: 60,
-                duration_formatted: "01:00".to_string(),
-                audio_file_path: None,
-                segments: vec![],
-                summary: "Güvenlik açıkları konuşuldu.".to_string(),
-                key_decisions: vec!["SQL injection önlemleri alınacak.".to_string()],
-                meeting_goal: None,
-                key_highlights: None,
-                action_items: None,
-                phase1_agreed: None,
-                phase2_deferred: None,
-                detailed_topics: None,
-                participants: None,
-                engine_used: None,
-                summary_provider: None,
-                tags: None,
-            }
-        ];
+        let meetings = vec![crate::storage::MeetingRecord {
+            id: "adv-1".to_string(),
+            title: "Güvenlik İnceleme Toplantısı".to_string(),
+            date_formatted: "14.09.2026".to_string(),
+            duration_seconds: 60,
+            duration_formatted: "01:00".to_string(),
+            audio_file_path: None,
+            segments: vec![],
+            summary: "Güvenlik açıkları konuşuldu.".to_string(),
+            key_decisions: vec!["SQL injection önlemleri alınacak.".to_string()],
+            meeting_goal: None,
+            key_highlights: None,
+            action_items: None,
+            phase1_agreed: None,
+            phase2_deferred: None,
+            detailed_topics: None,
+            participants: None,
+            engine_used: None,
+            summary_provider: None,
+            tags: None,
+        }];
 
         let chaotic_inputs = [
             "<script>alert(1)</script>",
@@ -220,15 +253,18 @@ mod e2e_qa_suite {
             "SELECT * FROM \"users\" WHERE 1=1;",
             "💥🔥🎉 \u{0000}\u{200B}\u{200C}",
             &"A".repeat(10000), // Aşırı uzun girdi
-            "   \t\n   ", // Sadece boşluk
+            "   \t\n   ",       // Sadece boşluk
         ];
 
         for query in chaotic_inputs {
-            let res = crate::cross_memory::CrossMeetingMemoryEngine::search(&meetings, crate::cross_memory::MemoryQueryOptions {
-                query: query.to_string(),
-                speaker_filter: None,
-                min_score: Some(1),
-            });
+            let res = crate::cross_memory::CrossMeetingMemoryEngine::search(
+                &meetings,
+                crate::cross_memory::MemoryQueryOptions {
+                    query: query.to_string(),
+                    speaker_filter: None,
+                    min_score: Some(1),
+                },
+            );
             // Should never panic or crash
             assert!(res.len() <= meetings.len());
         }
@@ -244,7 +280,10 @@ mod e2e_qa_suite {
             2000,
             Path::new("/tmp/test_clip.wav"),
         );
-        assert!(res_rev.is_err(), "Ters zaman aralığı (10s -> 2s) hata dönmeli");
+        assert!(
+            res_rev.is_err(),
+            "Ters zaman aralığı (10s -> 2s) hata dönmeli"
+        );
 
         // Non existent source file
         let res_no_file = crate::audio_clipper::AudioClipper::clip_to_wav(
@@ -280,7 +319,9 @@ mod e2e_qa_suite {
         }
         let a2 = crate::summarizer::analytics::AnalyticsEngine::calculate(&many_segs, Some(50.0));
         assert_eq!(a2.speaker_stats.len(), 50);
-        assert!(a2.meeting_balance_score >= 80, "50 eşit konuşmacı yüksek denge puanı almalı");
+        assert!(
+            a2.meeting_balance_score >= 80,
+            "50 eşit konuşmacı yüksek denge puanı almalı"
+        );
     }
 }
-

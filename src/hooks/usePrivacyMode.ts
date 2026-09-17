@@ -35,12 +35,15 @@ export function usePrivacyMode() {
     }
   }, []);
 
-  const setPrivacyMode = useCallback((newMode: PrivacyMode) => {
-    localStorage.setItem(STORAGE_KEY, newMode);
-    setModeState(newMode);
-    syncBackendPrivacyMode(newMode);
-    window.dispatchEvent(new CustomEvent(EVENT_NAME, { detail: newMode }));
-  }, [syncBackendPrivacyMode]);
+  const setPrivacyMode = useCallback(
+    (newMode: PrivacyMode) => {
+      localStorage.setItem(STORAGE_KEY, newMode);
+      setModeState(newMode);
+      syncBackendPrivacyMode(newMode);
+      window.dispatchEvent(new CustomEvent(EVENT_NAME, { detail: newMode }));
+    },
+    [syncBackendPrivacyMode],
+  );
 
   useEffect(() => {
     // Initial sync to Rust backend

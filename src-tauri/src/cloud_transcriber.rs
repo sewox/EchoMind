@@ -182,7 +182,8 @@ fn transcribe_audio_gemini(
     language: &str,
     model_version: Option<&str>,
 ) -> Result<Vec<TranscriptSegment>, String> {
-    let file_bytes = fs::read(audio_path).map_err(|e| format!("Ses dosyası okuma hatası: {}", e))?;
+    let file_bytes =
+        fs::read(audio_path).map_err(|e| format!("Ses dosyası okuma hatası: {}", e))?;
     let b64_audio = base64_encode(&file_bytes);
 
     let client = Client::builder()
@@ -266,7 +267,10 @@ fn transcribe_audio_gemini(
     if let Ok(parsed_segs) = serde_json::from_str::<Vec<Value>>(cleaned_json) {
         for (idx, seg) in parsed_segs.iter().enumerate() {
             let start = seg.get("start").and_then(|v| v.as_f64()).unwrap_or(0.0);
-            let end = seg.get("end").and_then(|v| v.as_f64()).unwrap_or(start + 5.0);
+            let end = seg
+                .get("end")
+                .and_then(|v| v.as_f64())
+                .unwrap_or(start + 5.0);
             let speaker = seg
                 .get("speaker")
                 .and_then(|v| v.as_str())

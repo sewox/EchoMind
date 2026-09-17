@@ -82,6 +82,10 @@ describe("App Top-Level Integration", () => {
       if (cmd === "list_audio_devices") return Promise.resolve([]);
       if (cmd === "get_stored_api_keys")
         return Promise.resolve({ groq: "", gemini: "", openai: "" });
+      if (cmd === "get_privacy_mode") return Promise.resolve("balanced");
+      if (cmd === "set_privacy_mode") return Promise.resolve();
+      if (cmd === "get_secure_credential") return Promise.resolve(null);
+      if (cmd === "save_secure_credential") return Promise.resolve();
       if (cmd === "get_ollama_config")
         return Promise.resolve({
           endpoint: "http://127.0.0.1:11434",
@@ -207,6 +211,7 @@ describe("App Top-Level Integration", () => {
   });
 
   it("handles audio file import dialog and smart advisor flow", async () => {
+    localStorage.setItem("echomind_app_language", "tr");
     setupDefaultInvoke();
 
     render(

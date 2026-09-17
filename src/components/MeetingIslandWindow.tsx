@@ -101,15 +101,9 @@ const IslandContent: FC = () => {
   return (
     <div className="w-full h-full flex items-center justify-center p-1 bg-transparent select-none font-sans">
       <div className="w-full bg-slate-950/95 backdrop-blur-xl border border-slate-700/80 rounded-2xl px-4 py-2.5 shadow-2xl shadow-black/80 flex items-center justify-between gap-3 text-slate-100">
-        {/* Left: App Info & Title (Draggable, Clean, NO pulse) */}
-        <div
-          data-tauri-drag-region
-          className="flex items-center gap-2.5 min-w-0 cursor-grab active:cursor-grabbing flex-1"
-        >
-          <div
-            data-tauri-drag-region
-            className="w-7 h-7 rounded-xl bg-cyan-950/80 border border-cyan-500/40 flex items-center justify-center text-cyan-400 shrink-0"
-          >
+        {/* Left: App Info & Title (Clean, NO pulse) */}
+        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+          <div className="w-7 h-7 rounded-xl bg-cyan-950/80 border border-cyan-500/40 flex items-center justify-center text-cyan-400 shrink-0">
             <Video className="w-3.5 h-3.5 pointer-events-none" />
           </div>
 

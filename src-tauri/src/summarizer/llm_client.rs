@@ -1,14 +1,16 @@
-use std::time::Instant;
-use crate::transcriber::TranscriptSegment;
-use super::types::{GeminiContent, GeminiGenerationConfig, GeminiPart, GeminiRequest, SummaryResult};
 use super::local_extractor::LocalSummaryExtractor;
+use super::types::{
+    GeminiContent, GeminiGenerationConfig, GeminiPart, GeminiRequest, SummaryResult,
+};
+use crate::transcriber::TranscriptSegment;
+use std::time::Instant;
 
 pub struct LLMClient;
 
 impl LLMClient {
     pub fn build_system_prompt(template_id: Option<&str>, custom_prompt: Option<&str>) -> String {
         let tid = template_id.unwrap_or("general");
-        
+
         let specific_role = match tid {
             "one_on_one" => {
                 "SEN DÜNYANIN EN DİKKATLİ BİREBİR (1-on-1) GÖRÜŞME VE LİDERLİK KOÇUSUN.\n\
@@ -101,7 +103,10 @@ YALNIZCA VE YALNIZCA AŞAĞIDAKİ GEÇERLİ JSON ŞEMASINDA YANIT VER:\n\
         custom_prompt: Option<&str>,
         start_time: Instant,
     ) -> Result<SummaryResult, String> {
-        let base_url = endpoint.unwrap_or("http://127.0.0.1:11434").trim().trim_end_matches('/');
+        let base_url = endpoint
+            .unwrap_or("http://127.0.0.1:11434")
+            .trim()
+            .trim_end_matches('/');
         let model = model_name.unwrap_or("llama3.2");
         let url = format!("{}/api/chat", base_url);
 
@@ -109,11 +114,20 @@ YALNIZCA VE YALNIZCA AŞAĞIDAKİ GEÇERLİ JSON ŞEMASINDA YANIT VER:\n\
         let mut full_transcript = String::new();
         for (idx, seg) in segments.iter().enumerate() {
             let sanitized_text = crate::dlp::redact_sensitive_data(&seg.text, &dlp_cfg);
-            full_transcript.push_str(&format!("[#{}] [{}] {}: {}\n", idx + 1, seg.timestamp_formatted, seg.speaker_name, sanitized_text));
+            full_transcript.push_str(&format!(
+                "[#{}] [{}] {}: {}\n",
+                idx + 1,
+                seg.timestamp_formatted,
+                seg.speaker_name,
+                sanitized_text
+            ));
         }
 
         let sys_prompt = Self::build_system_prompt(template_id, custom_prompt);
-        let prompt = format!("{}\n\n<transcript>\n{}\n</transcript>", sys_prompt, full_transcript);
+        let prompt = format!(
+            "{}\n\n<transcript>\n{}\n</transcript>",
+            sys_prompt, full_transcript
+        );
 
         let req_body = serde_json::json!({
             "model": model,
@@ -132,16 +146,29 @@ YALNIZCA VE YALNIZCA AŞAĞIDAKİ GEÇERLİ JSON ŞEMASINDA YANIT VER:\n\
             .build()
             .map_err(|e| e.to_string())?;
 
-        let resp = client.post(&url).json(&req_body).send().map_err(|e| format!("Ollama bağlantı hatası: {}", e))?;
+        let resp = client
+            .post(&url)
+            .json(&req_body)
+            .send()
+            .map_err(|e| format!("Ollama bağlantı hatası: {}", e))?;
         if !resp.status().is_success() {
             return Err(format!("Ollama API Hatası (HTTP {})", resp.status()));
         }
 
-        let json_val: serde_json::Value = resp.json().map_err(|e| format!("Ollama JSON ayrıştırma hatası: {}", e))?;
-        let content_str = json_val["message"]["content"].as_str().ok_or_else(|| "Geçersiz Ollama yanıt formatı".to_string())?;
+        let json_val: serde_json::Value = resp
+            .json()
+            .map_err(|e| format!("Ollama JSON ayrıştırma hatası: {}", e))?;
+        let content_str = json_val["message"]["content"]
+            .as_str()
+            .ok_or_else(|| "Geçersiz Ollama yanıt formatı".to_string())?;
 
-        let parsed: serde_json::Value = serde_json::from_str(content_str).map_err(|e| format!("Ollama içerik JSON parse hatası: {}", e))?;
-        LocalSummaryExtractor::parse_rich_summary_json(&parsed, &format!("Yerel LLM ({})", model), start_time)
+        let parsed: serde_json::Value = serde_json::from_str(content_str)
+            .map_err(|e| format!("Ollama içerik JSON parse hatası: {}", e))?;
+        LocalSummaryExtractor::parse_rich_summary_json(
+            &parsed,
+            &format!("Yerel LLM ({})", model),
+            start_time,
+        )
     }
 
     pub fn generate_openai_compatible_summary(
@@ -163,7 +190,13 @@ YALNIZCA VE YALNIZCA AŞAĞIDAKİ GEÇERLİ JSON ŞEMASINDA YANIT VER:\n\
         let mut full_transcript = String::new();
         for (idx, seg) in segments.iter().enumerate() {
             let sanitized_text = crate::dlp::redact_sensitive_data(&seg.text, &dlp_cfg);
-            full_transcript.push_str(&format!("[#{}] [{}] {}: {}\n", idx + 1, seg.timestamp_formatted, seg.speaker_name, sanitized_text));
+            full_transcript.push_str(&format!(
+                "[#{}] [{}] {}: {}\n",
+                idx + 1,
+                seg.timestamp_formatted,
+                seg.speaker_name,
+                sanitized_text
+            ));
         }
 
         let system_prompt = Self::build_system_prompt(template_id, custom_prompt);
@@ -191,7 +224,11 @@ YALNIZCA VE YALNIZCA AŞAĞIDAKİ GEÇERLİ JSON ŞEMASINDA YANIT VER:\n\
             .map_err(|e| e.to_string())?;
 
         if !resp.status().is_success() {
-            return Err(format!("{} API hatası: {}", display_name, resp.text().unwrap_or_default()));
+            return Err(format!(
+                "{} API hatası: {}",
+                display_name,
+                resp.text().unwrap_or_default()
+            ));
         }
 
         let json_val: serde_json::Value = resp.json().map_err(|e| e.to_string())?;
@@ -217,11 +254,20 @@ YALNIZCA VE YALNIZCA AŞAĞIDAKİ GEÇERLİ JSON ŞEMASINDA YANIT VER:\n\
         let mut full_transcript = String::new();
         for (idx, seg) in segments.iter().enumerate() {
             let sanitized_text = crate::dlp::redact_sensitive_data(&seg.text, &dlp_cfg);
-            full_transcript.push_str(&format!("[#{}] [{}] {}: {}\n", idx + 1, seg.timestamp_formatted, seg.speaker_name, sanitized_text));
+            full_transcript.push_str(&format!(
+                "[#{}] [{}] {}: {}\n",
+                idx + 1,
+                seg.timestamp_formatted,
+                seg.speaker_name,
+                sanitized_text
+            ));
         }
 
         let sys_prompt = Self::build_system_prompt(template_id, custom_prompt);
-        let prompt = format!("{}\n\n<transcript>\n{}\n</transcript>", sys_prompt, full_transcript);
+        let prompt = format!(
+            "{}\n\n<transcript>\n{}\n</transcript>",
+            sys_prompt, full_transcript
+        );
 
         let body = GeminiRequest {
             contents: vec![GeminiContent {
@@ -241,10 +287,11 @@ YALNIZCA VE YALNIZCA AŞAĞIDAKİ GEÇERLİ JSON ŞEMASINDA YANIT VER:\n\
 
         let client = match reqwest::blocking::Client::builder()
             .timeout(std::time::Duration::from_secs(120))
-            .build() {
-                Ok(c) => c,
-                Err(e) => return Err(e.to_string()),
-            };
+            .build()
+        {
+            Ok(c) => c,
+            Err(e) => return Err(e.to_string()),
+        };
 
         let mut available_models = Vec::new();
         if let Ok(list_resp) = client.get(&list_url).send() {
@@ -254,7 +301,9 @@ YALNIZCA VE YALNIZCA AŞAĞIDAKİ GEÇERLİ JSON ŞEMASINDA YANIT VER:\n\
                         if let Some(name) = m["name"].as_str() {
                             let methods = m["supportedGenerationMethods"]
                                 .as_array()
-                                .map(|arr| arr.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>())
+                                .map(|arr| {
+                                    arr.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>()
+                                })
                                 .unwrap_or_default();
                             if methods.contains(&"generateContent") {
                                 let clean_name = name.trim_start_matches("models/");
@@ -275,7 +324,12 @@ YALNIZCA VE YALNIZCA AŞAĞIDAKİ GEÇERLİ JSON ŞEMASINDA YANIT VER:\n\
 
         let models_to_try = if !available_models.is_empty() {
             let mut priority_models = Vec::new();
-            for pref in &["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"] {
+            for pref in &[
+                "gemini-2.5-flash",
+                "gemini-2.0-flash",
+                "gemini-1.5-flash",
+                "gemini-1.5-pro",
+            ] {
                 if let Some(pos) = available_models.iter().position(|m| m == pref) {
                     priority_models.push(available_models.remove(pos));
                 }
@@ -335,20 +389,28 @@ YALNIZCA VE YALNIZCA AŞAĞIDAKİ GEÇERLİ JSON ŞEMASINDA YANIT VER:\n\
                 .trim_end_matches("```")
                 .trim();
 
-            let extracted_json = if let (Some(start), Some(end)) = (clean_json.find('{'), clean_json.rfind('}')) {
-                if start <= end {
-                    &clean_json[start..=end]
+            let extracted_json =
+                if let (Some(start), Some(end)) = (clean_json.find('{'), clean_json.rfind('}')) {
+                    if start <= end {
+                        &clean_json[start..=end]
+                    } else {
+                        clean_json
+                    }
                 } else {
                     clean_json
-                }
-            } else {
-                clean_json
-            };
+                };
 
             if let Ok(parsed_json) = serde_json::from_str::<serde_json::Value>(extracted_json) {
-                return LocalSummaryExtractor::parse_rich_summary_json(&parsed_json, &format!("Google Gemini ({})", model), start_time);
+                return LocalSummaryExtractor::parse_rich_summary_json(
+                    &parsed_json,
+                    &format!("Google Gemini ({})", model),
+                    start_time,
+                );
             } else {
-                eprintln!("❌ Gemini {} content JSON parse failed: {}", model, extracted_json);
+                eprintln!(
+                    "❌ Gemini {} content JSON parse failed: {}",
+                    model, extracted_json
+                );
             }
         }
 

@@ -110,14 +110,14 @@ fn get_api_key_patterns() -> &'static Vec<Regex> {
 fn get_phone_regex() -> &'static Regex {
     PHONE_REGEX.get_or_init(|| {
         // Matches TR phones: +90 5xx xxx xx xx, 05xx..., 5xx...
-        Regex::new(r"(?:\+?90[\s.-]?)?(?:\(?0?5\d{2}\)?[\s.-]?)\d{3}[\s.-]?\d{2}[\s.-]?\d{2}\b").unwrap()
+        Regex::new(r"(?:\+?90[\s.-]?)?(?:\(?0?5\d{2}\)?[\s.-]?)\d{3}[\s.-]?\d{2}[\s.-]?\d{2}\b")
+            .unwrap()
     })
 }
 
 fn get_email_regex() -> &'static Regex {
-    EMAIL_REGEX.get_or_init(|| {
-        Regex::new(r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}").unwrap()
-    })
+    EMAIL_REGEX
+        .get_or_init(|| Regex::new(r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}").unwrap())
 }
 
 fn get_iban_regex() -> &'static Regex {
@@ -141,13 +141,17 @@ pub fn redact_sensitive_data(text: &str, config: &DlpConfig) -> String {
     // 1. Redact API Keys & Tokens
     if config.redact_api_keys {
         for pattern in get_api_key_patterns() {
-            result = pattern.replace_all(&result, "[REDACTED: API_KEY]").to_string();
+            result = pattern
+                .replace_all(&result, "[REDACTED: API_KEY]")
+                .to_string();
         }
     }
 
     // 2. Redact IBAN
     if config.redact_iban {
-        result = get_iban_regex().replace_all(&result, "[REDACTED: IBAN]").to_string();
+        result = get_iban_regex()
+            .replace_all(&result, "[REDACTED: IBAN]")
+            .to_string();
     }
 
     // 3. Redact Credit Cards & TCKN (Algorithmic verification)
@@ -174,12 +178,16 @@ pub fn redact_sensitive_data(text: &str, config: &DlpConfig) -> String {
 
     // 4. Redact Emails
     if config.redact_emails {
-        result = get_email_regex().replace_all(&result, "[REDACTED: EMAIL]").to_string();
+        result = get_email_regex()
+            .replace_all(&result, "[REDACTED: EMAIL]")
+            .to_string();
     }
 
     // 5. Redact Phone Numbers
     if config.redact_phones {
-        result = get_phone_regex().replace_all(&result, "[REDACTED: PHONE]").to_string();
+        result = get_phone_regex()
+            .replace_all(&result, "[REDACTED: PHONE]")
+            .to_string();
     }
 
     result

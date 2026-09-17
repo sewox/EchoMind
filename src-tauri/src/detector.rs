@@ -99,11 +99,7 @@ impl MeetingDetector {
                     "webexmta",
                 ],
             ),
-            (
-                "slack",
-                "Slack",
-                vec!["slack.exe", "slack"],
-            ),
+            ("slack", "Slack", vec!["slack.exe", "slack"]),
             (
                 "discord",
                 "Discord",
@@ -114,11 +110,7 @@ impl MeetingDetector {
                 "Skype",
                 vec!["skype.exe", "skype", "skypeforlinux"],
             ),
-            (
-                "facetime",
-                "Apple FaceTime",
-                vec!["facetime"],
-            ),
+            ("facetime", "Apple FaceTime", vec!["facetime"]),
         ];
 
         let mut results = Vec::new();
@@ -193,7 +185,9 @@ impl MeetingDetector {
                 .filter(|(_browser_name, match_names)| {
                     sys.processes().values().any(|p| {
                         let pname = p.name().to_string_lossy().to_lowercase();
-                        match_names.iter().any(|m| pname == *m || pname.starts_with(m))
+                        match_names
+                            .iter()
+                            .any(|m| pname == *m || pname.starts_with(m))
                     })
                 })
                 .map(|(b, _)| b)
@@ -219,7 +213,7 @@ impl MeetingDetector {
                     if output.status.success() {
                         let raw_stdout = String::from_utf8_lossy(&output.stdout);
                         let titles_str = raw_stdout.to_lowercase();
-                        
+
                         // Google Meet Detection (Active In-Call Verification)
                         if titles_str.contains("meet.google.com")
                             || titles_str.contains("meet –")
@@ -231,7 +225,9 @@ impl MeetingDetector {
                                 .find(|chunk| chunk.contains("meet.google.com/"))
                                 .and_then(|url| url.split("meet.google.com/").nth(1))
                                 .map(|code| code.split('?').next().unwrap_or(code))
-                                .map(|code| code.trim_matches(|c: char| !c.is_alphanumeric() && c != '-'))
+                                .map(|code| {
+                                    code.trim_matches(|c: char| !c.is_alphanumeric() && c != '-')
+                                })
                                 .filter(|s| !s.is_empty())
                                 .unwrap_or("");
 
@@ -258,11 +254,16 @@ impl MeetingDetector {
                                 || titles_str.contains("return to home screen")
                                 || titles_str.contains("ana ekrana dön");
 
-                            let is_valid_room = !is_left_or_home && (meeting_code.contains('-') || meeting_code.len() >= 9);
+                            let is_valid_room = !is_left_or_home
+                                && (meeting_code.contains('-') || meeting_code.len() >= 9);
 
                             if is_valid_room && !results.iter().any(|r| r.app_id == "meet") {
-                                let proc_name = format!("{} (Google Meet - {})", browser, meeting_code);
-                                let rec_title = format!("Google Meet Toplantısı ({}) - {}", meeting_code, date_str);
+                                let proc_name =
+                                    format!("{} (Google Meet - {})", browser, meeting_code);
+                                let rec_title = format!(
+                                    "Google Meet Toplantısı ({}) - {}",
+                                    meeting_code, date_str
+                                );
 
                                 results.push(MeetingAppInfo {
                                     app_id: "meet".to_string(),
@@ -287,7 +288,10 @@ impl MeetingDetector {
                                 display_name: "Microsoft Teams (Web)".to_string(),
                                 process_name: format!("{} (Teams)", browser),
                                 is_running: true,
-                                recommended_title: format!("Microsoft Teams Toplantısı - {}", date_str),
+                                recommended_title: format!(
+                                    "Microsoft Teams Toplantısı - {}",
+                                    date_str
+                                ),
                             });
                         }
                     }
@@ -525,11 +529,17 @@ impl MeetingDetector {
                 if current_count > 0 {
                     consecutive_misses = 0;
                     let current_primary = &filtered_active[0];
-                    let current_id = format!("{}-{}", current_primary.app_id, current_primary.process_name);
+                    let current_id = format!(
+                        "{}-{}",
+                        current_primary.app_id, current_primary.process_name
+                    );
 
                     let is_dismissed = {
                         let dismissed = get_dismissed_session().lock().unwrap();
-                        dismissed.as_ref().map(|d| d == &current_id).unwrap_or(false)
+                        dismissed
+                            .as_ref()
+                            .map(|d| d == &current_id)
+                            .unwrap_or(false)
                     };
 
                     // Check if new meeting session or title changed
@@ -539,44 +549,15 @@ impl MeetingDetector {
                         last_detected_id = current_id.clone();
                     }
 
-                    let is_recording_now = crate::audio::get_global_audio_engine().get_status().is_recording;
+                    let is_recording_now = crate::audio::get_global_audio_engine()
+                        .get_status()
+                        .is_recording;
 
                     if let Some(ref handle) = app_handle {
+                        // Keep island hidden by default to avoid overlaying and blocking main window clicks
                         if let Some(island_win) = handle.get_webview_window("island") {
                             let is_visible = island_win.is_visible().unwrap_or(false);
-                            if !is_recording_now && should_trigger && !is_dismissed {
-                                let bounds_opt = Self::get_target_meeting_window_bounds();
-                                let island_clone = island_win.clone();
-                                let _ = handle.run_on_main_thread(move || {
-                                    if let Some((left, top, win_w, _win_h)) = bounds_opt {
-                                        let target_x = left + (win_w - 560.0) / 2.0;
-                                        let target_y = top + 15.0;
-                                        let _ = island_clone.set_position(tauri::Position::Logical(tauri::LogicalPosition { x: target_x, y: target_y }));
-                                    } else if let Ok(Some(monitor)) = island_clone.current_monitor() {
-                                        let scale = monitor.scale_factor();
-                                        let mon_x = monitor.position().x as f64 / scale;
-                                        let mon_y = monitor.position().y as f64 / scale;
-                                        let mon_w = monitor.size().width as f64 / scale;
-                                        let target_x = mon_x + (mon_w - 560.0) / 2.0;
-                                        let target_y = mon_y + 15.0;
-                                        let _ = island_clone.set_position(tauri::Position::Logical(tauri::LogicalPosition { x: target_x, y: target_y }));
-                                    }
-                                    let _ = island_clone.show();
-                                    let _ = island_clone.set_always_on_top(true);
-
-                                    #[cfg(target_os = "macos")]
-                                    {
-                                        use objc::{msg_send, sel, sel_impl};
-                                        if let Ok(ns_window) = island_clone.ns_window() {
-                                            let ns_window_ptr = ns_window as *mut objc::runtime::Object;
-                                            unsafe {
-                                                let () = msg_send![ns_window_ptr, setLevel: 101i64];
-                                                let () = msg_send![ns_window_ptr, orderFrontRegardless];
-                                            }
-                                        }
-                                    }
-                                });
-                            } else if is_recording_now && is_visible {
+                            if is_recording_now && is_visible {
                                 let island_clone = island_win.clone();
                                 let _ = handle.run_on_main_thread(move || {
                                     let _ = island_clone.hide();
@@ -585,7 +566,10 @@ impl MeetingDetector {
                         }
 
                         if should_trigger && !is_dismissed {
-                            println!("🚀 Toplantı Tespit Edildi: {} ({})", current_primary.display_name, current_primary.process_name);
+                            println!(
+                                "🚀 Toplantı Tespit Edildi: {} ({})",
+                                current_primary.display_name, current_primary.process_name
+                            );
                             let _ = handle.emit("meeting-detected", &filtered_active);
 
                             #[cfg(target_os = "macos")]
@@ -605,8 +589,8 @@ impl MeetingDetector {
                     previous_apps = filtered_active;
                 } else {
                     consecutive_misses += 1;
-                    // Debounce misses: end meeting after 2 consecutive empty cycles (max 2-3 seconds)
-                    if consecutive_misses >= 2 && !last_detected_id.is_empty() {
+                    // End meeting immediately on 1 missed cycle (1-2 seconds response, well under 5s requirement)
+                    if consecutive_misses >= 1 && !last_detected_id.is_empty() {
                         last_detected_id.clear();
                         {
                             let mut dismissed = get_dismissed_session().lock().unwrap();
@@ -616,6 +600,7 @@ impl MeetingDetector {
                             let engine = crate::audio::get_global_audio_engine();
                             if engine.get_status().is_recording {
                                 println!("🛑 Otomatik Kayıt Durdurma Sinyali (Toplantı Kapandı).");
+                                let _ = engine.stop();
                             }
                         }
                         if let Some(ref handle) = app_handle {
@@ -625,7 +610,9 @@ impl MeetingDetector {
                                 let _ = island_win.hide();
                             }
                         }
-                        println!("🛑 Toplantı Sona Erdi (< 3s doğrulandı), bitiş sinyali iletildi.");
+                        println!(
+                            "🛑 Toplantı Sona Erdi (< 3s doğrulandı), bitiş sinyali iletildi."
+                        );
                     }
                 }
 
@@ -713,7 +700,11 @@ pub fn show_island_window(app_handle: AppHandle) -> Result<(), String> {
             if let Some((left, top, win_w, _win_h)) = bounds_opt {
                 let target_x = left + (win_w - 560.0) / 2.0;
                 let target_y = top + 15.0;
-                let _ = island_clone.set_position(tauri::Position::Logical(tauri::LogicalPosition { x: target_x, y: target_y }));
+                let _ =
+                    island_clone.set_position(tauri::Position::Logical(tauri::LogicalPosition {
+                        x: target_x,
+                        y: target_y,
+                    }));
             } else if let Ok(Some(monitor)) = island_clone.current_monitor() {
                 let scale = monitor.scale_factor();
                 let mon_x = monitor.position().x as f64 / scale;
@@ -721,22 +712,14 @@ pub fn show_island_window(app_handle: AppHandle) -> Result<(), String> {
                 let mon_w = monitor.size().width as f64 / scale;
                 let target_x = mon_x + (mon_w - 560.0) / 2.0;
                 let target_y = mon_y + 15.0;
-                let _ = island_clone.set_position(tauri::Position::Logical(tauri::LogicalPosition { x: target_x, y: target_y }));
+                let _ =
+                    island_clone.set_position(tauri::Position::Logical(tauri::LogicalPosition {
+                        x: target_x,
+                        y: target_y,
+                    }));
             }
             let _ = island_clone.show();
             let _ = island_clone.set_always_on_top(true);
-
-            #[cfg(target_os = "macos")]
-            {
-                use objc::{msg_send, sel, sel_impl};
-                if let Ok(ns_window) = island_clone.ns_window() {
-                    let ns_window_ptr = ns_window as *mut objc::runtime::Object;
-                    unsafe {
-                        let () = msg_send![ns_window_ptr, setLevel: 101i64];
-                        let () = msg_send![ns_window_ptr, orderFrontRegardless];
-                    }
-                }
-            }
         });
     }
     Ok(())

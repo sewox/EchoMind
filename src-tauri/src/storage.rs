@@ -106,7 +106,9 @@ impl StorageEngine {
             return Ok(Vec::new());
         }
 
-        match crate::encrypted_storage::load_encrypted_json::<Vec<MeetingRecord>, _>(&self.file_path) {
+        match crate::encrypted_storage::load_encrypted_json::<Vec<MeetingRecord>, _>(
+            &self.file_path,
+        ) {
             Ok(records) => {
                 let mut lock = self.meetings.lock().unwrap();
                 *lock = records.clone();
@@ -180,7 +182,7 @@ impl StorageEngine {
             if let Some(mtg) = lock.iter().find(|m| m.id == id) {
                 if let Some(ref path_str) = mtg.audio_file_path {
                     let audio_path = PathBuf::from(path_str);
-                    
+
                     // SAFETY GUARANTEE: Only delete files located inside the app's internal recordings directory!
                     // Never delete user's original external files (e.g. ~/Downloads/..., ~/Desktop/...).
                     let rec_dir = get_storage_dir().join("recordings");
@@ -247,8 +249,8 @@ pub fn compress_audio_to_flac(samples_f32: &[f32], output_path: &PathBuf) -> Res
         .map_err(|e| format!("FLAC yazma hatası: {:?}", e))?;
 
     let flac_bytes = sink.into_inner();
-    let mut file = File::create(output_path)
-        .map_err(|e| format!("FLAC ses dosyası oluşturulamadı: {}", e))?;
+    let mut file =
+        File::create(output_path).map_err(|e| format!("FLAC ses dosyası oluşturulamadı: {}", e))?;
     file.write_all(&flac_bytes)
         .map_err(|e| format!("FLAC ses verisi yazılamadı: {}", e))?;
 
@@ -261,7 +263,10 @@ pub fn generate_summary_from_segments(segments: &[TranscriptSegment]) -> String 
         return "Toplantıda henüz transkript edilmiş bir konuşma bulunmamaktadır.".to_string();
     }
 
-    let total_words: usize = segments.iter().map(|s| s.text.split_whitespace().count()).sum();
+    let total_words: usize = segments
+        .iter()
+        .map(|s| s.text.split_whitespace().count())
+        .sum();
     let speakers_count = segments
         .iter()
         .map(|s| &s.speaker_name)
@@ -287,13 +292,20 @@ pub fn extract_key_decisions(segments: &[TranscriptSegment]) -> Vec<String> {
     let mut decisions = Vec::new();
     for seg in segments {
         let lower = seg.text.to_lowercase();
-        if lower.contains("karar") || lower.contains("plan") || lower.contains("yapacağız") || lower.contains("onay") {
+        if lower.contains("karar")
+            || lower.contains("plan")
+            || lower.contains("yapacağız")
+            || lower.contains("onay")
+        {
             decisions.push(format!("{}: \"{}\"", seg.speaker_name, seg.text));
         }
     }
 
     if decisions.is_empty() && !segments.is_empty() {
-        decisions.push(format!("{}: \"{}\"", segments[0].speaker_name, segments[0].text));
+        decisions.push(format!(
+            "{}: \"{}\"",
+            segments[0].speaker_name, segments[0].text
+        ));
     }
 
     decisions
@@ -306,10 +318,7 @@ pub fn get_all_meetings() -> Vec<MeetingRecord> {
 }
 
 #[tauri::command]
-pub fn save_current_meeting(
-    title: String,
-    duration_seconds: u64,
-) -> Result<MeetingRecord, String> {
+pub fn save_current_meeting(title: String, duration_seconds: u64) -> Result<MeetingRecord, String> {
     let transcriber = crate::transcriber::get_global_transcriber();
     let segments = transcriber.get_history();
     let audio_engine = crate::audio::get_global_audio_engine();
@@ -415,8 +424,13 @@ pub fn save_current_meeting(
 }
 
 #[tauri::command]
-pub fn delete_meeting_by_id(id: Option<String>, meeting_id: Option<String>) -> Result<Vec<MeetingRecord>, String> {
-    let target_id = id.or(meeting_id).ok_or_else(|| "Toplantı ID belirtilmedi".to_string())?;
+pub fn delete_meeting_by_id(
+    id: Option<String>,
+    meeting_id: Option<String>,
+) -> Result<Vec<MeetingRecord>, String> {
+    let target_id = id
+        .or(meeting_id)
+        .ok_or_else(|| "Toplantı ID belirtilmedi".to_string())?;
     let storage = get_global_storage();
     storage.delete_meeting(&target_id)
 }
@@ -494,11 +508,18 @@ pub fn remove_meeting_tag(meeting_id: String, tag: String) -> Result<MeetingReco
 }
 
 #[tauri::command]
-pub fn get_related_meetings(meeting_id: String, limit: Option<usize>) -> Result<Vec<crate::auto_tagger::RelatedMeetingItem>, String> {
+pub fn get_related_meetings(
+    meeting_id: String,
+    limit: Option<usize>,
+) -> Result<Vec<crate::auto_tagger::RelatedMeetingItem>, String> {
     let storage = get_global_storage();
     let all = storage.get_all();
     if let Some(target) = all.iter().find(|m| m.id == meeting_id) {
-        let related = crate::auto_tagger::AutoTagEngine::find_related_meetings(target, &all, limit.unwrap_or(3));
+        let related = crate::auto_tagger::AutoTagEngine::find_related_meetings(
+            target,
+            &all,
+            limit.unwrap_or(3),
+        );
         Ok(related)
     } else {
         Err(format!("Toplantı bulunamadı: {}", meeting_id))
@@ -506,7 +527,10 @@ pub fn get_related_meetings(meeting_id: String, limit: Option<usize>) -> Result<
 }
 
 #[tauri::command]
-pub fn toggle_action_item_status(meeting_id: String, action_index: usize) -> Result<MeetingRecord, String> {
+pub fn toggle_action_item_status(
+    meeting_id: String,
+    action_index: usize,
+) -> Result<MeetingRecord, String> {
     let storage = get_global_storage();
     let mut lock = storage.meetings.lock().unwrap();
     if let Some(mtg) = lock.iter_mut().find(|m| m.id == meeting_id) {
@@ -657,8 +681,13 @@ mod tests {
         assert_eq!(fetched.title, "Eski Başlık");
 
         // 2. Update Title
-        let updated_list = storage.update_title("mtg_edit_test", "Yeni İcra Başlığı").unwrap();
-        let found = updated_list.iter().find(|m| m.id == "mtg_edit_test").unwrap();
+        let updated_list = storage
+            .update_title("mtg_edit_test", "Yeni İcra Başlığı")
+            .unwrap();
+        let found = updated_list
+            .iter()
+            .find(|m| m.id == "mtg_edit_test")
+            .unwrap();
         assert_eq!(found.title, "Yeni İcra Başlığı");
 
         // 3. Summary & Decision Extraction Helpers

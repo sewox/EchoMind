@@ -372,7 +372,9 @@ pub async fn pick_audio_file_dialog() -> Result<Option<PickedFileInfo>, String> 
     let file = rfd::AsyncFileDialog::new()
         .add_filter(
             "Desteklenen Ses Dosyaları",
-            &["mp3", "m4a", "opus", "ogg", "wav", "flac", "aac", "3gp", "mp4", "caf", "wma"],
+            &[
+                "mp3", "m4a", "opus", "ogg", "wav", "flac", "aac", "3gp", "mp4", "caf", "wma",
+            ],
         )
         .set_title("Toplantı Ses Dosyası Seç")
         .pick_file()
@@ -387,9 +389,7 @@ pub async fn pick_audio_file_dialog() -> Result<Option<PickedFileInfo>, String> 
                 .map(|f| f.to_string_lossy().to_string())
                 .unwrap_or_else(|| "Ses Kaydı".to_string());
 
-            let file_size_bytes = std::fs::metadata(&path_buf)
-                .map(|m| m.len())
-                .unwrap_or(0);
+            let file_size_bytes = std::fs::metadata(&path_buf).map(|m| m.len()).unwrap_or(0);
 
             let file_size_mb = (file_size_bytes as f64) / (1024.0 * 1024.0);
             let is_large_file = file_size_mb > 15.0;
@@ -413,7 +413,15 @@ pub async fn process_audio_file_path(
     api_key: Option<String>,
     model_version: Option<String>,
 ) -> Result<MeetingRecord, String> {
-    import_audio_file(file_path, None, language, cloud_provider, api_key, model_version).await
+    import_audio_file(
+        file_path,
+        None,
+        language,
+        cloud_provider,
+        api_key,
+        model_version,
+    )
+    .await
 }
 
 #[tauri::command]
@@ -595,7 +603,9 @@ pub async fn pick_and_import_audio_file(
     let file = rfd::AsyncFileDialog::new()
         .add_filter(
             "Desteklenen Ses Dosyaları",
-            &["mp3", "m4a", "opus", "ogg", "wav", "flac", "aac", "3gp", "mp4", "caf", "wma"],
+            &[
+                "mp3", "m4a", "opus", "ogg", "wav", "flac", "aac", "3gp", "mp4", "caf", "wma",
+            ],
         )
         .set_title("Toplantı Ses Dosyası Seç")
         .pick_file()
@@ -604,7 +614,15 @@ pub async fn pick_and_import_audio_file(
     match file {
         Some(handle) => {
             let path_str = handle.path().to_string_lossy().to_string();
-            let meeting = import_audio_file(path_str, None, language, cloud_provider, api_key, model_version).await?;
+            let meeting = import_audio_file(
+                path_str,
+                None,
+                language,
+                cloud_provider,
+                api_key,
+                model_version,
+            )
+            .await?;
             Ok(Some(meeting))
         }
         None => Ok(None),

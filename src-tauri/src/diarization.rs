@@ -5,10 +5,10 @@ use std::collections::HashMap;
 /// 8-Band spectral energy profile representing the vocal tract filter envelope
 #[derive(Debug, Clone)]
 pub struct AcousticFeatures {
-    pub pitch_f0: f32,             // Median fundamental frequency in Hz (80 Hz - 400 Hz)
-    pub spectral_bands: [f32; 8],  // 8-band log-energy spectral distribution
-    pub zero_crossing_rate: f32,   // Phonetic articulation speed
-    pub rms_energy: f32,           // Segment volume dynamics
+    pub pitch_f0: f32,            // Median fundamental frequency in Hz (80 Hz - 400 Hz)
+    pub spectral_bands: [f32; 8], // 8-band log-energy spectral distribution
+    pub zero_crossing_rate: f32,  // Phonetic articulation speed
+    pub rms_energy: f32,          // Segment volume dynamics
     pub voiced_frame_count: usize, // Number of valid voiced speech frames
 }
 
@@ -31,17 +31,18 @@ pub fn extract_segment_features(samples: &[f32], sample_rate: u32) -> AcousticFe
     }
 
     let frame_size = ((sample_rate as f32) * 0.032) as usize; // 32ms (~512 samples at 16kHz)
-    let hop_size = ((sample_rate as f32) * 0.016) as usize;   // 16ms (~256 samples at 16kHz)
+    let hop_size = ((sample_rate as f32) * 0.016) as usize; // 16ms (~256 samples at 16kHz)
 
     if samples.len() < frame_size {
         // Fallback for extremely short bursts
         let mut feats = AcousticFeatures::default();
-        feats.rms_energy = (samples.iter().map(|&s| s * s).sum::<f32>() / samples.len().max(1) as f32).sqrt();
+        feats.rms_energy =
+            (samples.iter().map(|&s| s * s).sum::<f32>() / samples.len().max(1) as f32).sqrt();
         return feats;
     }
 
     let min_lag = (sample_rate / 400) as usize; // ~40 samples (400 Hz)
-    let max_lag = (sample_rate / 80) as usize;  // ~200 samples (80 Hz)
+    let max_lag = (sample_rate / 80) as usize; // ~200 samples (80 Hz)
 
     let mut pitch_list: Vec<f32> = Vec::new();
     let mut band_energy_accum = [0.0f32; 8];
@@ -153,7 +154,12 @@ pub fn extract_segment_features(samples: &[f32], sample_rate: u32) -> AcousticFe
 /// Compute cosine distance between two spectral profiles + normalized pitch distance
 pub fn acoustic_distance(a: &AcousticFeatures, b: &AcousticFeatures) -> f32 {
     // 1. Cosine Distance on 8-Band Spectral Profile (Vocal Tract Envelope)
-    let dot: f32 = a.spectral_bands.iter().zip(b.spectral_bands.iter()).map(|(&x, &y)| x * y).sum();
+    let dot: f32 = a
+        .spectral_bands
+        .iter()
+        .zip(b.spectral_bands.iter())
+        .map(|(&x, &y)| x * y)
+        .sum();
     let spectral_cosine_dist = (1.0 - dot).clamp(0.0, 2.0);
 
     // 2. Relative Pitch ($F_0$) Distance
@@ -219,11 +225,19 @@ pub fn cluster_speakers(
 
         for i in 0..unique_clusters.len() {
             let c_i = unique_clusters[i];
-            let segs_i: Vec<usize> = cluster_assignments.iter().enumerate().filter_map(|(idx, &c)| if c == c_i { Some(idx) } else { None }).collect();
+            let segs_i: Vec<usize> = cluster_assignments
+                .iter()
+                .enumerate()
+                .filter_map(|(idx, &c)| if c == c_i { Some(idx) } else { None })
+                .collect();
 
             for j in (i + 1)..unique_clusters.len() {
                 let c_j = unique_clusters[j];
-                let segs_j: Vec<usize> = cluster_assignments.iter().enumerate().filter_map(|(idx, &c)| if c == c_j { Some(idx) } else { None }).collect();
+                let segs_j: Vec<usize> = cluster_assignments
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(idx, &c)| if c == c_j { Some(idx) } else { None })
+                    .collect();
 
                 let mut dist_sum = 0.0f32;
                 let mut pairs = 0;
@@ -235,7 +249,11 @@ pub fn cluster_speakers(
                     }
                 }
 
-                let avg_dist = if pairs > 0 { dist_sum / (pairs as f32) } else { f32::MAX };
+                let avg_dist = if pairs > 0 {
+                    dist_sum / (pairs as f32)
+                } else {
+                    f32::MAX
+                };
 
                 if avg_dist < min_cluster_dist {
                     min_cluster_dist = avg_dist;
@@ -262,7 +280,9 @@ pub fn cluster_speakers(
 
     // 3. Temporal Continuity Smoothing (Markov Continuity Pass)
     for i in 0..(num_segs.saturating_sub(1)) {
-        let gap_ms = segments[i + 1].start_time_ms.saturating_sub(segments[i].end_time_ms);
+        let gap_ms = segments[i + 1]
+            .start_time_ms
+            .saturating_sub(segments[i].end_time_ms);
         if gap_ms < 1200 {
             let dist = acoustic_distance(&features[i], &features[i + 1]);
             if dist < 0.48 {
@@ -276,7 +296,9 @@ pub fn cluster_speakers(
         if cluster_assignments[i - 1] == cluster_assignments[i + 1]
             && cluster_assignments[i] != cluster_assignments[i - 1]
         {
-            let seg_dur_ms = segments[i].end_time_ms.saturating_sub(segments[i].start_time_ms);
+            let seg_dur_ms = segments[i]
+                .end_time_ms
+                .saturating_sub(segments[i].start_time_ms);
             if seg_dur_ms < 2500 {
                 let dist_to_neighbor = acoustic_distance(&features[i], &features[i - 1]);
                 if dist_to_neighbor < 0.52 {
@@ -310,12 +332,19 @@ pub fn resolve_speaker_names(segments: &mut [TranscriptSegment]) {
     }
 
     // Multi-lingual Regex Patterns (English & Turkish)
-    let tr_intro_regex = Regex::new(r"(?i)\b(benim adım|benim ismim|adım|ismim)\s+([A-ZÇĞİÖŞÜ][a-zçğıöşü]{2,})\b").unwrap();
+    let tr_intro_regex =
+        Regex::new(r"(?i)\b(benim adım|benim ismim|adım|ismim)\s+([A-ZÇĞİÖŞÜ][a-zçğıöşü]{2,})\b")
+            .unwrap();
     let en_intro_regex = Regex::new(r"(?i)\b(my name is|i am|i'm)\s+([A-Z][a-z]{2,})\b").unwrap();
-    let en_this_is_regex = Regex::new(r"(?i)\b(this is)\s+([A-Z][a-z]{2,})\s+(speaking|here|from|calling)\b").unwrap();
+    let en_this_is_regex =
+        Regex::new(r"(?i)\b(this is)\s+([A-Z][a-z]{2,})\s+(speaking|here|from|calling)\b").unwrap();
 
-    let tr_vocative_regex = Regex::new(r"\b([A-ZÇĞİÖŞÜ][a-zçğıöşü]{2,})\s+(Bey|Hanım|Hocam)\b").unwrap();
-    let en_vocative_regex = Regex::new(r"(?i)\b(hey|thanks|thank you|go ahead|over to you|what do you think)\s+([A-Z][a-z]{2,})\b").unwrap();
+    let tr_vocative_regex =
+        Regex::new(r"\b([A-ZÇĞİÖŞÜ][a-zçğıöşü]{2,})\s+(Bey|Hanım|Hocam)\b").unwrap();
+    let en_vocative_regex = Regex::new(
+        r"(?i)\b(hey|thanks|thank you|go ahead|over to you|what do you think)\s+([A-Z][a-z]{2,})\b",
+    )
+    .unwrap();
     let en_title_regex = Regex::new(r"\b(Mr\.|Dr\.|Ms\.|Mrs\.)\s+([A-Z][a-z]{2,})\b").unwrap();
 
     let mut speaker_names: HashMap<String, String> = HashMap::new();
@@ -351,7 +380,10 @@ pub fn resolve_speaker_names(segments: &mut [TranscriptSegment]) {
         // 2. Turkish Direct Vocatives ("Sercan Bey", "Şeyma Hanım")
         if let Some(caps) = tr_vocative_regex.captures(text) {
             let lower = text.to_lowercase();
-            let is_3rd_person = lower.contains("görüştük") || lower.contains("konuştuk") || lower.contains("dedi") || lower.contains("ile");
+            let is_3rd_person = lower.contains("görüştük")
+                || lower.contains("konuştuk")
+                || lower.contains("dedi")
+                || lower.contains("ile");
             if !is_3rd_person {
                 if let Some(name_match) = caps.get(1) {
                     let honorific = caps.get(2).map(|m| m.as_str()).unwrap_or("Bey");
@@ -382,7 +414,11 @@ pub fn resolve_speaker_names(segments: &mut [TranscriptSegment]) {
         // 4. English Titles ("Dr. Watson", "Mr. Smith")
         if let Some(caps) = en_title_regex.captures(text) {
             if let (Some(title), Some(name_match)) = (caps.get(1), caps.get(2)) {
-                let full = format!("{} {}", title.as_str(), capitalize_first(name_match.as_str()));
+                let full = format!(
+                    "{} {}",
+                    title.as_str(),
+                    capitalize_first(name_match.as_str())
+                );
                 if i + 1 < segments.len() {
                     let next_spk = &segments[i + 1].speaker_id;
                     if next_spk != speaker_id && !speaker_names.contains_key(next_spk) {
@@ -427,23 +463,172 @@ fn is_stopword(s: &str) -> bool {
     let lower = s.to_lowercase();
     let stopwords = [
         // Turkish
-        "evet", "hayır", "tamam", "peki", "yani", "olur", "çünkü", "bence", "zaten", "artık",
-        "tabii", "tabi", "öyle", "böyle", "şöyle", "nasıl", "neden", "niçin", "nerede", "kim",
-        "bir", "iki", "üç", "dört", "beş", "on", "yüz", "bin", "lütfen", "merhaba", "selam",
-        "burada", "şurada", "orada", "şimdi", "sonra", "önce", "kadar", "gibi", "ile", "için",
-        "fakat", "lakin", "ancak", "çünkü", "veya", "yahut", "belki", "kesinlikle", "aslında",
+        "evet",
+        "hayır",
+        "tamam",
+        "peki",
+        "yani",
+        "olur",
+        "çünkü",
+        "bence",
+        "zaten",
+        "artık",
+        "tabii",
+        "tabi",
+        "öyle",
+        "böyle",
+        "şöyle",
+        "nasıl",
+        "neden",
+        "niçin",
+        "nerede",
+        "kim",
+        "bir",
+        "iki",
+        "üç",
+        "dört",
+        "beş",
+        "on",
+        "yüz",
+        "bin",
+        "lütfen",
+        "merhaba",
+        "selam",
+        "burada",
+        "şurada",
+        "orada",
+        "şimdi",
+        "sonra",
+        "önce",
+        "kadar",
+        "gibi",
+        "ile",
+        "için",
+        "fakat",
+        "lakin",
+        "ancak",
+        "çünkü",
+        "veya",
+        "yahut",
+        "belki",
+        "kesinlikle",
+        "aslında",
         // English
-        "yes", "no", "not", "okay", "ok", "right", "sure", "well", "hello", "hi", "hey", "thanks", "thank",
-        "good", "great", "now", "here", "there", "today", "yesterday", "tomorrow", "everyone",
-        "all", "guys", "folks", "team", "people", "morning", "afternoon", "evening", "also", "just",
-        "this", "that", "these", "those", "what", "where", "when", "why", "how", "who", "which",
-        "have", "having", "had", "has", "been", "being", "will", "would", "shall", "should", "can",
-        "could", "may", "might", "must", "done", "doing", "does", "think", "thinking", "thought",
-        "going", "trying", "saying", "said", "tell", "telling", "told", "really", "very", "much",
-        "more", "most", "some", "any", "other", "another", "such", "only", "own", "same", "so",
-        "than", "too", "very", "just", "about", "above", "after", "again", "against", "because",
-        "before", "below", "between", "both", "during", "each", "few", "from", "further", "into",
-        "through", "under", "until", "while", "with", "without", "able", "unable", "happy", "sorry"
+        "yes",
+        "no",
+        "not",
+        "okay",
+        "ok",
+        "right",
+        "sure",
+        "well",
+        "hello",
+        "hi",
+        "hey",
+        "thanks",
+        "thank",
+        "good",
+        "great",
+        "now",
+        "here",
+        "there",
+        "today",
+        "yesterday",
+        "tomorrow",
+        "everyone",
+        "all",
+        "guys",
+        "folks",
+        "team",
+        "people",
+        "morning",
+        "afternoon",
+        "evening",
+        "also",
+        "just",
+        "this",
+        "that",
+        "these",
+        "those",
+        "what",
+        "where",
+        "when",
+        "why",
+        "how",
+        "who",
+        "which",
+        "have",
+        "having",
+        "had",
+        "has",
+        "been",
+        "being",
+        "will",
+        "would",
+        "shall",
+        "should",
+        "can",
+        "could",
+        "may",
+        "might",
+        "must",
+        "done",
+        "doing",
+        "does",
+        "think",
+        "thinking",
+        "thought",
+        "going",
+        "trying",
+        "saying",
+        "said",
+        "tell",
+        "telling",
+        "told",
+        "really",
+        "very",
+        "much",
+        "more",
+        "most",
+        "some",
+        "any",
+        "other",
+        "another",
+        "such",
+        "only",
+        "own",
+        "same",
+        "so",
+        "than",
+        "too",
+        "very",
+        "just",
+        "about",
+        "above",
+        "after",
+        "again",
+        "against",
+        "because",
+        "before",
+        "below",
+        "between",
+        "both",
+        "during",
+        "each",
+        "few",
+        "from",
+        "further",
+        "into",
+        "through",
+        "under",
+        "until",
+        "while",
+        "with",
+        "without",
+        "able",
+        "unable",
+        "happy",
+        "sorry",
     ];
     stopwords.contains(&lower.as_str()) || lower.len() < 3
 }

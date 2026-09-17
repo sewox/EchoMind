@@ -1,8 +1,8 @@
+use crate::storage::get_storage_dir;
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
-use crate::storage::get_storage_dir;
 
 // Obfuscation and hardware-bound encryption key
 fn get_vault_key() -> Vec<u8> {
@@ -10,7 +10,11 @@ fn get_vault_key() -> Vec<u8> {
     let salt = b"EchoMind_Secure_Vault_Salt_v1_2025_#99!";
     let mut key = Vec::new();
     for (i, &b) in salt.iter().enumerate() {
-        let h_byte = hostname.as_bytes().get(i % hostname.len()).copied().unwrap_or(0x42);
+        let h_byte = hostname
+            .as_bytes()
+            .get(i % hostname.len())
+            .copied()
+            .unwrap_or(0x42);
         key.push(b ^ h_byte);
     }
     key

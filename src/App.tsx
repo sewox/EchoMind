@@ -33,6 +33,7 @@ import {
   SmartAdvisorModal,
   PickedFileInfo,
 } from "./components/SmartAdvisorModal";
+import { usePrivacyMode } from "./hooks/usePrivacyMode";
 import { CloudPrivacyConfirmModal } from "./components/CloudPrivacyConfirmModal";
 import { DeleteConfirmModal } from "./components/DeleteConfirmModal";
 import { GlobalAssistantModal } from "./components/GlobalAssistantModal";
@@ -127,6 +128,7 @@ import { getTagColorClass } from "./components/transcript/MeetingTagsBar";
 
 export function App() {
   const { t, language, setLanguage } = useI18n();
+  const { isParanoid } = usePrivacyMode();
   const [hardware, setHardware] = useState<HardwareInfo | null>(null);
   const [modelStatus, setModelStatus] = useState<ModelStatus | null>(null);
   const [selectedLanguage, setSelectedLanguage] = useState<string>("auto");
@@ -200,6 +202,7 @@ export function App() {
     useState<UpdateCheckResult | null>(null);
 
   const selectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     return () => {
@@ -438,6 +441,11 @@ export function App() {
     );
 
     const unlistenStop = listen("trigger-stop-recording", async () => {
+      try {
+        await invoke("stop_audio_capture");
+      } catch {
+        // Safe fallback if already stopped
+      }
       setIsRecording(false);
       await handleSaveCurrentMeeting();
     });
@@ -687,18 +695,19 @@ export function App() {
     }
   };
 
-  const handlePickAndImportAudioFile = async () => {
+  const processPickedFile = async (picked: PickedFileInfo) => {
     try {
-      const picked = await invoke<PickedFileInfo | null>(
-        "pick_audio_file_dialog",
-      );
-      if (!picked) return;
-
       const activeEngine =
         localStorage.getItem("echomind_active_engine") || "local";
       const groqKey = await CredentialStore.get("echomind_groq_key");
       const geminiKey = await CredentialStore.get("echomind_gemini_key");
       const openaiKey = await CredentialStore.get("echomind_openai_key");
+
+      // In Paranoid Mode: 100% offline local processing only (zero cloud leakage)
+      if (isParanoid) {
+        checkCloudPrivacyAndExecute(picked.path, null, null, undefined);
+        return;
+      }
 
       // If file is large (>12MB) and currently set to local mode,
       // present smart advisor recommendation
@@ -748,9 +757,42 @@ export function App() {
         modelVersion,
       );
     } catch (err) {
+      console.error("Failed to process picked audio file:", err);
+    }
+  };
+
+  const handlePickAndImportAudioFile = async () => {
+    try {
+      const picked = await invoke<PickedFileInfo | null>(
+        "pick_audio_file_dialog",
+      );
+
+      if (!picked) {
+        fileInputRef.current?.click();
+        return;
+      }
+
+      await processPickedFile(picked);
+    } catch (err) {
       console.error("Failed to pick audio file:", err);
       alert(`Dosya seçme hatası: ${err}`);
     }
+  };
+
+  const handleNativeHtmlFileInput = (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const path = (file as any).path || file.name;
+    const picked: PickedFileInfo = {
+      path,
+      file_name: file.name,
+      file_size_mb: Math.round((file.size / (1024 * 1024)) * 10) / 10,
+      is_large_file: file.size > 12 * 1024 * 1024,
+    };
+    processPickedFile(picked);
+    e.target.value = "";
   };
 
   const formatTimer = (totalSeconds: number) => {
@@ -829,6 +871,17 @@ export function App() {
               ))}
             </select>
           </div>
+
+          {updateCheckInfo?.is_update_available && (
+            <button
+              onClick={() => setIsUpdateModalOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/40 text-xs font-semibold text-amber-300 hover:bg-amber-500/30 transition shadow-sm"
+              title="Yeni sürüm indirilebilir"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              <span>Güncelle (v{updateCheckInfo.latest_version})</span>
+            </button>
+          )}
 
           <button
             onClick={() => setIsGlobalAssistantOpen(true)}
@@ -972,6 +1025,25 @@ export function App() {
                 />
               ))}
             </div>
+
+            {/* Loopback / System Audio Guidance */}
+            {isRecording && (
+              <div
+                data-testid="audio-loopback-hint"
+                className="flex items-center justify-center gap-1.5 text-[11px] text-slate-400"
+              >
+                <Mic className="w-3 h-3 text-emerald-400" />
+                <span>Mikrofon Aktif</span>
+                <span className="text-slate-600">•</span>
+                <button
+                  type="button"
+                  onClick={() => setIsSettingsOpen(true)}
+                  className="text-cyan-400 hover:text-cyan-300 underline underline-offset-2 transition cursor-pointer"
+                >
+                  Karşı tarafın sesi (Meet/Zoom) için Loopback / BlackHole seçin
+                </button>
+              </div>
+            )}
           </section>
         )}
 
@@ -1329,6 +1401,17 @@ export function App() {
       <CustomContextMenu
         onOpenAssistant={() => setIsGlobalAssistantOpen(true)}
         onOpenSettings={() => setIsSettingsOpen(true)}
+      />
+
+      {/* Hidden File Input for Linux / Headless Desktop Picker Fallback */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        className="hidden"
+        style={{ display: "none" }}
+        accept="audio/*,video/*,.mp3,.m4a,.wav,.ogg,.opus,.flac,.aac,.3gp,.mp4,.caf,.wma"
+        onChange={handleNativeHtmlFileInput}
+        data-testid="hidden-audio-file-input"
       />
     </div>
   );

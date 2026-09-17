@@ -1,8 +1,8 @@
+use super::types::SummaryResult;
+use crate::storage::MeetingRecord;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::OnceLock;
-use crate::storage::MeetingRecord;
-use super::types::SummaryResult;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReportLabels {
@@ -86,16 +86,39 @@ impl MeetingExporter {
     ) -> String {
         let labels = ReportLabels::for_lang(lang_code);
         let mut md = String::new();
-        md.push_str(&format!("# {}: {}\n", labels.report_title_prefix, record.title));
-        md.push_str(&format!("**{}:** {} • **{}:** {}\n\n", labels.date_label, record.date_formatted, labels.duration_label, record.duration_formatted));
-        
-        let goal_opt = custom_summary.map(|s| &s.meeting_goal).or(record.meeting_goal.as_ref());
-        let highlights_opt = custom_summary.map(|s| &s.key_highlights).or(record.key_highlights.as_ref());
-        let actions_opt = custom_summary.map(|s| &s.action_items).or(record.action_items.as_ref());
-        let phase1_opt = custom_summary.map(|s| &s.phase1_agreed).or(record.phase1_agreed.as_ref());
-        let phase2_opt = custom_summary.map(|s| &s.phase2_deferred).or(record.phase2_deferred.as_ref());
-        let topics_opt = custom_summary.map(|s| &s.detailed_topics).or(record.detailed_topics.as_ref());
-        let parts_opt = custom_summary.map(|s| &s.participants).or(record.participants.as_ref());
+        md.push_str(&format!(
+            "# {}: {}\n",
+            labels.report_title_prefix, record.title
+        ));
+        md.push_str(&format!(
+            "**{}:** {} • **{}:** {}\n\n",
+            labels.date_label,
+            record.date_formatted,
+            labels.duration_label,
+            record.duration_formatted
+        ));
+
+        let goal_opt = custom_summary
+            .map(|s| &s.meeting_goal)
+            .or(record.meeting_goal.as_ref());
+        let highlights_opt = custom_summary
+            .map(|s| &s.key_highlights)
+            .or(record.key_highlights.as_ref());
+        let actions_opt = custom_summary
+            .map(|s| &s.action_items)
+            .or(record.action_items.as_ref());
+        let phase1_opt = custom_summary
+            .map(|s| &s.phase1_agreed)
+            .or(record.phase1_agreed.as_ref());
+        let phase2_opt = custom_summary
+            .map(|s| &s.phase2_deferred)
+            .or(record.phase2_deferred.as_ref());
+        let topics_opt = custom_summary
+            .map(|s| &s.detailed_topics)
+            .or(record.detailed_topics.as_ref());
+        let parts_opt = custom_summary
+            .map(|s| &s.participants)
+            .or(record.participants.as_ref());
 
         // 1. Amaç / Purpose
         if let Some(goal) = goal_opt {
@@ -120,13 +143,27 @@ impl MeetingExporter {
                 md.push_str(&format!("### {}\n", labels.action_items_title));
                 for a in actions {
                     let check = if a.is_completed { "[x]" } else { "[ ]" };
-                    let assignee_str = a.assignee.as_deref().map(|p| format!(" ➔ **{}**", p)).unwrap_or_default();
+                    let assignee_str = a
+                        .assignee
+                        .as_deref()
+                        .map(|p| format!(" ➔ **{}**", p))
+                        .unwrap_or_default();
                     let cite_str = if !a.source_citations.is_empty() {
-                        format!(" ({})", a.source_citations.iter().map(|c| c.to_string()).collect::<Vec<_>>().join(", "))
+                        format!(
+                            " ({})",
+                            a.source_citations
+                                .iter()
+                                .map(|c| c.to_string())
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        )
                     } else {
                         "".to_string()
                     };
-                    md.push_str(&format!("- {} {}{}{}\n", check, a.task, assignee_str, cite_str));
+                    md.push_str(&format!(
+                        "- {} {}{}{}\n",
+                        check, a.task, assignee_str, cite_str
+                    ));
                 }
                 md.push_str("\n");
             }
@@ -179,7 +216,10 @@ impl MeetingExporter {
         // 8. Transkript Dökümü
         md.push_str(&format!("## {}\n", labels.transcript_title));
         for seg in &record.segments {
-            md.push_str(&format!("**[{}] {}**: {}\n", seg.timestamp_formatted, seg.speaker_name, seg.text));
+            md.push_str(&format!(
+                "**[{}] {}**: {}\n",
+                seg.timestamp_formatted, seg.speaker_name, seg.text
+            ));
         }
 
         md
@@ -191,19 +231,41 @@ impl MeetingExporter {
         lang_code: Option<&str>,
     ) -> String {
         let labels = ReportLabels::for_lang(lang_code);
-        let goal_opt = custom_summary.map(|s| &s.meeting_goal).or(record.meeting_goal.as_ref());
-        let highlights_opt = custom_summary.map(|s| &s.key_highlights).or(record.key_highlights.as_ref());
-        let actions_opt = custom_summary.map(|s| &s.action_items).or(record.action_items.as_ref());
-        let phase1_opt = custom_summary.map(|s| &s.phase1_agreed).or(record.phase1_agreed.as_ref());
-        let phase2_opt = custom_summary.map(|s| &s.phase2_deferred).or(record.phase2_deferred.as_ref());
-        let topics_opt = custom_summary.map(|s| &s.detailed_topics).or(record.detailed_topics.as_ref());
-        let parts_opt = custom_summary.map(|s| &s.participants).or(record.participants.as_ref());
-        let provider_str = custom_summary.map(|s| s.provider_used.as_str()).or(record.summary_provider.as_deref());
+        let goal_opt = custom_summary
+            .map(|s| &s.meeting_goal)
+            .or(record.meeting_goal.as_ref());
+        let highlights_opt = custom_summary
+            .map(|s| &s.key_highlights)
+            .or(record.key_highlights.as_ref());
+        let actions_opt = custom_summary
+            .map(|s| &s.action_items)
+            .or(record.action_items.as_ref());
+        let phase1_opt = custom_summary
+            .map(|s| &s.phase1_agreed)
+            .or(record.phase1_agreed.as_ref());
+        let phase2_opt = custom_summary
+            .map(|s| &s.phase2_deferred)
+            .or(record.phase2_deferred.as_ref());
+        let topics_opt = custom_summary
+            .map(|s| &s.detailed_topics)
+            .or(record.detailed_topics.as_ref());
+        let parts_opt = custom_summary
+            .map(|s| &s.participants)
+            .or(record.participants.as_ref());
+        let provider_str = custom_summary
+            .map(|s| s.provider_used.as_str())
+            .or(record.summary_provider.as_deref());
 
         let mut html = String::new();
-        html.push_str(&format!("<!DOCTYPE html>\n<html lang=\"{}\">\n<head>\n", labels.html_lang));
+        html.push_str(&format!(
+            "<!DOCTYPE html>\n<html lang=\"{}\">\n<head>\n",
+            labels.html_lang
+        ));
         html.push_str("<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n");
-        html.push_str(&format!("<title>{} - {}</title>\n", labels.report_title_prefix, record.title));
+        html.push_str(&format!(
+            "<title>{} - {}</title>\n",
+            labels.report_title_prefix, record.title
+        ));
         html.push_str(r#"<style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 :root {
@@ -405,17 +467,35 @@ body {
         html.push_str("<div class=\"badge-app\">EchoMind AI Meeting Assistant</div>\n");
         html.push_str(&format!("<h1>{}</h1>\n", escape_html(&record.title)));
         html.push_str("<div class=\"meta-row\">\n");
-        html.push_str(&format!("<div class=\"meta-item\">{}: <strong>{}</strong></div>\n", labels.date_label, escape_html(&record.date_formatted)));
-        html.push_str(&format!("<div class=\"meta-item\">{}: <strong>{}</strong></div>\n", labels.duration_label, escape_html(&record.duration_formatted)));
+        html.push_str(&format!(
+            "<div class=\"meta-item\">{}: <strong>{}</strong></div>\n",
+            labels.date_label,
+            escape_html(&record.date_formatted)
+        ));
+        html.push_str(&format!(
+            "<div class=\"meta-item\">{}: <strong>{}</strong></div>\n",
+            labels.duration_label,
+            escape_html(&record.duration_formatted)
+        ));
         if let Some(prov) = provider_str {
-            html.push_str(&format!("<div class=\"meta-item\">{}: <strong>{}</strong></div>\n", labels.model_label, escape_html(prov)));
+            html.push_str(&format!(
+                "<div class=\"meta-item\">{}: <strong>{}</strong></div>\n",
+                labels.model_label,
+                escape_html(prov)
+            ));
         }
         html.push_str("</div>\n</div>\n");
 
         // Goal
         if let Some(goal) = goal_opt {
-            html.push_str(&format!("<div class=\"card\">\n<div class=\"card-title\">{}</div>\n", labels.meeting_goal_title));
-            html.push_str(&format!("<div class=\"goal-text\">{}</div>\n</div>\n", escape_html(goal)));
+            html.push_str(&format!(
+                "<div class=\"card\">\n<div class=\"card-title\">{}</div>\n",
+                labels.meeting_goal_title
+            ));
+            html.push_str(&format!(
+                "<div class=\"goal-text\">{}</div>\n</div>\n",
+                escape_html(goal)
+            ));
         }
 
         // Highlights
@@ -432,7 +512,10 @@ body {
         // Action items
         if let Some(actions) = actions_opt {
             if !actions.is_empty() {
-                html.push_str(&format!("<div class=\"card\">\n<div class=\"card-title\">{}</div>\n", labels.action_items_title));
+                html.push_str(&format!(
+                    "<div class=\"card\">\n<div class=\"card-title\">{}</div>\n",
+                    labels.action_items_title
+                ));
                 for a in actions {
                     let completed_cls = if a.is_completed { " completed" } else { "" };
                     html.push_str(&format!("<div class=\"action-item{}\">\n", completed_cls));
@@ -440,7 +523,11 @@ body {
                     html.push_str("<div class=\"action-content\">\n");
                     html.push_str(&format!("<div>{}</div>\n", escape_html(&a.task)));
                     if let Some(ref ass) = a.assignee {
-                        html.push_str(&format!("<span class=\"assignee-badge\">{}: {}</span>\n", labels.assignee_label, escape_html(ass)));
+                        html.push_str(&format!(
+                            "<span class=\"assignee-badge\">{}: {}</span>\n",
+                            labels.assignee_label,
+                            escape_html(ass)
+                        ));
                     }
                     html.push_str("</div>\n</div>\n");
                 }
@@ -473,12 +560,18 @@ body {
         // Topics
         if let Some(topics) = topics_opt {
             if !topics.is_empty() {
-                html.push_str(&format!("<div class=\"card\">\n<div class=\"card-title\">{}</div>\n", labels.detailed_topics_title));
+                html.push_str(&format!(
+                    "<div class=\"card\">\n<div class=\"card-title\">{}</div>\n",
+                    labels.detailed_topics_title
+                ));
                 for t in topics {
                     html.push_str("<div class=\"topic-card\">\n");
                     html.push_str(&format!("<div class=\"topic-title\">{}</div>\n<ul style=\"padding-left:18px; font-size:13.5px; color:#334155;\">\n", escape_html(&t.topic_title)));
                     for b in &t.bullet_points {
-                        html.push_str(&format!("<li style=\"margin-bottom:6px;\">{}</li>\n", escape_html(b)));
+                        html.push_str(&format!(
+                            "<li style=\"margin-bottom:6px;\">{}</li>\n",
+                            escape_html(b)
+                        ));
                     }
                     html.push_str("</ul>\n</div>\n");
                 }
@@ -491,7 +584,10 @@ body {
             if !parts.is_empty() {
                 html.push_str(&format!("<div class=\"card\">\n<div class=\"card-title\">{}</div>\n<div class=\"participants-tags\">\n", labels.participants_title));
                 for p in parts {
-                    html.push_str(&format!("<span class=\"participant-tag\">{}</span>\n", escape_html(p)));
+                    html.push_str(&format!(
+                        "<span class=\"participant-tag\">{}</span>\n",
+                        escape_html(p)
+                    ));
                 }
                 html.push_str("</div>\n</div>\n");
             }
@@ -511,19 +607,45 @@ body {
         lang_code: Option<&str>,
     ) -> String {
         let labels = ReportLabels::for_lang(lang_code);
-        let goal_opt = custom_summary.map(|s| &s.meeting_goal).or(record.meeting_goal.as_ref());
-        let highlights_opt = custom_summary.map(|s| &s.key_highlights).or(record.key_highlights.as_ref());
-        let actions_opt = custom_summary.map(|s| &s.action_items).or(record.action_items.as_ref());
-        let phase1_opt = custom_summary.map(|s| &s.phase1_agreed).or(record.phase1_agreed.as_ref());
-        let phase2_opt = custom_summary.map(|s| &s.phase2_deferred).or(record.phase2_deferred.as_ref());
-        let parts_opt = custom_summary.map(|s| &s.participants).or(record.participants.as_ref());
+        let goal_opt = custom_summary
+            .map(|s| &s.meeting_goal)
+            .or(record.meeting_goal.as_ref());
+        let highlights_opt = custom_summary
+            .map(|s| &s.key_highlights)
+            .or(record.key_highlights.as_ref());
+        let actions_opt = custom_summary
+            .map(|s| &s.action_items)
+            .or(record.action_items.as_ref());
+        let phase1_opt = custom_summary
+            .map(|s| &s.phase1_agreed)
+            .or(record.phase1_agreed.as_ref());
+        let phase2_opt = custom_summary
+            .map(|s| &s.phase2_deferred)
+            .or(record.phase2_deferred.as_ref());
+        let parts_opt = custom_summary
+            .map(|s| &s.participants)
+            .or(record.participants.as_ref());
 
         let mut text = String::new();
-        text.push_str(&format!("📌 {}: {}\n", labels.report_title_prefix.to_uppercase(), record.title));
-        text.push_str(&format!("{}: {} | {}: {}\n", labels.date_label, record.date_formatted, labels.duration_label, record.duration_formatted));
+        text.push_str(&format!(
+            "📌 {}: {}\n",
+            labels.report_title_prefix.to_uppercase(),
+            record.title
+        ));
+        text.push_str(&format!(
+            "{}: {} | {}: {}\n",
+            labels.date_label,
+            record.date_formatted,
+            labels.duration_label,
+            record.duration_formatted
+        ));
         if let Some(parts) = parts_opt {
             if !parts.is_empty() {
-                text.push_str(&format!("{}: {}\n", labels.participants_title, parts.join(", ")));
+                text.push_str(&format!(
+                    "{}: {}\n",
+                    labels.participants_title,
+                    parts.join(", ")
+                ));
             }
         }
         text.push_str("--------------------------------------------------\n\n");
@@ -547,8 +669,16 @@ body {
             if !actions.is_empty() {
                 text.push_str(&format!("{}:\n", labels.action_items_title.to_uppercase()));
                 for a in actions {
-                    let status = if a.is_completed { "[DONE]" } else { "[PENDING]" };
-                    let assignee = a.assignee.as_deref().map(|p| format!(" ({}: {})", labels.assignee_label, p)).unwrap_or_default();
+                    let status = if a.is_completed {
+                        "[DONE]"
+                    } else {
+                        "[PENDING]"
+                    };
+                    let assignee = a
+                        .assignee
+                        .as_deref()
+                        .map(|p| format!(" ({}: {})", labels.assignee_label, p))
+                        .unwrap_or_default();
                     text.push_str(&format!("• {} {}{}\n", status, a.task, assignee));
                 }
                 text.push_str("\n");
@@ -586,20 +716,45 @@ body {
         lang_code: Option<&str>,
     ) -> String {
         let labels = ReportLabels::for_lang(lang_code);
-        let goal_opt = custom_summary.map(|s| &s.meeting_goal).or(record.meeting_goal.as_ref());
-        let highlights_opt = custom_summary.map(|s| &s.key_highlights).or(record.key_highlights.as_ref());
-        let actions_opt = custom_summary.map(|s| &s.action_items).or(record.action_items.as_ref());
-        let phase1_opt = custom_summary.map(|s| &s.phase1_agreed).or(record.phase1_agreed.as_ref());
-        let phase2_opt = custom_summary.map(|s| &s.phase2_deferred).or(record.phase2_deferred.as_ref());
-        let parts_opt = custom_summary.map(|s| &s.participants).or(record.participants.as_ref());
+        let goal_opt = custom_summary
+            .map(|s| &s.meeting_goal)
+            .or(record.meeting_goal.as_ref());
+        let highlights_opt = custom_summary
+            .map(|s| &s.key_highlights)
+            .or(record.key_highlights.as_ref());
+        let actions_opt = custom_summary
+            .map(|s| &s.action_items)
+            .or(record.action_items.as_ref());
+        let phase1_opt = custom_summary
+            .map(|s| &s.phase1_agreed)
+            .or(record.phase1_agreed.as_ref());
+        let phase2_opt = custom_summary
+            .map(|s| &s.phase2_deferred)
+            .or(record.phase2_deferred.as_ref());
+        let parts_opt = custom_summary
+            .map(|s| &s.participants)
+            .or(record.participants.as_ref());
 
         let mut slack = String::new();
-        slack.push_str(&format!("*📋 {} — {}*\n", labels.report_title_prefix, record.title));
-        slack.push_str(&format!("_{}: {} • {}: {}_\n", labels.date_label, record.date_formatted, labels.duration_label, record.duration_formatted));
+        slack.push_str(&format!(
+            "*📋 {} — {}*\n",
+            labels.report_title_prefix, record.title
+        ));
+        slack.push_str(&format!(
+            "_{}: {} • {}: {}_\n",
+            labels.date_label,
+            record.date_formatted,
+            labels.duration_label,
+            record.duration_formatted
+        ));
 
         if let Some(parts) = parts_opt {
             if !parts.is_empty() {
-                slack.push_str(&format!("*{}:* _{}_\n", labels.participants_title, parts.join(", ")));
+                slack.push_str(&format!(
+                    "*{}:* _{}_\n",
+                    labels.participants_title,
+                    parts.join(", ")
+                ));
             }
         }
         slack.push_str("\n");
@@ -623,7 +778,11 @@ body {
                 slack.push_str(&format!("*{}*\n", labels.action_items_title));
                 for a in actions {
                     let box_emoji = if a.is_completed { "☑️" } else { "◻️" };
-                    let assignee = a.assignee.as_deref().map(|p| format!(" _(@{})_", p)).unwrap_or_default();
+                    let assignee = a
+                        .assignee
+                        .as_deref()
+                        .map(|p| format!(" _(@{})_", p))
+                        .unwrap_or_default();
                     slack.push_str(&format!("{} *{}*{}\n", box_emoji, a.task, assignee));
                 }
                 slack.push_str("\n");
@@ -659,7 +818,9 @@ body {
         record: &MeetingRecord,
         custom_summary: Option<&SummaryResult>,
     ) -> String {
-        let actions_opt = custom_summary.map(|s| &s.action_items).or(record.action_items.as_ref());
+        let actions_opt = custom_summary
+            .map(|s| &s.action_items)
+            .or(record.action_items.as_ref());
         let mut csv = String::new();
         csv.push_str("\"ID\",\"Task\",\"Assignee\",\"Status\",\"Meeting Title\",\"Date\"\n");
 
@@ -687,14 +848,23 @@ body {
         record: &MeetingRecord,
         custom_summary: Option<&SummaryResult>,
     ) -> String {
-        let actions_opt = custom_summary.map(|s| &s.action_items).or(record.action_items.as_ref());
+        let actions_opt = custom_summary
+            .map(|s| &s.action_items)
+            .or(record.action_items.as_ref());
         let mut md = String::new();
-        md.push_str(&format!("# ✅ Aksiyon Maddeleri: {} ({})\n\n", record.title, record.date_formatted));
+        md.push_str(&format!(
+            "# ✅ Aksiyon Maddeleri: {} ({})\n\n",
+            record.title, record.date_formatted
+        ));
 
         if let Some(actions) = actions_opt {
             for a in actions {
                 let check = if a.is_completed { "[x]" } else { "[ ]" };
-                let assignee = a.assignee.as_deref().map(|p| format!(" (@{})", p)).unwrap_or_default();
+                let assignee = a
+                    .assignee
+                    .as_deref()
+                    .map(|p| format!(" (@{})", p))
+                    .unwrap_or_default();
                 md.push_str(&format!("- {} **{}**{}\n", check, a.task, assignee));
             }
         }
@@ -707,10 +877,18 @@ body {
         lang_code: Option<&str>,
     ) -> (String, String) {
         let labels = ReportLabels::for_lang(lang_code);
-        let goal_opt = custom_summary.map(|s| &s.meeting_goal).or(record.meeting_goal.as_ref());
-        let highlights_opt = custom_summary.map(|s| &s.key_highlights).or(record.key_highlights.as_ref());
-        let actions_opt = custom_summary.map(|s| &s.action_items).or(record.action_items.as_ref());
-        let phase1_opt = custom_summary.map(|s| &s.phase1_agreed).or(record.phase1_agreed.as_ref());
+        let goal_opt = custom_summary
+            .map(|s| &s.meeting_goal)
+            .or(record.meeting_goal.as_ref());
+        let highlights_opt = custom_summary
+            .map(|s| &s.key_highlights)
+            .or(record.key_highlights.as_ref());
+        let actions_opt = custom_summary
+            .map(|s| &s.action_items)
+            .or(record.action_items.as_ref());
+        let phase1_opt = custom_summary
+            .map(|s| &s.phase1_agreed)
+            .or(record.phase1_agreed.as_ref());
 
         let code = lang_code.unwrap_or("tr").to_lowercase();
         let prefix = if code.len() >= 2 { &code[..2] } else { "tr" };
@@ -763,8 +941,11 @@ body {
             ),
         };
 
-        let subject = format!("{}: {} ({})", subject_prefix, record.title, record.date_formatted);
-        
+        let subject = format!(
+            "{}: {} ({})",
+            subject_prefix, record.title, record.date_formatted
+        );
+
         let mut body = String::new();
         body.push_str(&format!("{}\n\n", greeting));
         body.push_str(&format!("{}\n\n", intro_template));
@@ -787,9 +968,21 @@ body {
             if !actions.is_empty() {
                 body.push_str(&format!("🎯 {}:\n", labels.action_items_title));
                 for a in actions {
-                    let status = if a.is_completed { done_label } else { pending_label };
-                    let assignee = a.assignee.as_deref().map(|p| format!(" - {}: @{}", labels.assignee_label, p)).unwrap_or_default();
-                    body.push_str(&format!("• {} {}{}\n", status, a.task, assignee));
+                    let status = if a.is_completed {
+                        done_label
+                    } else {
+                        pending_label
+                    };
+                    let clean_ass = a.assignee.as_deref().and_then(|p| {
+                        crate::summarizer::local_extractor::LocalSummaryExtractor::clean_assignee(
+                            Some(p),
+                            &a.task,
+                        )
+                    });
+                    let assignee_str = clean_ass
+                        .map(|p| format!(" - {}: @{}", labels.assignee_label, p))
+                        .unwrap_or_default();
+                    body.push_str(&format!("• {} {}{}\n", status, a.task, assignee_str));
                 }
                 body.push_str("\n");
             }
@@ -811,39 +1004,37 @@ body {
         (subject, body)
     }
 
-    /// Safely formats an ISO datetime string into RFC 5545 UTC iCalendar format (YYYYMMDDTHHMMSSZ).
-    /// Strips any fractional seconds (.123, .000) and normalizes timezone offsets.
-    pub fn format_rfc5545_datetime(iso_str: &str) -> String {
-        let trimmed = iso_str.trim();
-        // Remove trailing Z or timezone offsets first
-        let without_z = trimmed.trim_end_matches('Z').trim_end_matches('z');
-        // Split on + or - after index 10 for timezone offsets (e.g. 2026-09-20T10:00:00+03:00)
-        let main_part = if without_z.len() > 10 {
-            if let Some(pos) = without_z[10..].find('+').or_else(|| without_z[10..].find('-')) {
-                &without_z[..10 + pos]
-            } else {
-                without_z
-            }
-        } else {
-            without_z
-        };
+    /// Formats an ISO 8601 string into standard RFC 5545 UTC timestamp format (YYYYMMDDTHHMMSSZ).
+    pub fn format_rfc5545_datetime(input: &str) -> String {
+        let trimmed = input.trim();
 
-        // Split off fractional seconds (e.g. 10:00:00.123 -> 10:00:00)
-        let clean_datetime = if let Some(dot_pos) = main_part.find('.') {
-            &main_part[..dot_pos]
-        } else {
-            main_part
-        };
+        // 1. Try parse RFC 3339 / ISO 8601 with timezone (e.g. 2026-09-20T10:00:00+03:00 -> converts to exact UTC)
+        if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(trimmed) {
+            return dt
+                .with_timezone(&chrono::Utc)
+                .format("%Y%m%dT%H%M%SZ")
+                .to_string();
+        }
 
-        let digits: String = clean_datetime.chars().filter(|c| c.is_ascii_digit()).collect();
+        // 2. Try parse NaiveDateTime without timezone (e.g. 2026-09-20T10:00:00 or 2026-09-20 14:30:45)
+        if let Ok(naive) = chrono::NaiveDateTime::parse_from_str(trimmed, "%Y-%m-%dT%H:%M:%S")
+            .or_else(|_| chrono::NaiveDateTime::parse_from_str(trimmed, "%Y-%m-%d %H:%M:%S"))
+        {
+            return format!("{}Z", naive.format("%Y%m%dT%H%M%S"));
+        }
+
+        // 3. Try parse NaiveDate (e.g. 2026-09-20)
+        if let Ok(naive_date) = chrono::NaiveDate::parse_from_str(trimmed, "%Y-%m-%d") {
+            return format!("{}T090000Z", naive_date.format("%Y%m%d"));
+        }
+
+        // 4. Fallback: extract digits
+        let digits: String = trimmed.chars().filter(|c| c.is_ascii_digit()).collect();
         if digits.len() >= 14 {
-            // YYYYMMDDHHMMSS -> YYYYMMDDTHHMMSSZ
             format!("{}T{}Z", &digits[..8], &digits[8..14])
         } else if digits.len() >= 8 {
-            // YYYYMMDD -> YYYYMMDDT090000Z
             format!("{}T090000Z", &digits[..8])
         } else {
-            // Fallback to current UTC time
             chrono::Utc::now().format("%Y%m%dT%H%M%SZ").to_string()
         }
     }
@@ -857,7 +1048,7 @@ body {
                 ';' => out.push_str("\\;"),
                 ',' => out.push_str("\\,"),
                 '\n' => out.push_str("\\n"),
-                '\r' => {},
+                '\r' => {}
                 _ => out.push(c),
             }
         }
@@ -889,7 +1080,7 @@ body {
         format!(
             "BEGIN:VCALENDAR\r\n\
 VERSION:2.0\r\n\
-PRODID:-//EchoMind AI Assistant//Follow-up Engine//EN\r\n\
+PRODID:-//EchoMind AI//EchoMind Assistant v0.2.3//EN\r\n\
 CALSCALE:GREGORIAN\r\n\
 METHOD:REQUEST\r\n\
 BEGIN:VEVENT\r\n\
@@ -958,7 +1149,7 @@ mod tests {
         );
         assert!(ics.contains("BEGIN:VCALENDAR"));
         assert!(ics.contains("SUMMARY:Sprint Planning Follow-up\\, Review & Retro"));
-        assert!(ics.contains("DTSTART:20260920T100000Z"));
+        assert!(ics.contains("DTSTART:20260920T070000Z"));
         assert!(ics.contains("DURATION:PT45M"));
         assert!(ics.contains("LOCATION:Zoom Room\\, HQ"));
         assert!(ics.contains("DESCRIPTION:Follow-up discussion on Q4 goals\\;\\nNext steps."));

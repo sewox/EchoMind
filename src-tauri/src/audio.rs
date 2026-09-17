@@ -8,13 +8,13 @@ use std::thread;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AudioStatus {
     pub is_recording: bool,
-    pub mic_level: f32,       // 0.0 - 1.0 (VU Meter)
-    pub sys_level: f32,       // 0.0 - 1.0 (VU Meter)
-    pub is_speaking: bool,     // VAD Voice Activity Detection with Hangover
-    pub sample_rate: u32,      // Standard 16000 Hz for Whisper
-    pub channels: u16,         // 1 (Mono)
+    pub mic_level: f32,    // 0.0 - 1.0 (VU Meter)
+    pub sys_level: f32,    // 0.0 - 1.0 (VU Meter)
+    pub is_speaking: bool, // VAD Voice Activity Detection with Hangover
+    pub sample_rate: u32,  // Standard 16000 Hz for Whisper
+    pub channels: u16,     // 1 (Mono)
     pub buffered_samples: usize,
-    pub is_loopback: bool,     // Whether active device captures loopback/system audio
+    pub is_loopback: bool, // Whether active device captures loopback/system audio
     pub has_loopback_device: bool, // Whether any loopback device is available on the machine
     pub active_device_name: Option<String>,
 }
@@ -82,7 +82,10 @@ impl GlobalAudioEngine {
         if let Ok(devices) = host.input_devices() {
             for dev in devices {
                 if let Ok(name) = dev.name() {
-                    let is_default = default_device_name.as_ref().map(|d| d == &name).unwrap_or(false);
+                    let is_default = default_device_name
+                        .as_ref()
+                        .map(|d| d == &name)
+                        .unwrap_or(false);
                     let lower = name.to_lowercase();
                     let is_loopback = lower.contains("blackhole")
                         || lower.contains("loopback")
@@ -186,14 +189,17 @@ impl GlobalAudioEngine {
             let stream_result = match config.sample_format() {
                 cpal::SampleFormat::F32 => device.build_input_stream(
                     &config.into(),
-                    move |data: &[f32], _| process_audio_data(data, sample_rate, channels, &state_inner),
+                    move |data: &[f32], _| {
+                        process_audio_data(data, sample_rate, channels, &state_inner)
+                    },
                     err_fn,
                     None,
                 ),
                 cpal::SampleFormat::I16 => device.build_input_stream(
                     &config.into(),
                     move |data: &[i16], _| {
-                        let f32_data: Vec<f32> = data.iter().map(|s| s.to_sample::<f32>()).collect();
+                        let f32_data: Vec<f32> =
+                            data.iter().map(|s| s.to_sample::<f32>()).collect();
                         process_audio_data(&f32_data, sample_rate, channels, &state_inner);
                     },
                     err_fn,
@@ -202,7 +208,8 @@ impl GlobalAudioEngine {
                 cpal::SampleFormat::U16 => device.build_input_stream(
                     &config.into(),
                     move |data: &[u16], _| {
-                        let f32_data: Vec<f32> = data.iter().map(|s| s.to_sample::<f32>()).collect();
+                        let f32_data: Vec<f32> =
+                            data.iter().map(|s| s.to_sample::<f32>()).collect();
                         process_audio_data(&f32_data, sample_rate, channels, &state_inner);
                     },
                     err_fn,
@@ -294,14 +301,17 @@ impl GlobalAudioEngine {
             let stream_result = match config.sample_format() {
                 cpal::SampleFormat::F32 => device.build_input_stream(
                     &config.into(),
-                    move |data: &[f32], _| process_audio_data(data, sample_rate, channels, &state_inner),
+                    move |data: &[f32], _| {
+                        process_audio_data(data, sample_rate, channels, &state_inner)
+                    },
                     err_fn,
                     None,
                 ),
                 cpal::SampleFormat::I16 => device.build_input_stream(
                     &config.into(),
                     move |data: &[i16], _| {
-                        let f32_data: Vec<f32> = data.iter().map(|s| s.to_sample::<f32>()).collect();
+                        let f32_data: Vec<f32> =
+                            data.iter().map(|s| s.to_sample::<f32>()).collect();
                         process_audio_data(&f32_data, sample_rate, channels, &state_inner);
                     },
                     err_fn,
@@ -310,7 +320,8 @@ impl GlobalAudioEngine {
                 cpal::SampleFormat::U16 => device.build_input_stream(
                     &config.into(),
                     move |data: &[u16], _| {
-                        let f32_data: Vec<f32> = data.iter().map(|s| s.to_sample::<f32>()).collect();
+                        let f32_data: Vec<f32> =
+                            data.iter().map(|s| s.to_sample::<f32>()).collect();
                         process_audio_data(&f32_data, sample_rate, channels, &state_inner);
                     },
                     err_fn,
@@ -389,7 +400,12 @@ impl GlobalAudioEngine {
 // 2. Resample to 16000 Hz Mono
 // 3. RMS & VAD calculation with speech hangover
 // 4. Clean PCM buffer accumulation
-fn process_audio_data(data: &[f32], src_sample_rate: u32, channels: u16, state_arc: &SharedAudioState) {
+fn process_audio_data(
+    data: &[f32],
+    src_sample_rate: u32,
+    channels: u16,
+    state_arc: &SharedAudioState,
+) {
     if data.is_empty() {
         return;
     }
@@ -438,7 +454,8 @@ fn process_audio_data(data: &[f32], src_sample_rate: u32, channels: u16, state_a
         state.silence_counter = 0;
     } else {
         state.silence_counter = state.silence_counter.saturating_add(1);
-        if state.silence_counter > 35 { // ~1.5s silence hangover
+        if state.silence_counter > 35 {
+            // ~1.5s silence hangover
             state.is_speaking = false;
         }
     }
@@ -533,9 +550,12 @@ pub fn start_meeting_recording(
     engine.start(device_name)?;
     let title = meeting_title.unwrap_or_else(|| "Google Meet Toplantısı".to_string());
     println!("🎙️ start_meeting_recording çağrıldı: {:?}", title);
-    let _ = app_handle.emit("trigger-start-recording", serde_json::json!({
-        "title": title
-    }));
+    let _ = app_handle.emit(
+        "trigger-start-recording",
+        serde_json::json!({
+            "title": title
+        }),
+    );
     if let Some(island_win) = app_handle.get_webview_window("island") {
         let _ = island_win.hide();
     }
