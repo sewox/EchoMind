@@ -165,9 +165,11 @@ pub fn run() {
         .expect("error while building tauri application")
         .run(|_app_handle, event| {
             if let tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit = event {
-                transcriber::get_global_transcriber().cleanup_context();
+                // 1. Immediately cut audio streams to prevent new audio frames during shutdown
                 audio::get_global_audio_engine().stop().ok();
                 audio::get_global_audio_engine().stop_preview().ok();
+                // 2. Settle ongoing Whisper inference and safely drain Metal GPU pipeline before exit
+                transcriber::get_global_transcriber().cleanup_context();
             }
         });
 }

@@ -22,6 +22,7 @@ import {
   Loader2,
   AlertTriangle,
   Globe,
+  ExternalLink,
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { CredentialStore } from "../services/credentialStore";
@@ -96,6 +97,37 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     state: "idle" | "testing" | "success" | "error";
     message?: string;
   }>({ state: "idle" });
+
+  const [isAudioTesting, setIsAudioTesting] = useState<boolean>(false);
+  const [showLoopbackGuide, setShowLoopbackGuide] = useState<boolean>(false);
+
+  const handleTestAudio = async () => {
+    if (isAudioTesting) return;
+    setIsAudioTesting(true);
+    try {
+      await invoke("start_mic_preview", {
+        deviceName:
+          selectedAudioDevice === "default" ? null : selectedAudioDevice,
+      });
+      setTimeout(async () => {
+        try {
+          await invoke("stop_mic_preview");
+        } catch {}
+        setIsAudioTesting(false);
+      }, 5000);
+    } catch (err) {
+      console.warn("Audio test failed:", err);
+      setIsAudioTesting(false);
+    }
+  };
+
+  const handleOpenAudioMidiSetup = async () => {
+    try {
+      await invoke("open_audio_midi_setup");
+    } catch (err) {
+      console.warn("Could not open system audio panel:", err);
+    }
+  };
 
   const [askCloudConfirm, setAskCloudConfirm] = useState<boolean>(true);
 
@@ -637,6 +669,90 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       </span>
                     </div>
                   </div>
+
+                  {/* Loopback Actions and Controls */}
+                  <div className="pt-2 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleTestAudio}
+                        disabled={isAudioTesting}
+                        data-testid="settings-audio-test-btn"
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition ${
+                          isAudioTesting
+                            ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 animate-pulse"
+                            : "bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700"
+                        }`}
+                      >
+                        <Radio
+                          className={`w-3.5 h-3.5 ${isAudioTesting ? "text-cyan-400 animate-spin" : "text-slate-400"}`}
+                        />
+                        <span>
+                          {isAudioTesting
+                            ? "Ses Test Ediliyor (VU Dinleniyor)..."
+                            : "Giriş Sesini Test Et (5 sn)"}
+                        </span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleOpenAudioMidiSetup}
+                        className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-medium flex items-center gap-1.5 transition"
+                        title="İşletim sistemi ses denetim masasını veya Audio MIDI Setup'ı aç"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
+                        <span>Sistem Ses Panelini Aç</span>
+                      </button>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowLoopbackGuide(!showLoopbackGuide)}
+                      className="text-[11px] text-cyan-400 hover:text-cyan-300 underline underline-offset-2 transition"
+                    >
+                      {showLoopbackGuide
+                        ? "Kurulum Yönergesini Gizle"
+                        : "Loopback / BlackHole Kurulum Yönergesi"}
+                    </button>
+                  </div>
+
+                  {showLoopbackGuide && (
+                    <div className="p-3 rounded-lg bg-slate-950 border border-slate-800 text-[11px] text-slate-300 space-y-2 leading-relaxed">
+                      <h5 className="font-semibold text-white flex items-center gap-1.5">
+                        <Volume2 className="w-3.5 h-3.5 text-cyan-400" />
+                        <span>
+                          Sistem Sesi ve Karşı Taraf Sesini Yakalama Rehberi
+                        </span>
+                      </h5>
+                      <ul className="list-disc list-inside space-y-1 text-slate-400">
+                        <li>
+                          <strong className="text-slate-200">macOS:</strong>{" "}
+                          <code className="px-1 py-0.5 rounded bg-slate-900 text-cyan-300">
+                            brew install blackhole-2ch
+                          </code>{" "}
+                          kurup, <em>Audio MIDI Setup</em> üzerinden hem
+                          kulaklığınızı hem de BlackHole'u içeren bir{" "}
+                          <em>"Çoklu Çıkış Aygıtı (Multi-Output Device)"</em>{" "}
+                          oluşturun.
+                        </li>
+                        <li>
+                          <strong className="text-slate-200">Windows:</strong>{" "}
+                          Denetim Masası &gt; Ses &gt; Kayıt sekmesinde{" "}
+                          <em>Stereo Karışımı (Stereo Mix)</em> veya{" "}
+                          <em>VB-Audio Cable</em> sanal kablosunu
+                          varsayılan/seçili yapın.
+                        </li>
+                        <li>
+                          <strong className="text-slate-200">Linux:</strong>{" "}
+                          <code className="px-1 py-0.5 rounded bg-slate-900 text-cyan-300">
+                            pavucontrol
+                          </code>{" "}
+                          açarak EchoMind giriş aygıtını "Monitor of Built-in
+                          Audio" olarak yönlendirin.
+                        </li>
+                      </ul>
+                    </div>
+                  )}
                 </div>
               );
             })()}

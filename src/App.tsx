@@ -22,6 +22,7 @@ import {
   Check,
   Layers,
   Zap,
+  Volume2,
 } from "lucide-react";
 import {
   TranscriptViewer,
@@ -845,6 +846,19 @@ export function App() {
                   : t("nav.ready")}
             </span>
           </div>
+
+          {/* Loopback / System Audio Warning Badge during recording */}
+          {isRecording && !audioStatus?.is_loopback && (
+            <button
+              type="button"
+              onClick={() => setIsSettingsOpen(true)}
+              className="px-2.5 py-1 rounded-full bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-[11px] text-amber-300 flex items-center gap-1.5 transition"
+              title="Karşı tarafın sesini (Zoom/Meet vb.) net kaydetmek için ses ayarlarından Loopback seçebilirsiniz"
+            >
+              <Volume2 className="w-3 h-3 text-amber-400" />
+              <span>Sadece Mikrofon (Karşı taraf için Loopback seçin)</span>
+            </button>
+          )}
 
           {/* Privacy Security Profile Quick Switcher */}
           <PrivacyModeBadge />

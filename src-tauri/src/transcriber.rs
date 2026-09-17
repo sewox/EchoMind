@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::path::Path;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters};
 
@@ -52,6 +53,14 @@ pub type SharedTranscriberState = Arc<Mutex<TranscriberState>>;
 pub struct GlobalTranscriberEngine {
     pub state: SharedTranscriberState,
     pub whisper_ctx: Mutex<Option<WhisperContext>>,
+    pub is_transcribing: Arc<AtomicBool>,
+}
+
+struct TranscribeGuard<'a>(&'a AtomicBool);
+impl<'a> Drop for TranscribeGuard<'a> {
+    fn drop(&mut self) {
+        self.0.store(false, Ordering::SeqCst);
+    }
 }
 
 impl GlobalTranscriberEngine {
@@ -62,6 +71,7 @@ impl GlobalTranscriberEngine {
         GlobalTranscriberEngine {
             state: Arc::new(Mutex::new(TranscriberState::default())),
             whisper_ctx: Mutex::new(None),
+            is_transcribing: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -144,10 +154,20 @@ impl GlobalTranscriberEngine {
     }
 
     pub fn cleanup_context(&self) {
+        // 1. If an active inference pass is ongoing, wait gracefully for it to settle (up to 800ms)
+        let wait_start = std::time::Instant::now();
+        while self.is_transcribing.load(Ordering::SeqCst) {
+            if wait_start.elapsed() > std::time::Duration::from_millis(800) {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(25));
+        }
+
+        // 2. Safely acquire Whisper context lock and extract handle
         let mut lock = self.whisper_ctx.lock().unwrap();
         if let Some(ctx) = lock.take() {
-            // Allow any in-flight Metal GPU command buffers to flush before dropping handles to prevent SIGABRT
-            std::thread::sleep(std::time::Duration::from_millis(50));
+            // macOS Metal requires in-flight command buffers to drain prior to context drop
+            std::thread::sleep(std::time::Duration::from_millis(75));
             drop(ctx);
         }
         let mut state = self.state.lock().unwrap();
@@ -173,6 +193,9 @@ impl GlobalTranscriberEngine {
             let state = self.state.lock().unwrap();
             return Ok(state.segments.clone());
         }
+
+        self.is_transcribing.store(true, Ordering::SeqCst);
+        let _transcribe_guard = TranscribeGuard(&self.is_transcribing);
 
         // Lazy load Whisper model on demand if not already in memory
         self.ensure_model_loaded()?;
