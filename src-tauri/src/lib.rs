@@ -151,16 +151,7 @@ pub fn run() {
             get_related_meetings,
             get_all_tags
         ])
-        .setup(|app| {
-            #[cfg(debug_assertions)]
-            {
-                use tauri::Manager;
-                if let Some(window) = app.get_webview_window("main") {
-                    let _ = window.open_devtools();
-                }
-            }
-            Ok(())
-        })
+        .setup(|_app| Ok(()))
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|_app_handle, event| {

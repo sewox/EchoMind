@@ -2504,6 +2504,10 @@ describe("App Top-Level Integration", () => {
       </I18nProvider>,
     );
 
+    const updateBadge = await screen.findByTitle("Yeni sürüm indirilebilir");
+    expect(updateBadge).toBeInTheDocument();
+    fireEvent.click(updateBadge);
+
     expect(
       await screen.findByTestId("update-modal-backdrop"),
     ).toBeInTheDocument();

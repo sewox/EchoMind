@@ -222,13 +222,8 @@ export function App() {
       invoke<UpdateCheckResult>("check_for_updates")
         .then((res) => {
           if (res && res.is_update_available) {
-            const skippedVersion = localStorage.getItem(
-              "echomind_skip_update_version",
-            );
-            if (skippedVersion !== res.latest_version) {
-              setUpdateCheckInfo(res);
-              setIsUpdateModalOpen(true);
-            }
+            setUpdateCheckInfo(res);
+            // Automatic modal popup disabled on launch; user can click the update badge in header
           }
         })
         .catch(() => {
