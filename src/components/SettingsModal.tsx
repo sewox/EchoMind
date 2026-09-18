@@ -23,6 +23,7 @@ import {
   AlertTriangle,
   Globe,
   ExternalLink,
+  Lock,
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { CredentialStore } from "../services/credentialStore";
@@ -491,7 +492,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             }`}
           >
             <Key className="w-4 h-4" />
-            {t("settings.tabApiKeys")}
+            <span>{t("settings.tabApiKeys")}</span>
+            {isParanoid && (
+              <span className="flex items-center gap-1 text-[9px] bg-purple-950/80 border border-purple-500/40 text-purple-300 px-1.5 py-0.5 rounded-full font-mono">
+                <Lock className="w-2.5 h-2.5" />
+                <span>Kilitli</span>
+              </span>
+            )}
           </button>
           <button
             onClick={() => setActiveTab("language")}
@@ -1286,15 +1293,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             )}
 
             {/* Groq Cloud */}
-            <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-2.5">
+            <div
+              className={`p-3.5 rounded-xl bg-slate-950/60 space-y-2.5 border transition ${
+                isParanoid
+                  ? "opacity-50 pointer-events-none filter grayscale select-none border-purple-900/30"
+                  : "border-slate-800/80"
+              }`}
+            >
               <div className="flex items-center justify-between">
                 <label className="font-semibold text-white flex items-center gap-1.5">
                   <Zap className="w-4 h-4 text-amber-400" /> Groq (Yıldırım Hızı
                   - 10 Saniyede)
                 </label>
-                <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded">
-                  Ücretsiz & Ultra Hızlı
-                </span>
+                <div className="flex items-center gap-1.5">
+                  {isParanoid && (
+                    <span className="text-[10px] bg-purple-950/80 text-purple-300 border border-purple-500/40 px-1.5 py-0.5 rounded font-mono flex items-center gap-1">
+                      <Lock className="w-2.5 h-2.5" /> Kilitli
+                    </span>
+                  )}
+                  <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded">
+                    Ücretsiz & Ultra Hızlı
+                  </span>
+                </div>
               </div>
               <div className="relative">
                 <input
@@ -1356,15 +1376,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
 
             {/* Google Gemini */}
-            <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-2.5">
+            <div
+              className={`p-3.5 rounded-xl bg-slate-950/60 space-y-2.5 border transition ${
+                isParanoid
+                  ? "opacity-50 pointer-events-none filter grayscale select-none border-purple-900/30"
+                  : "border-slate-800/80"
+              }`}
+            >
               <div className="flex items-center justify-between">
                 <label className="font-semibold text-white flex items-center gap-1.5">
                   <Sparkles className="w-4 h-4 text-cyan-400" /> Google Gemini
                   (Flash & Pro Ailesi)
                 </label>
-                <span className="text-[10px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 px-1.5 py-0.5 rounded">
-                  Üst Düzey Zeka
-                </span>
+                <div className="flex items-center gap-1.5">
+                  {isParanoid && (
+                    <span className="text-[10px] bg-purple-950/80 text-purple-300 border border-purple-500/40 px-1.5 py-0.5 rounded font-mono flex items-center gap-1">
+                      <Lock className="w-2.5 h-2.5" /> Kilitli
+                    </span>
+                  )}
+                  <span className="text-[10px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 px-1.5 py-0.5 rounded">
+                    Üst Düzey Zeka
+                  </span>
+                </div>
               </div>
               <div className="relative">
                 <input
@@ -1426,15 +1459,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
 
             {/* OpenAI */}
-            <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-2.5">
+            <div
+              className={`p-3.5 rounded-xl bg-slate-950/60 space-y-2.5 border transition ${
+                isParanoid
+                  ? "opacity-50 pointer-events-none filter grayscale select-none border-purple-900/30"
+                  : "border-slate-800/80"
+              }`}
+            >
               <div className="flex items-center justify-between">
                 <label className="font-semibold text-white flex items-center gap-1.5">
                   <Cpu className="w-4 h-4 text-emerald-400" /> OpenAI (Whisper &
                   GPT-4o Audio)
                 </label>
-                <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-1.5 py-0.5 rounded">
-                  Küresel Standart
-                </span>
+                <div className="flex items-center gap-1.5">
+                  {isParanoid && (
+                    <span className="text-[10px] bg-purple-950/80 text-purple-300 border border-purple-500/40 px-1.5 py-0.5 rounded font-mono flex items-center gap-1">
+                      <Lock className="w-2.5 h-2.5" /> Kilitli
+                    </span>
+                  )}
+                  <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-1.5 py-0.5 rounded">
+                    Küresel Standart
+                  </span>
+                </div>
               </div>
               <div className="relative">
                 <input

@@ -486,7 +486,15 @@ export const GlobalAssistantModal: React.FC<GlobalAssistantModalProps> = ({
             </div>
 
             {/* Input Box */}
-            <div className="p-4 md:p-6 border-t border-white/10 bg-slate-900/60 shrink-0">
+            <div className="p-4 md:p-6 border-t border-white/10 bg-slate-900/60 shrink-0 space-y-3">
+              {isParanoid && (
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-purple-950/40 border border-purple-500/30 text-[11px] text-purple-300">
+                  <ShieldAlert className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                  <span>
+                    <strong>Paranoid (Air-Gapped) Mod Aktif:</strong> Sorularınız harici bulut servislerine gönderilmez; yalnızca yerel RAG & hafıza veritabanı ile yanıtlanır.
+                  </span>
+                </div>
+              )}
               <form
                 onSubmit={(e) => {
                   e.preventDefault();

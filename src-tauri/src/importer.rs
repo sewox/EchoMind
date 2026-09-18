@@ -255,6 +255,9 @@ pub async fn import_audio_file(
             } else if let Some(key) = api_key.as_deref() {
                 let clean_key = key.trim();
                 if !clean_key.is_empty() && (clean_prov == "groq" || clean_prov == "openai" || clean_prov == "gemini") {
+                    // HARD REJECT in Paranoid / Air-Gapped Mode
+                    crate::security::check_cloud_access_allowed()?;
+
                     println!("🌐 Online Bulut ASR başlatılıyor (Sağlayıcı: {}, Model: {:?})...", clean_prov, model_version);
                     if let Ok(mut cloud_segs) = crate::cloud_transcriber::transcribe_audio_cloud(
                         &flac_file_path,
@@ -369,6 +372,69 @@ pub struct PickedFileInfo {
 
 #[tauri::command]
 pub async fn pick_audio_file_dialog() -> Result<Option<PickedFileInfo>, String> {
+    #[cfg(target_os = "linux")]
+    {
+        // 1. Try zenity first (common on Ubuntu, Debian, GNOME, XFCE)
+        let zenity_res = std::process::Command::new("zenity")
+            .args([
+                "--file-selection",
+                "--title=Toplantı Ses Dosyası Seç",
+                "--file-filter=Ses Dosyaları | *.mp3 *.m4a *.opus *.ogg *.wav *.flac *.aac *.mp4 *.wma *.3gp",
+            ])
+            .output();
+
+        if let Ok(out) = zenity_res {
+            if out.status.success() {
+                let path_str = String::from_utf8_lossy(&out.stdout).trim().to_string();
+                if !path_str.is_empty() {
+                    let path_buf = std::path::PathBuf::from(&path_str);
+                    if path_buf.exists() {
+                        let file_name = path_buf
+                            .file_name()
+                            .map(|f| f.to_string_lossy().to_string())
+                            .unwrap_or_else(|| "Ses Kaydı".to_string());
+                        let file_size_bytes = std::fs::metadata(&path_buf).map(|m| m.len()).unwrap_or(0);
+                        let file_size_mb = (file_size_bytes as f64) / (1024.0 * 1024.0);
+                        return Ok(Some(PickedFileInfo {
+                            path: path_str,
+                            file_name,
+                            file_size_mb: (file_size_mb * 10.0).round() / 10.0,
+                            is_large_file: file_size_mb > 15.0,
+                        }));
+                    }
+                }
+            }
+        }
+
+        // 2. Try kdialog (common on KDE Plasma / Linux)
+        let kdialog_res = std::process::Command::new("kdialog")
+            .args(["--getopenfilename", ".", "*.mp3 *.m4a *.opus *.ogg *.wav *.flac *.aac *.mp4 *.wma *.3gp"])
+            .output();
+
+        if let Ok(out) = kdialog_res {
+            if out.status.success() {
+                let path_str = String::from_utf8_lossy(&out.stdout).trim().to_string();
+                if !path_str.is_empty() {
+                    let path_buf = std::path::PathBuf::from(&path_str);
+                    if path_buf.exists() {
+                        let file_name = path_buf
+                            .file_name()
+                            .map(|f| f.to_string_lossy().to_string())
+                            .unwrap_or_else(|| "Ses Kaydı".to_string());
+                        let file_size_bytes = std::fs::metadata(&path_buf).map(|m| m.len()).unwrap_or(0);
+                        let file_size_mb = (file_size_bytes as f64) / (1024.0 * 1024.0);
+                        return Ok(Some(PickedFileInfo {
+                            path: path_str,
+                            file_name,
+                            file_size_mb: (file_size_mb * 10.0).round() / 10.0,
+                            is_large_file: file_size_mb > 15.0,
+                        }));
+                    }
+                }
+            }
+        }
+    }
+
     let file = rfd::AsyncFileDialog::new()
         .add_filter(
             "Desteklenen Ses Dosyaları",
@@ -403,6 +469,64 @@ pub async fn pick_audio_file_dialog() -> Result<Option<PickedFileInfo>, String> 
         }
         None => Ok(None),
     }
+}
+
+fn internal_base64_decode(input: &str) -> Result<Vec<u8>, String> {
+    let mut out = Vec::new();
+    let clean = input.trim();
+    let mut val = 0u32;
+    let mut valb = -8;
+    for c in clean.chars() {
+        if c == '=' {
+            break;
+        }
+        let b = match c {
+            'A'..='Z' => c as u32 - 'A' as u32,
+            'a'..='z' => c as u32 - 'a' as u32 + 26,
+            '0'..='9' => c as u32 - '0' as u32 + 52,
+            '+' => 62,
+            '/' => 63,
+            _ => continue,
+        };
+        val = (val << 6) | b;
+        valb += 6;
+        if valb >= 0 {
+            out.push(((val >> valb) & 0xFF) as u8);
+            valb -= 8;
+        }
+    }
+    Ok(out)
+}
+
+#[tauri::command]
+pub async fn save_uploaded_audio_bytes(
+    file_name: String,
+    file_base64: String,
+) -> Result<PickedFileInfo, String> {
+    let bytes = internal_base64_decode(&file_base64)?;
+
+    let temp_dir = std::env::temp_dir().join("echomind_uploads");
+    if !temp_dir.exists() {
+        let _ = std::fs::create_dir_all(&temp_dir);
+    }
+
+    let clean_name = std::path::Path::new(&file_name)
+        .file_name()
+        .map(|f| f.to_string_lossy().to_string())
+        .unwrap_or_else(|| "uploaded_audio.mp3".to_string());
+
+    let target_path = temp_dir.join(&clean_name);
+    std::fs::write(&target_path, &bytes)
+        .map_err(|e| format!("Dosya geçici dizine yazılamadı: {}", e))?;
+
+    let file_size_mb = (bytes.len() as f64) / (1024.0 * 1024.0);
+
+    Ok(PickedFileInfo {
+        path: target_path.to_string_lossy().to_string(),
+        file_name: clean_name,
+        file_size_mb: (file_size_mb * 10.0).round() / 10.0,
+        is_large_file: file_size_mb > 15.0,
+    })
 }
 
 #[tauri::command]
@@ -489,6 +613,8 @@ pub async fn retranscribe_meeting(
             } else if let Some(key) = api_key.as_deref() {
                 let clean_key = key.trim();
                 if !clean_key.is_empty() && (clean_prov == "groq" || clean_prov == "openai" || clean_prov == "gemini") {
+                    // HARD REJECT in Paranoid / Air-Gapped Mode
+                    crate::security::check_cloud_access_allowed()?;
                     if let Ok(mut cloud_segs) = crate::cloud_transcriber::transcribe_audio_cloud(
                         &path,
                         &clean_prov,

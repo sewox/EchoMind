@@ -601,11 +601,13 @@ impl MeetingDetector {
                             if engine.get_status().is_recording {
                                 println!("🛑 Otomatik Kayıt Durdurma Sinyali (Toplantı Kapandı).");
                                 let _ = engine.stop();
+                                if let Some(ref handle) = app_handle {
+                                    let _ = handle.emit("trigger-stop-recording", ());
+                                }
                             }
                         }
                         if let Some(ref handle) = app_handle {
                             let _ = handle.emit("meeting-ended", &previous_apps);
-                            let _ = handle.emit("trigger-stop-recording", ());
                             if let Some(island_win) = handle.get_webview_window("island") {
                                 let _ = island_win.hide();
                             }

@@ -446,7 +446,12 @@ export function App() {
       await handleSaveCurrentMeeting();
     });
 
-    const unlistenSaved = listen<MeetingRecord>("meeting-saved", (event) => {
+    const unlistenSaved = listen<MeetingRecord>("meeting-saved", async (event) => {
+      try {
+        await invoke("stop_audio_capture");
+      } catch {
+        // Safe fallback
+      }
       setIsRecording(false);
       setMeetingTitleInput("");
       if (event.payload) {
@@ -775,20 +780,58 @@ export function App() {
     }
   };
 
-  const handleNativeHtmlFileInput = (
+  const handleNativeHtmlFileInput = async (
     e: React.ChangeEvent<HTMLInputElement>,
   ) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const path = (file as any).path || file.name;
-    const picked: PickedFileInfo = {
-      path,
-      file_name: file.name,
-      file_size_mb: Math.round((file.size / (1024 * 1024)) * 10) / 10,
-      is_large_file: file.size > 12 * 1024 * 1024,
-    };
-    processPickedFile(picked);
-    e.target.value = "";
+    try {
+      const nativePath = (file as any).path;
+      if (
+        nativePath &&
+        typeof nativePath === "string" &&
+        nativePath.length > 0 &&
+        !nativePath.startsWith("blob:")
+      ) {
+        const picked: PickedFileInfo = {
+          path: nativePath,
+          file_name: file.name,
+          file_size_mb: Math.round((file.size / (1024 * 1024)) * 10) / 10,
+          is_large_file: file.size > 12 * 1024 * 1024,
+        };
+        await processPickedFile(picked);
+      } else {
+        // Fallback for Linux WebKit where file.path is stripped for security:
+        // Read file bytes via FileReader and write to temp directory in Rust
+        const reader = new FileReader();
+        reader.onload = async () => {
+          try {
+            const arrayBuffer = reader.result as ArrayBuffer;
+            const bytes = new Uint8Array(arrayBuffer);
+            let binary = "";
+            const len = bytes.byteLength;
+            for (let i = 0; i < len; i++) {
+              binary += String.fromCharCode(bytes[i]);
+            }
+            const base64 = window.btoa(binary);
+            const picked = await invoke<PickedFileInfo>(
+              "save_uploaded_audio_bytes",
+              {
+                fileName: file.name,
+                fileBase64: base64,
+              },
+            );
+            await processPickedFile(picked);
+          } catch (uploadErr) {
+            console.error("Yüklenen ses dosyası işlenemedi:", uploadErr);
+            alert(`Dosya yükleme hatası: ${uploadErr}`);
+          }
+        };
+        reader.readAsArrayBuffer(file);
+      }
+    } finally {
+      e.target.value = "";
+    }
   };
 
   const formatTimer = (totalSeconds: number) => {

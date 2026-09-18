@@ -316,6 +316,25 @@ impl LocalSummaryExtractor {
             "düzeltilecek",
             "hazırlanacak",
             "onaylandı",
+            "gönderilecek",
+            "gönderecek",
+            "paylaşılacak",
+            "paylaşacak",
+            "tamamlanacak",
+            "bitirilecek",
+            "teslim edilecek",
+            "güncellenecek",
+            "güncelleyecek",
+            "sorumlu",
+            "takip edilecek",
+            "test edilecek",
+            "yazılacak",
+            "kontrol edilecek",
+            "sunulacak",
+            "çözülecek",
+            "toplantı yapılacak",
+            "organize edilecek",
+            "entegre edilecek",
             // English
             "action",
             "will",
@@ -333,6 +352,16 @@ impl LocalSummaryExtractor {
             "review",
             "prepare",
             "submit",
+            "send",
+            "share",
+            "complete",
+            "finish",
+            "deliver",
+            "test",
+            "update",
+            "coordinate",
+            "present",
+            "deploy",
         ];
 
         let phase2_keywords = [
@@ -535,5 +564,38 @@ mod tests {
             LocalSummaryExtractor::clean_assignee(Some("Sarah Connor"), "Task"),
             Some("Sarah Connor".to_string())
         );
+    }
+
+    #[test]
+    fn test_expanded_action_keywords_extraction() {
+        let segments = vec![
+            TranscriptSegment {
+                id: 1,
+                speaker_id: "spk-1".to_string(),
+                speaker_name: "Ayşe".to_string(),
+                start_time_ms: 0,
+                end_time_ms: 3000,
+                timestamp_formatted: "00:00 -> 00:03".to_string(),
+                text: "Ahmet bey yarın sabah sunumu paylaşacak ve raporu tamamlayacak.".to_string(),
+                language: "tr".to_string(),
+                confidence: 0.95,
+            },
+            TranscriptSegment {
+                id: 2,
+                speaker_id: "spk-2".to_string(),
+                speaker_name: "Mehmet".to_string(),
+                start_time_ms: 3100,
+                end_time_ms: 6000,
+                timestamp_formatted: "00:03 -> 00:06".to_string(),
+                text: "Ali bey de API belgelerini güncelleyecek ve ekibe gönderecek.".to_string(),
+                language: "tr".to_string(),
+                confidence: 0.98,
+            },
+        ];
+
+        let res = LocalSummaryExtractor::generate_local_heuristic_summary(&segments, Instant::now());
+        assert_eq!(res.action_items.len(), 2);
+        assert!(res.action_items[0].task.contains("sunumu"));
+        assert!(res.action_items[1].task.contains("güncelleyecek"));
     }
 }

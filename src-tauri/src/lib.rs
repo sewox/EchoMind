@@ -37,7 +37,7 @@ use detector::{
 use hardware::get_hardware_info;
 use importer::{
     import_audio_file, pick_and_import_audio_file, pick_audio_file_dialog, process_audio_file_path,
-    read_audio_file_bytes, retranscribe_meeting,
+    read_audio_file_bytes, retranscribe_meeting, save_uploaded_audio_bytes,
 };
 use player::{
     get_native_playback_status, pause_native_audio, play_native_audio, play_native_audio_at,
@@ -89,6 +89,7 @@ pub fn run() {
             pick_and_import_audio_file,
             pick_audio_file_dialog,
             process_audio_file_path,
+            save_uploaded_audio_bytes,
             retranscribe_meeting,
             read_audio_file_bytes,
             play_native_audio,
