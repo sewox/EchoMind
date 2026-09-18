@@ -593,7 +593,8 @@ mod tests {
             },
         ];
 
-        let res = LocalSummaryExtractor::generate_local_heuristic_summary(&segments, Instant::now());
+        let res =
+            LocalSummaryExtractor::generate_local_heuristic_summary(&segments, Instant::now());
         assert_eq!(res.action_items.len(), 2);
         assert!(res.action_items[0].task.contains("sunumu"));
         assert!(res.action_items[1].task.contains("güncelleyecek"));
