@@ -238,14 +238,26 @@ impl MeetingDetector {
                                 || meeting_code.starts_with("_meet")
                                 || titles_str.contains("ayrıldınız")
                                 || titles_str.contains("ayrıldın")
+                                || titles_str.contains("toplantıdan ayrıldınız")
+                                || titles_str.contains("görüşmeden ayrıldınız")
                                 || titles_str.contains("left the meeting")
                                 || titles_str.contains("left the call")
+                                || titles_str.contains("you left the")
+                                || titles_str.contains("you've left")
                                 || titles_str.contains("left the video call")
                                 || titles_str.contains("görüşme sonlandırıldı")
+                                || titles_str.contains("görüşme sona erdi")
+                                || titles_str.contains("toplantı sona erdi")
+                                || titles_str.contains("sona erdi")
                                 || titles_str.contains("görüşmeden çıktınız")
                                 || titles_str.contains("toplantı sonlandırıldı")
                                 || titles_str.contains("toplantı bitti")
                                 || titles_str.contains("call ended")
+                                || titles_str.contains("meeting ended")
+                                || titles_str.contains("the call has ended")
+                                || titles_str.contains("besprechung beendet")
+                                || titles_str.contains("reunión finalizada")
+                                || titles_str.contains("réunion terminée")
                                 || titles_str.contains("katılmaya hazır")
                                 || titles_str.contains("ready to join")
                                 || titles_str.contains("ana sayfa")
@@ -609,7 +621,10 @@ impl MeetingDetector {
                         if let Some(ref handle) = app_handle {
                             let _ = handle.emit("meeting-ended", &previous_apps);
                             if let Some(island_win) = handle.get_webview_window("island") {
-                                let _ = island_win.hide();
+                                let island_clone = island_win.clone();
+                                let _ = handle.run_on_main_thread(move || {
+                                    let _ = island_clone.hide();
+                                });
                             }
                         }
                         println!(

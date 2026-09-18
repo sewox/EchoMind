@@ -58,7 +58,27 @@ const IslandContent: FC = () => {
       })
       .catch(() => {});
 
+    // Periodic heartbeat (every 2s) to guarantee island transitions out of "Aktif" within max 5s
+    const heartbeatInterval = setInterval(() => {
+      invoke<any>("get_detector_status")
+        .then((status) => {
+          if (status) {
+            const hasActive =
+              status.detected_apps && status.detected_apps.length > 0;
+            if (!hasActive) {
+              setAppInfo((prev) => ({ ...prev, is_running: false }));
+              setLatestSuggestion(null);
+              invoke("hide_island_window").catch(() => {});
+            } else {
+              setAppInfo(status.detected_apps[0]);
+            }
+          }
+        })
+        .catch(() => {});
+    }, 2000);
+
     return () => {
+      clearInterval(heartbeatInterval);
       unlistenDetected.then((f) => f());
       unlistenEnded.then((f) => f());
       unlistenSuggestion.then((f) => f());
@@ -112,8 +132,15 @@ const IslandContent: FC = () => {
               <span className="text-xs font-semibold text-white truncate">
                 {appInfo.display_name}
               </span>
-              <span className="text-[10px] font-medium text-emerald-400 bg-emerald-950/60 px-1.5 py-0.2 rounded border border-emerald-500/30">
-                Aktif
+              <span
+                data-testid="island-status-badge"
+                className={`text-[10px] font-medium px-1.5 py-0.2 rounded border transition-colors ${
+                  appInfo.is_running
+                    ? "text-emerald-400 bg-emerald-950/60 border-emerald-500/30"
+                    : "text-slate-400 bg-slate-900/60 border-slate-700/40"
+                }`}
+              >
+                {appInfo.is_running ? "Aktif" : "Beklemede"}
               </span>
               <span
                 data-testid="island-privacy-badge"
@@ -129,7 +156,9 @@ const IslandContent: FC = () => {
               </span>
             </div>
             <span className="text-[11px] text-slate-400 truncate">
-              Toplantıyı kaydetmek istiyor musunuz?
+              {appInfo.is_running
+                ? "Toplantıyı kaydetmek istiyor musunuz?"
+                : "Toplantı sona erdi (Beklemede)"}
             </span>
           </div>
         </div>
