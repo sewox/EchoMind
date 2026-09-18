@@ -292,8 +292,44 @@ pub async fn import_audio_file(
         // Explicitly free 16k PCM vector after compression
         drop(pcm_16k);
 
+        // Step 0: Audio duration clamp and hallucination loop filter pass
+        let total_duration_ms = duration_seconds * 1000;
+        let mut clean_segs = Vec::new();
+        for mut s in segments {
+            if s.start_time_ms >= total_duration_ms {
+                continue;
+            }
+            if s.end_time_ms > total_duration_ms {
+                s.end_time_ms = total_duration_ms;
+                let start_sec = s.start_time_ms / 1000;
+                let end_sec = s.end_time_ms / 1000;
+                s.timestamp_formatted = format!(
+                    "{:02}:{:02} -> {:02}:{:02}",
+                    start_sec / 60,
+                    start_sec % 60,
+                    end_sec / 60,
+                    end_sec % 60
+                );
+            }
+            if s.start_time_ms >= s.end_time_ms {
+                continue;
+            }
+
+            let (cleaned, has_loop, ratio) =
+                crate::summarizer::cleaner::SpeechCleaner::detect_and_clean_hallucination_loops(&s.text);
+            if has_loop && (ratio > 0.60 || cleaned.split_whitespace().count() < 2) {
+                continue;
+            }
+            if has_loop {
+                s.text = cleaned;
+                s.confidence = (s.confidence * (1.0 - ratio).max(0.20) * 100.0).round() / 100.0;
+            }
+
+            clean_segs.push(s);
+        }
+        let mut segments = clean_segs;
+
         // Step 1: Automatic Redaction and Phonetic Error Correction Pass
-        let mut segments = segments;
         crate::summarizer::TranscriptRedactor::redact_segments(
             &mut segments,
             cloud_provider.as_deref(),
@@ -393,7 +429,8 @@ pub async fn pick_audio_file_dialog() -> Result<Option<PickedFileInfo>, String> 
                             .file_name()
                             .map(|f| f.to_string_lossy().to_string())
                             .unwrap_or_else(|| "Ses Kaydı".to_string());
-                        let file_size_bytes = std::fs::metadata(&path_buf).map(|m| m.len()).unwrap_or(0);
+                        let file_size_bytes =
+                            std::fs::metadata(&path_buf).map(|m| m.len()).unwrap_or(0);
                         let file_size_mb = (file_size_bytes as f64) / (1024.0 * 1024.0);
                         return Ok(Some(PickedFileInfo {
                             path: path_str,
@@ -408,7 +445,11 @@ pub async fn pick_audio_file_dialog() -> Result<Option<PickedFileInfo>, String> 
 
         // 2. Try kdialog (common on KDE Plasma / Linux)
         let kdialog_res = std::process::Command::new("kdialog")
-            .args(["--getopenfilename", ".", "*.mp3 *.m4a *.opus *.ogg *.wav *.flac *.aac *.mp4 *.wma *.3gp"])
+            .args([
+                "--getopenfilename",
+                ".",
+                "*.mp3 *.m4a *.opus *.ogg *.wav *.flac *.aac *.mp4 *.wma *.3gp",
+            ])
             .output();
 
         if let Ok(out) = kdialog_res {
@@ -421,7 +462,8 @@ pub async fn pick_audio_file_dialog() -> Result<Option<PickedFileInfo>, String> 
                             .file_name()
                             .map(|f| f.to_string_lossy().to_string())
                             .unwrap_or_else(|| "Ses Kaydı".to_string());
-                        let file_size_bytes = std::fs::metadata(&path_buf).map(|m| m.len()).unwrap_or(0);
+                        let file_size_bytes =
+                            std::fs::metadata(&path_buf).map(|m| m.len()).unwrap_or(0);
                         let file_size_mb = (file_size_bytes as f64) / (1024.0 * 1024.0);
                         return Ok(Some(PickedFileInfo {
                             path: path_str,
@@ -592,7 +634,7 @@ pub async fn retranscribe_meeting(
         }
 
         // 1. Decode audio to 16kHz PCM
-        let (mut pcm_16k, _) = decode_audio_file_to_pcm16k(&path)?;
+        let (mut pcm_16k, duration_seconds) = decode_audio_file_to_pcm16k(&path)?;
         crate::audio::normalize_audio_samples(&mut pcm_16k);
 
         let lang = language.as_deref().unwrap_or("auto");
@@ -643,8 +685,44 @@ pub async fn retranscribe_meeting(
             segments = Some(res);
         }
 
-        let mut segments = segments.unwrap_or_default();
+        let segments_raw = segments.unwrap_or_default();
         drop(pcm_16k);
+
+        let total_duration_ms = duration_seconds * 1000;
+        let mut clean_segs = Vec::new();
+        for mut s in segments_raw {
+            if s.start_time_ms >= total_duration_ms {
+                continue;
+            }
+            if s.end_time_ms > total_duration_ms {
+                s.end_time_ms = total_duration_ms;
+                let start_sec = s.start_time_ms / 1000;
+                let end_sec = s.end_time_ms / 1000;
+                s.timestamp_formatted = format!(
+                    "{:02}:{:02} -> {:02}:{:02}",
+                    start_sec / 60,
+                    start_sec % 60,
+                    end_sec / 60,
+                    end_sec % 60
+                );
+            }
+            if s.start_time_ms >= s.end_time_ms {
+                continue;
+            }
+
+            let (cleaned, has_loop, ratio) =
+                crate::summarizer::cleaner::SpeechCleaner::detect_and_clean_hallucination_loops(&s.text);
+            if has_loop && (ratio > 0.60 || cleaned.split_whitespace().count() < 2) {
+                continue;
+            }
+            if has_loop {
+                s.text = cleaned;
+                s.confidence = (s.confidence * (1.0 - ratio).max(0.20) * 100.0).round() / 100.0;
+            }
+
+            clean_segs.push(s);
+        }
+        let mut segments = clean_segs;
 
         // Step 1: Redaction & phonetic correction
         crate::summarizer::TranscriptRedactor::redact_segments(

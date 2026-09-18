@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
   MessageSquare,
@@ -15,6 +15,7 @@ import {
   Loader2,
   RotateCw,
   BarChart3,
+  AlertTriangle,
 } from "lucide-react";
 import { MeetingRecord, ActionItem, TopicBreakdown } from "../App";
 import { ExportModal } from "./ExportModal";
@@ -836,6 +837,14 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
 
   const actionItemsCount = richSummary?.action_items?.length || 0;
 
+  const isLowQualityTranscript = useMemo(() => {
+    if (!segments || segments.length === 0) return false;
+    const avgConfidence =
+      segments.reduce((acc, s) => acc + (s.confidence || 0), 0) /
+      segments.length;
+    return avgConfidence < 0.6;
+  }, [segments]);
+
   return (
     <div className="bento-card p-0 flex flex-col flex-1 min-h-0 bg-[#0b1324] border border-white/10 rounded-2xl shadow-xl overflow-hidden relative">
       {/* Global AI Processing Glassmorphism Overlay */}
@@ -1045,6 +1054,21 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
           onSeek={handleAudioSeek}
           formatPlayerTime={formatPlayerTime}
         />
+      )}
+
+      {/* Low Quality ASR Warning Banner */}
+      {isLowQualityTranscript && (
+        <div className="mx-4 mt-3 p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-start gap-3 text-amber-200 text-xs animate-in fade-in duration-150">
+          <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <span className="font-semibold text-amber-300">
+              {t("transcript.lowQualityWarningTitle") ||
+                "Transkript Güvenilirlik Uyarısı:"}
+            </span>{" "}
+            {t("transcript.lowQualityWarningDesc") ||
+              "Bu kayıtta zayıf ses sinyali veya tekrarlayan konuşma desenleri tespit edildi. Transkript güvenilirliği düşük olabilir. Daha yüksek doğruluk için Ayarlar'dan Whisper Small modelini kullanabilir veya dili manuel olarak seçebilirsiniz."}
+          </div>
+        </div>
       )}
 
       {/* Main Tab Viewport */}

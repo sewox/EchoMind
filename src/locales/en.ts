@@ -60,6 +60,9 @@ export const en: TranslationKeys = {
     retranscribe: "Re-transcribe",
     retranscribeTooltip:
       "Re-process the meeting audio using a different AI model or provider",
+    lowQualityWarningTitle: "Transcript Reliability Warning:",
+    lowQualityWarningDesc:
+      "Weak audio signals or repetitive speech patterns were detected in this recording. Transcription accuracy may be degraded. For higher fidelity, choose the Whisper Small model in Settings or select the language explicitly.",
     shareReport: "Export / Share",
     shareReportTooltip:
       "Export meeting notes to PDF, Slack, Email, or Markdown",

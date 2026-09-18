@@ -232,6 +232,8 @@ impl GlobalTranscriberEngine {
             state.segment_counter
         };
 
+        let total_duration_ms = ((samples.len() as f64 / 16000.0) * 1000.0) as u64;
+
         for (chunk_idx, (chunk_time_offset_ms, chunk_samples)) in natural_chunks.iter().enumerate()
         {
             let mut state_ctx = ctx
@@ -242,12 +244,14 @@ impl GlobalTranscriberEngine {
             params.set_language(whisper_lang);
             params.set_initial_prompt(prompt);
             params.set_no_context(true); // Isolate chunks from previous hallucination loops
+            params.set_single_segment(false);
             params.set_temperature(0.0);
-            params.set_temperature_inc(0.0); // Keep greedy zero-temperature
+            params.set_temperature_inc(0.2); // Fallback to higher temperatures if trapped in repetition
             params.set_entropy_thold(2.4);
+            params.set_logprob_thold(-1.0);
+            params.set_no_speech_thold(0.50);
             params.set_suppress_blank(true);
             params.set_suppress_nst(true);
-            params.set_no_speech_thold(0.60);
             params.set_print_special(false);
             params.set_print_progress(false);
             params.set_print_realtime(false);
@@ -269,11 +273,41 @@ impl GlobalTranscriberEngine {
                         continue;
                     }
 
+                    // 1. Anti-Hallucination N-Gram Loop Detection & Truncation
+                    let (cleaned_text, has_loop, loop_ratio) =
+                        crate::summarizer::cleaner::SpeechCleaner::detect_and_clean_hallucination_loops(&segment_text);
+
+                    // If the segment is overwhelmingly repetitive garbage (e.g. 50x "ve kanalıma"), discard it completely!
+                    if has_loop
+                        && (loop_ratio > 0.60 || cleaned_text.split_whitespace().count() < 2)
+                    {
+                        println!("🚫 [ASR Hallucination Guard] Tekrarlayan döngü segmenti reddedildi (oran: {:.2}): {:?}", loop_ratio, segment_text);
+                        continue;
+                    }
+
+                    let final_text = if has_loop { cleaned_text } else { segment_text };
+                    if final_text.trim().is_empty() {
+                        continue;
+                    }
+
+                    // 2. Timestamp Clamping to Total Audio Duration
                     let seg_start_ms = (seg.start_timestamp() as u64) * 10;
                     let seg_end_ms = (seg.end_timestamp() as u64) * 10;
 
                     let start_time_ms = chunk_time_offset_ms + seg_start_ms;
-                    let end_time_ms = chunk_time_offset_ms + seg_end_ms;
+                    let mut end_time_ms = chunk_time_offset_ms + seg_end_ms;
+
+                    // Discard ghost segments beyond the physical audio length
+                    if start_time_ms >= total_duration_ms {
+                        continue;
+                    }
+                    // Clamp end time to strictly never exceed actual audio duration
+                    if end_time_ms > total_duration_ms {
+                        end_time_ms = total_duration_ms;
+                    }
+                    if start_time_ms >= end_time_ms {
+                        continue;
+                    }
 
                     let start_sec = start_time_ms / 1000;
                     let end_sec = end_time_ms / 1000;
@@ -285,6 +319,35 @@ impl GlobalTranscriberEngine {
                         end_sec % 60
                     );
 
+                    // 3. Dynamic Confidence & Quality Score Calculation
+                    let n_tokens = seg.n_tokens();
+                    let mut token_prob_sum = 0.0f32;
+                    let mut token_prob_count = 0usize;
+                    for t in 0..n_tokens {
+                        if let Some(tok) = seg.get_token(t) {
+                            let p = tok.token_probability();
+                            if p > 0.0 {
+                                token_prob_sum += p;
+                                token_prob_count += 1;
+                            }
+                        }
+                    }
+                    let avg_token_prob = if token_prob_count > 0 {
+                        token_prob_sum / (token_prob_count as f32)
+                    } else {
+                        0.85
+                    };
+
+                    let no_speech_p = seg.no_speech_probability();
+                    let mut calc_confidence = avg_token_prob * (1.0 - (no_speech_p * 0.5));
+
+                    if has_loop {
+                        // Penalize confidence if any repetition loop was stripped
+                        calc_confidence *= (1.0 - loop_ratio).max(0.20);
+                    }
+
+                    let confidence = (calc_confidence.clamp(0.10, 0.98) * 100.0).round() / 100.0;
+
                     segment_counter += 1;
                     let id = segment_counter;
 
@@ -295,13 +358,13 @@ impl GlobalTranscriberEngine {
                         start_time_ms,
                         end_time_ms,
                         timestamp_formatted,
-                        text: segment_text,
+                        text: final_text,
                         language: if is_auto {
                             "auto".to_string()
                         } else {
                             language.to_string()
                         },
-                        confidence: 0.98,
+                        confidence,
                     };
 
                     new_segments.push(segment);
