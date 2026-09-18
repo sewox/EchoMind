@@ -59,7 +59,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onClose,
   hardware,
   modelStatus,
-  onOpenUpdateModal,
 }) => {
   const { t, language, setLanguage } = useI18n();
   const { setPrivacyMode, isParanoid, isBalanced, isMaxIntelligence } =
@@ -169,9 +168,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           state: "updateAvailable",
           version: res.latest_version,
         });
-        if (onOpenUpdateModal) {
-          onOpenUpdateModal(res);
-        }
       } else {
         setUpdateStatus({
           state: "upToDate",

@@ -631,7 +631,7 @@ describe("SettingsModal Component", () => {
       fireEvent.click(checkBtn);
     });
 
-    expect(onOpenUpdateModal).toHaveBeenCalled();
+    expect(onOpenUpdateModal).not.toHaveBeenCalled();
     expect(screen.getByText(/Yeni Sürüm Mevcut/i)).toBeInTheDocument();
 
     // Now test error case
