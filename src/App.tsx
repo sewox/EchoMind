@@ -79,6 +79,7 @@ export interface ModelStatus {
   is_downloading: boolean;
   download_progress: number;
   hardware_acceleration: string;
+  used_fallback_model: boolean;
 }
 
 export interface ActionItem {

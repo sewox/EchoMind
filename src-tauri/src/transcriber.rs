@@ -24,6 +24,11 @@ pub struct ModelStatus {
     pub is_downloading: bool,
     pub download_progress: f32,
     pub hardware_acceleration: String,
+    /// True when the requested/selected model failed to load (e.g. not yet
+    /// downloaded) and the engine silently fell back to a smaller, lower-quality
+    /// model instead. Grok Bot's v0.2.5 QA report flagged exactly this case on
+    /// Linux: base loaded instead of small with no visible signal to the user.
+    pub used_fallback_model: bool,
 }
 
 pub struct TranscriberState {
@@ -31,6 +36,7 @@ pub struct TranscriberState {
     pub selected_model_path: String,
     pub model_display_name: String,
     pub is_model_loaded: bool,
+    pub used_fallback_model: bool,
     pub segments: Vec<TranscriptSegment>,
     pub segment_counter: usize,
 }
@@ -42,6 +48,7 @@ impl Default for TranscriberState {
             selected_model_path: "models/ggml-small.bin".to_string(),
             model_display_name: "Whisper Small 244M (Kullanım Anında Yüklenecek)".to_string(),
             is_model_loaded: false,
+            used_fallback_model: false,
             segments: Vec::new(),
             segment_counter: 0,
         }
@@ -93,8 +100,21 @@ impl GlobalTranscriberEngine {
             state.selected_model_path.clone()
         };
 
+        let fallback_path = "models/ggml-base.bin";
         if self.init_model(&model_path).is_err() {
-            self.init_model("models/ggml-base.bin")?;
+            self.init_model(fallback_path)?;
+            let fell_back = model_path != fallback_path;
+            let mut state = self.state.lock().unwrap();
+            state.used_fallback_model = fell_back;
+            if fell_back {
+                eprintln!(
+                    "⚠️ [Model Fallback] İstenen model yüklenemedi ({}), Base modele düşüldü — kalite daha düşük olabilir.",
+                    model_path
+                );
+            }
+        } else {
+            let mut state = self.state.lock().unwrap();
+            state.used_fallback_model = false;
         }
         Ok(())
     }
@@ -450,6 +470,7 @@ impl GlobalTranscriberEngine {
             is_downloading: false,
             download_progress: 100.0,
             hardware_acceleration: accel,
+            used_fallback_model: state.used_fallback_model,
         }
     }
 }
