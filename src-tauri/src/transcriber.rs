@@ -1,7 +1,9 @@
 use serde::{Deserialize, Serialize};
+use std::io::{Read, Write};
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
+use tauri::Emitter;
 use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -653,6 +655,38 @@ pub fn clear_transcription_history() -> Vec<TranscriptSegment> {
     Vec::new()
 }
 
+/// Picks the best default Whisper model tier for the given amount of system RAM, so
+/// first-run setup can fetch a model that will actually run well on this machine
+/// instead of always grabbing the same size regardless of hardware. Deliberately only
+/// ever recommends tiny/base/small — the larger tiers (medium, large-v3-turbo) stay
+/// opt-in from the Model Hub since they're a much bigger unattended download (1.5GB+)
+/// for accuracy most users don't need by default.
+pub fn recommended_model_key(total_ram_gb: f64) -> &'static str {
+    if total_ram_gb < 3.0 {
+        "tiny"
+    } else if total_ram_gb < 6.0 {
+        "base"
+    } else {
+        "small"
+    }
+}
+
+#[tauri::command]
+pub fn get_recommended_model_key() -> String {
+    let hw = crate::hardware::HardwareInfo::detect();
+    recommended_model_key(hw.total_ram_gb).to_string()
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModelDownloadProgressPayload {
+    pub model_key: String,
+    pub percentage: f64,
+    pub downloaded_bytes: u64,
+    pub total_bytes: u64,
+    pub status: String, // "downloading", "completed", "error"
+    pub error: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModelInfo {
     pub key: String,            // "tiny", "base", "small", "medium", "large-v3-turbo"
@@ -788,7 +822,7 @@ pub fn switch_transcription_model(model_key: String) -> Result<ModelStatus, Stri
 }
 
 #[tauri::command]
-pub fn download_whisper_model(model_key: String) -> Result<String, String> {
+pub fn download_whisper_model(app: tauri::AppHandle, model_key: String) -> Result<String, String> {
     let models = get_available_models();
     let model = models
         .into_iter()
@@ -802,23 +836,132 @@ pub fn download_whisper_model(model_key: String) -> Result<String, String> {
     let target_file = target_dir.join(&model.filename);
 
     if target_file.exists() {
+        let _ = app.emit(
+            "model-download-progress",
+            ModelDownloadProgressPayload {
+                model_key: model_key.clone(),
+                percentage: 100.0,
+                downloaded_bytes: 0,
+                total_bytes: 0,
+                status: "completed".to_string(),
+                error: None,
+            },
+        );
         return Ok(format!("{} zaten mevcut.", model.name));
     }
 
+    let emit_error = |msg: &str| {
+        let _ = app.emit(
+            "model-download-progress",
+            ModelDownloadProgressPayload {
+                model_key: model_key.clone(),
+                percentage: 0.0,
+                downloaded_bytes: 0,
+                total_bytes: 0,
+                status: "error".to_string(),
+                error: Some(msg.to_string()),
+            },
+        );
+    };
+
     let client = reqwest::blocking::Client::builder()
-        .timeout(std::time::Duration::from_secs(300))
+        .timeout(std::time::Duration::from_secs(1800)) // large models can take a while on slow links
         .build()
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| {
+            emit_error(&e.to_string());
+            e.to_string()
+        })?;
 
-    let mut resp = client
-        .get(&model.download_url)
-        .send()
-        .map_err(|e| format!("İndirme hatası: {}", e))?;
+    let mut resp = client.get(&model.download_url).send().map_err(|e| {
+        let msg = format!("İndirme hatası: {}", e);
+        emit_error(&msg);
+        msg
+    })?;
 
-    let mut out = std::fs::File::create(&target_file)
-        .map_err(|e| format!("Dosya oluşturma hatası: {}", e))?;
+    if !resp.status().is_success() {
+        let msg = format!("HTTP İndirme Hatası: {}", resp.status());
+        emit_error(&msg);
+        return Err(msg);
+    }
 
-    std::io::copy(&mut resp, &mut out).map_err(|e| format!("Yazma hatası: {}", e))?;
+    let total_size = resp
+        .content_length()
+        .unwrap_or((model.size_mb as u64) * 1024 * 1024);
+
+    // Download into a .part file first: init_model() only checks whether the final
+    // filename exists, so a half-downloaded file left behind by an interrupted
+    // download (crash, network drop) must never be mistaken for a complete model.
+    let tmp_file = target_dir.join(format!("{}.part", model.filename));
+    let mut out = std::fs::File::create(&tmp_file).map_err(|e| {
+        let msg = format!("Dosya oluşturma hatası: {}", e);
+        emit_error(&msg);
+        msg
+    })?;
+
+    let mut downloaded: u64 = 0;
+    let mut buffer = [0u8; 65536];
+    let mut last_emit_percent: i64 = -1;
+
+    loop {
+        match resp.read(&mut buffer) {
+            Ok(0) => break,
+            Ok(bytes_read) => {
+                if let Err(e) = out.write_all(&buffer[..bytes_read]) {
+                    let msg = format!("Yazma hatası: {}", e);
+                    emit_error(&msg);
+                    let _ = std::fs::remove_file(&tmp_file);
+                    return Err(msg);
+                }
+                downloaded += bytes_read as u64;
+
+                let percent = if total_size > 0 {
+                    (downloaded as f64 / total_size as f64) * 100.0
+                } else {
+                    0.0
+                };
+                if (percent as i64) != last_emit_percent || downloaded == total_size {
+                    last_emit_percent = percent as i64;
+                    let _ = app.emit(
+                        "model-download-progress",
+                        ModelDownloadProgressPayload {
+                            model_key: model_key.clone(),
+                            percentage: (percent * 10.0).round() / 10.0,
+                            downloaded_bytes: downloaded,
+                            total_bytes: total_size,
+                            status: "downloading".to_string(),
+                            error: None,
+                        },
+                    );
+                }
+            }
+            Err(e) => {
+                let msg = format!("İndirme sırasında kesinti: {}", e);
+                emit_error(&msg);
+                let _ = std::fs::remove_file(&tmp_file);
+                return Err(msg);
+            }
+        }
+    }
+    let _ = out.flush();
+    drop(out);
+
+    std::fs::rename(&tmp_file, &target_file).map_err(|e| {
+        let msg = format!("Dosya taşıma hatası: {}", e);
+        emit_error(&msg);
+        msg
+    })?;
+
+    let _ = app.emit(
+        "model-download-progress",
+        ModelDownloadProgressPayload {
+            model_key: model_key.clone(),
+            percentage: 100.0,
+            downloaded_bytes: downloaded,
+            total_bytes: total_size,
+            status: "completed".to_string(),
+            error: None,
+        },
+    );
 
     Ok(format!("{} başarıyla indirildi!", model.name))
 }
@@ -845,5 +988,17 @@ mod tests {
         let engine = GlobalTranscriberEngine::new();
         let status = engine.get_model_status();
         assert!(!status.is_loaded);
+    }
+
+    #[test]
+    fn test_recommended_model_key_scales_with_ram() {
+        assert_eq!(recommended_model_key(2.0), "tiny");
+        assert_eq!(recommended_model_key(2.9), "tiny");
+        assert_eq!(recommended_model_key(3.0), "base");
+        assert_eq!(recommended_model_key(4.0), "base");
+        assert_eq!(recommended_model_key(5.9), "base");
+        assert_eq!(recommended_model_key(6.0), "small");
+        assert_eq!(recommended_model_key(16.0), "small");
+        assert_eq!(recommended_model_key(64.0), "small");
     }
 }

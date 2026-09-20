@@ -62,8 +62,8 @@ use summarizer::{
 };
 use transcriber::{
     clear_transcription_history, download_whisper_model, get_available_models, get_model_status,
-    get_transcription_history, switch_transcription_model, transcribe_audio_buffer,
-    unload_transcription_model,
+    get_recommended_model_key, get_transcription_history, switch_transcription_model,
+    transcribe_audio_buffer, unload_transcription_model,
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -137,6 +137,7 @@ pub fn run() {
             get_available_models,
             switch_transcription_model,
             download_whisper_model,
+            get_recommended_model_key,
             save_secure_credential,
             get_secure_credential,
             delete_secure_credential,

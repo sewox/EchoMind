@@ -46,6 +46,8 @@ import { useI18n, SUPPORTED_LANGUAGES } from "./locales/i18nContext";
 import { useAudioRecording } from "./hooks/useAudioRecording";
 import { useMeetingManager } from "./hooks/useMeetingManager";
 import { useMeetingDetector, MeetingAppInfo } from "./hooks/useMeetingDetector";
+import { useFirstRunModelSetup } from "./hooks/useFirstRunModelSetup";
+import { FirstRunModelSetupBanner } from "./components/FirstRunModelSetupBanner";
 import { CredentialStore } from "./services/credentialStore";
 
 export interface HardwareInfo {
@@ -140,6 +142,11 @@ export function App() {
   // Audio Recording Hook
   const { isRecording, recordingSeconds, audioStatus, setIsRecording } =
     useAudioRecording();
+
+  // First-run: silently fetch the RAM-appropriate Whisper model in the background
+  // so local transcription works out of the box without a manual Model Hub trip.
+  const { progress: modelSetupProgress, dismiss: dismissModelSetup } =
+    useFirstRunModelSetup();
 
   // Meeting Manager Hook
   const {
@@ -966,6 +973,11 @@ export function App() {
           </button>
         </div>
       </header>
+
+      <FirstRunModelSetupBanner
+        progress={modelSetupProgress}
+        onDismiss={dismissModelSetup}
+      />
 
       {/* Floating Completion Notification Banner (Steve Jobs simplicity) */}
       {completionNotification && (
