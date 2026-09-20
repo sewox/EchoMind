@@ -16,7 +16,10 @@ export function useAudioRecording() {
         setIsRecording(true);
       },
     );
-    const unlistenStop = listen("trigger-stop-recording", () => {
+    const unlistenStop = listen("trigger-stop-recording", async () => {
+      try {
+        await invoke("stop_audio_capture");
+      } catch {}
       setIsRecording(false);
     });
 

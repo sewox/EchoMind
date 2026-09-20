@@ -4,11 +4,13 @@ import { RetranscribeModal } from "./RetranscribeModal";
 import { I18nProvider } from "../locales/i18nContext";
 import { invoke } from "@tauri-apps/api/core";
 import { MeetingRecord } from "../App";
+import { CredentialStore } from "../services/credentialStore";
 
 describe("RetranscribeModal Component", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    CredentialStore.clearCache();
   });
 
   const mockMeeting: MeetingRecord = {
@@ -88,8 +90,8 @@ describe("RetranscribeModal Component", () => {
   });
 
   it("allows selecting OpenAI and Gemini cloud providers and triggers cloud re-transcription with stored API keys", async () => {
-    localStorage.setItem("echomind_gemini_key", "AIzaSy_stored_key");
-    localStorage.setItem("echomind_openai_key", "sk-proj_stored_key");
+    await CredentialStore.set("echomind_gemini_key", "AIzaSy_stored_key");
+    await CredentialStore.set("echomind_openai_key", "sk-proj_stored_key");
 
     (invoke as any).mockImplementation((cmd: string) => {
       if (cmd === "get_available_models") return Promise.resolve([]);
@@ -117,6 +119,10 @@ describe("RetranscribeModal Component", () => {
         <RetranscribeModal {...defaultProps} />
       </I18nProvider>,
     );
+
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 10));
+    });
 
     const cloudBtn = screen.getByText(/Yüksek Hızlı Bulut Zekası/i);
     await act(async () => {
@@ -158,6 +164,10 @@ describe("RetranscribeModal Component", () => {
       </I18nProvider>,
     );
 
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 10));
+    });
+
     const cloudBtn = screen.getByText(/Yüksek Hızlı Bulut Zekası/i);
     await act(async () => {
       fireEvent.click(cloudBtn);
@@ -170,11 +180,13 @@ describe("RetranscribeModal Component", () => {
       fireEvent.click(submitBtn);
     });
 
-    expect(screen.getByText(/API Anahtarı girmelisiniz/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/API Anahtarı girmelisiniz/i),
+    ).toBeInTheDocument();
   });
 
   it("handles Groq and OpenAI cloud providers with API keys and retranscribe error", async () => {
-    localStorage.setItem("echomind_groq_key", "gsk_groq_retranscribe_key");
+    await CredentialStore.set("echomind_groq_key", "gsk_groq_retranscribe_key");
     (invoke as any).mockImplementation((cmd: string) => {
       if (cmd === "get_available_models") return Promise.resolve([]);
       if (cmd === "get_stored_api_keys")
@@ -193,6 +205,10 @@ describe("RetranscribeModal Component", () => {
         <RetranscribeModal {...defaultProps} />
       </I18nProvider>,
     );
+
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 10));
+    });
 
     const cloudBtn = screen.getByText(/Yüksek Hızlı Bulut Zekası/i);
     await act(async () => {

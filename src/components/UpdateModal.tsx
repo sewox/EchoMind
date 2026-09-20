@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import {
   Sparkles,
   ArrowRight,
-  ExternalLink,
   X,
   Calendar,
   CheckCircle2,
@@ -122,17 +121,6 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
     }
   };
 
-  const handleOpenGitHubRelease = async () => {
-    try {
-      await invoke("open_release_url", {
-        url: updateInfo.html_url,
-      });
-      onClose();
-    } catch (err) {
-      console.error("Failed to open release URL:", err);
-    }
-  };
-
   const handleRemindLater = () => {
     if (dontShowAgain) {
       localStorage.setItem(
@@ -164,14 +152,20 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200 cursor-pointer"
       data-testid="update-modal-backdrop"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
     >
       <div
-        className="relative w-full max-w-xl overflow-hidden rounded-2xl border border-cyan-500/30 bg-slate-900/95 p-6 shadow-2xl shadow-cyan-950/50 backdrop-blur-xl animate-in zoom-in-95 duration-200"
+        className="relative w-full max-w-xl overflow-hidden rounded-2xl border border-cyan-500/30 bg-slate-900/95 p-6 shadow-2xl shadow-cyan-950/50 backdrop-blur-xl animate-in zoom-in-95 duration-200 cursor-default"
         role="dialog"
         aria-modal="true"
         aria-labelledby="update-modal-title"
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Top Glow Background */}
         <div className="absolute -top-24 -left-24 w-60 h-60 bg-cyan-500/15 rounded-full blur-3xl pointer-events-none" />
@@ -292,7 +286,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
           </div>
         )}
 
-        {/* Download Error Banner & Manual Fallback */}
+        {/* Download Error Banner */}
         {downloadError && (
           <div
             className="mb-5 p-3.5 rounded-xl bg-rose-950/40 border border-rose-500/30 text-xs text-rose-300 flex items-start gap-2.5 relative z-10"
@@ -307,15 +301,6 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
               <div className="text-[11px] text-rose-300/80 font-mono break-all">
                 {downloadError}
               </div>
-              <button
-                type="button"
-                onClick={handleOpenGitHubRelease}
-                className="inline-flex items-center gap-1.5 text-xs font-semibold text-cyan-300 hover:text-cyan-200 underline mt-1 cursor-pointer"
-              >
-                <ExternalLink className="w-3 h-3" />
-                {t("updater.manualDownloadFallback") ||
-                  "Doğrudan GitHub'dan İndir"}
-              </button>
             </div>
           </div>
         )}
@@ -370,17 +355,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center justify-between gap-3 pt-4 border-t border-white/10 relative z-10">
-          <button
-            type="button"
-            onClick={handleOpenGitHubRelease}
-            className="text-xs text-slate-500 hover:text-slate-300 transition flex items-center gap-1 cursor-pointer"
-            title="GitHub Release"
-          >
-            <ExternalLink className="w-3 h-3" />
-            <span className="hidden sm:inline">GitHub</span>
-          </button>
-
+        <div className="flex items-center justify-end gap-3 pt-4 border-t border-white/10 relative z-10">
           <div className="flex items-center gap-3">
             <button
               type="button"

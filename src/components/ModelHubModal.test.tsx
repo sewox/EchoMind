@@ -3,11 +3,13 @@ import { render, screen, fireEvent, act } from "@testing-library/react";
 import { ModelHubModal } from "./ModelHubModal";
 import { I18nProvider } from "../locales/i18nContext";
 import { invoke } from "@tauri-apps/api/core";
+import { CredentialStore } from "../services/credentialStore";
 
 describe("ModelHubModal Component", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    CredentialStore.clearCache();
   });
 
   const mockModels = [
@@ -133,9 +135,10 @@ describe("ModelHubModal Component", () => {
       fireEvent.click(saveGroqKeyBtn);
     });
 
-    expect(localStorage.getItem("echomind_groq_key")).toBe(
+    expect(CredentialStore.getSync("echomind_groq_key")).toBe(
       "gsk_test_model_hub",
     );
+    expect(localStorage.getItem("echomind_groq_key")).toBeNull();
     expect(localStorage.getItem("echomind_active_engine")).toBe("cloud_groq");
 
     // 2. Select Gemini -> Enter key
@@ -159,9 +162,10 @@ describe("ModelHubModal Component", () => {
         fireEvent.click(saveGeminiKeyBtn);
       });
 
-      expect(localStorage.getItem("echomind_gemini_key")).toBe(
+      expect(CredentialStore.getSync("echomind_gemini_key")).toBe(
         "AIzaSy_test_model_hub",
       );
+      expect(localStorage.getItem("echomind_gemini_key")).toBeNull();
       expect(localStorage.getItem("echomind_active_engine")).toBe(
         "cloud_gemini",
       );
@@ -190,9 +194,10 @@ describe("ModelHubModal Component", () => {
       fireEvent.click(saveOpenaiKeyBtn);
     });
 
-    expect(localStorage.getItem("echomind_openai_key")).toBe(
+    expect(CredentialStore.getSync("echomind_openai_key")).toBe(
       "sk-proj_test_model_hub",
     );
+    expect(localStorage.getItem("echomind_openai_key")).toBeNull();
     expect(localStorage.getItem("echomind_active_engine")).toBe("cloud_openai");
 
     // Test model version select dropdowns
@@ -278,28 +283,31 @@ describe("ModelHubModal Component", () => {
     fireEvent.click(cloudTab);
 
     // Click Groq Cloud Activate when no key exists
-    const groqActivateBtn = screen.getAllByRole("button", {
-      name: /Bunu Seç/i,
-    })[0];
-    fireEvent.click(groqActivateBtn);
-
-    expect(
-      screen.getByText(/Lütfen GROQ API anahtarınızı girip onaylayın/i),
-    ).toBeInTheDocument();
+    const groqActivateBtn = (
+      await screen.findAllByRole("button", {
+        name: /Bunu Seç/i,
+      })
+    )[0];
+    await act(async () => {
+      fireEvent.click(groqActivateBtn);
+    });
 
     // Fill inline key input
-    const inlineInput = screen.getByPlaceholderText(
+    const inlineInput = await screen.findByPlaceholderText(
       /Groq API Anahtarını Yapıştırın/i,
     );
     fireEvent.change(inlineInput, { target: { value: "gsk_inline_test_key" } });
 
     // Click save and activate
     const saveInlineBtn = screen.getByRole("button", { name: /Kaydet & Seç/i });
-    fireEvent.click(saveInlineBtn);
+    await act(async () => {
+      fireEvent.click(saveInlineBtn);
+    });
 
-    expect(localStorage.getItem("echomind_groq_key")).toBe(
+    expect(CredentialStore.getSync("echomind_groq_key")).toBe(
       "gsk_inline_test_key",
     );
+    expect(localStorage.getItem("echomind_groq_key")).toBeNull();
     expect(localStorage.getItem("echomind_active_engine")).toBe("cloud_groq");
   });
 
@@ -383,9 +391,11 @@ describe("ModelHubModal Component", () => {
       name: /Bunu Seç/i,
     });
     if (selectButtons.length > 1) {
-      fireEvent.click(selectButtons[1]);
+      await act(async () => {
+        fireEvent.click(selectButtons[1]);
+      });
 
-      const inlineInput = screen.getByPlaceholderText(
+      const inlineInput = await screen.findByPlaceholderText(
         /Gemini API Anahtarını Yapıştırın/i,
       );
       fireEvent.change(inlineInput, {
@@ -395,11 +405,14 @@ describe("ModelHubModal Component", () => {
       const saveInlineBtn = screen.getByRole("button", {
         name: /Kaydet & Seç/i,
       });
-      fireEvent.click(saveInlineBtn);
+      await act(async () => {
+        fireEvent.click(saveInlineBtn);
+      });
 
-      expect(localStorage.getItem("echomind_gemini_key")).toBe(
+      expect(CredentialStore.getSync("echomind_gemini_key")).toBe(
         "AIzaSy_inline_gemini_key",
       );
+      expect(localStorage.getItem("echomind_gemini_key")).toBeNull();
       expect(localStorage.getItem("echomind_active_engine")).toBe(
         "cloud_gemini",
       );
@@ -410,9 +423,11 @@ describe("ModelHubModal Component", () => {
       name: /Bunu Seç/i,
     });
     if (updatedSelectButtons.length > 2) {
-      fireEvent.click(updatedSelectButtons[2]);
+      await act(async () => {
+        fireEvent.click(updatedSelectButtons[2]);
+      });
 
-      const openaiInput = screen.getByPlaceholderText(
+      const openaiInput = await screen.findByPlaceholderText(
         /OpenAI API Anahtarını Yapıştırın/i,
       );
       fireEvent.change(openaiInput, {
@@ -422,11 +437,14 @@ describe("ModelHubModal Component", () => {
       const saveOpenaiBtn = screen.getByRole("button", {
         name: /Kaydet & Seç/i,
       });
-      fireEvent.click(saveOpenaiBtn);
+      await act(async () => {
+        fireEvent.click(saveOpenaiBtn);
+      });
 
-      expect(localStorage.getItem("echomind_openai_key")).toBe(
+      expect(CredentialStore.getSync("echomind_openai_key")).toBe(
         "sk-proj-inline_openai_key",
       );
+      expect(localStorage.getItem("echomind_openai_key")).toBeNull();
       expect(localStorage.getItem("echomind_active_engine")).toBe(
         "cloud_openai",
       );
@@ -469,9 +487,9 @@ describe("ModelHubModal Component", () => {
   });
 
   it("handles existing API keys and custom model version selects for Gemini and OpenAI in ModelHubModal", async () => {
-    localStorage.setItem("echomind_gemini_key", "AIza_stored_hub_key");
-    localStorage.setItem("echomind_openai_key", "sk_stored_hub_key");
-    localStorage.setItem("echomind_groq_key", "gsk_stored_hub_key");
+    await CredentialStore.set("echomind_gemini_key", "AIza_stored_hub_key");
+    await CredentialStore.set("echomind_openai_key", "sk_stored_hub_key");
+    await CredentialStore.set("echomind_groq_key", "gsk_stored_hub_key");
 
     (invoke as any).mockImplementation((cmd: string) => {
       if (cmd === "get_available_models") return Promise.resolve(mockModels);
@@ -495,15 +513,21 @@ describe("ModelHubModal Component", () => {
       name: /Bunu Seç/i,
     });
     if (selectButtons.length >= 3) {
-      fireEvent.click(selectButtons[0]);
+      await act(async () => {
+        fireEvent.click(selectButtons[0]);
+      });
       expect(localStorage.getItem("echomind_active_engine")).toBe("cloud_groq");
 
-      fireEvent.click(selectButtons[1]);
+      await act(async () => {
+        fireEvent.click(selectButtons[1]);
+      });
       expect(localStorage.getItem("echomind_active_engine")).toBe(
         "cloud_gemini",
       );
 
-      fireEvent.click(selectButtons[2]);
+      await act(async () => {
+        fireEvent.click(selectButtons[2]);
+      });
       expect(localStorage.getItem("echomind_active_engine")).toBe(
         "cloud_openai",
       );

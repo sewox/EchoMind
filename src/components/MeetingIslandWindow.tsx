@@ -34,6 +34,8 @@ const IslandContent: FC = () => {
     );
 
     const unlistenEnded = listen("meeting-ended", () => {
+      setAppInfo((prev) => ({ ...prev, is_running: false }));
+      setLatestSuggestion(null);
       invoke("hide_island_window").catch(() => {});
     });
 
@@ -56,7 +58,27 @@ const IslandContent: FC = () => {
       })
       .catch(() => {});
 
+    // Periodic heartbeat (every 2s) to guarantee island transitions out of "Aktif" within max 5s
+    const heartbeatInterval = setInterval(() => {
+      invoke<any>("get_detector_status")
+        .then((status) => {
+          if (status) {
+            const hasActive =
+              status.detected_apps && status.detected_apps.length > 0;
+            if (!hasActive) {
+              setAppInfo((prev) => ({ ...prev, is_running: false }));
+              setLatestSuggestion(null);
+              invoke("hide_island_window").catch(() => {});
+            } else {
+              setAppInfo(status.detected_apps[0]);
+            }
+          }
+        })
+        .catch(() => {});
+    }, 2000);
+
     return () => {
+      clearInterval(heartbeatInterval);
       unlistenDetected.then((f) => f());
       unlistenEnded.then((f) => f());
       unlistenSuggestion.then((f) => f());
@@ -99,15 +121,9 @@ const IslandContent: FC = () => {
   return (
     <div className="w-full h-full flex items-center justify-center p-1 bg-transparent select-none font-sans">
       <div className="w-full bg-slate-950/95 backdrop-blur-xl border border-slate-700/80 rounded-2xl px-4 py-2.5 shadow-2xl shadow-black/80 flex items-center justify-between gap-3 text-slate-100">
-        {/* Left: App Info & Title (Draggable, Clean, NO pulse) */}
-        <div
-          data-tauri-drag-region
-          className="flex items-center gap-2.5 min-w-0 cursor-grab active:cursor-grabbing flex-1"
-        >
-          <div
-            data-tauri-drag-region
-            className="w-7 h-7 rounded-xl bg-cyan-950/80 border border-cyan-500/40 flex items-center justify-center text-cyan-400 shrink-0"
-          >
+        {/* Left: App Info & Title (Clean, NO pulse) */}
+        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+          <div className="w-7 h-7 rounded-xl bg-cyan-950/80 border border-cyan-500/40 flex items-center justify-center text-cyan-400 shrink-0">
             <Video className="w-3.5 h-3.5 pointer-events-none" />
           </div>
 
@@ -116,8 +132,15 @@ const IslandContent: FC = () => {
               <span className="text-xs font-semibold text-white truncate">
                 {appInfo.display_name}
               </span>
-              <span className="text-[10px] font-medium text-emerald-400 bg-emerald-950/60 px-1.5 py-0.2 rounded border border-emerald-500/30">
-                Aktif
+              <span
+                data-testid="island-status-badge"
+                className={`text-[10px] font-medium px-1.5 py-0.2 rounded border transition-colors ${
+                  appInfo.is_running
+                    ? "text-emerald-400 bg-emerald-950/60 border-emerald-500/30"
+                    : "text-slate-400 bg-slate-900/60 border-slate-700/40"
+                }`}
+              >
+                {appInfo.is_running ? "Aktif" : "Beklemede"}
               </span>
               <span
                 data-testid="island-privacy-badge"
@@ -133,7 +156,9 @@ const IslandContent: FC = () => {
               </span>
             </div>
             <span className="text-[11px] text-slate-400 truncate">
-              Toplantıyı kaydetmek istiyor musunuz?
+              {appInfo.is_running
+                ? "Toplantıyı kaydetmek istiyor musunuz?"
+                : "Toplantı sona erdi (Beklemede)"}
             </span>
           </div>
         </div>

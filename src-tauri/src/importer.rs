@@ -255,6 +255,9 @@ pub async fn import_audio_file(
             } else if let Some(key) = api_key.as_deref() {
                 let clean_key = key.trim();
                 if !clean_key.is_empty() && (clean_prov == "groq" || clean_prov == "openai" || clean_prov == "gemini") {
+                    // HARD REJECT in Paranoid / Air-Gapped Mode
+                    crate::security::check_cloud_access_allowed()?;
+
                     println!("🌐 Online Bulut ASR başlatılıyor (Sağlayıcı: {}, Model: {:?})...", clean_prov, model_version);
                     if let Ok(mut cloud_segs) = crate::cloud_transcriber::transcribe_audio_cloud(
                         &flac_file_path,
@@ -289,8 +292,44 @@ pub async fn import_audio_file(
         // Explicitly free 16k PCM vector after compression
         drop(pcm_16k);
 
+        // Step 0: Audio duration clamp and hallucination loop filter pass
+        let total_duration_ms = duration_seconds * 1000;
+        let mut clean_segs = Vec::new();
+        for mut s in segments {
+            if s.start_time_ms >= total_duration_ms {
+                continue;
+            }
+            if s.end_time_ms > total_duration_ms {
+                s.end_time_ms = total_duration_ms;
+                let start_sec = s.start_time_ms / 1000;
+                let end_sec = s.end_time_ms / 1000;
+                s.timestamp_formatted = format!(
+                    "{:02}:{:02} -> {:02}:{:02}",
+                    start_sec / 60,
+                    start_sec % 60,
+                    end_sec / 60,
+                    end_sec % 60
+                );
+            }
+            if s.start_time_ms >= s.end_time_ms {
+                continue;
+            }
+
+            let (cleaned, has_loop, ratio) =
+                crate::summarizer::cleaner::SpeechCleaner::detect_and_clean_hallucination_loops(&s.text);
+            if has_loop && (ratio > 0.60 || cleaned.split_whitespace().count() < 2) {
+                continue;
+            }
+            if has_loop {
+                s.text = cleaned;
+                s.confidence = (s.confidence * (1.0 - ratio).max(0.20) * 100.0).round() / 100.0;
+            }
+
+            clean_segs.push(s);
+        }
+        let mut segments = clean_segs;
+
         // Step 1: Automatic Redaction and Phonetic Error Correction Pass
-        let mut segments = segments;
         crate::summarizer::TranscriptRedactor::redact_segments(
             &mut segments,
             cloud_provider.as_deref(),
@@ -369,10 +408,81 @@ pub struct PickedFileInfo {
 
 #[tauri::command]
 pub async fn pick_audio_file_dialog() -> Result<Option<PickedFileInfo>, String> {
+    #[cfg(target_os = "linux")]
+    {
+        // 1. Try zenity first (common on Ubuntu, Debian, GNOME, XFCE)
+        let zenity_res = std::process::Command::new("zenity")
+            .args([
+                "--file-selection",
+                "--title=Toplantı Ses Dosyası Seç",
+                "--file-filter=Ses Dosyaları | *.mp3 *.m4a *.opus *.ogg *.wav *.flac *.aac *.mp4 *.wma *.3gp",
+            ])
+            .output();
+
+        if let Ok(out) = zenity_res {
+            if out.status.success() {
+                let path_str = String::from_utf8_lossy(&out.stdout).trim().to_string();
+                if !path_str.is_empty() {
+                    let path_buf = std::path::PathBuf::from(&path_str);
+                    if path_buf.exists() {
+                        let file_name = path_buf
+                            .file_name()
+                            .map(|f| f.to_string_lossy().to_string())
+                            .unwrap_or_else(|| "Ses Kaydı".to_string());
+                        let file_size_bytes =
+                            std::fs::metadata(&path_buf).map(|m| m.len()).unwrap_or(0);
+                        let file_size_mb = (file_size_bytes as f64) / (1024.0 * 1024.0);
+                        return Ok(Some(PickedFileInfo {
+                            path: path_str,
+                            file_name,
+                            file_size_mb: (file_size_mb * 10.0).round() / 10.0,
+                            is_large_file: file_size_mb > 15.0,
+                        }));
+                    }
+                }
+            }
+        }
+
+        // 2. Try kdialog (common on KDE Plasma / Linux)
+        let kdialog_res = std::process::Command::new("kdialog")
+            .args([
+                "--getopenfilename",
+                ".",
+                "*.mp3 *.m4a *.opus *.ogg *.wav *.flac *.aac *.mp4 *.wma *.3gp",
+            ])
+            .output();
+
+        if let Ok(out) = kdialog_res {
+            if out.status.success() {
+                let path_str = String::from_utf8_lossy(&out.stdout).trim().to_string();
+                if !path_str.is_empty() {
+                    let path_buf = std::path::PathBuf::from(&path_str);
+                    if path_buf.exists() {
+                        let file_name = path_buf
+                            .file_name()
+                            .map(|f| f.to_string_lossy().to_string())
+                            .unwrap_or_else(|| "Ses Kaydı".to_string());
+                        let file_size_bytes =
+                            std::fs::metadata(&path_buf).map(|m| m.len()).unwrap_or(0);
+                        let file_size_mb = (file_size_bytes as f64) / (1024.0 * 1024.0);
+                        return Ok(Some(PickedFileInfo {
+                            path: path_str,
+                            file_name,
+                            file_size_mb: (file_size_mb * 10.0).round() / 10.0,
+                            is_large_file: file_size_mb > 15.0,
+                        }));
+                    }
+                }
+            }
+        }
+    }
+
     let file = rfd::AsyncFileDialog::new()
         .add_filter(
             "Desteklenen Ses Dosyaları",
-            &["mp3", "m4a", "opus", "ogg", "wav", "flac", "aac", "3gp", "mp4", "caf", "wma"],
+            &[
+                "mp3", "m4a", "opus", "ogg", "wav", "flac", "aac", "3gp", "mp4", "caf", "wma",
+            ],
         )
         .set_title("Toplantı Ses Dosyası Seç")
         .pick_file()
@@ -387,9 +497,7 @@ pub async fn pick_audio_file_dialog() -> Result<Option<PickedFileInfo>, String> 
                 .map(|f| f.to_string_lossy().to_string())
                 .unwrap_or_else(|| "Ses Kaydı".to_string());
 
-            let file_size_bytes = std::fs::metadata(&path_buf)
-                .map(|m| m.len())
-                .unwrap_or(0);
+            let file_size_bytes = std::fs::metadata(&path_buf).map(|m| m.len()).unwrap_or(0);
 
             let file_size_mb = (file_size_bytes as f64) / (1024.0 * 1024.0);
             let is_large_file = file_size_mb > 15.0;
@@ -405,6 +513,64 @@ pub async fn pick_audio_file_dialog() -> Result<Option<PickedFileInfo>, String> 
     }
 }
 
+fn internal_base64_decode(input: &str) -> Result<Vec<u8>, String> {
+    let mut out = Vec::new();
+    let clean = input.trim();
+    let mut val = 0u32;
+    let mut valb = -8;
+    for c in clean.chars() {
+        if c == '=' {
+            break;
+        }
+        let b = match c {
+            'A'..='Z' => c as u32 - 'A' as u32,
+            'a'..='z' => c as u32 - 'a' as u32 + 26,
+            '0'..='9' => c as u32 - '0' as u32 + 52,
+            '+' => 62,
+            '/' => 63,
+            _ => continue,
+        };
+        val = (val << 6) | b;
+        valb += 6;
+        if valb >= 0 {
+            out.push(((val >> valb) & 0xFF) as u8);
+            valb -= 8;
+        }
+    }
+    Ok(out)
+}
+
+#[tauri::command]
+pub async fn save_uploaded_audio_bytes(
+    file_name: String,
+    file_base64: String,
+) -> Result<PickedFileInfo, String> {
+    let bytes = internal_base64_decode(&file_base64)?;
+
+    let temp_dir = std::env::temp_dir().join("echomind_uploads");
+    if !temp_dir.exists() {
+        let _ = std::fs::create_dir_all(&temp_dir);
+    }
+
+    let clean_name = std::path::Path::new(&file_name)
+        .file_name()
+        .map(|f| f.to_string_lossy().to_string())
+        .unwrap_or_else(|| "uploaded_audio.mp3".to_string());
+
+    let target_path = temp_dir.join(&clean_name);
+    std::fs::write(&target_path, &bytes)
+        .map_err(|e| format!("Dosya geçici dizine yazılamadı: {}", e))?;
+
+    let file_size_mb = (bytes.len() as f64) / (1024.0 * 1024.0);
+
+    Ok(PickedFileInfo {
+        path: target_path.to_string_lossy().to_string(),
+        file_name: clean_name,
+        file_size_mb: (file_size_mb * 10.0).round() / 10.0,
+        is_large_file: file_size_mb > 15.0,
+    })
+}
+
 #[tauri::command]
 pub async fn process_audio_file_path(
     file_path: String,
@@ -413,10 +579,19 @@ pub async fn process_audio_file_path(
     api_key: Option<String>,
     model_version: Option<String>,
 ) -> Result<MeetingRecord, String> {
-    import_audio_file(file_path, None, language, cloud_provider, api_key, model_version).await
+    import_audio_file(
+        file_path,
+        None,
+        language,
+        cloud_provider,
+        api_key,
+        model_version,
+    )
+    .await
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn retranscribe_meeting(
     meeting_id: String,
     language: Option<String>,
@@ -460,7 +635,7 @@ pub async fn retranscribe_meeting(
         }
 
         // 1. Decode audio to 16kHz PCM
-        let (mut pcm_16k, _) = decode_audio_file_to_pcm16k(&path)?;
+        let (mut pcm_16k, duration_seconds) = decode_audio_file_to_pcm16k(&path)?;
         crate::audio::normalize_audio_samples(&mut pcm_16k);
 
         let lang = language.as_deref().unwrap_or("auto");
@@ -481,6 +656,8 @@ pub async fn retranscribe_meeting(
             } else if let Some(key) = api_key.as_deref() {
                 let clean_key = key.trim();
                 if !clean_key.is_empty() && (clean_prov == "groq" || clean_prov == "openai" || clean_prov == "gemini") {
+                    // HARD REJECT in Paranoid / Air-Gapped Mode
+                    crate::security::check_cloud_access_allowed()?;
                     if let Ok(mut cloud_segs) = crate::cloud_transcriber::transcribe_audio_cloud(
                         &path,
                         &clean_prov,
@@ -509,8 +686,44 @@ pub async fn retranscribe_meeting(
             segments = Some(res);
         }
 
-        let mut segments = segments.unwrap_or_default();
+        let segments_raw = segments.unwrap_or_default();
         drop(pcm_16k);
+
+        let total_duration_ms = duration_seconds * 1000;
+        let mut clean_segs = Vec::new();
+        for mut s in segments_raw {
+            if s.start_time_ms >= total_duration_ms {
+                continue;
+            }
+            if s.end_time_ms > total_duration_ms {
+                s.end_time_ms = total_duration_ms;
+                let start_sec = s.start_time_ms / 1000;
+                let end_sec = s.end_time_ms / 1000;
+                s.timestamp_formatted = format!(
+                    "{:02}:{:02} -> {:02}:{:02}",
+                    start_sec / 60,
+                    start_sec % 60,
+                    end_sec / 60,
+                    end_sec % 60
+                );
+            }
+            if s.start_time_ms >= s.end_time_ms {
+                continue;
+            }
+
+            let (cleaned, has_loop, ratio) =
+                crate::summarizer::cleaner::SpeechCleaner::detect_and_clean_hallucination_loops(&s.text);
+            if has_loop && (ratio > 0.60 || cleaned.split_whitespace().count() < 2) {
+                continue;
+            }
+            if has_loop {
+                s.text = cleaned;
+                s.confidence = (s.confidence * (1.0 - ratio).max(0.20) * 100.0).round() / 100.0;
+            }
+
+            clean_segs.push(s);
+        }
+        let mut segments = clean_segs;
 
         // Step 1: Redaction & phonetic correction
         crate::summarizer::TranscriptRedactor::redact_segments(
@@ -595,7 +808,9 @@ pub async fn pick_and_import_audio_file(
     let file = rfd::AsyncFileDialog::new()
         .add_filter(
             "Desteklenen Ses Dosyaları",
-            &["mp3", "m4a", "opus", "ogg", "wav", "flac", "aac", "3gp", "mp4", "caf", "wma"],
+            &[
+                "mp3", "m4a", "opus", "ogg", "wav", "flac", "aac", "3gp", "mp4", "caf", "wma",
+            ],
         )
         .set_title("Toplantı Ses Dosyası Seç")
         .pick_file()
@@ -604,34 +819,19 @@ pub async fn pick_and_import_audio_file(
     match file {
         Some(handle) => {
             let path_str = handle.path().to_string_lossy().to_string();
-            let meeting = import_audio_file(path_str, None, language, cloud_provider, api_key, model_version).await?;
+            let meeting = import_audio_file(
+                path_str,
+                None,
+                language,
+                cloud_provider,
+                api_key,
+                model_version,
+            )
+            .await?;
             Ok(Some(meeting))
         }
         None => Ok(None),
     }
-}
-
-#[tauri::command]
-pub fn read_audio_file_bytes(file_path: String) -> Result<Vec<u8>, String> {
-    let mut path = PathBuf::from(&file_path);
-
-    if !path.exists() {
-        if let Ok(cwd) = std::env::current_dir() {
-            let alt1 = cwd.join(&file_path);
-            let alt2 = cwd.join("src-tauri").join(&file_path);
-            if alt1.exists() {
-                path = alt1;
-            } else if alt2.exists() {
-                path = alt2;
-            }
-        }
-    }
-
-    if !path.exists() {
-        return Err(format!("Ses dosyası diskte bulunamadı: {}", file_path));
-    }
-
-    std::fs::read(&path).map_err(|e| format!("Dosya okuma hatası: {}", e))
 }
 
 #[cfg(test)]

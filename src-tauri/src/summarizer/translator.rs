@@ -1,10 +1,13 @@
-use std::time::Instant;
-use super::types::{GeminiContent, GeminiGenerationConfig, GeminiPart, GeminiRequest, SummaryResult};
 use super::local_extractor::LocalSummaryExtractor;
+use super::types::{
+    GeminiContent, GeminiGenerationConfig, GeminiPart, GeminiRequest, SummaryResult,
+};
+use std::time::Instant;
 
 pub struct SummaryTranslator;
 
 impl SummaryTranslator {
+    #[allow(clippy::too_many_arguments)]
     pub fn translate_summary(
         summary: &SummaryResult,
         target_language: &str,
@@ -18,7 +21,10 @@ impl SummaryTranslator {
         let clean_target = target_language.trim();
         let target_code = target_lang_code.trim().to_lowercase();
 
-        if target_code == "tr" || clean_target.eq_ignore_ascii_case("turkish") || clean_target.eq_ignore_ascii_case("türkçe") {
+        if target_code == "tr"
+            || clean_target.eq_ignore_ascii_case("turkish")
+            || clean_target.eq_ignore_ascii_case("türkçe")
+        {
             return Ok(summary.clone());
         }
 
@@ -58,14 +64,28 @@ STRICT CONTEXT & INTEGRITY PRESERVATION RULES:\n\
             let clean_key = key.trim();
             if !clean_key.is_empty() {
                 if prov_norm.contains("gemini") {
-                    if let Ok(res) = Self::translate_with_gemini(&system_prompt, &user_prompt, clean_key, clean_target, start_time) {
+                    if let Ok(res) = Self::translate_with_gemini(
+                        &system_prompt,
+                        &user_prompt,
+                        clean_key,
+                        clean_target,
+                        start_time,
+                    ) {
                         return Ok(res);
                     }
                 } else if prov_norm.contains("openai") || prov_norm.contains("groq") {
                     let (endpoint, model, disp) = if prov_norm.contains("groq") {
-                        ("https://api.groq.com/openai/v1/chat/completions", "llama-3.3-70b-versatile", "Groq Llama-3.3-70B")
+                        (
+                            "https://api.groq.com/openai/v1/chat/completions",
+                            "llama-3.3-70b-versatile",
+                            "Groq Llama-3.3-70B",
+                        )
                     } else {
-                        ("https://api.openai.com/v1/chat/completions", "gpt-4o-mini", "OpenAI GPT-4o-mini")
+                        (
+                            "https://api.openai.com/v1/chat/completions",
+                            "gpt-4o-mini",
+                            "OpenAI GPT-4o-mini",
+                        )
                     };
 
                     if let Ok(res) = Self::translate_with_openai_compatible(
@@ -109,6 +129,8 @@ STRICT CONTEXT & INTEGRITY PRESERVATION RULES:\n\
         target_lang: &str,
         start_time: Instant,
     ) -> Result<SummaryResult, String> {
+        crate::security::check_cloud_access_allowed()?;
+
         let full_prompt = format!("{}\n\n{}", system_prompt, user_prompt);
         let body = GeminiRequest {
             contents: vec![GeminiContent {
@@ -130,7 +152,8 @@ STRICT CONTEXT & INTEGRITY PRESERVATION RULES:\n\
         for model in &candidate_models {
             let url = format!(
                 "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent?key={}",
-                model, api_key.trim()
+                model,
+                api_key.trim()
             );
 
             if let Ok(resp) = client.post(&url).json(&body).send() {
@@ -146,9 +169,18 @@ STRICT CONTEXT & INTEGRITY PRESERVATION RULES:\n\
                             .and_then(|t| t.as_str())
                             .unwrap_or("");
 
-                        let clean_json = raw_text.trim().trim_start_matches("```json").trim_start_matches("```").trim_end_matches("```").trim();
+                        let clean_json = raw_text
+                            .trim()
+                            .trim_start_matches("```json")
+                            .trim_start_matches("```")
+                            .trim_end_matches("```")
+                            .trim();
                         if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(clean_json) {
-                            return LocalSummaryExtractor::parse_rich_summary_json(&parsed, &format!("Google Gemini ({}) Çeviri", target_lang), start_time);
+                            return LocalSummaryExtractor::parse_rich_summary_json(
+                                &parsed,
+                                &format!("Google Gemini ({}) Çeviri", target_lang),
+                                start_time,
+                            );
                         }
                     }
                 }
@@ -158,6 +190,7 @@ STRICT CONTEXT & INTEGRITY PRESERVATION RULES:\n\
         Err("Gemini çeviri isteği başarısız oldu".to_string())
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn translate_with_openai_compatible(
         system_prompt: &str,
         user_prompt: &str,
@@ -168,6 +201,11 @@ STRICT CONTEXT & INTEGRITY PRESERVATION RULES:\n\
         target_lang: &str,
         start_time: Instant,
     ) -> Result<SummaryResult, String> {
+        let is_local = endpoint.contains("127.0.0.1") || endpoint.contains("localhost");
+        if !is_local {
+            crate::security::check_cloud_access_allowed()?;
+        }
+
         let client = reqwest::blocking::Client::builder()
             .timeout(std::time::Duration::from_secs(60))
             .build()
@@ -195,10 +233,16 @@ STRICT CONTEXT & INTEGRITY PRESERVATION RULES:\n\
         }
 
         let json_val: serde_json::Value = resp.json().map_err(|e| e.to_string())?;
-        let content = json_val["choices"][0]["message"]["content"].as_str().unwrap_or("{}");
+        let content = json_val["choices"][0]["message"]["content"]
+            .as_str()
+            .unwrap_or("{}");
         let parsed: serde_json::Value = serde_json::from_str(content).map_err(|e| e.to_string())?;
 
-        LocalSummaryExtractor::parse_rich_summary_json(&parsed, &format!("{} ({}) Çeviri", display_name, target_lang), start_time)
+        LocalSummaryExtractor::parse_rich_summary_json(
+            &parsed,
+            &format!("{} ({}) Çeviri", display_name, target_lang),
+            start_time,
+        )
     }
 
     fn translate_with_ollama(
@@ -209,7 +253,10 @@ STRICT CONTEXT & INTEGRITY PRESERVATION RULES:\n\
         target_lang: &str,
         start_time: Instant,
     ) -> Result<SummaryResult, String> {
-        let base_url = endpoint.unwrap_or("http://127.0.0.1:11434").trim().trim_end_matches('/');
+        let base_url = endpoint
+            .unwrap_or("http://127.0.0.1:11434")
+            .trim()
+            .trim_end_matches('/');
         let model = model_name.unwrap_or("llama3.2");
         let url = format!("{}/api/chat", base_url);
 
@@ -228,15 +275,26 @@ STRICT CONTEXT & INTEGRITY PRESERVATION RULES:\n\
             .build()
             .map_err(|e| e.to_string())?;
 
-        let resp = client.post(&url).json(&req_body).send().map_err(|e| format!("Ollama bağlantı hatası: {}", e))?;
+        let resp = client
+            .post(&url)
+            .json(&req_body)
+            .send()
+            .map_err(|e| format!("Ollama bağlantı hatası: {}", e))?;
         if !resp.status().is_success() {
             return Err(format!("Ollama Çeviri Hatası (HTTP {})", resp.status()));
         }
 
         let json_val: serde_json::Value = resp.json().map_err(|e| e.to_string())?;
-        let content_str = json_val["message"]["content"].as_str().ok_or_else(|| "Geçersiz yanıt".to_string())?;
-        let parsed: serde_json::Value = serde_json::from_str(content_str).map_err(|e| e.to_string())?;
+        let content_str = json_val["message"]["content"]
+            .as_str()
+            .ok_or_else(|| "Geçersiz yanıt".to_string())?;
+        let parsed: serde_json::Value =
+            serde_json::from_str(content_str).map_err(|e| e.to_string())?;
 
-        LocalSummaryExtractor::parse_rich_summary_json(&parsed, &format!("Yerel LLM ({}) [{}] Çeviri", model, target_lang), start_time)
+        LocalSummaryExtractor::parse_rich_summary_json(
+            &parsed,
+            &format!("Yerel LLM ({}) [{}] Çeviri", model, target_lang),
+            start_time,
+        )
     }
 }

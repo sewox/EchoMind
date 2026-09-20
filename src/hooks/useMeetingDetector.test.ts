@@ -196,4 +196,62 @@ describe("useMeetingDetector Hook", () => {
 
     expect(result.current.promptApp).toEqual(mockApp);
   });
+
+  it("ignores meeting-detected while already recording", async () => {
+    const onAutoStart = vi.fn();
+    const { result } = renderHook(() =>
+      useMeetingDetector({
+        isRecording: true,
+        onAutoStartMeeting: onAutoStart,
+      }),
+    );
+
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 10));
+    });
+
+    await act(async () => {
+      detectedCallback?.({ payload: [mockApp] });
+    });
+
+    expect(onAutoStart).not.toHaveBeenCalled();
+    expect(result.current.promptApp).toBeNull();
+  });
+
+  it("treats a missing meeting-detected payload as an empty app list", async () => {
+    const { result } = renderHook(() =>
+      useMeetingDetector({ isRecording: false }),
+    );
+
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 10));
+    });
+
+    await act(async () => {
+      detectedCallback?.({ payload: undefined as unknown as MeetingAppInfo[] });
+    });
+
+    expect(result.current.activeApps).toEqual([]);
+    expect(result.current.promptApp).toBeNull();
+  });
+
+  it("does not call onAutoStopMeeting from meeting-ended while not recording", async () => {
+    const onAutoStop = vi.fn();
+    renderHook(() =>
+      useMeetingDetector({
+        isRecording: false,
+        onAutoStopMeeting: onAutoStop,
+      }),
+    );
+
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 10));
+    });
+
+    await act(async () => {
+      endedCallback?.({ payload: [mockApp] });
+    });
+
+    expect(onAutoStop).not.toHaveBeenCalled();
+  });
 });

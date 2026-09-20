@@ -23,6 +23,7 @@ import {
   OPENAI_MODELS,
 } from "./ModelHubModalConstants";
 import { useI18n } from "../locales/i18nContext";
+import { CredentialStore } from "../services/credentialStore";
 
 export interface ModelInfo {
   key: string;
@@ -155,7 +156,9 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
     if (onModelChanged) onModelChanged();
   };
 
-  const handleSelectCloudEngine = (engine: "groq" | "gemini" | "openai") => {
+  const handleSelectCloudEngine = async (
+    engine: "groq" | "gemini" | "openai",
+  ) => {
     const keyStorageMap: Record<string, string> = {
       groq: "echomind_groq_key",
       gemini: "echomind_gemini_key",
@@ -163,7 +166,7 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
     };
 
     const keyName = keyStorageMap[engine];
-    const storedKey = localStorage.getItem(keyName) || "";
+    const storedKey = await CredentialStore.get(keyName);
 
     if (!storedKey.trim()) {
       setInlineKeyTarget(engine);
@@ -191,7 +194,7 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
     if (onModelChanged) onModelChanged();
   };
 
-  const handleSaveInlineKeyAndActivate = (
+  const handleSaveInlineKeyAndActivate = async (
     engine: "groq" | "gemini" | "openai",
   ) => {
     const trimmed = inlineKeyValue.trim();
@@ -203,7 +206,7 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
       openai: "echomind_openai_key",
     };
 
-    localStorage.setItem(keyStorageMap[engine], trimmed);
+    await CredentialStore.set(keyStorageMap[engine], trimmed);
     const engineKey = `cloud_${engine}`;
     localStorage.setItem("echomind_active_engine", engineKey);
     setActiveEngine(engineKey);
@@ -241,8 +244,18 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md animate-fade-in p-4">
-      <div className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md animate-fade-in p-4 cursor-pointer"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+    >
+      <div
+        className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] cursor-default"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="px-6 py-5 border-b border-slate-800 flex items-center justify-between bg-slate-900/90">
           <div className="flex items-center gap-3">

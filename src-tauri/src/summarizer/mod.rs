@@ -1,30 +1,36 @@
-pub mod types;
-pub mod redaction;
-pub mod local_extractor;
-pub mod llm_client;
-pub mod translator;
-pub mod exporter;
-pub mod rag;
-pub mod cleaner;
 pub mod analytics;
+pub mod cleaner;
+pub mod exporter;
+pub mod llm_client;
+pub mod local_extractor;
+pub mod rag;
+pub mod redaction;
 pub mod suggestions;
+pub mod translator;
+pub mod types;
 
-pub use types::*;
-pub use redaction::*;
-pub use local_extractor::*;
-pub use llm_client::*;
-pub use translator::*;
-pub use exporter::*;
-pub use rag::*;
-pub use cleaner::*;
 pub use analytics::*;
+pub use cleaner::*;
+pub use exporter::*;
+pub use llm_client::*;
+pub use local_extractor::*;
+pub use rag::*;
+pub use redaction::*;
 pub use suggestions::*;
+pub use translator::*;
+pub use types::*;
 
-use std::time::Instant;
-use crate::storage::{MeetingRecord, StorageEngine, get_storage_dir};
+use crate::storage::{get_storage_dir, MeetingRecord, StorageEngine};
 use crate::transcriber::TranscriptSegment;
+use std::time::Instant;
 
 pub struct SummarizerEngine;
+
+impl Default for SummarizerEngine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl SummarizerEngine {
     pub fn new() -> Self {
@@ -67,7 +73,13 @@ impl SummarizerEngine {
             let clean_key = key.trim();
             if !clean_key.is_empty() {
                 if prov_norm.contains("gemini") {
-                    match LLMClient::generate_gemini_summary(segments, clean_key, template_id, custom_prompt, start_time) {
+                    match LLMClient::generate_gemini_summary(
+                        segments,
+                        clean_key,
+                        template_id,
+                        custom_prompt,
+                        start_time,
+                    ) {
                         Ok(res) => return res,
                         Err(e) => eprintln!("❌ Gemini summary generation error: {}", e),
                     }
@@ -104,7 +116,14 @@ impl SummarizerEngine {
         }
 
         // 2. Try Local LLM Server (Ollama / Local Server)
-        if let Ok(ollama_res) = LLMClient::generate_ollama_summary(segments, custom_endpoint, custom_model, template_id, custom_prompt, start_time) {
+        if let Ok(ollama_res) = LLMClient::generate_ollama_summary(
+            segments,
+            custom_endpoint,
+            custom_model,
+            template_id,
+            custom_prompt,
+            start_time,
+        ) {
             return ollama_res;
         }
 
@@ -112,6 +131,7 @@ impl SummarizerEngine {
         LocalSummaryExtractor::generate_local_heuristic_summary(segments, start_time)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn translate_summary(
         summary: &SummaryResult,
         target_language: &str,
@@ -185,7 +205,8 @@ impl SummarizerEngine {
         custom_summary: Option<&SummaryResult>,
         lang_code: Option<&str>,
     ) -> FollowupEmailResult {
-        let (subject, body) = MeetingExporter::export_followup_email(record, custom_summary, lang_code);
+        let (subject, body) =
+            MeetingExporter::export_followup_email(record, custom_summary, lang_code);
         let encoded_subject = urlencoding::encode(&subject);
         let encoded_body = urlencoding::encode(&body);
         let mailto_url = format!("mailto:?subject={}&body={}", encoded_subject, encoded_body);
@@ -298,7 +319,11 @@ pub fn export_meeting_notes(
         .find(|m| m.id == meeting_id)
         .ok_or_else(|| format!("Toplantı kaydı bulunamadı: {}", meeting_id))?;
 
-    Ok(SummarizerEngine::export_notes_markdown(target_meeting, custom_summary.as_ref(), lang_code.as_deref()))
+    Ok(SummarizerEngine::export_notes_markdown(
+        target_meeting,
+        custom_summary.as_ref(),
+        lang_code.as_deref(),
+    ))
 }
 
 #[tauri::command]
@@ -315,7 +340,11 @@ pub fn export_meeting_notes_html(
         .find(|m| m.id == meeting_id)
         .ok_or_else(|| format!("Toplantı kaydı bulunamadı: {}", meeting_id))?;
 
-    Ok(SummarizerEngine::export_notes_html(target_meeting, custom_summary.as_ref(), lang_code.as_deref()))
+    Ok(SummarizerEngine::export_notes_html(
+        target_meeting,
+        custom_summary.as_ref(),
+        lang_code.as_deref(),
+    ))
 }
 
 #[tauri::command]
@@ -332,7 +361,11 @@ pub fn export_meeting_email_digest(
         .find(|m| m.id == meeting_id)
         .ok_or_else(|| format!("Toplantı kaydı bulunamadı: {}", meeting_id))?;
 
-    Ok(SummarizerEngine::export_notes_email_digest(target_meeting, custom_summary.as_ref(), lang_code.as_deref()))
+    Ok(SummarizerEngine::export_notes_email_digest(
+        target_meeting,
+        custom_summary.as_ref(),
+        lang_code.as_deref(),
+    ))
 }
 
 #[tauri::command]
@@ -349,7 +382,11 @@ pub fn export_meeting_notes_slack(
         .find(|m| m.id == meeting_id)
         .ok_or_else(|| format!("Toplantı kaydı bulunamadı: {}", meeting_id))?;
 
-    Ok(SummarizerEngine::export_notes_slack_markdown(target_meeting, custom_summary.as_ref(), lang_code.as_deref()))
+    Ok(SummarizerEngine::export_notes_slack_markdown(
+        target_meeting,
+        custom_summary.as_ref(),
+        lang_code.as_deref(),
+    ))
 }
 
 #[tauri::command]
@@ -365,7 +402,10 @@ pub fn export_meeting_action_items_csv(
         .find(|m| m.id == meeting_id)
         .ok_or_else(|| format!("Toplantı kaydı bulunamadı: {}", meeting_id))?;
 
-    Ok(SummarizerEngine::export_action_items_csv(target_meeting, custom_summary.as_ref()))
+    Ok(SummarizerEngine::export_action_items_csv(
+        target_meeting,
+        custom_summary.as_ref(),
+    ))
 }
 
 #[tauri::command]
@@ -381,7 +421,10 @@ pub fn export_meeting_action_items_markdown(
         .find(|m| m.id == meeting_id)
         .ok_or_else(|| format!("Toplantı kaydı bulunamadı: {}", meeting_id))?;
 
-    Ok(SummarizerEngine::export_action_items_markdown(target_meeting, custom_summary.as_ref()))
+    Ok(SummarizerEngine::export_action_items_markdown(
+        target_meeting,
+        custom_summary.as_ref(),
+    ))
 }
 
 #[tauri::command]
@@ -398,7 +441,11 @@ pub fn export_meeting_followup_email(
         .find(|m| m.id == meeting_id)
         .ok_or_else(|| format!("Toplantı kaydı bulunamadı: {}", meeting_id))?;
 
-    Ok(SummarizerEngine::export_followup_email(target_meeting, custom_summary.as_ref(), lang_code.as_deref()))
+    Ok(SummarizerEngine::export_followup_email(
+        target_meeting,
+        custom_summary.as_ref(),
+        lang_code.as_deref(),
+    ))
 }
 
 #[tauri::command]
@@ -414,14 +461,14 @@ pub fn filter_meeting_filler_words(
         .find(|m| m.id == meeting_id)
         .ok_or_else(|| format!("Toplantı kaydı bulunamadı: {}", meeting_id))?;
 
-    Ok(SpeechCleaner::clean_segments(&target_meeting.segments, lang_code.as_deref()))
+    Ok(SpeechCleaner::clean_segments(
+        &target_meeting.segments,
+        lang_code.as_deref(),
+    ))
 }
 
 #[tauri::command]
-pub fn clean_transcript_text(
-    raw_text: String,
-    lang_code: Option<String>,
-) -> (String, usize) {
+pub fn clean_transcript_text(raw_text: String, lang_code: Option<String>) -> (String, usize) {
     SpeechCleaner::clean_text(&raw_text, lang_code.as_deref())
 }
 
@@ -430,13 +477,14 @@ pub fn get_meeting_analytics(
     segments: Vec<TranscriptSegment>,
     total_duration_seconds: Option<f64>,
 ) -> Result<MeetingAnalytics, String> {
-    Ok(AnalyticsEngine::calculate(&segments, total_duration_seconds))
+    Ok(AnalyticsEngine::calculate(
+        &segments,
+        total_duration_seconds,
+    ))
 }
 
 #[tauri::command]
-pub fn get_meeting_analytics_by_id(
-    meeting_id: String,
-) -> Result<MeetingAnalytics, String> {
+pub fn get_meeting_analytics_by_id(meeting_id: String) -> Result<MeetingAnalytics, String> {
     let storage = StorageEngine::new();
     let meetings_lock = storage.meetings.lock().unwrap();
 
@@ -451,7 +499,10 @@ pub fn get_meeting_analytics_by_id(
         None
     };
 
-    Ok(AnalyticsEngine::calculate(&target_meeting.segments, duration_sec))
+    Ok(AnalyticsEngine::calculate(
+        &target_meeting.segments,
+        duration_sec,
+    ))
 }
 
 #[tauri::command]
@@ -467,8 +518,12 @@ pub fn open_meeting_html_report(
         .find(|m| m.id == meeting_id)
         .ok_or_else(|| format!("Toplantı bulunamadı: {}", meeting_id))?;
 
-    let safe_id: String = meeting_id.chars().filter(|c| c.is_alphanumeric() || *c == '-').collect();
-    let html_content = SummarizerEngine::export_notes_html(target, custom_summary.as_ref(), lang_code.as_deref());
+    let safe_id: String = meeting_id
+        .chars()
+        .filter(|c| c.is_alphanumeric() || *c == '-')
+        .collect();
+    let html_content =
+        SummarizerEngine::export_notes_html(target, custom_summary.as_ref(), lang_code.as_deref());
     let temp_dir = std::env::temp_dir();
     let temp_file = temp_dir.join(format!("EchoMind_Rapor_{}.html", safe_id));
     std::fs::write(&temp_file, html_content.as_bytes())
@@ -506,7 +561,10 @@ pub async fn save_meeting_export_file(
     custom_summary: Option<SummaryResult>,
     lang_code: Option<String>,
 ) -> Result<String, String> {
-    let safe_id: String = meeting_id.chars().filter(|c| c.is_alphanumeric() || *c == '-').collect();
+    let safe_id: String = meeting_id
+        .chars()
+        .filter(|c| c.is_alphanumeric() || *c == '-')
+        .collect();
     let (content, default_ext, file_filter_name) = {
         let storage = StorageEngine::new();
         let meetings_lock = storage.meetings.lock().unwrap();
@@ -519,40 +577,80 @@ pub async fn save_meeting_export_file(
         let summary_ref = custom_summary.as_ref();
 
         match export_type.to_lowercase().as_str() {
-            "html" => (SummarizerEngine::export_notes_html(target, summary_ref, lang_ref), "html", "HTML Raporu (*.html)"),
-            "md" | "markdown" => (SummarizerEngine::export_notes_markdown(target, summary_ref, lang_ref), "md", "Markdown Dosyası (*.md)"),
-            "slack" => (SummarizerEngine::export_notes_slack_markdown(target, summary_ref, lang_ref), "txt", "Slack / Teams Metni (*.txt)"),
-            "csv" | "tasks_csv" => (SummarizerEngine::export_action_items_csv(target, summary_ref), "csv", "CSV Görev Listesi (*.csv)"),
-            "tasks_md" => (SummarizerEngine::export_action_items_markdown(target, summary_ref), "md", "Markdown Görev Listesi (*.md)"),
-            "email" | "digest" => (SummarizerEngine::export_notes_email_digest(target, summary_ref, lang_ref), "txt", "E-Posta Özeti (*.txt)"),
+            "html" => (
+                SummarizerEngine::export_notes_html(target, summary_ref, lang_ref),
+                "html",
+                "HTML Raporu (*.html)",
+            ),
+            "md" | "markdown" => (
+                SummarizerEngine::export_notes_markdown(target, summary_ref, lang_ref),
+                "md",
+                "Markdown Dosyası (*.md)",
+            ),
+            "slack" => (
+                SummarizerEngine::export_notes_slack_markdown(target, summary_ref, lang_ref),
+                "txt",
+                "Slack / Teams Metni (*.txt)",
+            ),
+            "csv" | "tasks_csv" => (
+                SummarizerEngine::export_action_items_csv(target, summary_ref),
+                "csv",
+                "CSV Görev Listesi (*.csv)",
+            ),
+            "tasks_md" => (
+                SummarizerEngine::export_action_items_markdown(target, summary_ref),
+                "md",
+                "Markdown Görev Listesi (*.md)",
+            ),
+            "email" | "digest" => (
+                SummarizerEngine::export_notes_email_digest(target, summary_ref, lang_ref),
+                "txt",
+                "E-Posta Özeti (*.txt)",
+            ),
             "ics" | "calendar" => (
                 MeetingExporter::export_calendar_ics(
                     &format!("Follow-up: {}", target.title),
                     &chrono::Utc::now().to_rfc3339(),
                     30,
-                    &format!("Toplantı Takibi: {}\nEchoMind AI ile oluşturuldu.", target.title),
+                    &format!(
+                        "Toplantı Takibi: {}\nEchoMind AI ile oluşturuldu.",
+                        target.title
+                    ),
                     None,
                 ),
                 "ics",
-                "iCalendar Takvim Daveti (*.ics)"
+                "iCalendar Takvim Daveti (*.ics)",
             ),
-            "json" => (serde_json::to_string_pretty(target).map_err(|e| e.to_string())?, "json", "JSON Verisi (*.json)"),
+            "json" => (
+                serde_json::to_string_pretty(target).map_err(|e| e.to_string())?,
+                "json",
+                "JSON Verisi (*.json)",
+            ),
             _ => (
-                target.segments.iter().map(|s| format!("[{}] {}: {}", s.timestamp_formatted, s.speaker_name, s.text)).collect::<Vec<_>>().join("\n"),
+                target
+                    .segments
+                    .iter()
+                    .map(|s| format!("[{}] {}: {}", s.timestamp_formatted, s.speaker_name, s.text))
+                    .collect::<Vec<_>>()
+                    .join("\n"),
                 "txt",
-                "Transkript Metni (*.txt)"
+                "Transkript Metni (*.txt)",
             ),
         }
     };
 
-    let safe_ext: String = default_ext.chars().filter(|c| c.is_alphanumeric()).collect();
+    let safe_ext: String = default_ext
+        .chars()
+        .filter(|c| c.is_alphanumeric())
+        .collect();
     let dialog = rfd::AsyncFileDialog::new()
-        .set_file_name(&format!("EchoMind_Rapor_{}.{}", safe_id, safe_ext))
+        .set_file_name(format!("EchoMind_Rapor_{}.{}", safe_id, safe_ext))
         .add_filter(file_filter_name, &[default_ext]);
 
     if let Some(file_handle) = dialog.save_file().await {
         let path = file_handle.path();
-        std::fs::write(&path, content.as_bytes()).map_err(|e| format!("Dosya kaydedilemedi: {}", e))?;
+        std::fs::write(path, content.as_bytes())
+            .map_err(|e| format!("Dosya kaydedilemedi: {}", e))?;
         Ok(path.to_string_lossy().to_string())
     } else {
         Err("Kaydetme işlemi iptal edildi.".to_string())
@@ -568,7 +666,8 @@ pub fn generate_meeting_ics(
     location: Option<String>,
 ) -> Result<String, String> {
     let dur = duration_minutes.unwrap_or(30);
-    let desc = description.unwrap_or_else(|| format!("EchoMind Takip Toplantısı: {}", meeting_title));
+    let desc =
+        description.unwrap_or_else(|| format!("EchoMind Takip Toplantısı: {}", meeting_title));
     Ok(MeetingExporter::export_calendar_ics(
         &meeting_title,
         &start_datetime_iso,
@@ -637,7 +736,11 @@ pub async fn enhance_meeting_transcript(
             .find(|m| m.id == meeting_id)
             .ok_or_else(|| format!("Toplantı kaydı bulunamadı: {}", meeting_id))?;
 
-        TranscriptRedactor::redact_segments(&mut target_meeting.segments, provider.as_deref(), api_key.as_deref());
+        TranscriptRedactor::redact_segments(
+            &mut target_meeting.segments,
+            provider.as_deref(),
+            api_key.as_deref(),
+        );
 
         let updated_record = target_meeting.clone();
         let json_data = serde_json::to_string_pretty(&*meetings_lock).map_err(|e| e.to_string())?;
@@ -721,6 +824,9 @@ pub async fn ask_global_assistant(
         let key = api_key.as_deref().unwrap_or("").trim();
 
         if !key.is_empty() && (prov.contains("gemini") || prov.contains("openai") || prov.contains("groq")) {
+            // Hard reject if in Paranoid / Air-Gapped Mode
+            crate::security::check_cloud_access_allowed()?;
+
             if prov.contains("gemini") {
                 if let Ok(ans) = RAGEngine::call_gemini_global_assistant(&context, q, key) {
                     let cited = RAGEngine::find_referenced_meeting_ids(&meetings_lock, q);
@@ -787,7 +893,11 @@ pub async fn test_ollama_connection(
     endpoint: Option<String>,
     model: Option<String>,
 ) -> Result<String, String> {
-    let base = endpoint.as_deref().unwrap_or("http://127.0.0.1:11434").trim().trim_end_matches('/');
+    let base = endpoint
+        .as_deref()
+        .unwrap_or("http://127.0.0.1:11434")
+        .trim()
+        .trim_end_matches('/');
     let target_model = model.as_deref().unwrap_or("llama3.2");
     let test_url = format!("{}/api/tags", base);
 
@@ -814,14 +924,23 @@ pub async fn test_ollama_connection(
             .unwrap_or_default();
 
         if models.iter().any(|m| m.contains(target_model)) {
-            Ok(format!("Bağlantı Başarılı! Sunucu aktif ve '{}' modeli hazır.", target_model))
+            Ok(format!(
+                "Bağlantı Başarılı! Sunucu aktif ve '{}' modeli hazır.",
+                target_model
+            ))
         } else if !models.is_empty() {
-            Ok(format!("Bağlantı Başarılı! Sunucu aktif (Mevcut modeller: {}).", models.join(", ")))
+            Ok(format!(
+                "Bağlantı Başarılı! Sunucu aktif (Mevcut modeller: {}).",
+                models.join(", ")
+            ))
         } else {
             Ok("Bağlantı Başarılı! Sunucu aktif.".to_string())
         }
     } else {
-        Err(format!("Sunucu yanıt verdi ancak hata kodu döndü: HTTP {}", resp.status()))
+        Err(format!(
+            "Sunucu yanıt verdi ancak hata kodu döndü: HTTP {}",
+            resp.status()
+        ))
     }
 }
 
@@ -864,7 +983,8 @@ mod tests {
             },
         ];
 
-        let result = SummarizerEngine::generate_summary(&segments, "local", None, None, None, None, None);
+        let result =
+            SummarizerEngine::generate_summary(&segments, "local", None, None, None, None, None);
         assert!(!result.summary.is_empty());
         assert!(!result.meeting_goal.is_empty());
         assert!(!result.action_items.is_empty());
@@ -963,7 +1083,10 @@ mod tests {
         assert!(ans.contains("Yurt dışı depo yatırımı onaylandı"));
         assert!(ans.contains("Kira kontratı imzalanacak"));
 
-        let actions_ans = RAGEngine::synthesize_local_multi_meeting_answer(&meetings, "Tüm toplantılardaki açık eylem maddelerini, görevleri ve sorumluları listele.");
+        let actions_ans = RAGEngine::synthesize_local_multi_meeting_answer(
+            &meetings,
+            "Tüm toplantılardaki açık eylem maddelerini, görevleri ve sorumluları listele.",
+        );
         assert!(actions_ans.contains("Eylem Maddeleri & Görev Dağılımı"));
         assert!(actions_ans.contains("Kira kontratı imzalanacak"));
     }
@@ -1028,7 +1151,8 @@ mod tests {
         };
 
         let translated_summary = SummaryResult {
-            meeting_goal: "Scale international warehouse logistics and optimize tax compliance.".to_string(),
+            meeting_goal: "Scale international warehouse logistics and optimize tax compliance."
+                .to_string(),
             key_highlights: vec!["Logistics cost will drop by 22%".to_string()],
             action_items: vec![ActionItem {
                 task: "Sign overseas lease contract".to_string(),
@@ -1048,7 +1172,8 @@ mod tests {
             generation_time_ms: 50,
         };
 
-        let html = SummarizerEngine::export_notes_html(&record, Some(&translated_summary), Some("en"));
+        let html =
+            SummarizerEngine::export_notes_html(&record, Some(&translated_summary), Some("en"));
         assert!(html.contains("Meeting Purpose & Objectives"));
         assert!(html.contains("Key Takeaways & Strategic Insights"));
         assert!(html.contains("Action Items & Tasks"));
@@ -1131,7 +1256,9 @@ mod tests {
         };
 
         let csv = SummarizerEngine::export_action_items_csv(&record, None);
-        assert!(csv.starts_with("\"ID\",\"Task\",\"Assignee\",\"Status\",\"Meeting Title\",\"Date\""));
+        assert!(
+            csv.starts_with("\"ID\",\"Task\",\"Assignee\",\"Status\",\"Meeting Title\",\"Date\"")
+        );
         assert!(csv.contains("\"1\",\"API endpoint tasarla, \"\"v2\"\" desteği ekle\",\"Selin\",\"To Do\",\"Product Roadmap Planning\",\"08.09.2026\""));
         assert!(csv.contains("\"2\",\"UI wireframeleri çiz\",\"Unassigned\",\"Done\",\"Product Roadmap Planning\",\"08.09.2026\""));
 
@@ -1171,9 +1298,13 @@ mod tests {
         };
 
         let email_res = SummarizerEngine::export_followup_email(&record, None, Some("tr"));
-        assert!(email_res.subject.contains("Takip & Toplantı Notları: Client Sync & Demo"));
+        assert!(email_res
+            .subject
+            .contains("Takip & Toplantı Notları: Client Sync & Demo"));
         assert!(email_res.body.contains("🎯 Toplantı Amacı:"));
-        assert!(email_res.body.contains("🎯 ✅ Eylem Maddeleri & Sorumlular:"));
+        assert!(email_res
+            .body
+            .contains("🎯 ✅ Eylem Maddeleri & Sorumlular:"));
         assert!(email_res.body.contains("Sözleşme taslağını ilet"));
         assert!(email_res.mailto_url.starts_with("mailto:?subject="));
         assert!(email_res.mailto_url.contains("&body="));

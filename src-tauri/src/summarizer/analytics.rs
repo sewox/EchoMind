@@ -1,6 +1,6 @@
+use crate::transcriber::TranscriptSegment;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use crate::transcriber::TranscriptSegment;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SpeakerAnalytics {
@@ -33,7 +33,10 @@ pub struct MeetingAnalytics {
 pub struct AnalyticsEngine;
 
 impl AnalyticsEngine {
-    pub fn calculate(segments: &[TranscriptSegment], total_duration_seconds: Option<f64>) -> MeetingAnalytics {
+    pub fn calculate(
+        segments: &[TranscriptSegment],
+        total_duration_seconds: Option<f64>,
+    ) -> MeetingAnalytics {
         if segments.is_empty() {
             let dur = total_duration_seconds.unwrap_or(0.0);
             return MeetingAnalytics {
@@ -88,18 +91,20 @@ impl AnalyticsEngine {
                 "speaker_unknown".to_string()
             };
 
-            let entry = speaker_map.entry(key.clone()).or_insert_with(|| SpeakerAccumulator {
-                speaker_id: seg.speaker_id.clone(),
-                speaker_name: if !seg.speaker_name.trim().is_empty() {
-                    seg.speaker_name.clone()
-                } else {
-                    seg.speaker_id.clone()
-                },
-                speech_ms: 0,
-                words: 0,
-                segment_count: 0,
-                longest_monologue_ms: 0,
-            });
+            let entry = speaker_map
+                .entry(key.clone())
+                .or_insert_with(|| SpeakerAccumulator {
+                    speaker_id: seg.speaker_id.clone(),
+                    speaker_name: if !seg.speaker_name.trim().is_empty() {
+                        seg.speaker_name.clone()
+                    } else {
+                        seg.speaker_id.clone()
+                    },
+                    speech_ms: 0,
+                    words: 0,
+                    segment_count: 0,
+                    longest_monologue_ms: 0,
+                });
 
             entry.speech_ms += seg_dur_ms;
             entry.words += word_count;
@@ -170,7 +175,11 @@ impl AnalyticsEngine {
         }
 
         // Sort speakers descending by total speech
-        speaker_stats.sort_by(|a, b| b.total_speech_seconds.partial_cmp(&a.total_speech_seconds).unwrap_or(std::cmp::Ordering::Equal));
+        speaker_stats.sort_by(|a, b| {
+            b.total_speech_seconds
+                .partial_cmp(&a.total_speech_seconds)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         // 3. Meeting Pace & Average WPM
         let average_wpm = if total_speech_seconds > 0.0 {
@@ -213,7 +222,10 @@ impl AnalyticsEngine {
         let mut key_insights = Vec::new();
         if num_speakers >= 2 {
             if meeting_balance_score >= 80 {
-                key_insights.push(format!("Toplantıda konuşma süreleri dengeli dağılmış (Denge Skoru: %{}).", meeting_balance_score));
+                key_insights.push(format!(
+                    "Toplantıda konuşma süreleri dengeli dağılmış (Denge Skoru: %{}).",
+                    meeting_balance_score
+                ));
             } else if meeting_balance_score < 50 {
                 if let Some(ref dom) = dominant_speaker {
                     key_insights.push(format!("{} toplantının %{:.1}'ini domine etti. Katılım dengesini artırmak için diğer konuşmacılara daha fazla söz verilebilir.", dom, dominant_speaker_percentage));
@@ -224,12 +236,18 @@ impl AnalyticsEngine {
         }
 
         if silence_percentage > 35.0 {
-            key_insights.push(format!("Toplantının %{:.1}'i sessizlik/düşünme payı ile geçti.", silence_percentage));
+            key_insights.push(format!(
+                "Toplantının %{:.1}'i sessizlik/düşünme payı ile geçti.",
+                silence_percentage
+            ));
         }
 
         for s in &speaker_stats {
             if s.longest_monologue_seconds >= 180.0 {
-                key_insights.push(format!("{} tek seferde {:.0} saniyelik uzun bir monolog gerçekleştirdi.", s.speaker_name, s.longest_monologue_seconds));
+                key_insights.push(format!(
+                    "{} tek seferde {:.0} saniyelik uzun bir monolog gerçekleştirdi.",
+                    s.speaker_name, s.longest_monologue_seconds
+                ));
                 break;
             }
         }
@@ -255,7 +273,14 @@ impl AnalyticsEngine {
 mod tests {
     use super::*;
 
-    fn create_dummy_segment(id: usize, speaker_id: &str, speaker_name: &str, start_ms: u64, end_ms: u64, text: &str) -> TranscriptSegment {
+    fn create_dummy_segment(
+        id: usize,
+        speaker_id: &str,
+        speaker_name: &str,
+        start_ms: u64,
+        end_ms: u64,
+        text: &str,
+    ) -> TranscriptSegment {
         TranscriptSegment {
             id,
             speaker_id: speaker_id.to_string(),
@@ -280,9 +305,14 @@ mod tests {
 
     #[test]
     fn test_single_speaker() {
-        let segments = vec![
-            create_dummy_segment(1, "spk1", "Ahmet", 0, 10000, "Bugün toplantımızda yeni özellikleri değerlendiriyoruz."),
-        ];
+        let segments = vec![create_dummy_segment(
+            1,
+            "spk1",
+            "Ahmet",
+            0,
+            10000,
+            "Bugün toplantımızda yeni özellikleri değerlendiriyoruz.",
+        )];
         let analytics = AnalyticsEngine::calculate(&segments, Some(20.0));
         assert_eq!(analytics.speaker_stats.len(), 1);
         assert_eq!(analytics.total_speech_seconds, 10.0);
@@ -296,8 +326,22 @@ mod tests {
     #[test]
     fn test_two_equal_speakers_high_balance() {
         let segments = vec![
-            create_dummy_segment(1, "spk1", "Ahmet", 0, 30000, "İlk 30 saniye Ahmet konuştu ve projeyi detaylandırdı."),
-            create_dummy_segment(2, "spk2", "Mehmet", 30000, 60000, "İkinci 30 saniye Mehmet konuştu ve mimariyi anlattı."),
+            create_dummy_segment(
+                1,
+                "spk1",
+                "Ahmet",
+                0,
+                30000,
+                "İlk 30 saniye Ahmet konuştu ve projeyi detaylandırdı.",
+            ),
+            create_dummy_segment(
+                2,
+                "spk2",
+                "Mehmet",
+                30000,
+                60000,
+                "İkinci 30 saniye Mehmet konuştu ve mimariyi anlattı.",
+            ),
         ];
         let analytics = AnalyticsEngine::calculate(&segments, Some(60.0));
         assert_eq!(analytics.speaker_stats.len(), 2);
@@ -310,7 +354,14 @@ mod tests {
     #[test]
     fn test_unbalanced_speakers() {
         let segments = vec![
-            create_dummy_segment(1, "spk1", "Ahmet", 0, 90000, "Ahmet sürekli konuştu ve neredeyse tüm toplantıyı anlattı uzunca devam etti."),
+            create_dummy_segment(
+                1,
+                "spk1",
+                "Ahmet",
+                0,
+                90000,
+                "Ahmet sürekli konuştu ve neredeyse tüm toplantıyı anlattı uzunca devam etti.",
+            ),
             create_dummy_segment(2, "spk2", "Mehmet", 90000, 100000, "Tamam anladım."),
         ];
         let analytics = AnalyticsEngine::calculate(&segments, Some(100.0));

@@ -60,6 +60,9 @@ export const en: TranslationKeys = {
     retranscribe: "Re-transcribe",
     retranscribeTooltip:
       "Re-process the meeting audio using a different AI model or provider",
+    lowQualityWarningTitle: "Transcript Reliability Warning:",
+    lowQualityWarningDesc:
+      "Weak audio signals or repetitive speech patterns were detected in this recording. Transcription accuracy may be degraded. For higher fidelity, choose the Whisper Small model in Settings or select the language explicitly.",
     shareReport: "Export / Share",
     shareReportTooltip:
       "Export meeting notes to PDF, Slack, Email, or Markdown",
@@ -373,7 +376,6 @@ export const en: TranslationKeys = {
       "The update package has been launched. Finalizing installation...",
     downloadFailed:
       "Failed to download update. Please check your network connection.",
-    manualDownloadFallback: "Download from GitHub Directly",
     remindLater: "Remind Me Later",
     dontShowAgainForVersion: "Don't show this version again on startup",
     autoCheckToggle: "Automatically Check for Updates on Startup",

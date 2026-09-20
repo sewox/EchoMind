@@ -1,6 +1,11 @@
 import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { usePrivacyMode } from "./usePrivacyMode";
+import { invoke } from "@tauri-apps/api/core";
+
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke: vi.fn().mockResolvedValue("balanced"),
+}));
 
 describe("usePrivacyMode Hook", () => {
   beforeEach(() => {
@@ -113,5 +118,19 @@ describe("usePrivacyMode Hook", () => {
       );
     });
     expect(result.current.mode).toBe("balanced");
+  });
+
+  it("syncs privacy mode to Rust backend on initialize and update", () => {
+    const { result } = renderHook(() => usePrivacyMode());
+    expect(invoke).toHaveBeenCalledWith("set_privacy_mode", {
+      mode: "balanced",
+    });
+
+    act(() => {
+      result.current.setPrivacyMode("paranoid");
+    });
+    expect(invoke).toHaveBeenCalledWith("set_privacy_mode", {
+      mode: "paranoid",
+    });
   });
 });

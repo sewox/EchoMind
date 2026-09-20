@@ -30,6 +30,12 @@ pub struct PlayerHandle {
     sender: Sender<PlayerCommand>,
 }
 
+impl Default for PlayerHandle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PlayerHandle {
     pub fn new() -> Self {
         let (tx, rx) = channel::<PlayerCommand>();
@@ -41,23 +47,24 @@ impl PlayerHandle {
             let mut duration_secs: f32 = 0.0;
             let mut offset_secs: f32 = 0.0;
 
-            let make_status = |s: &Option<Sink>, cur_f: &Option<String>, dur: f32, off: f32| -> PlaybackStatus {
-                if let Some(ref active_sink) = s {
-                    PlaybackStatus {
-                        is_playing: !active_sink.is_paused() && !active_sink.empty(),
-                        current_time_secs: off + active_sink.get_pos().as_secs_f32(),
-                        duration_secs: dur,
-                        current_file: cur_f.clone(),
+            let make_status =
+                |s: &Option<Sink>, cur_f: &Option<String>, dur: f32, off: f32| -> PlaybackStatus {
+                    if let Some(ref active_sink) = s {
+                        PlaybackStatus {
+                            is_playing: !active_sink.is_paused() && !active_sink.empty(),
+                            current_time_secs: off + active_sink.get_pos().as_secs_f32(),
+                            duration_secs: dur,
+                            current_file: cur_f.clone(),
+                        }
+                    } else {
+                        PlaybackStatus {
+                            is_playing: false,
+                            current_time_secs: 0.0,
+                            duration_secs: 0.0,
+                            current_file: None,
+                        }
                     }
-                } else {
-                    PlaybackStatus {
-                        is_playing: false,
-                        current_time_secs: 0.0,
-                        duration_secs: 0.0,
-                        current_file: None,
-                    }
-                }
-            };
+                };
 
             while let Ok(cmd) = rx.recv() {
                 match cmd {
@@ -79,7 +86,8 @@ impl PlayerHandle {
                         }
 
                         if !path.exists() {
-                            let _ = resp.send(Err(format!("Ses dosyası bulunamadı: {}", file_path)));
+                            let _ =
+                                resp.send(Err(format!("Ses dosyası bulunamadı: {}", file_path)));
                             continue;
                         }
 
@@ -92,7 +100,12 @@ impl PlayerHandle {
                                     } else {
                                         s.pause();
                                     }
-                                    let st = make_status(&sink, &current_file, duration_secs, offset_secs);
+                                    let st = make_status(
+                                        &sink,
+                                        &current_file,
+                                        duration_secs,
+                                        offset_secs,
+                                    );
                                     let _ = resp.send(Ok(st));
                                     continue;
                                 }
@@ -133,11 +146,14 @@ impl PlayerHandle {
                                             };
                                             let _ = resp.send(Ok(st));
                                         } else {
-                                            let _ = resp.send(Err("Ses çıkış aygıtı (Sink) başlatılamadı".to_string()));
+                                            let _ = resp
+                                                .send(Err("Ses çıkış aygıtı (Sink) başlatılamadı"
+                                                    .to_string()));
                                         }
                                     }
                                     Err(e) => {
-                                        let _ = resp.send(Err(format!("Ses dekoderi hatası: {:?}", e)));
+                                        let _ =
+                                            resp.send(Err(format!("Ses dekoderi hatası: {:?}", e)));
                                     }
                                 }
                             }
@@ -164,7 +180,8 @@ impl PlayerHandle {
                         }
 
                         if !path.exists() {
-                            let _ = resp.send(Err(format!("Ses dosyası bulunamadı: {}", file_path)));
+                            let _ =
+                                resp.send(Err(format!("Ses dosyası bulunamadı: {}", file_path)));
                             continue;
                         }
 
@@ -190,7 +207,9 @@ impl PlayerHandle {
                                         if let Some(ref current_sink) = sink {
                                             current_sink.stop();
                                             if offset_secs > 0.0 {
-                                                let skipped = source.skip_duration(std::time::Duration::from_secs_f32(offset_secs));
+                                                let skipped = source.skip_duration(
+                                                    std::time::Duration::from_secs_f32(offset_secs),
+                                                );
                                                 current_sink.append(skipped);
                                             } else {
                                                 current_sink.append(source);
@@ -205,11 +224,14 @@ impl PlayerHandle {
                                             };
                                             let _ = resp.send(Ok(st));
                                         } else {
-                                            let _ = resp.send(Err("Ses çıkış aygıtı (Sink) başlatılamadı".to_string()));
+                                            let _ = resp
+                                                .send(Err("Ses çıkış aygıtı (Sink) başlatılamadı"
+                                                    .to_string()));
                                         }
                                     }
                                     Err(e) => {
-                                        let _ = resp.send(Err(format!("Ses dekoderi hatası: {:?}", e)));
+                                        let _ =
+                                            resp.send(Err(format!("Ses dekoderi hatası: {:?}", e)));
                                     }
                                 }
                             }
@@ -261,7 +283,9 @@ impl PlayerHandle {
                                         if let Ok(source) = Decoder::new(reader) {
                                             offset_secs = pos_secs.max(0.0);
                                             if offset_secs > 0.0 {
-                                                let skipped = source.skip_duration(std::time::Duration::from_secs_f32(offset_secs));
+                                                let skipped = source.skip_duration(
+                                                    std::time::Duration::from_secs_f32(offset_secs),
+                                                );
                                                 current_sink.append(skipped);
                                             } else {
                                                 current_sink.append(source);
@@ -299,7 +323,8 @@ impl PlayerHandle {
         self.sender
             .send(PlayerCommand::Play(file_path, tx))
             .map_err(|e| format!("Player thread hatası: {}", e))?;
-        rx.recv().map_err(|e| format!("Playback yanıt hatası: {}", e))?
+        rx.recv()
+            .map_err(|e| format!("Playback yanıt hatası: {}", e))?
     }
 
     pub fn play_at(&self, file_path: String, start_secs: f32) -> Result<PlaybackStatus, String> {
@@ -307,7 +332,8 @@ impl PlayerHandle {
         self.sender
             .send(PlayerCommand::PlayAt(file_path, start_secs, tx))
             .map_err(|e| format!("Player thread hatası: {}", e))?;
-        rx.recv().map_err(|e| format!("Playback yanıt hatası: {}", e))?
+        rx.recv()
+            .map_err(|e| format!("Playback yanıt hatası: {}", e))?
     }
 
     pub fn pause(&self) -> Result<PlaybackStatus, String> {
@@ -315,7 +341,8 @@ impl PlayerHandle {
         self.sender
             .send(PlayerCommand::Pause(tx))
             .map_err(|e| format!("Player thread hatası: {}", e))?;
-        rx.recv().map_err(|e| format!("Playback yanıt hatası: {}", e))
+        rx.recv()
+            .map_err(|e| format!("Playback yanıt hatası: {}", e))
     }
 
     pub fn stop(&self) -> Result<PlaybackStatus, String> {
@@ -323,7 +350,8 @@ impl PlayerHandle {
         self.sender
             .send(PlayerCommand::Stop(tx))
             .map_err(|e| format!("Player thread hatası: {}", e))?;
-        rx.recv().map_err(|e| format!("Playback yanıt hatası: {}", e))
+        rx.recv()
+            .map_err(|e| format!("Playback yanıt hatası: {}", e))
     }
 
     pub fn seek(&self, position_seconds: f32) -> Result<PlaybackStatus, String> {
@@ -331,7 +359,8 @@ impl PlayerHandle {
         self.sender
             .send(PlayerCommand::Seek(position_seconds, tx))
             .map_err(|e| format!("Player thread hatası: {}", e))?;
-        rx.recv().map_err(|e| format!("Playback yanıt hatası: {}", e))?
+        rx.recv()
+            .map_err(|e| format!("Playback yanıt hatası: {}", e))?
     }
 
     pub fn get_status(&self) -> Result<PlaybackStatus, String> {
@@ -339,7 +368,8 @@ impl PlayerHandle {
         self.sender
             .send(PlayerCommand::GetStatus(tx))
             .map_err(|e| format!("Player thread hatası: {}", e))?;
-        rx.recv().map_err(|e| format!("Playback status error: {}", e))
+        rx.recv()
+            .map_err(|e| format!("Playback status error: {}", e))
     }
 }
 

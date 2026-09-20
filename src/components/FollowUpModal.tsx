@@ -129,9 +129,16 @@ export const FollowUpModal: React.FC<FollowUpModalProps> = ({
   const actionItems = meeting.action_items || [];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200 cursor-pointer"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+    >
       <div
-        className="w-full max-w-3xl bg-slate-900 border border-cyan-500/30 rounded-3xl shadow-2xl shadow-cyan-950/50 p-6 md:p-8 relative overflow-hidden flex flex-col max-h-[90vh] text-slate-100"
+        className="w-full max-w-3xl bg-slate-900 border border-cyan-500/30 rounded-3xl shadow-2xl shadow-cyan-950/50 p-6 md:p-8 relative overflow-hidden flex flex-col max-h-[90vh] text-slate-100 cursor-default"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Glowing Accents */}

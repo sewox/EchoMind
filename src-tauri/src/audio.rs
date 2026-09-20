@@ -8,12 +8,15 @@ use std::thread;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AudioStatus {
     pub is_recording: bool,
-    pub mic_level: f32,       // 0.0 - 1.0 (VU Meter)
-    pub sys_level: f32,       // 0.0 - 1.0 (VU Meter)
-    pub is_speaking: bool,     // VAD Voice Activity Detection with Hangover
-    pub sample_rate: u32,      // Standard 16000 Hz for Whisper
-    pub channels: u16,         // 1 (Mono)
+    pub mic_level: f32,    // 0.0 - 1.0 (VU Meter)
+    pub sys_level: f32,    // 0.0 - 1.0 (VU Meter)
+    pub is_speaking: bool, // VAD Voice Activity Detection with Hangover
+    pub sample_rate: u32,  // Standard 16000 Hz for Whisper
+    pub channels: u16,     // 1 (Mono)
     pub buffered_samples: usize,
+    pub is_loopback: bool, // Whether active device captures loopback/system audio
+    pub has_loopback_device: bool, // Whether any loopback device is available on the machine
+    pub active_device_name: Option<String>,
 }
 
 pub struct AudioState {
@@ -49,6 +52,7 @@ pub struct GlobalAudioEngine {
     pub state: SharedAudioState,
     pub stop_tx: Mutex<Option<Sender<()>>>,
     pub preview_tx: Mutex<Option<Sender<()>>>,
+    pub active_device_name: Mutex<Option<String>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -60,12 +64,19 @@ pub struct AudioDeviceInfo {
     pub default_sample_rate: u32,
 }
 
+impl Default for GlobalAudioEngine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl GlobalAudioEngine {
     pub fn new() -> Self {
         GlobalAudioEngine {
             state: Arc::new(Mutex::new(AudioState::default())),
             stop_tx: Mutex::new(None),
             preview_tx: Mutex::new(None),
+            active_device_name: Mutex::new(None),
         }
     }
 
@@ -77,7 +88,10 @@ impl GlobalAudioEngine {
         if let Ok(devices) = host.input_devices() {
             for dev in devices {
                 if let Ok(name) = dev.name() {
-                    let is_default = default_device_name.as_ref().map(|d| d == &name).unwrap_or(false);
+                    let is_default = default_device_name
+                        .as_ref()
+                        .map(|d| d == &name)
+                        .unwrap_or(false);
                     let lower = name.to_lowercase();
                     let is_loopback = lower.contains("blackhole")
                         || lower.contains("loopback")
@@ -121,8 +135,11 @@ impl GlobalAudioEngine {
             return Ok(()); // Already recording
         }
 
+        *self.active_device_name.lock().unwrap() = target_device_name.clone();
+
         let (tx, rx) = channel::<()>();
         let state_clone = Arc::clone(&self.state);
+        let target_device_for_thread = target_device_name;
 
         {
             let mut state = state_clone.lock().unwrap();
@@ -136,7 +153,7 @@ impl GlobalAudioEngine {
 
         thread::spawn(move || {
             let host = cpal::default_host();
-            let device = if let Some(ref target_name) = target_device_name {
+            let device = if let Some(ref target_name) = target_device_for_thread {
                 let mut found = None;
                 if let Ok(devices) = host.input_devices() {
                     for d in devices {
@@ -178,14 +195,17 @@ impl GlobalAudioEngine {
             let stream_result = match config.sample_format() {
                 cpal::SampleFormat::F32 => device.build_input_stream(
                     &config.into(),
-                    move |data: &[f32], _| process_audio_data(data, sample_rate, channels, &state_inner),
+                    move |data: &[f32], _| {
+                        process_audio_data(data, sample_rate, channels, &state_inner)
+                    },
                     err_fn,
                     None,
                 ),
                 cpal::SampleFormat::I16 => device.build_input_stream(
                     &config.into(),
                     move |data: &[i16], _| {
-                        let f32_data: Vec<f32> = data.iter().map(|s| s.to_sample::<f32>()).collect();
+                        let f32_data: Vec<f32> =
+                            data.iter().map(|s| s.to_sample::<f32>()).collect();
                         process_audio_data(&f32_data, sample_rate, channels, &state_inner);
                     },
                     err_fn,
@@ -194,7 +214,8 @@ impl GlobalAudioEngine {
                 cpal::SampleFormat::U16 => device.build_input_stream(
                     &config.into(),
                     move |data: &[u16], _| {
-                        let f32_data: Vec<f32> = data.iter().map(|s| s.to_sample::<f32>()).collect();
+                        let f32_data: Vec<f32> =
+                            data.iter().map(|s| s.to_sample::<f32>()).collect();
                         process_audio_data(&f32_data, sample_rate, channels, &state_inner);
                     },
                     err_fn,
@@ -243,6 +264,7 @@ impl GlobalAudioEngine {
         }
 
         self.stop_preview()?;
+        *self.active_device_name.lock().unwrap() = target_device_name.clone();
 
         let (tx, rx) = channel::<()>();
         let state_clone = Arc::clone(&self.state);
@@ -285,14 +307,17 @@ impl GlobalAudioEngine {
             let stream_result = match config.sample_format() {
                 cpal::SampleFormat::F32 => device.build_input_stream(
                     &config.into(),
-                    move |data: &[f32], _| process_audio_data(data, sample_rate, channels, &state_inner),
+                    move |data: &[f32], _| {
+                        process_audio_data(data, sample_rate, channels, &state_inner)
+                    },
                     err_fn,
                     None,
                 ),
                 cpal::SampleFormat::I16 => device.build_input_stream(
                     &config.into(),
                     move |data: &[i16], _| {
-                        let f32_data: Vec<f32> = data.iter().map(|s| s.to_sample::<f32>()).collect();
+                        let f32_data: Vec<f32> =
+                            data.iter().map(|s| s.to_sample::<f32>()).collect();
                         process_audio_data(&f32_data, sample_rate, channels, &state_inner);
                     },
                     err_fn,
@@ -301,7 +326,8 @@ impl GlobalAudioEngine {
                 cpal::SampleFormat::U16 => device.build_input_stream(
                     &config.into(),
                     move |data: &[u16], _| {
-                        let f32_data: Vec<f32> = data.iter().map(|s| s.to_sample::<f32>()).collect();
+                        let f32_data: Vec<f32> =
+                            data.iter().map(|s| s.to_sample::<f32>()).collect();
                         process_audio_data(&f32_data, sample_rate, channels, &state_inner);
                     },
                     err_fn,
@@ -339,6 +365,22 @@ impl GlobalAudioEngine {
 
     pub fn get_status(&self) -> AudioStatus {
         let state = self.state.lock().unwrap();
+        let dev_name = self.active_device_name.lock().unwrap().clone();
+        let devices = Self::list_devices();
+        let has_loopback = devices.iter().any(|d| d.is_loopback);
+        let is_loopback = match &dev_name {
+            Some(name) => devices
+                .iter()
+                .find(|d| d.name.eq_ignore_ascii_case(name))
+                .map(|d| d.is_loopback)
+                .unwrap_or(false),
+            None => devices
+                .iter()
+                .find(|d| d.is_default)
+                .map(|d| d.is_loopback)
+                .unwrap_or(false),
+        };
+
         AudioStatus {
             is_recording: state.is_recording,
             mic_level: (state.mic_level * 100.0).round() / 100.0,
@@ -347,6 +389,9 @@ impl GlobalAudioEngine {
             sample_rate: 16000,
             channels: 1,
             buffered_samples: state.pcm_16k_buffer.len(),
+            is_loopback,
+            has_loopback_device: has_loopback,
+            active_device_name: dev_name,
         }
     }
 
@@ -361,7 +406,12 @@ impl GlobalAudioEngine {
 // 2. Resample to 16000 Hz Mono
 // 3. RMS & VAD calculation with speech hangover
 // 4. Clean PCM buffer accumulation
-fn process_audio_data(data: &[f32], src_sample_rate: u32, channels: u16, state_arc: &SharedAudioState) {
+fn process_audio_data(
+    data: &[f32],
+    src_sample_rate: u32,
+    channels: u16,
+    state_arc: &SharedAudioState,
+) {
     if data.is_empty() {
         return;
     }
@@ -410,14 +460,15 @@ fn process_audio_data(data: &[f32], src_sample_rate: u32, channels: u16, state_a
         state.silence_counter = 0;
     } else {
         state.silence_counter = state.silence_counter.saturating_add(1);
-        if state.silence_counter > 35 { // ~1.5s silence hangover
+        if state.silence_counter > 35 {
+            // ~1.5s silence hangover
             state.is_speaking = false;
         }
     }
 
     // 5. Resample to 16000 Hz Mono
     let target_sample_rate = 16000.0;
-    let ratio = src_sample_rate as f64 / target_sample_rate as f64;
+    let ratio = src_sample_rate as f64 / target_sample_rate;
     let resampled_len = (filtered_mono.len() as f64 / ratio) as usize;
 
     let mut resampled_pcm = Vec::with_capacity(resampled_len);
@@ -505,9 +556,12 @@ pub fn start_meeting_recording(
     engine.start(device_name)?;
     let title = meeting_title.unwrap_or_else(|| "Google Meet Toplantısı".to_string());
     println!("🎙️ start_meeting_recording çağrıldı: {:?}", title);
-    let _ = app_handle.emit("trigger-start-recording", serde_json::json!({
-        "title": title
-    }));
+    let _ = app_handle.emit(
+        "trigger-start-recording",
+        serde_json::json!({
+            "title": title
+        }),
+    );
     if let Some(island_win) = app_handle.get_webview_window("island") {
         let _ = island_win.hide();
     }
@@ -516,6 +570,17 @@ pub fn start_meeting_recording(
 
 #[tauri::command]
 pub fn stop_audio_capture() -> Result<AudioStatus, String> {
+    let engine = get_global_audio_engine();
+    engine.stop()?;
+    Ok(engine.get_status())
+}
+
+/// Stops capture without persisting the meeting, for the "discard recording" UI flow.
+/// The audio engine itself never writes to disk on stop, so this is functionally
+/// identical to `stop_audio_capture`; the distinct command name lets the frontend
+/// skip its post-stop save step when the user explicitly cancels.
+#[tauri::command]
+pub fn cancel_audio_capture() -> Result<AudioStatus, String> {
     let engine = get_global_audio_engine();
     engine.stop()?;
     Ok(engine.get_status())

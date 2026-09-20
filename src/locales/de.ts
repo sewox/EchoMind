@@ -61,6 +61,9 @@ export const de: TranslationKeys = {
     retranscribe: "Neu Transkribieren",
     retranscribeTooltip:
       "Audiodatei mit einem anderen KI-Modell erneut transkribieren",
+    lowQualityWarningTitle: "Transkript-Zuverlässigkeitswarnung:",
+    lowQualityWarningDesc:
+      "In dieser Aufnahme wurden schwache Sprachsignale oder sich wiederholende Muster erkannt. Die Transkriptgenauigkeit kann beeinträchtigt sein.",
     shareReport: "Bericht Teilen / Exportieren",
     shareReportTooltip:
       "Meeting-Notizen als PDF, Slack, E-Mail oder Markdown exportieren",
@@ -369,7 +372,6 @@ export const de: TranslationKeys = {
     completedDesc:
       "Das Update wurde gestartet. Die Installation wird abgeschlossen...",
     downloadFailed: "Fehler beim Herunterladen des Updates.",
-    manualDownloadFallback: "Direkt von GitHub herunterladen",
     remindLater: "Später erinnern",
     dontShowAgainForVersion: "Diese Version beim Start nicht mehr anzeigen",
     autoCheckToggle: "Beim Start automatisch nach Updates suchen",

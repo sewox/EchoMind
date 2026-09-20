@@ -1,6 +1,6 @@
-use serde::{Deserialize, Serialize};
-use crate::storage::{MeetingRecord, StorageEngine};
 use super::types::{GeminiContent, GeminiGenerationConfig, GeminiPart, GeminiRequest};
+use crate::storage::{MeetingRecord, StorageEngine};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SearchMatch {
@@ -34,10 +34,35 @@ pub struct RAGEngine;
 impl RAGEngine {
     pub fn clean_search_tokens(text: &str) -> Vec<String> {
         let stop_words = [
-            "tüm", "tum", "toplantı", "toplanti", "toplantılardaki", "toplantilardaki",
-            "hakkında", "hakkinda", "olan", "olanlar", "ve", "ile", "için", "icin", "ne",
-            "neler", "var", "listele", "özetle", "ozetle", "göster", "goster", "sor",
-            "ara", "nelerdir", "bir", "bu", "da", "de"
+            "tüm",
+            "tum",
+            "toplantı",
+            "toplanti",
+            "toplantılardaki",
+            "toplantilardaki",
+            "hakkında",
+            "hakkinda",
+            "olan",
+            "olanlar",
+            "ve",
+            "ile",
+            "için",
+            "icin",
+            "ne",
+            "neler",
+            "var",
+            "listele",
+            "özetle",
+            "ozetle",
+            "göster",
+            "goster",
+            "sor",
+            "ara",
+            "nelerdir",
+            "bir",
+            "bu",
+            "da",
+            "de",
         ];
         text.to_lowercase()
             .split(|c: char| !c.is_alphanumeric())
@@ -51,26 +76,64 @@ impl RAGEngine {
         let tokens = Self::clean_search_tokens(query);
         let mut matching_ids = Vec::new();
 
-        let is_action_intent = q.contains("eylem") || q.contains("görev") || q.contains("gorev") || q.contains("sorumlu") || q.contains("action") || q.contains("todo");
-        let is_decision_intent = q.contains("karar") || q.contains("mutabakat") || q.contains("decision");
-        let is_goal_intent = q.contains("hedef") || q.contains("amaç") || q.contains("amac") || q.contains("goal");
+        let is_action_intent = q.contains("eylem")
+            || q.contains("görev")
+            || q.contains("gorev")
+            || q.contains("sorumlu")
+            || q.contains("action")
+            || q.contains("todo");
+        let is_decision_intent =
+            q.contains("karar") || q.contains("mutabakat") || q.contains("decision");
+        let is_goal_intent =
+            q.contains("hedef") || q.contains("amaç") || q.contains("amac") || q.contains("goal");
 
         for m in meetings {
             let mut matched = false;
 
-            if is_action_intent && m.action_items.as_ref().map(|a| !a.is_empty()).unwrap_or(false) {
-                matched = true;
-            } else if is_decision_intent && !m.key_decisions.is_empty() {
-                matched = true;
-            } else if is_goal_intent && m.meeting_goal.is_some() {
+            let action_intent_matched = is_action_intent
+                && m.action_items
+                    .as_ref()
+                    .map(|a| !a.is_empty())
+                    .unwrap_or(false);
+            let decision_intent_matched = is_decision_intent && !m.key_decisions.is_empty();
+            let goal_intent_matched = is_goal_intent && m.meeting_goal.is_some();
+
+            if action_intent_matched || decision_intent_matched || goal_intent_matched {
                 matched = true;
             } else {
                 for t in &tokens {
                     if m.title.to_lowercase().contains(t)
-                        || m.meeting_goal.as_deref().unwrap_or("").to_lowercase().contains(t)
+                        || m.meeting_goal
+                            .as_deref()
+                            .unwrap_or("")
+                            .to_lowercase()
+                            .contains(t)
                         || m.key_decisions.iter().any(|d| d.to_lowercase().contains(t))
-                        || m.action_items.as_ref().map(|acts| acts.iter().any(|a| a.task.to_lowercase().contains(t) || a.assignee.as_deref().unwrap_or("").to_lowercase().contains(t))).unwrap_or(false)
-                        || m.detailed_topics.as_ref().map(|tops| tops.iter().any(|tp| tp.topic_title.to_lowercase().contains(t) || tp.bullet_points.iter().any(|b| b.to_lowercase().contains(t)))).unwrap_or(false)
+                        || m.action_items
+                            .as_ref()
+                            .map(|acts| {
+                                acts.iter().any(|a| {
+                                    a.task.to_lowercase().contains(t)
+                                        || a.assignee
+                                            .as_deref()
+                                            .unwrap_or("")
+                                            .to_lowercase()
+                                            .contains(t)
+                                })
+                            })
+                            .unwrap_or(false)
+                        || m.detailed_topics
+                            .as_ref()
+                            .map(|tops| {
+                                tops.iter().any(|tp| {
+                                    tp.topic_title.to_lowercase().contains(t)
+                                        || tp
+                                            .bullet_points
+                                            .iter()
+                                            .any(|b| b.to_lowercase().contains(t))
+                                })
+                            })
+                            .unwrap_or(false)
                     {
                         matched = true;
                         break;
@@ -147,11 +210,21 @@ impl RAGEngine {
             if let Some(ref actions) = m.action_items {
                 for a in actions {
                     let assignee_text = a.assignee.as_deref().unwrap_or("");
-                    if a.task.to_lowercase().contains(&q) || assignee_text.to_lowercase().contains(&q) {
+                    if a.task.to_lowercase().contains(&q)
+                        || assignee_text.to_lowercase().contains(&q)
+                    {
                         matches.push(SearchMatch {
                             match_type: "action_item".to_string(),
                             matched_text: a.task.clone(),
-                            snippet: format!("Görev: {} (Sorumlu: {})", a.task, if assignee_text.is_empty() { "Belirtilmemiş" } else { assignee_text }),
+                            snippet: format!(
+                                "Görev: {} (Sorumlu: {})",
+                                a.task,
+                                if assignee_text.is_empty() {
+                                    "Belirtilmemiş"
+                                } else {
+                                    assignee_text
+                                }
+                            ),
                             timestamp_formatted: None,
                             start_time_ms: None,
                             speaker_name: a.assignee.clone(),
@@ -194,12 +267,17 @@ impl RAGEngine {
             // 6. Dialogue Transcripts (first 5 matches per meeting to keep clean)
             let mut transcript_match_count = 0;
             for seg in &m.segments {
-                if seg.text.to_lowercase().contains(&q) || seg.speaker_name.to_lowercase().contains(&q) {
+                if seg.text.to_lowercase().contains(&q)
+                    || seg.speaker_name.to_lowercase().contains(&q)
+                {
                     if transcript_match_count < 5 {
                         matches.push(SearchMatch {
                             match_type: "transcript".to_string(),
                             matched_text: seg.text.clone(),
-                            snippet: format!("[{}] {}: {}", seg.timestamp_formatted, seg.speaker_name, seg.text),
+                            snippet: format!(
+                                "[{}] {}: {}",
+                                seg.timestamp_formatted, seg.speaker_name, seg.text
+                            ),
                             timestamp_formatted: Some(seg.timestamp_formatted.clone()),
                             start_time_ms: Some(seg.start_time_ms),
                             speaker_name: Some(seg.speaker_name.clone()),
@@ -222,7 +300,7 @@ impl RAGEngine {
             }
         }
 
-        results.sort_by(|a, b| b.score.cmp(&a.score));
+        results.sort_by_key(|r| std::cmp::Reverse(r.score));
         results
     }
 
@@ -233,6 +311,11 @@ impl RAGEngine {
         endpoint: &str,
         model: &str,
     ) -> Result<String, String> {
+        let is_local = endpoint.contains("127.0.0.1") || endpoint.contains("localhost");
+        if !is_local {
+            crate::security::check_cloud_access_allowed()?;
+        }
+
         let client = reqwest::blocking::Client::builder()
             .timeout(std::time::Duration::from_secs(60))
             .build()
@@ -282,6 +365,8 @@ KULLANICININ SORUSUNU BU VERİLERDEN YOLA ÇIKARAK AKICI, PROFESYONEL VE TÜRKÇ
         query: &str,
         api_key: &str,
     ) -> Result<String, String> {
+        crate::security::check_cloud_access_allowed()?;
+
         let client = reqwest::blocking::Client::builder()
             .timeout(std::time::Duration::from_secs(60))
             .build()
@@ -342,7 +427,10 @@ TOPLANTI ARŞİVİ:\n{}\n\nKULLANICI SORUSU:\n{}",
         endpoint: Option<&str>,
         model: Option<&str>,
     ) -> Result<String, String> {
-        let base_url = endpoint.unwrap_or("http://127.0.0.1:11434").trim().trim_end_matches('/');
+        let base_url = endpoint
+            .unwrap_or("http://127.0.0.1:11434")
+            .trim()
+            .trim_end_matches('/');
         let target_model = model.unwrap_or("llama3.2");
         let url = format!("{}/api/chat", base_url);
 
@@ -383,18 +471,40 @@ Kullanıcının sorusunu bu verilere dayanarak net, akıcı, profesyonel ve Tür
         Ok(content.to_string())
     }
 
-    pub fn synthesize_local_multi_meeting_answer(meetings: &[MeetingRecord], query: &str) -> String {
+    pub fn synthesize_local_multi_meeting_answer(
+        meetings: &[MeetingRecord],
+        query: &str,
+    ) -> String {
         let q = query.to_lowercase();
         let tokens = Self::clean_search_tokens(query);
 
-        let is_action_intent = q.contains("eylem") || q.contains("görev") || q.contains("gorev") || q.contains("sorumlu") || q.contains("action") || q.contains("todo") || q.contains("açık") || q.contains("acik");
-        let is_decision_intent = q.contains("karar") || q.contains("mutabakat") || q.contains("decision") || q.contains("anlaşma") || q.contains("anlasma");
-        let is_goal_intent = q.contains("hedef") || q.contains("amaç") || q.contains("amac") || q.contains("goal");
+        let is_action_intent = q.contains("eylem")
+            || q.contains("görev")
+            || q.contains("gorev")
+            || q.contains("sorumlu")
+            || q.contains("action")
+            || q.contains("todo")
+            || q.contains("açık")
+            || q.contains("acik");
+        let is_decision_intent = q.contains("karar")
+            || q.contains("mutabakat")
+            || q.contains("decision")
+            || q.contains("anlaşma")
+            || q.contains("anlasma");
+        let is_goal_intent =
+            q.contains("hedef") || q.contains("amaç") || q.contains("amac") || q.contains("goal");
 
         // Intent 1: Action Items across all meetings
-        if is_action_intent && (tokens.is_empty() || q.contains("tüm") || q.contains("tum") || q.contains("bütün") || q.contains("açık")) {
+        if is_action_intent
+            && (tokens.is_empty()
+                || q.contains("tüm")
+                || q.contains("tum")
+                || q.contains("bütün")
+                || q.contains("açık"))
+        {
             let mut total_actions = 0;
-            let mut ans = String::from("### 📋 Tüm Toplantılardaki Eylem Maddeleri & Görev Dağılımı\n\n");
+            let mut ans =
+                String::from("### 📋 Tüm Toplantılardaki Eylem Maddeleri & Görev Dağılımı\n\n");
 
             for m in meetings {
                 if let Some(ref actions) = m.action_items {
@@ -402,11 +512,18 @@ Kullanıcının sorusunu bu verilere dayanarak net, akıcı, profesyonel ve Tür
                         ans.push_str(&format!("#### 📌 {} (*{}*)\n", m.title, m.date_formatted));
                         for a in actions {
                             total_actions += 1;
-                            let status_badge = if a.is_completed { "✅ [Tamamlandı]" } else { "⏳ [Bekliyor]" };
+                            let status_badge = if a.is_completed {
+                                "✅ [Tamamlandı]"
+                            } else {
+                                "⏳ [Bekliyor]"
+                            };
                             let assignee = a.assignee.as_deref().unwrap_or("Sorumlu Belirtilmemiş");
-                            ans.push_str(&format!("• {} **{}** — Sorumlu: *{}*\n", status_badge, a.task, assignee));
+                            ans.push_str(&format!(
+                                "• {} **{}** — Sorumlu: *{}*\n",
+                                status_badge, a.task, assignee
+                            ));
                         }
-                        ans.push_str("\n");
+                        ans.push('\n');
                     }
                 }
             }
@@ -416,12 +533,20 @@ Kullanıcının sorusunu bu verilere dayanarak net, akıcı, profesyonel ve Tür
             }
 
             ans.push_str("--------------------------------------------------\n");
-            ans.push_str("*EchoMind: Kendi Belgelerinizle Güvenle Çalışan Akıllı Arama ve Yanıt Asistanı*");
+            ans.push_str(
+                "*EchoMind: Kendi Belgelerinizle Güvenle Çalışan Akıllı Arama ve Yanıt Asistanı*",
+            );
             return ans;
         }
 
         // Intent 2: Decisions across all meetings
-        if is_decision_intent && (tokens.is_empty() || q.contains("tüm") || q.contains("tum") || q.contains("bütün") || q.contains("kritik")) {
+        if is_decision_intent
+            && (tokens.is_empty()
+                || q.contains("tüm")
+                || q.contains("tum")
+                || q.contains("bütün")
+                || q.contains("kritik"))
+        {
             let mut total_decisions = 0;
             let mut ans = String::from("### ⚡ Alınan Tüm Kritik Kararlar & Mutabakatlar\n\n");
 
@@ -432,7 +557,7 @@ Kullanıcının sorusunu bu verilere dayanarak net, akıcı, profesyonel ve Tür
                         total_decisions += 1;
                         ans.push_str(&format!("• {}\n", d));
                     }
-                    ans.push_str("\n");
+                    ans.push('\n');
                 }
             }
 
@@ -446,7 +571,12 @@ Kullanıcının sorusunu bu verilere dayanarak net, akıcı, profesyonel ve Tür
         }
 
         // Intent 3: Goals across all meetings
-        if is_goal_intent && (tokens.is_empty() || q.contains("tüm") || q.contains("tum") || q.contains("karşılaştır")) {
+        if is_goal_intent
+            && (tokens.is_empty()
+                || q.contains("tüm")
+                || q.contains("tum")
+                || q.contains("karşılaştır"))
+        {
             let mut ans = String::from("### 🎯 Toplantı Hedefleri ve Süreç Analizi\n\n");
             for m in meetings {
                 ans.push_str(&format!("#### 📌 {} (*{}*)\n", m.title, m.date_formatted));
@@ -458,7 +588,7 @@ Kullanıcının sorusunu bu verilere dayanarak net, akıcı, profesyonel ve Tür
                         ans.push_str(&format!("• **Ertelenen Konular:** {}\n", p2.join(", ")));
                     }
                 }
-                ans.push_str("\n");
+                ans.push('\n');
             }
             ans.push_str("--------------------------------------------------\n");
             ans.push_str("*EchoMind Local RAG Pipeline & Semantic Knowledge Retrieval Engine*");
@@ -473,7 +603,14 @@ Kullanıcının sorusunu bu verilere dayanarak net, akıcı, profesyonel ve Tür
 
         for m in meetings {
             let mut hit = false;
-            let mtg_matched = tokens.iter().any(|t| m.title.to_lowercase().contains(t) || m.meeting_goal.as_deref().unwrap_or("").to_lowercase().contains(t));
+            let mtg_matched = tokens.iter().any(|t| {
+                m.title.to_lowercase().contains(t)
+                    || m.meeting_goal
+                        .as_deref()
+                        .unwrap_or("")
+                        .to_lowercase()
+                        .contains(t)
+            });
 
             if mtg_matched {
                 hit = true;
@@ -483,8 +620,17 @@ Kullanıcının sorusunu bu verilere dayanarak net, akıcı, profesyonel ve Tür
             if let Some(ref actions) = m.action_items {
                 for a in actions {
                     let assignee_text = a.assignee.as_deref().unwrap_or("");
-                    if mtg_matched || tokens.iter().any(|t| a.task.to_lowercase().contains(t) || assignee_text.to_lowercase().contains(t)) {
-                        matching_actions.push((m.title.clone(), m.date_formatted.clone(), a.clone()));
+                    if mtg_matched
+                        || tokens.iter().any(|t| {
+                            a.task.to_lowercase().contains(t)
+                                || assignee_text.to_lowercase().contains(t)
+                        })
+                    {
+                        matching_actions.push((
+                            m.title.clone(),
+                            m.date_formatted.clone(),
+                            a.clone(),
+                        ));
                         hit = true;
                     }
                 }
@@ -501,8 +647,19 @@ Kullanıcının sorusunu bu verilere dayanarak net, akıcı, profesyonel ve Tür
             // Topics check
             if let Some(ref topics) = m.detailed_topics {
                 for t in topics {
-                    if mtg_matched || tokens.iter().any(|tk| t.topic_title.to_lowercase().contains(tk) || t.bullet_points.iter().any(|b| b.to_lowercase().contains(tk))) {
-                        matching_topics.push((m.title.clone(), m.date_formatted.clone(), t.clone()));
+                    if mtg_matched
+                        || tokens.iter().any(|tk| {
+                            t.topic_title.to_lowercase().contains(tk)
+                                || t.bullet_points
+                                    .iter()
+                                    .any(|b| b.to_lowercase().contains(tk))
+                        })
+                    {
+                        matching_topics.push((
+                            m.title.clone(),
+                            m.date_formatted.clone(),
+                            t.clone(),
+                        ));
                         hit = true;
                     }
                 }
@@ -513,7 +670,10 @@ Kullanıcının sorusunu bu verilere dayanarak net, akıcı, profesyonel ve Tür
             }
         }
 
-        if matching_meetings.is_empty() && matching_actions.is_empty() && matching_decisions.is_empty() {
+        if matching_meetings.is_empty()
+            && matching_actions.is_empty()
+            && matching_decisions.is_empty()
+        {
             return format!(
                 "### 🔍 Arama Sonucu\n\n\
                 Toplantı arşivinizde **\"{}\"** sorgusuyla doğrudan eşleşen bir karar veya eylem maddesi bulunamadı.\n\n\
@@ -523,35 +683,48 @@ Kullanıcının sorusunu bu verilere dayanarak net, akıcı, profesyonel ve Tür
         }
 
         let mut ans = format!("### 📊 \"{}\" Hakkında Bilgi Bankası Analizi\n\n", query);
-        ans.push_str(&format!("Arşivinizde sorgunuzla ilgili **{} toplantı** tespit edildi.\n\n", matching_meetings.len()));
+        ans.push_str(&format!(
+            "Arşivinizde sorgunuzla ilgili **{} toplantı** tespit edildi.\n\n",
+            matching_meetings.len()
+        ));
 
         if !matching_decisions.is_empty() {
             ans.push_str("#### ⚡ İlgili Kararlar & Mutabakatlar:\n");
             for (mtg_title, mtg_date, dec) in matching_decisions.iter().take(6) {
                 ans.push_str(&format!("• **{}** (*{} - {}*)\n", dec, mtg_title, mtg_date));
             }
-            ans.push_str("\n");
+            ans.push('\n');
         }
 
         if !matching_actions.is_empty() {
             ans.push_str("#### ✅ İlgili Eylem Maddeleri & Görevler:\n");
             for (mtg_title, mtg_date, act) in matching_actions.iter().take(6) {
-                let status_badge = if act.is_completed { "✅ Tamamlandı" } else { "⏳ Bekliyor" };
+                let status_badge = if act.is_completed {
+                    "✅ Tamamlandı"
+                } else {
+                    "⏳ Bekliyor"
+                };
                 let assignee = act.assignee.as_deref().unwrap_or("Belirtilmemiş");
-                ans.push_str(&format!("• **{}** — Sorumlu: *{}* [{}] (*{} - {}*)\n", act.task, assignee, status_badge, mtg_title, mtg_date));
+                ans.push_str(&format!(
+                    "• **{}** — Sorumlu: *{}* [{}] (*{} - {}*)\n",
+                    act.task, assignee, status_badge, mtg_title, mtg_date
+                ));
             }
-            ans.push_str("\n");
+            ans.push('\n');
         }
 
         if !matching_topics.is_empty() {
             ans.push_str("#### 📂 İlgili Gündem Konuları:\n");
             for (mtg_title, mtg_date, top) in matching_topics.iter().take(4) {
-                ans.push_str(&format!("• **{}** (*{} - {}*)\n", top.topic_title, mtg_title, mtg_date));
+                ans.push_str(&format!(
+                    "• **{}** (*{} - {}*)\n",
+                    top.topic_title, mtg_title, mtg_date
+                ));
                 for b in top.bullet_points.iter().take(2) {
                     ans.push_str(&format!("  - {}\n", b));
                 }
             }
-            ans.push_str("\n");
+            ans.push('\n');
         }
 
         ans.push_str("--------------------------------------------------\n");
