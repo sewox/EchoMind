@@ -35,7 +35,7 @@ export const EchoMindLogo: React.FC<{
             EchoMind
           </span>
           <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-400 font-normal border border-white/5">
-            v0.2.4
+            v0.2.5
           </span>
         </div>
         {showTagline && (
