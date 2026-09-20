@@ -30,6 +30,7 @@ describe("SettingsModal Component", () => {
     is_downloading: false,
     download_progress: 100,
     hardware_acceleration: "Metal (Apple Silicon)",
+    used_fallback_model: false,
   };
 
   const defaultProps = {
