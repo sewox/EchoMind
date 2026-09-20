@@ -379,7 +379,6 @@ export const tr: TranslationKeys = {
       "Uygulama yükleyicisi başlatıldı. Güncelleme tamamlanıyor...",
     downloadFailed:
       "Güncelleme indirilemedi. Lütfen bağlantınızı kontrol edin.",
-    manualDownloadFallback: "Doğrudan GitHub'dan İndir",
     remindLater: "Sonra Hatırlat",
     dontShowAgainForVersion: "Bu sürümü açılışta bir daha gösterme",
     autoCheckToggle: "Açılışta Güncellemeleri Otomatik Denetle",

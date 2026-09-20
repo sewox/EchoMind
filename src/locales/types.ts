@@ -332,7 +332,6 @@ export interface TranslationKeys {
     completed: string;
     completedDesc: string;
     downloadFailed: string;
-    manualDownloadFallback: string;
     remindLater: string;
     dontShowAgainForVersion: string;
     autoCheckToggle: string;

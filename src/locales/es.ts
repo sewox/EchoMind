@@ -373,7 +373,6 @@ export const es: TranslationKeys = {
     completed: "Paquete de instalación listo",
     completedDesc: "Se ha iniciado el instalador. Finalizando actualización...",
     downloadFailed: "Error al descargar la actualización.",
-    manualDownloadFallback: "Descargar directamente desde GitHub",
     remindLater: "Recordármelo más tarde",
     dontShowAgainForVersion: "No volver a mostrar esta versión al iniciar",
     autoCheckToggle: "Buscar actualizaciones automáticamente al iniciar",

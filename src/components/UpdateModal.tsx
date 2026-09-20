@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import {
   Sparkles,
   ArrowRight,
-  ExternalLink,
   X,
   Calendar,
   CheckCircle2,
@@ -119,17 +118,6 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
       console.error("Failed to download and install update:", errMsg);
       setDownloadError(errMsg);
       setIsUpdating(false);
-    }
-  };
-
-  const handleOpenGitHubRelease = async () => {
-    try {
-      await invoke("open_release_url", {
-        url: updateInfo.html_url,
-      });
-      onClose();
-    } catch (err) {
-      console.error("Failed to open release URL:", err);
     }
   };
 
@@ -298,7 +286,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
           </div>
         )}
 
-        {/* Download Error Banner & Manual Fallback */}
+        {/* Download Error Banner */}
         {downloadError && (
           <div
             className="mb-5 p-3.5 rounded-xl bg-rose-950/40 border border-rose-500/30 text-xs text-rose-300 flex items-start gap-2.5 relative z-10"
@@ -313,15 +301,6 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
               <div className="text-[11px] text-rose-300/80 font-mono break-all">
                 {downloadError}
               </div>
-              <button
-                type="button"
-                onClick={handleOpenGitHubRelease}
-                className="inline-flex items-center gap-1.5 text-xs font-semibold text-cyan-300 hover:text-cyan-200 underline mt-1 cursor-pointer"
-              >
-                <ExternalLink className="w-3 h-3" />
-                {t("updater.manualDownloadFallback") ||
-                  "Doğrudan GitHub'dan İndir"}
-              </button>
             </div>
           </div>
         )}
@@ -376,17 +355,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center justify-between gap-3 pt-4 border-t border-white/10 relative z-10">
-          <button
-            type="button"
-            onClick={handleOpenGitHubRelease}
-            className="text-xs text-slate-500 hover:text-slate-300 transition flex items-center gap-1 cursor-pointer"
-            title="GitHub Release"
-          >
-            <ExternalLink className="w-3 h-3" />
-            <span className="hidden sm:inline">GitHub</span>
-          </button>
-
+        <div className="flex items-center justify-end gap-3 pt-4 border-t border-white/10 relative z-10">
           <div className="flex items-center gap-3">
             <button
               type="button"

@@ -188,7 +188,7 @@ describe("UpdateModal Component", () => {
     expect(screen.getByText("100%")).toBeInTheDocument();
   });
 
-  it("handles download error and presents manual GitHub fallback link", async () => {
+  it("shows the download error banner with the failure message on download failure", async () => {
     (invoke as any).mockRejectedValue("Network error while downloading");
 
     renderComponent({
@@ -205,13 +205,6 @@ describe("UpdateModal Component", () => {
       expect(
         screen.getByText(/Network error while downloading/),
       ).toBeInTheDocument();
-    });
-
-    const fallbackBtn = screen.getByText(/Doğrudan GitHub'dan İndir/i);
-    fireEvent.click(fallbackBtn);
-
-    expect(invoke).toHaveBeenCalledWith("open_release_url", {
-      url: "https://github.com/sewox/EchoMind/releases/tag/v0.3.0",
     });
   });
 

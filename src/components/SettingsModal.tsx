@@ -332,14 +332,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     await CredentialStore.set("echomind_gemini_key", geminiKey.trim());
     await CredentialStore.set("echomind_openai_key", openaiKey.trim());
 
-    try {
-      await invoke("save_api_keys", {
-        groq: groqKey.trim(),
-        gemini: geminiKey.trim(),
-        openai: openaiKey.trim(),
-      });
-    } catch {}
-
     localStorage.setItem(
       "echomind_ollama_endpoint",
       ollamaEndpoint.trim() || "http://127.0.0.1:11434",
@@ -1083,7 +1075,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   {t("updater.checkNowButton") || "Uygulama Güncellemeleri"}
                 </span>
                 <span className="text-[10px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 px-2 py-0.5 rounded-full font-bold">
-                  v0.2.3
+                  v0.2.4
                 </span>
               </div>
 
@@ -1121,8 +1113,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400 font-medium">
                       <Check className="w-3.5 h-3.5" />
                       {t("updater.upToDateDesc", {
-                        version: updateStatus.version || "v0.2.3",
-                      }) || "EchoMind güncel (v0.2.3)."}
+                        version: updateStatus.version || "v0.2.4",
+                      }) || "EchoMind güncel (v0.2.4)."}
                     </span>
                   )}
                   {updateStatus.state === "updateAvailable" && (

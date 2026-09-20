@@ -112,7 +112,6 @@ describe("SettingsModal Component", () => {
         });
       if (cmd === "test_ollama_connection")
         return Promise.resolve("Ollama sunucusu hazır: llama3.2");
-      if (cmd === "save_api_keys") return Promise.resolve();
       return Promise.resolve();
     });
 

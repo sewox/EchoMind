@@ -371,7 +371,6 @@ export const fr: TranslationKeys = {
     completed: "Paquet d'installation prêt",
     completedDesc: "Le programme d'installation a été lancé. Finalisation...",
     downloadFailed: "Échec du téléchargement de la mise à jour.",
-    manualDownloadFallback: "Télécharger directement depuis GitHub",
     remindLater: "Me le rappeler plus tard",
     dontShowAgainForVersion: "Ne plus afficher cette version au démarrage",
     autoCheckToggle: "Vérifier automatiquement les mises à jour au démarrage",

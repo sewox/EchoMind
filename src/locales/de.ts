@@ -372,7 +372,6 @@ export const de: TranslationKeys = {
     completedDesc:
       "Das Update wurde gestartet. Die Installation wird abgeschlossen...",
     downloadFailed: "Fehler beim Herunterladen des Updates.",
-    manualDownloadFallback: "Direkt von GitHub herunterladen",
     remindLater: "Später erinnern",
     dontShowAgainForVersion: "Diese Version beim Start nicht mehr anzeigen",
     autoCheckToggle: "Beim Start automatisch nach Updates suchen",
