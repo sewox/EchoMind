@@ -211,11 +211,6 @@ impl GlobalTranscriberEngine {
             .as_mut()
             .ok_or_else(|| "Whisper modeli henüz yüklü değil".to_string())?;
 
-        // VAD-Based Intelligent Natural Pause Audio Slicing:
-        // Slices audio strictly at natural silence dips between sentences (approx 4-5 minutes nominal).
-        // This eliminates cutting words in the middle and avoids Whisper hallucination loops.
-        let natural_chunks = split_audio_at_natural_pauses(samples, 16000, 240);
-
         let cpu_count = std::thread::available_parallelism()
             .map(|n| n.get())
             .unwrap_or(8);
@@ -223,28 +218,41 @@ impl GlobalTranscriberEngine {
         let is_auto = language.is_empty() || language.eq_ignore_ascii_case("auto");
         let whisper_lang = if is_auto { None } else { Some(language) };
 
+        // VAD-Based Intelligent Natural Pause Audio Slicing:
+        // Slices audio strictly at natural silence dips between sentences.
+        // This eliminates cutting words in the middle and avoids Whisper hallucination loops.
+        //
+        // In auto-detect mode, Whisper only detects language ONCE per full() call and then
+        // decodes the entire chunk under that single language — a multilingual recording
+        // (e.g. TR intro, then an English block) gets everything after the first language
+        // forced through the wrong token space, producing silence/garbage for later blocks
+        // (verified against a real TR→EN→DE→FR golden fixture: the EN/DE/FR portions came
+        // back empty or as TR-hallucinated nonsense). Using a much shorter nominal chunk
+        // length only when auto-detecting gives language re-detection far more chances to
+        // catch a mid-recording switch, at the cost of slightly more per-chunk overhead.
+        let nominal_chunk_sec = if is_auto { 15 } else { 240 };
+        let natural_chunks = split_audio_at_natural_pauses(samples, 16000, nominal_chunk_sec);
+
         // When the language is auto-detected, a low detection probability (e.g. p≈0.24)
         // is a strong signal that the audio is noisy/ambiguous even if Whisper still
         // produces fluent-looking, high-token-probability garbage text. Run one cheap
-        // encode-only pass on the first chunk to get that probability and fold it into
-        // every segment's confidence score below, instead of trusting token probability
-        // alone (which doesn't catch this failure mode).
-        let lang_confidence_factor: f32 = if is_auto {
-            natural_chunks
-                .first()
-                .and_then(|(_, first_chunk_samples)| {
-                    ctx.create_state()
-                        .and_then(|mut lang_state| {
-                            lang_state.pcm_to_mel(first_chunk_samples, n_threads as usize)?;
-                            lang_state.encode(0, n_threads as usize)?;
-                            lang_state.lang_detect(0, n_threads as usize)
-                        })
-                        .ok()
+        // encode-only pass per chunk (language can differ between chunks — see above) to
+        // get that probability and fold it into that chunk's segment confidence scores
+        // below, instead of trusting token probability alone (which doesn't catch this
+        // failure mode).
+        let detect_lang_confidence = |chunk_samples: &[f32]| -> f32 {
+            if !is_auto {
+                return 1.0;
+            }
+            ctx.create_state()
+                .and_then(|mut lang_state| {
+                    lang_state.pcm_to_mel(chunk_samples, n_threads as usize)?;
+                    lang_state.encode(0, n_threads as usize)?;
+                    lang_state.lang_detect(0, n_threads as usize)
                 })
+                .ok()
                 .and_then(|(lang_id, probs)| probs.get(lang_id as usize).copied())
                 .unwrap_or(1.0)
-        } else {
-            1.0
         };
 
         let prompt = match language {
@@ -266,6 +274,8 @@ impl GlobalTranscriberEngine {
 
         for (chunk_idx, (chunk_time_offset_ms, chunk_samples)) in natural_chunks.iter().enumerate()
         {
+            let lang_confidence_factor = detect_lang_confidence(chunk_samples);
+
             let mut state_ctx = ctx
                 .create_state()
                 .map_err(|e| format!("Whisper state hatası: {}", e))?;
