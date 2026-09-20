@@ -6,6 +6,14 @@ import { invoke } from "@tauri-apps/api/core";
 import { globalTestEventListeners } from "./test/setup";
 import { CredentialStore } from "./services/credentialStore";
 
+// Not under test here: has its own dedicated, isolated test suite
+// (useFirstRunModelSetup.test.ts). Left live, it would react to whatever
+// get_available_models/download_whisper_model mocks individual App tests set
+// up for unrelated purposes and could render its banner unpredictably.
+vi.mock("./hooks/useFirstRunModelSetup", () => ({
+  useFirstRunModelSetup: () => ({ progress: null, dismiss: vi.fn() }),
+}));
+
 const mockPastMeetings: MeetingRecord[] = [
   {
     id: "mtg-app-1",
