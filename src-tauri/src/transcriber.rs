@@ -1,19 +1,20 @@
-use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
+use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TranscriptSegment {
     pub id: usize,
-    pub speaker_id: String,       // e.g. "Konuşmacı 1", "Konuşmacı 2"
-    pub speaker_name: String,     // e.g. "Konuşmacı 1 (Siz)", "Konuşmacı 2 (Katılımcı)"
+    pub speaker_id: String,   // e.g. "Konuşmacı 1", "Konuşmacı 2"
+    pub speaker_name: String, // e.g. "Konuşmacı 1 (Siz)", "Konuşmacı 2 (Katılımcı)"
     pub start_time_ms: u64,
     pub end_time_ms: u64,
     pub timestamp_formatted: String, // e.g. "00:12 -> 00:18"
     pub text: String,
-    pub language: String,         // "tr" or "en"
-    pub confidence: f32,          // 0.0 - 1.0
+    pub language: String, // "tr" or "en"
+    pub confidence: f32,  // 0.0 - 1.0
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -52,6 +53,20 @@ pub type SharedTranscriberState = Arc<Mutex<TranscriberState>>;
 pub struct GlobalTranscriberEngine {
     pub state: SharedTranscriberState,
     pub whisper_ctx: Mutex<Option<WhisperContext>>,
+    pub is_transcribing: Arc<AtomicBool>,
+}
+
+struct TranscribeGuard<'a>(&'a AtomicBool);
+impl<'a> Drop for TranscribeGuard<'a> {
+    fn drop(&mut self) {
+        self.0.store(false, Ordering::SeqCst);
+    }
+}
+
+impl Default for GlobalTranscriberEngine {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl GlobalTranscriberEngine {
@@ -62,6 +77,7 @@ impl GlobalTranscriberEngine {
         GlobalTranscriberEngine {
             state: Arc::new(Mutex::new(TranscriberState::default())),
             whisper_ctx: Mutex::new(None),
+            is_transcribing: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -78,7 +94,7 @@ impl GlobalTranscriberEngine {
         };
 
         if self.init_model(&model_path).is_err() {
-            let _ = self.init_model("models/ggml-base.bin")?;
+            self.init_model("models/ggml-base.bin")?;
         }
         Ok(())
     }
@@ -99,17 +115,24 @@ impl GlobalTranscriberEngine {
         let mut ctx_params = WhisperContextParameters::default();
         ctx_params.use_gpu(true);
 
-        let (ctx, is_gpu_active) = match WhisperContext::new_with_params(actual_path.to_str().unwrap(), ctx_params) {
-            Ok(c) => (c, true),
-            Err(e) => {
-                println!("GPU donanım hızlandırma bulunamadı, CPU moduna geçiliyor: {}", e);
-                let mut cpu_params = WhisperContextParameters::default();
-                cpu_params.use_gpu(false);
-                let c = WhisperContext::new_with_params(actual_path.to_str().unwrap(), cpu_params)
-                    .map_err(|err| format!("Whisper GGML model yüklenirken hata oluştu: {}", err))?;
-                (c, false)
-            }
-        };
+        let (ctx, is_gpu_active) =
+            match WhisperContext::new_with_params(actual_path.to_str().unwrap(), ctx_params) {
+                Ok(c) => (c, true),
+                Err(e) => {
+                    println!(
+                        "GPU donanım hızlandırma bulunamadı, CPU moduna geçiliyor: {}",
+                        e
+                    );
+                    let mut cpu_params = WhisperContextParameters::default();
+                    cpu_params.use_gpu(false);
+                    let c =
+                        WhisperContext::new_with_params(actual_path.to_str().unwrap(), cpu_params)
+                            .map_err(|err| {
+                                format!("Whisper GGML model yüklenirken hata oluştu: {}", err)
+                            })?;
+                    (c, false)
+                }
+            };
 
         let mut lock = self.whisper_ctx.lock().unwrap();
         *lock = Some(ctx);
@@ -117,38 +140,76 @@ impl GlobalTranscriberEngine {
         let mut state = self.state.lock().unwrap();
         state.is_model_loaded = true;
         state.selected_model_path = actual_path.to_str().unwrap().to_string();
-        
-        let gpu_label = if is_gpu_active { "Metal/CUDA GPU" } else { "CPU AVX2 Vector" };
+
+        let gpu_label = if is_gpu_active {
+            "Metal/CUDA GPU"
+        } else {
+            "CPU AVX2 Vector"
+        };
         state.model_display_name = if model_path.contains("small") {
             format!("ggml-small.bin (Whisper Small 244M - {})", gpu_label)
         } else {
             format!("ggml-base.bin (Whisper Base 74M - {})", gpu_label)
         };
 
-        println!("Whisper GGML Model talep üzerine başarıyla yüklendi [Donanım: {}]: {:?}", gpu_label, actual_path);
+        println!(
+            "Whisper GGML Model talep üzerine başarıyla yüklendi [Donanım: {}]: {:?}",
+            gpu_label, actual_path
+        );
         Ok(())
     }
 
     pub fn cleanup_context(&self) {
+        // 1. If an active inference pass is ongoing, wait gracefully for it to settle (up to 800ms)
+        let wait_start = std::time::Instant::now();
+        while self.is_transcribing.load(Ordering::SeqCst) {
+            if wait_start.elapsed() > std::time::Duration::from_millis(800) {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(25));
+        }
+
+        // 2. Safely acquire Whisper context lock and extract handle
         let mut lock = self.whisper_ctx.lock().unwrap();
-        *lock = None;
+        if let Some(ctx) = lock.take() {
+            // macOS Metal requires in-flight command buffers to drain prior to context drop
+            std::thread::sleep(std::time::Duration::from_millis(75));
+            drop(ctx);
+        }
         let mut state = self.state.lock().unwrap();
         state.is_model_loaded = false;
         state.model_display_name = "Whisper Small 244M (Bellekten Boşaltıldı)".to_string();
-        println!("Whisper GGML modeli bellekten boşaltıldı (RAM/GPU serbest bırakıldı).");
+        println!("Whisper GGML modeli bellekten boşaltıldı (Metal GPU ve RAM serbest bırakıldı).");
     }
+}
 
-    pub fn transcribe_pcm(&self, samples: &[f32], language: &str) -> Result<Vec<TranscriptSegment>, String> {
+impl Drop for GlobalTranscriberEngine {
+    fn drop(&mut self) {
+        self.cleanup_context();
+    }
+}
+
+impl GlobalTranscriberEngine {
+    pub fn transcribe_pcm(
+        &self,
+        samples: &[f32],
+        language: &str,
+    ) -> Result<Vec<TranscriptSegment>, String> {
         if samples.is_empty() {
             let state = self.state.lock().unwrap();
             return Ok(state.segments.clone());
         }
 
+        self.is_transcribing.store(true, Ordering::SeqCst);
+        let _transcribe_guard = TranscribeGuard(&self.is_transcribing);
+
         // Lazy load Whisper model on demand if not already in memory
         self.ensure_model_loaded()?;
 
         let mut ctx_lock = self.whisper_ctx.lock().unwrap();
-        let ctx = ctx_lock.as_mut().ok_or_else(|| "Whisper modeli henüz yüklü değil".to_string())?;
+        let ctx = ctx_lock
+            .as_mut()
+            .ok_or_else(|| "Whisper modeli henüz yüklü değil".to_string())?;
 
         // VAD-Based Intelligent Natural Pause Audio Slicing:
         // Slices audio strictly at natural silence dips between sentences (approx 4-5 minutes nominal).
@@ -177,19 +238,26 @@ impl GlobalTranscriberEngine {
             state.segment_counter
         };
 
-        for (chunk_idx, (chunk_time_offset_ms, chunk_samples)) in natural_chunks.iter().enumerate() {
-            let mut state_ctx = ctx.create_state().map_err(|e| format!("Whisper state hatası: {}", e))?;
+        let total_duration_ms = ((samples.len() as f64 / 16000.0) * 1000.0) as u64;
+
+        for (chunk_idx, (chunk_time_offset_ms, chunk_samples)) in natural_chunks.iter().enumerate()
+        {
+            let mut state_ctx = ctx
+                .create_state()
+                .map_err(|e| format!("Whisper state hatası: {}", e))?;
             let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 5 });
             params.set_n_threads(n_threads);
             params.set_language(whisper_lang);
             params.set_initial_prompt(prompt);
             params.set_no_context(true); // Isolate chunks from previous hallucination loops
+            params.set_single_segment(false);
             params.set_temperature(0.0);
-            params.set_temperature_inc(0.0); // Keep greedy zero-temperature
+            params.set_temperature_inc(0.2); // Fallback to higher temperatures if trapped in repetition
             params.set_entropy_thold(2.4);
+            params.set_logprob_thold(-1.0);
+            params.set_no_speech_thold(0.50);
             params.set_suppress_blank(true);
             params.set_suppress_nst(true);
-            params.set_no_speech_thold(0.60);
             params.set_print_special(false);
             params.set_print_progress(false);
             params.set_print_realtime(false);
@@ -211,11 +279,41 @@ impl GlobalTranscriberEngine {
                         continue;
                     }
 
+                    // 1. Anti-Hallucination N-Gram Loop Detection & Truncation
+                    let (cleaned_text, has_loop, loop_ratio) =
+                        crate::summarizer::cleaner::SpeechCleaner::detect_and_clean_hallucination_loops(&segment_text);
+
+                    // If the segment is overwhelmingly repetitive garbage (e.g. 50x "ve kanalıma"), discard it completely!
+                    if has_loop
+                        && (loop_ratio > 0.60 || cleaned_text.split_whitespace().count() < 2)
+                    {
+                        println!("🚫 [ASR Hallucination Guard] Tekrarlayan döngü segmenti reddedildi (oran: {:.2}): {:?}", loop_ratio, segment_text);
+                        continue;
+                    }
+
+                    let final_text = if has_loop { cleaned_text } else { segment_text };
+                    if final_text.trim().is_empty() {
+                        continue;
+                    }
+
+                    // 2. Timestamp Clamping to Total Audio Duration
                     let seg_start_ms = (seg.start_timestamp() as u64) * 10;
                     let seg_end_ms = (seg.end_timestamp() as u64) * 10;
 
                     let start_time_ms = chunk_time_offset_ms + seg_start_ms;
-                    let end_time_ms = chunk_time_offset_ms + seg_end_ms;
+                    let mut end_time_ms = chunk_time_offset_ms + seg_end_ms;
+
+                    // Discard ghost segments beyond the physical audio length
+                    if start_time_ms >= total_duration_ms {
+                        continue;
+                    }
+                    // Clamp end time to strictly never exceed actual audio duration
+                    if end_time_ms > total_duration_ms {
+                        end_time_ms = total_duration_ms;
+                    }
+                    if start_time_ms >= end_time_ms {
+                        continue;
+                    }
 
                     let start_sec = start_time_ms / 1000;
                     let end_sec = end_time_ms / 1000;
@@ -227,6 +325,35 @@ impl GlobalTranscriberEngine {
                         end_sec % 60
                     );
 
+                    // 3. Dynamic Confidence & Quality Score Calculation
+                    let n_tokens = seg.n_tokens();
+                    let mut token_prob_sum = 0.0f32;
+                    let mut token_prob_count = 0usize;
+                    for t in 0..n_tokens {
+                        if let Some(tok) = seg.get_token(t) {
+                            let p = tok.token_probability();
+                            if p > 0.0 {
+                                token_prob_sum += p;
+                                token_prob_count += 1;
+                            }
+                        }
+                    }
+                    let avg_token_prob = if token_prob_count > 0 {
+                        token_prob_sum / (token_prob_count as f32)
+                    } else {
+                        0.85
+                    };
+
+                    let no_speech_p = seg.no_speech_probability();
+                    let mut calc_confidence = avg_token_prob * (1.0 - (no_speech_p * 0.5));
+
+                    if has_loop {
+                        // Penalize confidence if any repetition loop was stripped
+                        calc_confidence *= (1.0 - loop_ratio).max(0.20);
+                    }
+
+                    let confidence = (calc_confidence.clamp(0.10, 0.98) * 100.0).round() / 100.0;
+
                     segment_counter += 1;
                     let id = segment_counter;
 
@@ -237,9 +364,13 @@ impl GlobalTranscriberEngine {
                         start_time_ms,
                         end_time_ms,
                         timestamp_formatted,
-                        text: segment_text,
-                        language: if is_auto { "auto".to_string() } else { language.to_string() },
-                        confidence: 0.98,
+                        text: final_text,
+                        language: if is_auto {
+                            "auto".to_string()
+                        } else {
+                            language.to_string()
+                        },
+                        confidence,
                     };
 
                     new_segments.push(segment);
@@ -302,7 +433,7 @@ pub fn split_audio_at_natural_pauses(
         return Vec::new();
     }
 
-    let target_chunk_samples = (target_chunk_sec as usize) * (sample_rate as usize);
+    let target_chunk_samples = target_chunk_sec * (sample_rate as usize);
     if samples.len() <= target_chunk_samples {
         return vec![(0, samples.to_vec())];
     }
@@ -388,16 +519,16 @@ pub fn clear_transcription_history() -> Vec<TranscriptSegment> {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModelInfo {
-    pub key: String,             // "tiny", "base", "small", "medium", "large-v3-turbo"
-    pub name: String,            // "Whisper Small (244M)"
-    pub filename: String,        // "ggml-small.bin"
-    pub size_mb: usize,          // 487
-    pub ram_required_mb: usize,  // 500
+    pub key: String,            // "tiny", "base", "small", "medium", "large-v3-turbo"
+    pub name: String,           // "Whisper Small (244M)"
+    pub filename: String,       // "ggml-small.bin"
+    pub size_mb: usize,         // 487
+    pub ram_required_mb: usize, // 500
     pub is_downloaded: bool,
     pub is_active: bool,
-    pub description: String,     // "Dengeli ve yüksek performanslı model (Önerilen)"
-    pub accuracy_score: u8,      // 1 - 5
-    pub speed_score: u8,         // 1 - 5
+    pub description: String, // "Dengeli ve yüksek performanslı model (Önerilen)"
+    pub accuracy_score: u8,  // 1 - 5
+    pub speed_score: u8,     // 1 - 5
     pub download_url: String,
 }
 
@@ -423,10 +554,12 @@ pub fn get_available_models() -> Vec<ModelInfo> {
             ram_required_mb: 150,
             is_downloaded: is_present("ggml-tiny.bin"),
             is_active: current_selected_path.contains("tiny"),
-            description: "Çok hızlı ve hafif. Kısa notlar ve hızlı ses kayıtları için idealdir.".to_string(),
+            description: "Çok hızlı ve hafif. Kısa notlar ve hızlı ses kayıtları için idealdir."
+                .to_string(),
             accuracy_score: 2,
             speed_score: 5,
-            download_url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin".to_string(),
+            download_url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin"
+                .to_string(),
         },
         ModelInfo {
             key: "base".to_string(),
@@ -436,10 +569,12 @@ pub fn get_available_models() -> Vec<ModelInfo> {
             ram_required_mb: 250,
             is_downloaded: is_present("ggml-base.bin"),
             is_active: current_selected_path.contains("base"),
-            description: "Hızlı ve pratik. Günlük konuşmalar ve birebir sohbetler için uygundur.".to_string(),
+            description: "Hızlı ve pratik. Günlük konuşmalar ve birebir sohbetler için uygundur."
+                .to_string(),
             accuracy_score: 3,
             speed_score: 4,
-            download_url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin".to_string(),
+            download_url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin"
+                .to_string(),
         },
         ModelInfo {
             key: "small".to_string(),
@@ -449,10 +584,13 @@ pub fn get_available_models() -> Vec<ModelInfo> {
             ram_required_mb: 500,
             is_downloaded: is_present("ggml-small.bin"),
             is_active: current_selected_path.contains("small"),
-            description: "Mükemmel anlama kalitesi ve akıcı hız. Çoğu toplantı için ideal denge.".to_string(),
+            description: "Mükemmel anlama kalitesi ve akıcı hız. Çoğu toplantı için ideal denge."
+                .to_string(),
             accuracy_score: 4,
             speed_score: 4,
-            download_url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin".to_string(),
+            download_url:
+                "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin"
+                    .to_string(),
         },
         ModelInfo {
             key: "medium".to_string(),
@@ -462,10 +600,14 @@ pub fn get_available_models() -> Vec<ModelInfo> {
             ram_required_mb: 1600,
             is_downloaded: is_present("ggml-medium.bin"),
             is_active: current_selected_path.contains("medium"),
-            description: "Teknik terimler ve çok katılımcılı kalabalık toplantılar için üstün doğruluk.".to_string(),
+            description:
+                "Teknik terimler ve çok katılımcılı kalabalık toplantılar için üstün doğruluk."
+                    .to_string(),
             accuracy_score: 5,
             speed_score: 3,
-            download_url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.bin".to_string(),
+            download_url:
+                "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.bin"
+                    .to_string(),
         },
         ModelInfo {
             key: "large-v3-turbo".to_string(),
@@ -475,10 +617,14 @@ pub fn get_available_models() -> Vec<ModelInfo> {
             ram_required_mb: 1700,
             is_downloaded: is_present("ggml-large-v3-turbo.bin"),
             is_active: current_selected_path.contains("large-v3-turbo"),
-            description: "En yüksek anlama yeteneği ve detayları kaçırmayan kristal netliğinde çözümleme.".to_string(),
+            description:
+                "En yüksek anlama yeteneği ve detayları kaçırmayan kristal netliğinde çözümleme."
+                    .to_string(),
             accuracy_score: 5,
             speed_score: 4,
-            download_url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin".to_string(),
+            download_url:
+                "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin"
+                    .to_string(),
         },
     ]
 }
@@ -536,8 +682,7 @@ pub fn download_whisper_model(model_key: String) -> Result<String, String> {
     let mut out = std::fs::File::create(&target_file)
         .map_err(|e| format!("Dosya oluşturma hatası: {}", e))?;
 
-    std::io::copy(&mut resp, &mut out)
-        .map_err(|e| format!("Yazma hatası: {}", e))?;
+    std::io::copy(&mut resp, &mut out).map_err(|e| format!("Yazma hatası: {}", e))?;
 
     Ok(format!("{} başarıyla indirildi!", model.name))
 }
@@ -566,4 +711,3 @@ mod tests {
         assert!(!status.is_loaded);
     }
 }
-

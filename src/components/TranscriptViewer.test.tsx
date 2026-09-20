@@ -4,6 +4,7 @@ import { TranscriptViewer } from "./TranscriptViewer";
 import { I18nProvider } from "../locales/i18nContext";
 import { invoke } from "@tauri-apps/api/core";
 import { MeetingRecord } from "../App";
+import { CredentialStore } from "../services/credentialStore";
 
 const mockPastMeeting: MeetingRecord = {
   id: "mtg-001",
@@ -61,6 +62,7 @@ describe("TranscriptViewer Component", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    CredentialStore.clearCache();
   });
 
   const defaultProps = {
@@ -1380,7 +1382,7 @@ describe("TranscriptViewer Component", () => {
 
     // Test OpenAI
     localStorage.setItem("echomind_active_engine", "cloud_openai");
-    localStorage.setItem("echomind_openai_key", "sk_openai_key");
+    await CredentialStore.set("echomind_openai_key", "sk_openai_key");
 
     render(
       <I18nProvider>
@@ -1715,7 +1717,7 @@ describe("TranscriptViewer Component", () => {
     });
 
     localStorage.setItem("echomind_active_engine", "cloud_gemini");
-    localStorage.setItem("echomind_gemini_key", "gemini_secret_key");
+    await CredentialStore.set("echomind_gemini_key", "gemini_secret_key");
 
     render(
       <I18nProvider>
@@ -1916,7 +1918,7 @@ describe("TranscriptViewer Component", () => {
 
     // 1. Live buffer transcribe with Groq
     localStorage.setItem("echomind_active_engine", "cloud_groq");
-    localStorage.setItem("echomind_groq_key", "gsk_groq_live_key");
+    await CredentialStore.set("echomind_groq_key", "gsk_groq_live_key");
     localStorage.setItem("echomind_groq_model_version", "whisper-large-v3");
 
     const { unmount } = render(
@@ -1947,7 +1949,7 @@ describe("TranscriptViewer Component", () => {
 
     // 2. Summary generation with Gemini
     localStorage.setItem("echomind_active_engine", "cloud_gemini");
-    localStorage.setItem("echomind_gemini_key", "gemini_gen_key");
+    await CredentialStore.set("echomind_gemini_key", "gemini_gen_key");
 
     const { unmount: unmount2 } = render(
       <I18nProvider>
@@ -2035,7 +2037,7 @@ describe("TranscriptViewer Component", () => {
     });
 
     localStorage.setItem("echomind_active_engine", "cloud_openai");
-    localStorage.setItem("echomind_openai_key", "sk-openai-key");
+    await CredentialStore.set("echomind_openai_key", "sk-openai-key");
 
     const { unmount } = render(
       <I18nProvider>
@@ -2064,7 +2066,7 @@ describe("TranscriptViewer Component", () => {
 
     // Cloud Gemini Transcribe
     localStorage.setItem("echomind_active_engine", "cloud_gemini");
-    localStorage.setItem("echomind_gemini_key", "sk-gemini-key");
+    await CredentialStore.set("echomind_gemini_key", "sk-gemini-key");
     await act(async () => {
       fireEvent.click(transcribeBtn);
     });
@@ -2212,7 +2214,7 @@ describe("TranscriptViewer Component", () => {
 
     // 1. Ollama & OpenAI summary generation
     localStorage.setItem("echomind_active_engine", "cloud_openai");
-    localStorage.setItem("echomind_openai_key", "sk-test-openai");
+    await CredentialStore.set("echomind_openai_key", "sk-test-openai");
     localStorage.setItem("echomind_ollama_endpoint", "http://localhost:11434");
     localStorage.setItem("echomind_ollama_model", "llama3:8b");
 
@@ -2289,7 +2291,7 @@ describe("TranscriptViewer Component", () => {
 
     // 2. Redaction with Groq & OpenAI & Error branch
     localStorage.setItem("echomind_active_engine", "cloud_groq");
-    localStorage.setItem("echomind_groq_key", "gsk_groq_redact");
+    await CredentialStore.set("echomind_groq_key", "gsk_groq_redact");
 
     (invoke as any).mockImplementation((cmd: string) => {
       if (cmd === "enhance_meeting_transcript")
@@ -2317,7 +2319,7 @@ describe("TranscriptViewer Component", () => {
 
     // Redaction with OpenAI
     localStorage.setItem("echomind_active_engine", "cloud_openai");
-    localStorage.setItem("echomind_openai_key", "sk_openai_redact");
+    await CredentialStore.set("echomind_openai_key", "sk_openai_redact");
     (invoke as any).mockImplementation((cmd: string) => {
       if (cmd === "enhance_meeting_transcript") {
         return Promise.resolve({

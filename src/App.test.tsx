@@ -4,6 +4,7 @@ import App, { MeetingRecord } from "./App";
 import { I18nProvider } from "./locales/i18nContext";
 import { invoke } from "@tauri-apps/api/core";
 import { globalTestEventListeners } from "./test/setup";
+import { CredentialStore } from "./services/credentialStore";
 
 const mockPastMeetings: MeetingRecord[] = [
   {
@@ -48,6 +49,7 @@ describe("App Top-Level Integration", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    CredentialStore.clearCache();
   });
 
   const setupDefaultInvoke = () => {
@@ -80,6 +82,10 @@ describe("App Top-Level Integration", () => {
       if (cmd === "list_audio_devices") return Promise.resolve([]);
       if (cmd === "get_stored_api_keys")
         return Promise.resolve({ groq: "", gemini: "", openai: "" });
+      if (cmd === "get_privacy_mode") return Promise.resolve("balanced");
+      if (cmd === "set_privacy_mode") return Promise.resolve();
+      if (cmd === "get_secure_credential") return Promise.resolve(null);
+      if (cmd === "save_secure_credential") return Promise.resolve();
       if (cmd === "get_ollama_config")
         return Promise.resolve({
           endpoint: "http://127.0.0.1:11434",
@@ -205,6 +211,7 @@ describe("App Top-Level Integration", () => {
   });
 
   it("handles audio file import dialog and smart advisor flow", async () => {
+    localStorage.setItem("echomind_app_language", "tr");
     setupDefaultInvoke();
 
     render(
@@ -853,7 +860,7 @@ describe("App Top-Level Integration", () => {
     ).toBeInTheDocument();
 
     // Set groq key in storage
-    localStorage.setItem("echomind_groq_key", "gsk_test_12345");
+    await CredentialStore.set("echomind_groq_key", "gsk_test_12345");
 
     // Switch to Cloud method
     const cloudMethodCard = screen.getByText(/Yüksek Hızlı Bulut Zekası/i);
@@ -2497,6 +2504,10 @@ describe("App Top-Level Integration", () => {
       </I18nProvider>,
     );
 
+    const updateBadge = await screen.findByTitle("Yeni sürüm indirilebilir");
+    expect(updateBadge).toBeInTheDocument();
+    fireEvent.click(updateBadge);
+
     expect(
       await screen.findByTestId("update-modal-backdrop"),
     ).toBeInTheDocument();
@@ -2588,5 +2599,417 @@ describe("App Top-Level Integration", () => {
 
     expect(screen.getByText("Finans Raporu Toplantısı")).toBeInTheDocument();
     expect(screen.getByText("Tasarım Toplantısı")).toBeInTheDocument();
+  });
+
+  it("auto-starts recording on meeting-detected and auto-stops on meeting-ended when enabled", async () => {
+    (invoke as any).mockImplementation((cmd: string) => {
+      if (cmd === "get_all_meetings") return Promise.resolve([]);
+      if (cmd === "get_detector_status") {
+        return Promise.resolve({
+          is_active: true,
+          detected_apps: [],
+          active_count: 0,
+          last_check_timestamp: "",
+          settings: {
+            enabled: true,
+            auto_start_record: true,
+            auto_stop_on_app_close: true,
+            ignored_apps: [],
+          },
+        });
+      }
+      if (cmd === "start_audio_capture") return Promise.resolve();
+      if (cmd === "stop_audio_capture") return Promise.resolve();
+      if (cmd === "save_current_meeting")
+        return Promise.resolve({
+          ...mockPastMeetings[0],
+          id: "mtg_auto_stopped",
+        });
+      return Promise.resolve();
+    });
+
+    render(
+      <I18nProvider>
+        <App />
+      </I18nProvider>,
+    );
+
+    // Wait for the detector's initial status fetch so auto_start_record is primed.
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 10));
+    });
+
+    const detectedListeners =
+      globalTestEventListeners["meeting-detected"] || [];
+    expect(detectedListeners.length).toBeGreaterThan(0);
+    await act(async () => {
+      detectedListeners[detectedListeners.length - 1]({
+        payload: [
+          {
+            app_id: "zoom",
+            display_name: "Zoom",
+            process_name: "zoom.us",
+            is_running: true,
+            recommended_title: "Zoom Toplantısı",
+          },
+        ],
+      });
+      await new Promise((r) => setTimeout(r, 10));
+    });
+
+    expect(invoke).toHaveBeenCalledWith("start_audio_capture", {
+      deviceName: undefined,
+    });
+
+    const endedListeners = globalTestEventListeners["meeting-ended"] || [];
+    await act(async () => {
+      endedListeners[endedListeners.length - 1]({});
+      await new Promise((r) => setTimeout(r, 10));
+    });
+
+    expect(invoke).toHaveBeenCalledWith("stop_audio_capture");
+    expect(invoke).toHaveBeenCalledWith(
+      "save_current_meeting",
+      expect.any(Object),
+    );
+  });
+
+  it("logs an error gracefully when hardware and model status fetches fail", async () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    (invoke as any).mockImplementation((cmd: string) => {
+      if (cmd === "get_all_meetings") return Promise.resolve([]);
+      if (cmd === "get_hardware_info")
+        return Promise.reject(new Error("hw failure"));
+      if (cmd === "get_model_status")
+        return Promise.reject(new Error("model failure"));
+      return Promise.resolve();
+    });
+
+    render(
+      <I18nProvider>
+        <App />
+      </I18nProvider>,
+    );
+
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 10));
+    });
+
+    expect(consoleSpy).toHaveBeenCalledWith(
+      "Hardware info error:",
+      expect.any(Error),
+    );
+    expect(consoleSpy).toHaveBeenCalledWith(
+      "Model status error:",
+      expect.any(Error),
+    );
+    consoleSpy.mockRestore();
+  });
+
+  it("uploads a picked file via the hidden file input FileReader fallback when no native path exists", async () => {
+    (invoke as any).mockImplementation((cmd: string) => {
+      if (cmd === "get_all_meetings") return Promise.resolve([]);
+      if (cmd === "save_uploaded_audio_bytes") {
+        return Promise.resolve({
+          path: "/tmp/uploaded_via_bytes.mp3",
+          file_name: "clip.mp3",
+          file_size_mb: 0.1,
+          is_large_file: false,
+        });
+      }
+      if (cmd === "process_audio_file_path") {
+        return Promise.resolve({
+          ...mockPastMeetings[0],
+          id: "mtg_uploaded_bytes",
+        });
+      }
+      return Promise.resolve();
+    });
+
+    render(
+      <I18nProvider>
+        <App />
+      </I18nProvider>,
+    );
+
+    const hiddenInput = screen.getByTestId(
+      "hidden-audio-file-input",
+    ) as HTMLInputElement;
+    const file = new File(["fake-audio-bytes"], "clip.mp3", {
+      type: "audio/mpeg",
+    });
+    // jsdom File objects have no `.path`, matching the Linux WebKit sandboxed picker.
+    await act(async () => {
+      fireEvent.change(hiddenInput, { target: { files: [file] } });
+      await new Promise((r) => setTimeout(r, 20));
+    });
+
+    expect(invoke).toHaveBeenCalledWith(
+      "save_uploaded_audio_bytes",
+      expect.objectContaining({ fileName: "clip.mp3" }),
+    );
+  });
+
+  it("opens the hidden file input fallback when the native pick dialog returns null", async () => {
+    (invoke as any).mockImplementation((cmd: string) => {
+      if (cmd === "get_all_meetings") return Promise.resolve([]);
+      if (cmd === "pick_audio_file_dialog") return Promise.resolve(null);
+      return Promise.resolve();
+    });
+
+    render(
+      <I18nProvider>
+        <App />
+      </I18nProvider>,
+    );
+
+    const hiddenInput = screen.getByTestId("hidden-audio-file-input");
+    const clickSpy = vi.spyOn(hiddenInput, "click");
+
+    const importBtn = screen.getByTitle(/Ses Dosyası Yükle/i);
+    await act(async () => {
+      fireEvent.click(importBtn);
+      await new Promise((r) => setTimeout(r, 10));
+    });
+
+    expect(clickSpy).toHaveBeenCalled();
+  });
+
+  it("retranscribes a meeting via Smart Advisor with the Gemini cloud engine", async () => {
+    localStorage.removeItem("echomind_gemini_key");
+    (invoke as any).mockImplementation((cmd: string) => {
+      if (cmd === "get_all_meetings") return Promise.resolve(mockPastMeetings);
+      if (cmd === "retranscribe_meeting") {
+        return Promise.resolve({
+          ...mockPastMeetings[0],
+          id: "mtg_needs_retranscribe_gemini",
+        });
+      }
+      return Promise.resolve();
+    });
+
+    render(
+      <I18nProvider>
+        <App />
+      </I18nProvider>,
+    );
+
+    const savedListeners = globalTestEventListeners["meeting-saved"] || [];
+    await act(async () => {
+      savedListeners[savedListeners.length - 1]({
+        payload: {
+          ...mockPastMeetings[0],
+          id: "mtg_needs_retranscribe_gemini",
+          audio_file_path: "/tmp/recorded_new.wav",
+          duration_seconds: 800,
+          segments: [],
+        },
+      });
+      await new Promise((r) => setTimeout(r, 20));
+    });
+
+    expect(
+      await screen.findByText(/Akıllı İşlem Tavsiyesi/i),
+    ).toBeInTheDocument();
+
+    const cloudCard = screen
+      .getByText("⚡ Yıldırım Hızı (Bulut)")
+      .closest("button");
+    await act(async () => {
+      fireEvent.click(cloudCard!);
+      await new Promise((r) => setTimeout(r, 10));
+    });
+
+    const geminiProviderBtn = screen.getByText("Google Gemini");
+    await act(async () => {
+      fireEvent.click(geminiProviderBtn);
+    });
+
+    const keyInput = screen.getByPlaceholderText(/AIzaSy.../i);
+    await act(async () => {
+      fireEvent.change(keyInput, { target: { value: "AIzaSyTestKey" } });
+    });
+
+    const proceedBtn = screen.getByRole("button", { name: /^Başlat$/i });
+    await act(async () => {
+      fireEvent.click(proceedBtn);
+      await new Promise((r) => setTimeout(r, 20));
+    });
+
+    expect(invoke).toHaveBeenCalledWith(
+      "retranscribe_meeting",
+      expect.objectContaining({
+        meetingId: "mtg_needs_retranscribe_gemini",
+        cloudProvider: "gemini",
+        apiKey: "AIzaSyTestKey",
+      }),
+    );
+  });
+
+  it("imports a large file via Smart Advisor with the OpenAI cloud engine", async () => {
+    localStorage.setItem("echomind_active_engine", "local");
+    localStorage.removeItem("echomind_openai_key");
+    localStorage.setItem("echomind_suppress_cloud_warning", "true");
+
+    (invoke as any).mockImplementation((cmd: string) => {
+      if (cmd === "get_all_meetings") return Promise.resolve(mockPastMeetings);
+      if (cmd === "pick_audio_file_dialog") {
+        return Promise.resolve({
+          path: "/tmp/large_openai.mp3",
+          file_name: "large_openai.mp3",
+          file_size_mb: 30.0,
+          is_large_file: true,
+        });
+      }
+      if (cmd === "process_audio_file_path") {
+        return Promise.resolve({
+          ...mockPastMeetings[0],
+          id: "mtg_openai_processed",
+        });
+      }
+      return Promise.resolve();
+    });
+
+    render(
+      <I18nProvider>
+        <App />
+      </I18nProvider>,
+    );
+
+    const importBtn = screen.getByTitle(/Ses Dosyası Yükle/i);
+    await act(async () => {
+      fireEvent.click(importBtn);
+      await new Promise((r) => setTimeout(r, 10));
+    });
+
+    const cloudCard = screen
+      .getByText("⚡ Yıldırım Hızı (Bulut)")
+      .closest("button");
+    await act(async () => {
+      fireEvent.click(cloudCard!);
+      await new Promise((r) => setTimeout(r, 10));
+    });
+
+    const openaiProviderBtn = screen.getByText("OpenAI");
+    await act(async () => {
+      fireEvent.click(openaiProviderBtn);
+    });
+
+    const keyInput = screen.getByPlaceholderText(/sk-proj-.../i);
+    await act(async () => {
+      fireEvent.change(keyInput, { target: { value: "sk-proj-test-key" } });
+    });
+
+    const proceedBtn = screen.getByRole("button", { name: /^Başlat$/i });
+    await act(async () => {
+      fireEvent.click(proceedBtn);
+      await new Promise((r) => setTimeout(r, 20));
+    });
+
+    expect(invoke).toHaveBeenCalledWith(
+      "process_audio_file_path",
+      expect.objectContaining({
+        cloudProvider: "openai",
+        apiKey: "sk-proj-test-key",
+      }),
+    );
+  });
+
+  it("filters by tag from the per-card tag badge without selecting the meeting", async () => {
+    const taggedMeetings = [
+      {
+        ...mockPastMeetings[0],
+        id: "m-card-tag-1",
+        title: "Finans Raporu Toplantısı",
+        tags: ["Finans & Bütçe"],
+      },
+      {
+        ...mockPastMeetings[0],
+        id: "m-card-tag-2",
+        title: "Tasarım Toplantısı",
+        tags: ["Tasarım & UI/UX"],
+      },
+    ];
+    (invoke as any).mockImplementation((cmd: string) => {
+      if (cmd === "get_all_meetings") return Promise.resolve(taggedMeetings);
+      return Promise.resolve();
+    });
+
+    render(
+      <I18nProvider>
+        <App />
+      </I18nProvider>,
+    );
+
+    expect(
+      await screen.findByText("Finans Raporu Toplantısı"),
+    ).toBeInTheDocument();
+
+    // The per-card badge is the last "Finans & Bütçe" node (after the header filter pill).
+    const badges = screen.getAllByText("Finans & Bütçe");
+    const cardBadge = badges[badges.length - 1];
+    await act(async () => {
+      fireEvent.click(cardBadge);
+    });
+
+    expect(screen.getByText("Finans Raporu Toplantısı")).toBeInTheDocument();
+    expect(screen.queryByText("Tasarım Toplantısı")).not.toBeInTheDocument();
+  });
+
+  it("shows the loopback warning badge while recording without loopback audio and opens Settings", async () => {
+    (invoke as any).mockImplementation((cmd: string) => {
+      if (cmd === "get_all_meetings") return Promise.resolve([]);
+      if (cmd === "get_audio_status")
+        return Promise.resolve({
+          is_recording: true,
+          mic_level: 0.4,
+          is_loopback: false,
+        });
+      return Promise.resolve();
+    });
+
+    render(
+      <I18nProvider>
+        <App />
+      </I18nProvider>,
+    );
+
+    const badge = await screen.findByText(
+      /Sadece Mikrofon \(Karşı taraf için Loopback seçin\)/i,
+    );
+    await act(async () => {
+      fireEvent.click(badge);
+    });
+
+    expect(
+      await screen.findByText(/Ayarlar/i, { selector: "h2, h3, div" }),
+    ).toBeTruthy();
+  });
+
+  it("returns to the live session from the sidebar header plus button", async () => {
+    (invoke as any).mockImplementation((cmd: string) => {
+      if (cmd === "get_all_meetings") return Promise.resolve(mockPastMeetings);
+      return Promise.resolve();
+    });
+
+    render(
+      <I18nProvider>
+        <App />
+      </I18nProvider>,
+    );
+
+    const meetingCard = await screen.findByText(
+      "Haftalık İcra Kurulu Toplantısı",
+    );
+    await act(async () => {
+      fireEvent.click(meetingCard);
+    });
+
+    const liveSessionBtn = screen.getByTitle(/Canlı Toplantı Akışı/i);
+    await act(async () => {
+      fireEvent.click(liveSessionBtn);
+    });
+
+    expect(screen.queryByText("Yeniden Yazıya Dök")).not.toBeInTheDocument();
   });
 });

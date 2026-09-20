@@ -102,4 +102,19 @@ describe("CloudPrivacyConfirmModal Component", () => {
 
     expect(container.firstChild).toBeNull();
   });
+
+  it("closes when clicking the backdrop but not when clicking inside the card", () => {
+    const onClose = vi.fn();
+    const { container } = render(
+      <I18nProvider>
+        <CloudPrivacyConfirmModal {...defaultProps} onClose={onClose} />
+      </I18nProvider>,
+    );
+
+    fireEvent.click(screen.getByText(/Groq Cloud Whisper/i));
+    expect(onClose).not.toHaveBeenCalled();
+
+    fireEvent.click(container.firstChild as Element);
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
 });

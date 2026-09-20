@@ -10,7 +10,7 @@ pub enum OfflineEngineType {
 }
 
 impl OfflineEngineType {
-    pub fn from_str(s: &str) -> Self {
+    pub fn from_identifier(s: &str) -> Self {
         match s.to_lowercase().as_str() {
             "apple_speech" | "apple_native" | "apple" => OfflineEngineType::AppleSpeechNative,
             "sensevoice" | "sense_voice" => OfflineEngineType::SenseVoiceLocal,
@@ -141,7 +141,7 @@ pub fn transcribe_sensevoice(
     for seg in &mut segments {
         if !seg.text.contains("😊") && !seg.text.contains("💬") {
             // Tag with non-autoregressive acoustic mark
-            seg.speaker_id = format!("{}", seg.speaker_id);
+            seg.speaker_id = seg.speaker_id.to_string();
         }
     }
 
@@ -154,8 +154,17 @@ mod tests {
 
     #[test]
     fn test_offline_engine_type_parsing() {
-        assert_eq!(OfflineEngineType::from_str("apple_speech"), OfflineEngineType::AppleSpeechNative);
-        assert_eq!(OfflineEngineType::from_str("sensevoice"), OfflineEngineType::SenseVoiceLocal);
-        assert_eq!(OfflineEngineType::from_str("whisper"), OfflineEngineType::WhisperLocal);
+        assert_eq!(
+            OfflineEngineType::from_identifier("apple_speech"),
+            OfflineEngineType::AppleSpeechNative
+        );
+        assert_eq!(
+            OfflineEngineType::from_identifier("sensevoice"),
+            OfflineEngineType::SenseVoiceLocal
+        );
+        assert_eq!(
+            OfflineEngineType::from_identifier("whisper"),
+            OfflineEngineType::WhisperLocal
+        );
     }
 }

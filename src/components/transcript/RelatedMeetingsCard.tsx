@@ -43,7 +43,7 @@ export const RelatedMeetingsCard: React.FC<RelatedMeetingsCardProps> = ({
         if (isMounted) {
           setRelatedList(Array.isArray(res) ? res : []);
         }
-      } catch (err) {
+      } catch {
         if (isMounted) setRelatedList([]);
       } finally {
         if (isMounted) setIsLoading(false);

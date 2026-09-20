@@ -10,6 +10,7 @@ describe("CredentialStore Service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    CredentialStore.clearCache();
   });
 
   it("retrieves key from native secure vault if available", async () => {
@@ -30,15 +31,19 @@ describe("CredentialStore Service", () => {
     expect(result).toBe("gsk_fallback_key");
   });
 
-  it("saves key to both native vault and localStorage", async () => {
+  it("saves key to native vault and purges plaintext from localStorage", async () => {
     vi.mocked(invoke).mockResolvedValueOnce(undefined);
+    localStorage.setItem("echomind_gemini_key", "old_plaintext");
 
     await CredentialStore.set("echomind_gemini_key", "AIzaSy_secure_gemini");
     expect(invoke).toHaveBeenCalledWith("save_secure_credential", {
       keyName: "echomind_gemini_key",
       keyValue: "AIzaSy_secure_gemini",
     });
-    expect(localStorage.getItem("echomind_gemini_key")).toBe(
+    // Plaintext MUST NOT exist in localStorage
+    expect(localStorage.getItem("echomind_gemini_key")).toBeNull();
+    // But in-memory and get() must return the key
+    expect(CredentialStore.getSync("echomind_gemini_key")).toBe(
       "AIzaSy_secure_gemini",
     );
   });
@@ -51,7 +56,7 @@ describe("CredentialStore Service", () => {
     expect(localStorage.getItem("echomind_key")).toBeNull();
   });
 
-  it("deletes key from both native vault and localStorage", async () => {
+  it("deletes key from native vault and localStorage", async () => {
     vi.mocked(invoke).mockResolvedValueOnce(undefined);
     localStorage.setItem("echomind_key", "to_delete");
 
@@ -60,5 +65,17 @@ describe("CredentialStore Service", () => {
       keyName: "echomind_key",
     });
     expect(localStorage.getItem("echomind_key")).toBeNull();
+  });
+
+  it("migrates legacy localStorage keys to native vault and cleans up", async () => {
+    vi.mocked(invoke).mockResolvedValue(undefined);
+    localStorage.setItem("echomind_groq_key", "gsk_legacy_to_migrate");
+
+    await CredentialStore.migrateLegacyStorage();
+    expect(invoke).toHaveBeenCalledWith("save_secure_credential", {
+      keyName: "echomind_groq_key",
+      keyValue: "gsk_legacy_to_migrate",
+    });
+    expect(localStorage.getItem("echomind_groq_key")).toBeNull();
   });
 });

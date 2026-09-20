@@ -119,4 +119,52 @@ describe("CustomContextMenu Component", () => {
     });
     expect(screen.queryByText("EchoMind AI")).toBeNull();
   });
+
+  it("does not copy when there is no active text selection", async () => {
+    window.getSelection = vi.fn().mockReturnValue({ toString: () => "" });
+    const writeTextSpy = vi.fn();
+    Object.assign(navigator, { clipboard: { writeText: writeTextSpy } });
+
+    render(
+      <I18nProvider>
+        <CustomContextMenu {...defaultProps} />
+      </I18nProvider>,
+    );
+
+    await act(async () => {
+      fireEvent.contextMenu(window, { clientX: 100, clientY: 100 });
+    });
+
+    const copyBtn = screen.getByRole("button", { name: /Kopyala/i });
+    await act(async () => {
+      fireEvent.click(copyBtn);
+    });
+
+    expect(writeTextSpy).not.toHaveBeenCalled();
+  });
+
+  it("shows the ⌘ shortcut prefix on a Mac user agent", async () => {
+    const originalUA = navigator.userAgent;
+    Object.defineProperty(navigator, "userAgent", {
+      value: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
+      configurable: true,
+    });
+
+    render(
+      <I18nProvider>
+        <CustomContextMenu {...defaultProps} />
+      </I18nProvider>,
+    );
+
+    await act(async () => {
+      fireEvent.contextMenu(window, { clientX: 100, clientY: 100 });
+    });
+
+    expect(screen.getByText("⌘C")).toBeInTheDocument();
+
+    Object.defineProperty(navigator, "userAgent", {
+      value: originalUA,
+      configurable: true,
+    });
+  });
 });

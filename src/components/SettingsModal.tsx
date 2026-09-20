@@ -22,6 +22,8 @@ import {
   Loader2,
   AlertTriangle,
   Globe,
+  ExternalLink,
+  Lock,
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { CredentialStore } from "../services/credentialStore";
@@ -57,7 +59,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onClose,
   hardware,
   modelStatus,
-  onOpenUpdateModal,
 }) => {
   const { t, language, setLanguage } = useI18n();
   const { setPrivacyMode, isParanoid, isBalanced, isMaxIntelligence } =
@@ -96,6 +97,37 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     state: "idle" | "testing" | "success" | "error";
     message?: string;
   }>({ state: "idle" });
+
+  const [isAudioTesting, setIsAudioTesting] = useState<boolean>(false);
+  const [showLoopbackGuide, setShowLoopbackGuide] = useState<boolean>(false);
+
+  const handleTestAudio = async () => {
+    if (isAudioTesting) return;
+    setIsAudioTesting(true);
+    try {
+      await invoke("start_mic_preview", {
+        deviceName:
+          selectedAudioDevice === "default" ? null : selectedAudioDevice,
+      });
+      setTimeout(async () => {
+        try {
+          await invoke("stop_mic_preview");
+        } catch {}
+        setIsAudioTesting(false);
+      }, 5000);
+    } catch (err) {
+      console.warn("Audio test failed:", err);
+      setIsAudioTesting(false);
+    }
+  };
+
+  const handleOpenAudioMidiSetup = async () => {
+    try {
+      await invoke("open_audio_midi_setup");
+    } catch (err) {
+      console.warn("Could not open system audio panel:", err);
+    }
+  };
 
   const [askCloudConfirm, setAskCloudConfirm] = useState<boolean>(true);
 
@@ -136,9 +168,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           state: "updateAvailable",
           version: res.latest_version,
         });
-        if (onOpenUpdateModal) {
-          onOpenUpdateModal(res);
-        }
       } else {
         setUpdateStatus({
           state: "upToDate",
@@ -298,10 +327,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
-  const handleSaveKeys = () => {
-    CredentialStore.set("echomind_groq_key", groqKey.trim());
-    CredentialStore.set("echomind_gemini_key", geminiKey.trim());
-    CredentialStore.set("echomind_openai_key", openaiKey.trim());
+  const handleSaveKeys = async () => {
+    await CredentialStore.set("echomind_groq_key", groqKey.trim());
+    await CredentialStore.set("echomind_gemini_key", geminiKey.trim());
+    await CredentialStore.set("echomind_openai_key", openaiKey.trim());
 
     localStorage.setItem(
       "echomind_ollama_endpoint",
@@ -383,9 +412,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         : "Sistem";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200 cursor-pointer"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+    >
       <div
-        className="w-full max-w-xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-6 relative overflow-hidden flex flex-col gap-5 text-slate-100 max-h-[90vh] overflow-y-auto"
+        className="w-full max-w-xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-6 relative overflow-hidden flex flex-col gap-5 text-slate-100 max-h-[90vh] overflow-y-auto cursor-default"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -444,7 +480,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             }`}
           >
             <Key className="w-4 h-4" />
-            {t("settings.tabApiKeys")}
+            <span>{t("settings.tabApiKeys")}</span>
+            {isParanoid && (
+              <span className="flex items-center gap-1 text-[9px] bg-purple-950/80 border border-purple-500/40 text-purple-300 px-1.5 py-0.5 rounded-full font-mono">
+                <Lock className="w-2.5 h-2.5" />
+                <span>Kilitli</span>
+              </span>
+            )}
           </button>
           <button
             onClick={() => setActiveTab("language")}
@@ -528,48 +570,187 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
             </div>
 
-            {/* Automatic Native System Audio & Mic Capture */}
-            <div className="p-4 rounded-xl bg-gradient-to-b from-cyan-950/20 to-slate-950/60 border border-cyan-500/20 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="p-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-400">
-                    <Sparkles className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-white text-xs">
-                      Akıllı Çift Yönlü Ses Kaydı (Otomatik Miksaj)
-                    </h4>
-                    <p className="text-[10px] text-slate-400">
-                      Ekstra sürücü veya sanal aygıt kurulumu gerektirmez
-                    </p>
-                  </div>
-                </div>
-                <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-medium text-[10px] flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                  Aktif & Optimize
-                </span>
-              </div>
+            {/* Dynamic System Audio & Loopback Status Card */}
+            {(() => {
+              const selectedDev = (audioDevices || []).find(
+                (d) => d.name === selectedAudioDevice,
+              );
+              const isLoopbackActive = selectedDev?.is_loopback ?? false;
+              const hasAnyLoopback = (audioDevices || []).some(
+                (d) => d.is_loopback,
+              );
 
-              <p className="text-slate-300 text-[11px] leading-relaxed">
-                EchoMind; Google Meet, Zoom, Teams ve Discord görüşmelerinde{" "}
-                <strong>
-                  kendi sesiniz ile toplantıdaki diğer katılımcıların sesini
-                </strong>{" "}
-                yerel işletim sistemi API'si üzerinden otomatik olarak
-                birleştirir ve net bir şekilde yazıya döker.
-              </p>
+              return (
+                <div className="p-4 rounded-xl bg-gradient-to-b from-slate-900/90 to-slate-950/80 border border-slate-800 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div
+                        className={`p-1.5 rounded-lg border ${
+                          isLoopbackActive
+                            ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+                            : "bg-cyan-500/10 border-cyan-500/20 text-cyan-400"
+                        }`}
+                      >
+                        {isLoopbackActive ? (
+                          <Volume2 className="w-4 h-4" />
+                        ) : (
+                          <Mic className="w-4 h-4" />
+                        )}
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-white text-xs">
+                          {isLoopbackActive
+                            ? "Sistem Sesi + Mikrofon (Çift Yönlü Kayıt Aktif)"
+                            : "Mikrofon Ses Kaydı"}
+                        </h4>
+                        <p className="text-[10px] text-slate-400">
+                          {isLoopbackActive
+                            ? "Sanal ses döngüsü (Loopback) devrede; karşı tarafın konuşmaları net kaydediliyor."
+                            : "Şu an doğrudan mikrofon girişiniz dinleniyor."}
+                        </p>
+                      </div>
+                    </div>
+                    <span
+                      className={`px-2 py-0.5 rounded-full font-medium text-[10px] flex items-center gap-1.5 ${
+                        isLoopbackActive
+                          ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400"
+                          : "bg-amber-500/10 border border-amber-500/20 text-amber-400"
+                      }`}
+                    >
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full ${
+                          isLoopbackActive ? "bg-emerald-400" : "bg-amber-400"
+                        }`}
+                      />
+                      {isLoopbackActive ? "Loopback Aktif" : "Sadece Mikrofon"}
+                    </span>
+                  </div>
 
-              <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-400 pt-1">
-                <div className="p-2 rounded-lg bg-slate-900/60 border border-slate-800 flex items-center gap-2">
-                  <Mic className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                  <span>Sizin Sesiniz: Seçili Giriş Aygıtı</span>
+                  {!isLoopbackActive && (
+                    <div className="p-3 rounded-lg bg-amber-950/20 border border-amber-500/20 text-amber-300 text-[11px] space-y-1.5 leading-relaxed">
+                      <p className="font-medium text-amber-200 flex items-center gap-1.5">
+                        <span>💡</span> Toplantıda Karşı Tarafın Sesini Kaydetme
+                        İpucu:
+                      </p>
+                      <p className="text-[10.5px] text-amber-300/90">
+                        Kulaklık kullandığınızda bilgisayarınızdan çalan diğer
+                        katılımcıların sesi standart mikrofona ulaşmaz. Karşı
+                        tarafın sesini de doğrudan yazıya dökmek için{" "}
+                        <strong>BlackHole (macOS)</strong>,{" "}
+                        <strong>VB-Cable</strong> veya{" "}
+                        <strong>Stereo Mix</strong> sanal aygıtını
+                        seçebilirsiniz.
+                      </p>
+                      {hasAnyLoopback && (
+                        <p className="text-[10px] text-emerald-300 font-semibold pt-0.5">
+                          ✓ Sisteminizde sanal ses aygıtı bulundu! Yukarıdaki
+                          listeden Loopback aygıtını seçebilirsiniz.
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-400 pt-1">
+                    <div className="p-2 rounded-lg bg-slate-900/60 border border-slate-800 flex items-center gap-2">
+                      <Mic className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                      <span>Sizin Sesiniz: Aktif Giriş</span>
+                    </div>
+                    <div className="p-2 rounded-lg bg-slate-900/60 border border-slate-800 flex items-center gap-2">
+                      <Volume2 className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                      <span>
+                        {isLoopbackActive
+                          ? "Sistem Sesi: Loopback Devrede"
+                          : "Sistem Sesi: Hoparlör/Ortam"}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Loopback Actions and Controls */}
+                  <div className="pt-2 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleTestAudio}
+                        disabled={isAudioTesting}
+                        data-testid="settings-audio-test-btn"
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition ${
+                          isAudioTesting
+                            ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 animate-pulse"
+                            : "bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700"
+                        }`}
+                      >
+                        <Radio
+                          className={`w-3.5 h-3.5 ${isAudioTesting ? "text-cyan-400 animate-spin" : "text-slate-400"}`}
+                        />
+                        <span>
+                          {isAudioTesting
+                            ? "Ses Test Ediliyor (VU Dinleniyor)..."
+                            : "Giriş Sesini Test Et (5 sn)"}
+                        </span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleOpenAudioMidiSetup}
+                        className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-medium flex items-center gap-1.5 transition"
+                        title="İşletim sistemi ses denetim masasını veya Audio MIDI Setup'ı aç"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
+                        <span>Sistem Ses Panelini Aç</span>
+                      </button>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowLoopbackGuide(!showLoopbackGuide)}
+                      className="text-[11px] text-cyan-400 hover:text-cyan-300 underline underline-offset-2 transition"
+                    >
+                      {showLoopbackGuide
+                        ? "Kurulum Yönergesini Gizle"
+                        : "Loopback / BlackHole Kurulum Yönergesi"}
+                    </button>
+                  </div>
+
+                  {showLoopbackGuide && (
+                    <div className="p-3 rounded-lg bg-slate-950 border border-slate-800 text-[11px] text-slate-300 space-y-2 leading-relaxed">
+                      <h5 className="font-semibold text-white flex items-center gap-1.5">
+                        <Volume2 className="w-3.5 h-3.5 text-cyan-400" />
+                        <span>
+                          Sistem Sesi ve Karşı Taraf Sesini Yakalama Rehberi
+                        </span>
+                      </h5>
+                      <ul className="list-disc list-inside space-y-1 text-slate-400">
+                        <li>
+                          <strong className="text-slate-200">macOS:</strong>{" "}
+                          <code className="px-1 py-0.5 rounded bg-slate-900 text-cyan-300">
+                            brew install blackhole-2ch
+                          </code>{" "}
+                          kurup, <em>Audio MIDI Setup</em> üzerinden hem
+                          kulaklığınızı hem de BlackHole'u içeren bir{" "}
+                          <em>"Çoklu Çıkış Aygıtı (Multi-Output Device)"</em>{" "}
+                          oluşturun.
+                        </li>
+                        <li>
+                          <strong className="text-slate-200">Windows:</strong>{" "}
+                          Denetim Masası &gt; Ses &gt; Kayıt sekmesinde{" "}
+                          <em>Stereo Karışımı (Stereo Mix)</em> veya{" "}
+                          <em>VB-Audio Cable</em> sanal kablosunu
+                          varsayılan/seçili yapın.
+                        </li>
+                        <li>
+                          <strong className="text-slate-200">Linux:</strong>{" "}
+                          <code className="px-1 py-0.5 rounded bg-slate-900 text-cyan-300">
+                            pavucontrol
+                          </code>{" "}
+                          açarak EchoMind giriş aygıtını "Monitor of Built-in
+                          Audio" olarak yönlendirin.
+                        </li>
+                      </ul>
+                    </div>
+                  )}
                 </div>
-                <div className="p-2 rounded-lg bg-slate-900/60 border border-slate-800 flex items-center gap-2">
-                  <Volume2 className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                  <span>Katılımcılar: Otomatik Sistem Sesi</span>
-                </div>
-              </div>
-            </div>
+              );
+            })()}
           </div>
         )}
 
@@ -756,7 +937,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <div className="flex items-center justify-between text-slate-400">
                 <span>Veri Güvenliği:</span>
                 <span className="text-slate-200">
-                  Sesleriniz ve toplantılarınız asla dışarı gönderilmez.
+                  {isParanoid
+                    ? "Paranoid Mod: %100 Cihazınızda Gizli, sıfır bulut çıkışı."
+                    : "Yerel modellerde %100 gizli; bulut kullanımında açık onay istenir."}
                 </span>
               </div>
               {modelStatus && (
@@ -892,7 +1075,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   {t("updater.checkNowButton") || "Uygulama Güncellemeleri"}
                 </span>
                 <span className="text-[10px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 px-2 py-0.5 rounded-full font-bold">
-                  v0.2.2
+                  v0.2.4
                 </span>
               </div>
 
@@ -930,8 +1113,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400 font-medium">
                       <Check className="w-3.5 h-3.5" />
                       {t("updater.upToDateDesc", {
-                        version: updateStatus.version || "v0.2.2",
-                      }) || "EchoMind güncel (v0.2.2)."}
+                        version: updateStatus.version || "v0.2.4",
+                      }) || "EchoMind güncel (v0.2.4)."}
                     </span>
                   )}
                   {updateStatus.state === "updateAvailable" && (
@@ -1077,16 +1260,49 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               )}
             </div>
 
+            {isParanoid && (
+              <div
+                data-testid="settings-paranoid-cloud-banner"
+                className="p-3.5 rounded-xl bg-purple-950/60 border border-purple-500/40 text-purple-200 text-xs flex items-start gap-2.5 animate-in fade-in"
+              >
+                <ShieldAlert className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
+                <div>
+                  <div className="font-semibold text-purple-300">
+                    Air-Gapped / Paranoid Mod Aktif
+                  </div>
+                  <div className="text-[11px] text-purple-300/80 mt-0.5">
+                    Bu mod devredeyken harici bulut API çağrıları (Groq, Gemini,
+                    OpenAI) Rust backend seviyesinde tamamen engellenmiştir.
+                    Aşağıdaki anahtarlar yalnızca Dengeli veya Maksimum Zeka
+                    moduna geçtiğinizde etkinleşir.
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Groq Cloud */}
-            <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-2.5">
+            <div
+              className={`p-3.5 rounded-xl bg-slate-950/60 space-y-2.5 border transition ${
+                isParanoid
+                  ? "opacity-50 pointer-events-none filter grayscale select-none border-purple-900/30"
+                  : "border-slate-800/80"
+              }`}
+            >
               <div className="flex items-center justify-between">
                 <label className="font-semibold text-white flex items-center gap-1.5">
                   <Zap className="w-4 h-4 text-amber-400" /> Groq (Yıldırım Hızı
                   - 10 Saniyede)
                 </label>
-                <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded">
-                  Ücretsiz & Ultra Hızlı
-                </span>
+                <div className="flex items-center gap-1.5">
+                  {isParanoid && (
+                    <span className="text-[10px] bg-purple-950/80 text-purple-300 border border-purple-500/40 px-1.5 py-0.5 rounded font-mono flex items-center gap-1">
+                      <Lock className="w-2.5 h-2.5" /> Kilitli
+                    </span>
+                  )}
+                  <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded">
+                    Ücretsiz & Ultra Hızlı
+                  </span>
+                </div>
               </div>
               <div className="relative">
                 <input
@@ -1097,7 +1313,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   onChange={(e) => {
                     const val = e.target.value;
                     setGroqKey(val);
-                    localStorage.setItem("echomind_groq_key", val.trim());
                   }}
                   placeholder="gsk_..."
                   className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs font-mono text-slate-200 pr-10 focus:outline-none focus:border-amber-500"
@@ -1149,15 +1364,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
 
             {/* Google Gemini */}
-            <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-2.5">
+            <div
+              className={`p-3.5 rounded-xl bg-slate-950/60 space-y-2.5 border transition ${
+                isParanoid
+                  ? "opacity-50 pointer-events-none filter grayscale select-none border-purple-900/30"
+                  : "border-slate-800/80"
+              }`}
+            >
               <div className="flex items-center justify-between">
                 <label className="font-semibold text-white flex items-center gap-1.5">
                   <Sparkles className="w-4 h-4 text-cyan-400" /> Google Gemini
                   (Flash & Pro Ailesi)
                 </label>
-                <span className="text-[10px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 px-1.5 py-0.5 rounded">
-                  Üst Düzey Zeka
-                </span>
+                <div className="flex items-center gap-1.5">
+                  {isParanoid && (
+                    <span className="text-[10px] bg-purple-950/80 text-purple-300 border border-purple-500/40 px-1.5 py-0.5 rounded font-mono flex items-center gap-1">
+                      <Lock className="w-2.5 h-2.5" /> Kilitli
+                    </span>
+                  )}
+                  <span className="text-[10px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 px-1.5 py-0.5 rounded">
+                    Üst Düzey Zeka
+                  </span>
+                </div>
               </div>
               <div className="relative">
                 <input
@@ -1168,7 +1396,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   onChange={(e) => {
                     const val = e.target.value;
                     setGeminiKey(val);
-                    localStorage.setItem("echomind_gemini_key", val.trim());
                   }}
                   placeholder="AIzaSy..."
                   className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs font-mono text-slate-200 pr-10 focus:outline-none focus:border-cyan-500"
@@ -1220,15 +1447,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
 
             {/* OpenAI */}
-            <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-2.5">
+            <div
+              className={`p-3.5 rounded-xl bg-slate-950/60 space-y-2.5 border transition ${
+                isParanoid
+                  ? "opacity-50 pointer-events-none filter grayscale select-none border-purple-900/30"
+                  : "border-slate-800/80"
+              }`}
+            >
               <div className="flex items-center justify-between">
                 <label className="font-semibold text-white flex items-center gap-1.5">
                   <Cpu className="w-4 h-4 text-emerald-400" /> OpenAI (Whisper &
                   GPT-4o Audio)
                 </label>
-                <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-1.5 py-0.5 rounded">
-                  Küresel Standart
-                </span>
+                <div className="flex items-center gap-1.5">
+                  {isParanoid && (
+                    <span className="text-[10px] bg-purple-950/80 text-purple-300 border border-purple-500/40 px-1.5 py-0.5 rounded font-mono flex items-center gap-1">
+                      <Lock className="w-2.5 h-2.5" /> Kilitli
+                    </span>
+                  )}
+                  <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-1.5 py-0.5 rounded">
+                    Küresel Standart
+                  </span>
+                </div>
               </div>
               <div className="relative">
                 <input
@@ -1239,7 +1479,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   onChange={(e) => {
                     const val = e.target.value;
                     setOpenaiKey(val);
-                    localStorage.setItem("echomind_openai_key", val.trim());
                   }}
                   placeholder="sk-proj-..."
                   className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs font-mono text-slate-200 pr-10 focus:outline-none focus:border-emerald-500"

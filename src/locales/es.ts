@@ -61,6 +61,9 @@ export const es: TranslationKeys = {
     retranscribe: "Retranscribir",
     retranscribeTooltip:
       "Vuelve a procesar el audio con un modelo de IA diferente",
+    lowQualityWarningTitle: "Advertencia de Fiabilidad de Transcripción:",
+    lowQualityWarningDesc:
+      "Se detectaron señales débiles de voz o repeticiones en esta grabación. La precisión puede verse comprometida.",
     shareReport: "Compartir / Exportar",
     shareReportTooltip: "Exporta las notas a PDF, Slack, E-Mail o Markdown",
     fillerFilter: {
@@ -370,7 +373,6 @@ export const es: TranslationKeys = {
     completed: "Paquete de instalación listo",
     completedDesc: "Se ha iniciado el instalador. Finalizando actualización...",
     downloadFailed: "Error al descargar la actualización.",
-    manualDownloadFallback: "Descargar directamente desde GitHub",
     remindLater: "Recordármelo más tarde",
     dontShowAgainForVersion: "No volver a mostrar esta versión al iniciar",
     autoCheckToggle: "Buscar actualizaciones automáticamente al iniciar",

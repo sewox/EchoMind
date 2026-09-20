@@ -119,6 +119,59 @@ describe("MeetingIslandWindow Component", () => {
       await new Promise((r) => setTimeout(r, 20));
     });
     expect(invoke).toHaveBeenCalledWith("hide_island_window");
+    expect(screen.getByTestId("island-status-badge")).toHaveTextContent(
+      "Beklemede",
+    );
+  });
+
+  it("transitions to idle/Beklemede when periodic heartbeat detects no active apps", async () => {
+    vi.useFakeTimers();
+    let currentStatus = {
+      is_active: true,
+      detected_apps: [
+        {
+          app_id: "meet",
+          display_name: "Google Meet",
+          process_name: "Google Chrome",
+          is_running: true,
+          recommended_title: "Google Meet",
+        },
+      ],
+    };
+
+    vi.mocked(invoke).mockImplementation((cmd: string) => {
+      if (cmd === "get_detector_status") {
+        return Promise.resolve(currentStatus);
+      }
+      return Promise.resolve();
+    });
+
+    render(<MeetingIslandWindow />);
+
+    await act(async () => {
+      vi.advanceTimersByTime(50);
+    });
+
+    expect(screen.getByTestId("island-status-badge")).toHaveTextContent(
+      "Aktif",
+    );
+
+    // Meet closes, next heartbeat receives empty apps
+    currentStatus = {
+      is_active: false,
+      detected_apps: [],
+    };
+
+    await act(async () => {
+      vi.advanceTimersByTime(2100);
+    });
+
+    expect(screen.getByTestId("island-status-badge")).toHaveTextContent(
+      "Beklemede",
+    );
+    expect(invoke).toHaveBeenCalledWith("hide_island_window");
+
+    vi.useRealTimers();
   });
 
   it("handles start and auto-start error catch blocks gracefully", async () => {

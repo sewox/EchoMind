@@ -5,6 +5,14 @@ use std::time::Duration;
 use sysinfo::System;
 use tauri::{AppHandle, Emitter, Manager};
 
+/// Escapes a value for safe interpolation inside a double-quoted AppleScript string literal.
+/// All current callers pass hardcoded app names, but this closes the injection path
+/// (e.g. `do shell script` via an unescaped quote/backslash) for any future caller that doesn't.
+#[cfg(target_os = "macos")]
+fn escape_applescript_string(input: &str) -> String {
+    input.replace('\\', "\\\\").replace('"', "\\\"")
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct MeetingAppInfo {
     pub app_id: String,
@@ -54,6 +62,12 @@ pub struct MeetingDetector {
     pub settings: Arc<Mutex<DetectorSettings>>,
 }
 
+impl Default for MeetingDetector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MeetingDetector {
     pub fn new() -> Self {
         Self {
@@ -99,11 +113,7 @@ impl MeetingDetector {
                     "webexmta",
                 ],
             ),
-            (
-                "slack",
-                "Slack",
-                vec!["slack.exe", "slack"],
-            ),
+            ("slack", "Slack", vec!["slack.exe", "slack"]),
             (
                 "discord",
                 "Discord",
@@ -114,11 +124,7 @@ impl MeetingDetector {
                 "Skype",
                 vec!["skype.exe", "skype", "skypeforlinux"],
             ),
-            (
-                "facetime",
-                "Apple FaceTime",
-                vec!["facetime"],
-            ),
+            ("facetime", "Apple FaceTime", vec!["facetime"]),
         ];
 
         let mut results = Vec::new();
@@ -129,7 +135,7 @@ impl MeetingDetector {
             let mut found = false;
             let mut matched_proc_name = String::new();
 
-            for (_pid, process) in sys.processes() {
+            for process in sys.processes().values() {
                 let proc_name = process.name().to_string_lossy().to_lowercase();
                 let base_name = proc_name.strip_suffix(".exe").unwrap_or(&proc_name);
 
@@ -179,24 +185,39 @@ impl MeetingDetector {
         // 2. Scan Browser-based Meetings (Google Meet, Teams Web, Zoom Web) via AppleScript on macOS
         #[cfg(target_os = "macos")]
         {
-            let browser_apps = vec![
-                "Google Chrome",
-                "Arc",
-                "Brave Browser",
-                "Microsoft Edge",
-                "Safari",
+            let browser_candidates = vec![
+                ("Google Chrome", vec!["chrome", "google chrome"]),
+                ("Arc", vec!["arc"]),
+                ("Brave Browser", vec!["brave", "brave browser"]),
+                ("Microsoft Edge", vec!["edge", "microsoft edge", "msedge"]),
+                ("Safari", vec!["safari"]),
             ];
 
-            for browser in browser_apps {
+            // Only query browsers that are actually running to avoid heavy osascript spawn overhead
+            let running_browsers: Vec<&str> = browser_candidates
+                .into_iter()
+                .filter(|(_browser_name, match_names)| {
+                    sys.processes().values().any(|p| {
+                        let pname = p.name().to_string_lossy().to_lowercase();
+                        match_names
+                            .iter()
+                            .any(|m| pname == *m || pname.starts_with(m))
+                    })
+                })
+                .map(|(b, _)| b)
+                .collect();
+
+            for browser in running_browsers {
+                let safe_browser = escape_applescript_string(browser);
                 let script = if browser == "Safari" {
                     format!(
                         "tell application \"{}\" to if running then get {{name, URL}} of tabs of every window",
-                        browser
+                        safe_browser
                     )
                 } else {
                     format!(
                         "tell application \"{}\" to if running then get {{title, URL}} of tabs of every window & name of every window",
-                        browser
+                        safe_browser
                     )
                 };
 
@@ -207,7 +228,7 @@ impl MeetingDetector {
                     if output.status.success() {
                         let raw_stdout = String::from_utf8_lossy(&output.stdout);
                         let titles_str = raw_stdout.to_lowercase();
-                        
+
                         // Google Meet Detection (Active In-Call Verification)
                         if titles_str.contains("meet.google.com")
                             || titles_str.contains("meet –")
@@ -215,11 +236,13 @@ impl MeetingDetector {
                             || titles_str.contains("google meet")
                         {
                             let meeting_code = raw_stdout
-                                .split(|c: char| c == ',' || c == ' ' || c == '\n')
+                                .split([',', ' ', '\n'])
                                 .find(|chunk| chunk.contains("meet.google.com/"))
                                 .and_then(|url| url.split("meet.google.com/").nth(1))
                                 .map(|code| code.split('?').next().unwrap_or(code))
-                                .map(|code| code.trim_matches(|c: char| !c.is_alphanumeric() && c != '-'))
+                                .map(|code| {
+                                    code.trim_matches(|c: char| !c.is_alphanumeric() && c != '-')
+                                })
                                 .filter(|s| !s.is_empty())
                                 .unwrap_or("");
 
@@ -229,18 +252,45 @@ impl MeetingDetector {
                                 || meeting_code == "new"
                                 || meeting_code.starts_with("_meet")
                                 || titles_str.contains("ayrıldınız")
+                                || titles_str.contains("ayrıldın")
+                                || titles_str.contains("toplantıdan ayrıldınız")
+                                || titles_str.contains("görüşmeden ayrıldınız")
                                 || titles_str.contains("left the meeting")
                                 || titles_str.contains("left the call")
+                                || titles_str.contains("you left the")
+                                || titles_str.contains("you've left")
+                                || titles_str.contains("left the video call")
                                 || titles_str.contains("görüşme sonlandırıldı")
+                                || titles_str.contains("görüşme sona erdi")
+                                || titles_str.contains("toplantı sona erdi")
+                                || titles_str.contains("sona erdi")
                                 || titles_str.contains("görüşmeden çıktınız")
+                                || titles_str.contains("toplantı sonlandırıldı")
+                                || titles_str.contains("toplantı bitti")
+                                || titles_str.contains("call ended")
+                                || titles_str.contains("meeting ended")
+                                || titles_str.contains("the call has ended")
+                                || titles_str.contains("besprechung beendet")
+                                || titles_str.contains("reunión finalizada")
+                                || titles_str.contains("réunion terminée")
                                 || titles_str.contains("katılmaya hazır")
-                                || titles_str.contains("ana sayfa");
+                                || titles_str.contains("ready to join")
+                                || titles_str.contains("ana sayfa")
+                                || titles_str.contains("rejoin")
+                                || titles_str.contains("tekrar katıl")
+                                || titles_str.contains("return to home screen")
+                                || titles_str.contains("ana ekrana dön");
 
-                            let is_valid_room = !is_left_or_home && (meeting_code.contains('-') || meeting_code.len() >= 9);
+                            let is_valid_room = !is_left_or_home
+                                && (meeting_code.contains('-') || meeting_code.len() >= 9);
 
                             if is_valid_room && !results.iter().any(|r| r.app_id == "meet") {
-                                let proc_name = format!("{} (Google Meet - {})", browser, meeting_code);
-                                let rec_title = format!("Google Meet Toplantısı ({}) - {}", meeting_code, date_str);
+                                let proc_name =
+                                    format!("{} (Google Meet - {})", browser, meeting_code);
+                                let rec_title = format!(
+                                    "Google Meet Toplantısı ({}) - {}",
+                                    meeting_code, date_str
+                                );
 
                                 results.push(MeetingAppInfo {
                                     app_id: "meet".to_string(),
@@ -265,7 +315,10 @@ impl MeetingDetector {
                                 display_name: "Microsoft Teams (Web)".to_string(),
                                 process_name: format!("{} (Teams)", browser),
                                 is_running: true,
-                                recommended_title: format!("Microsoft Teams Toplantısı - {}", date_str),
+                                recommended_title: format!(
+                                    "Microsoft Teams Toplantısı - {}",
+                                    date_str
+                                ),
                             });
                         }
                     }
@@ -471,7 +524,7 @@ impl MeetingDetector {
         let settings_clone = self.settings.clone();
 
         thread::spawn(move || {
-            println!("🔍 Toplantı ve Ses Algılama Servisi Başlatıldı (1.5s Hızlı Tepki).");
+            println!("🔍 Toplantı ve Ses Algılama Servisi Başlatıldı (1.0s Hızlı Tepki).");
             let mut last_detected_id = String::new();
             let mut consecutive_misses: u32 = 0;
             let mut previous_apps: Vec<MeetingAppInfo> = Vec::new();
@@ -483,7 +536,7 @@ impl MeetingDetector {
                 };
 
                 if !current_settings.enabled {
-                    thread::sleep(Duration::from_millis(1500));
+                    thread::sleep(Duration::from_millis(1000));
                     continue;
                 }
 
@@ -503,11 +556,17 @@ impl MeetingDetector {
                 if current_count > 0 {
                     consecutive_misses = 0;
                     let current_primary = &filtered_active[0];
-                    let current_id = format!("{}-{}", current_primary.app_id, current_primary.process_name);
+                    let current_id = format!(
+                        "{}-{}",
+                        current_primary.app_id, current_primary.process_name
+                    );
 
                     let is_dismissed = {
                         let dismissed = get_dismissed_session().lock().unwrap();
-                        dismissed.as_ref().map(|d| d == &current_id).unwrap_or(false)
+                        dismissed
+                            .as_ref()
+                            .map(|d| d == &current_id)
+                            .unwrap_or(false)
                     };
 
                     // Check if new meeting session or title changed
@@ -517,44 +576,15 @@ impl MeetingDetector {
                         last_detected_id = current_id.clone();
                     }
 
-                    let is_recording_now = crate::audio::get_global_audio_engine().get_status().is_recording;
+                    let is_recording_now = crate::audio::get_global_audio_engine()
+                        .get_status()
+                        .is_recording;
 
                     if let Some(ref handle) = app_handle {
+                        // Keep island hidden by default to avoid overlaying and blocking main window clicks
                         if let Some(island_win) = handle.get_webview_window("island") {
                             let is_visible = island_win.is_visible().unwrap_or(false);
-                            if !is_recording_now && should_trigger && !is_dismissed {
-                                let bounds_opt = Self::get_target_meeting_window_bounds();
-                                let island_clone = island_win.clone();
-                                let _ = handle.run_on_main_thread(move || {
-                                    if let Some((left, top, win_w, _win_h)) = bounds_opt {
-                                        let target_x = left + (win_w - 560.0) / 2.0;
-                                        let target_y = top + 15.0;
-                                        let _ = island_clone.set_position(tauri::Position::Logical(tauri::LogicalPosition { x: target_x, y: target_y }));
-                                    } else if let Ok(Some(monitor)) = island_clone.current_monitor() {
-                                        let scale = monitor.scale_factor();
-                                        let mon_x = monitor.position().x as f64 / scale;
-                                        let mon_y = monitor.position().y as f64 / scale;
-                                        let mon_w = monitor.size().width as f64 / scale;
-                                        let target_x = mon_x + (mon_w - 560.0) / 2.0;
-                                        let target_y = mon_y + 15.0;
-                                        let _ = island_clone.set_position(tauri::Position::Logical(tauri::LogicalPosition { x: target_x, y: target_y }));
-                                    }
-                                    let _ = island_clone.show();
-                                    let _ = island_clone.set_always_on_top(true);
-
-                                    #[cfg(target_os = "macos")]
-                                    {
-                                        use objc::{msg_send, sel, sel_impl};
-                                        if let Ok(ns_window) = island_clone.ns_window() {
-                                            let ns_window_ptr = ns_window as *mut objc::runtime::Object;
-                                            unsafe {
-                                                let () = msg_send![ns_window_ptr, setLevel: 101i64];
-                                                let () = msg_send![ns_window_ptr, orderFrontRegardless];
-                                            }
-                                        }
-                                    }
-                                });
-                            } else if is_recording_now && is_visible {
+                            if is_recording_now && is_visible {
                                 let island_clone = island_win.clone();
                                 let _ = handle.run_on_main_thread(move || {
                                     let _ = island_clone.hide();
@@ -563,12 +593,16 @@ impl MeetingDetector {
                         }
 
                         if should_trigger && !is_dismissed {
-                            println!("🚀 Toplantı Tespit Edildi: {} ({})", current_primary.display_name, current_primary.process_name);
+                            println!(
+                                "🚀 Toplantı Tespit Edildi: {} ({})",
+                                current_primary.display_name, current_primary.process_name
+                            );
                             let _ = handle.emit("meeting-detected", &filtered_active);
 
                             #[cfg(target_os = "macos")]
                             {
-                                let app_name = &current_primary.display_name;
+                                let app_name =
+                                    escape_applescript_string(&current_primary.display_name);
                                 let notif_script = format!(
                                     "display notification \"{} toplantısı başladı. Kaydı başlatmak için tıklayın.\" with title \"EchoMind Asistan\" subtitle \"Toplantı Başladı\" sound name \"Glass\"",
                                     app_name
@@ -583,8 +617,8 @@ impl MeetingDetector {
                     previous_apps = filtered_active;
                 } else {
                     consecutive_misses += 1;
-                    // Debounce misses: end meeting after 3 consecutive empty cycles (4.5 seconds)
-                    if consecutive_misses >= 3 && !last_detected_id.is_empty() {
+                    // End meeting immediately on 1 missed cycle (1-2 seconds response, well under 5s requirement)
+                    if consecutive_misses >= 1 && !last_detected_id.is_empty() {
                         last_detected_id.clear();
                         {
                             let mut dismissed = get_dismissed_session().lock().unwrap();
@@ -594,20 +628,28 @@ impl MeetingDetector {
                             let engine = crate::audio::get_global_audio_engine();
                             if engine.get_status().is_recording {
                                 println!("🛑 Otomatik Kayıt Durdurma Sinyali (Toplantı Kapandı).");
+                                let _ = engine.stop();
+                                if let Some(ref handle) = app_handle {
+                                    let _ = handle.emit("trigger-stop-recording", ());
+                                }
                             }
                         }
                         if let Some(ref handle) = app_handle {
                             let _ = handle.emit("meeting-ended", &previous_apps);
-                            let _ = handle.emit("trigger-stop-recording", ());
                             if let Some(island_win) = handle.get_webview_window("island") {
-                                let _ = island_win.hide();
+                                let island_clone = island_win.clone();
+                                let _ = handle.run_on_main_thread(move || {
+                                    let _ = island_clone.hide();
+                                });
                             }
                         }
-                        println!("🛑 Toplantı Sona Erdi (4.5s doğrulandı), bitiş sinyali iletildi.");
+                        println!(
+                            "🛑 Toplantı Sona Erdi (< 3s doğrulandı), bitiş sinyali iletildi."
+                        );
                     }
                 }
 
-                thread::sleep(Duration::from_millis(1500));
+                thread::sleep(Duration::from_millis(1000));
             }
 
             println!("🛑 Toplantı Algılama Servisi Durduruldu.");
@@ -691,7 +733,11 @@ pub fn show_island_window(app_handle: AppHandle) -> Result<(), String> {
             if let Some((left, top, win_w, _win_h)) = bounds_opt {
                 let target_x = left + (win_w - 560.0) / 2.0;
                 let target_y = top + 15.0;
-                let _ = island_clone.set_position(tauri::Position::Logical(tauri::LogicalPosition { x: target_x, y: target_y }));
+                let _ =
+                    island_clone.set_position(tauri::Position::Logical(tauri::LogicalPosition {
+                        x: target_x,
+                        y: target_y,
+                    }));
             } else if let Ok(Some(monitor)) = island_clone.current_monitor() {
                 let scale = monitor.scale_factor();
                 let mon_x = monitor.position().x as f64 / scale;
@@ -699,22 +745,14 @@ pub fn show_island_window(app_handle: AppHandle) -> Result<(), String> {
                 let mon_w = monitor.size().width as f64 / scale;
                 let target_x = mon_x + (mon_w - 560.0) / 2.0;
                 let target_y = mon_y + 15.0;
-                let _ = island_clone.set_position(tauri::Position::Logical(tauri::LogicalPosition { x: target_x, y: target_y }));
+                let _ =
+                    island_clone.set_position(tauri::Position::Logical(tauri::LogicalPosition {
+                        x: target_x,
+                        y: target_y,
+                    }));
             }
             let _ = island_clone.show();
             let _ = island_clone.set_always_on_top(true);
-
-            #[cfg(target_os = "macos")]
-            {
-                use objc::{msg_send, sel, sel_impl};
-                if let Ok(ns_window) = island_clone.ns_window() {
-                    let ns_window_ptr = ns_window as *mut objc::runtime::Object;
-                    unsafe {
-                        let () = msg_send![ns_window_ptr, setLevel: 101i64];
-                        let () = msg_send![ns_window_ptr, orderFrontRegardless];
-                    }
-                }
-            }
         });
     }
     Ok(())
@@ -759,11 +797,11 @@ mod tests {
     fn test_detector_status_and_settings() {
         let detector = MeetingDetector::new();
         let status = detector.get_status();
-        assert_eq!(status.is_active, false);
+        assert!(!status.is_active);
         assert_eq!(status.active_count, 0);
-        assert_eq!(status.settings.enabled, true);
-        assert_eq!(status.settings.auto_start_record, false);
-        assert_eq!(status.settings.auto_stop_on_app_close, true);
+        assert!(status.settings.enabled);
+        assert!(!status.settings.auto_start_record);
+        assert!(status.settings.auto_stop_on_app_close);
 
         // Update settings
         let updated = detector.update_settings(DetectorSettings {
@@ -773,8 +811,8 @@ mod tests {
             ignored_apps: vec!["discord".to_string()],
         });
 
-        assert_eq!(updated.settings.auto_start_record, true);
-        assert_eq!(updated.settings.auto_stop_on_app_close, false);
+        assert!(updated.settings.auto_start_record);
+        assert!(!updated.settings.auto_stop_on_app_close);
         assert_eq!(updated.settings.ignored_apps, vec!["discord".to_string()]);
     }
 }

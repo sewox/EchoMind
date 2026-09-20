@@ -50,7 +50,10 @@ describe("useLiveSuggestions Hook", () => {
     });
 
     expect(result.current.suggestions).toEqual([]);
-    expect(invoke).not.toHaveBeenCalled();
+    expect(invoke).not.toHaveBeenCalledWith(
+      "generate_live_suggestions",
+      expect.anything(),
+    );
   });
 
   it("does not fetch suggestions when segments list is empty", () => {
@@ -60,19 +63,27 @@ describe("useLiveSuggestions Hook", () => {
     });
 
     expect(result.current.suggestions).toEqual([]);
-    expect(invoke).not.toHaveBeenCalled();
+    expect(invoke).not.toHaveBeenCalledWith(
+      "generate_live_suggestions",
+      expect.anything(),
+    );
   });
 
   it("fetches and sets suggestions when recording with new segments", async () => {
-    (invoke as any).mockResolvedValueOnce([
-      {
-        id: "sug-1",
-        category: "question",
-        text: "Tavan bütçeniz nedir?",
-        rationale: "Bütçe belirsizliğini netleştirin.",
-        timestamp_ms: 12345,
-      },
-    ]);
+    (invoke as any).mockImplementation((cmd: string) => {
+      if (cmd === "generate_live_suggestions") {
+        return Promise.resolve([
+          {
+            id: "sug-1",
+            category: "question",
+            text: "Tavan bütçeniz nedir?",
+            rationale: "Bütçe belirsizliğini netleştirin.",
+            timestamp_ms: 12345,
+          },
+        ]);
+      }
+      return Promise.resolve();
+    });
 
     const { result } = renderSuggestionsHook({
       isRecording: true,
@@ -97,22 +108,27 @@ describe("useLiveSuggestions Hook", () => {
   });
 
   it("dismisses single suggestion by ID", async () => {
-    (invoke as any).mockResolvedValueOnce([
-      {
-        id: "sug-1",
-        category: "question",
-        text: "Soru 1",
-        rationale: "Gerekçe 1",
-        timestamp_ms: 1,
-      },
-      {
-        id: "sug-2",
-        category: "action",
-        text: "Aksiyon 2",
-        rationale: "Gerekçe 2",
-        timestamp_ms: 2,
-      },
-    ]);
+    (invoke as any).mockImplementation((cmd: string) => {
+      if (cmd === "generate_live_suggestions") {
+        return Promise.resolve([
+          {
+            id: "sug-1",
+            category: "question",
+            text: "Soru 1",
+            rationale: "Gerekçe 1",
+            timestamp_ms: 1,
+          },
+          {
+            id: "sug-2",
+            category: "action",
+            text: "Aksiyon 2",
+            rationale: "Gerekçe 2",
+            timestamp_ms: 2,
+          },
+        ]);
+      }
+      return Promise.resolve();
+    });
 
     const { result } = renderSuggestionsHook({
       isRecording: true,
@@ -135,15 +151,20 @@ describe("useLiveSuggestions Hook", () => {
   });
 
   it("clears all suggestions", async () => {
-    (invoke as any).mockResolvedValueOnce([
-      {
-        id: "sug-1",
-        category: "insight",
-        text: "İpucu",
-        rationale: "Gerekçe",
-        timestamp_ms: 1,
-      },
-    ]);
+    (invoke as any).mockImplementation((cmd: string) => {
+      if (cmd === "generate_live_suggestions") {
+        return Promise.resolve([
+          {
+            id: "sug-1",
+            category: "insight",
+            text: "İpucu",
+            rationale: "Gerekçe",
+            timestamp_ms: 1,
+          },
+        ]);
+      }
+      return Promise.resolve();
+    });
 
     const { result } = renderSuggestionsHook({
       isRecording: true,
@@ -165,7 +186,12 @@ describe("useLiveSuggestions Hook", () => {
   });
 
   it("handles invoke errors gracefully without crashing", async () => {
-    (invoke as any).mockRejectedValueOnce(new Error("Engine failed"));
+    (invoke as any).mockImplementation((cmd: string) => {
+      if (cmd === "generate_live_suggestions") {
+        return Promise.reject(new Error("Engine failed"));
+      }
+      return Promise.resolve();
+    });
 
     const { result } = renderSuggestionsHook({
       isRecording: true,

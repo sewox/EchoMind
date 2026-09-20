@@ -60,6 +60,9 @@ export const tr: TranslationKeys = {
     retranscribe: "Yeniden Yazıya Dök",
     retranscribeTooltip:
       "Farklı bir yapay zeka modeliyle ses kaydını sıfırdan yeniden çözümler",
+    lowQualityWarningTitle: "Transkript Güvenilirlik Uyarısı:",
+    lowQualityWarningDesc:
+      "Bu ses kaydında zayıf dil sinyali veya tekrarlayan konuşma desenleri tespit edildi. Transkript güvenilirliği düşük olabilir. Daha yüksek doğruluk için Ayarlar'dan Whisper Small modelini kullanabilir veya dili manuel olarak seçebilirsiniz.",
     shareReport: "Raporu Paylaş / Dışa Aktar",
     shareReportTooltip:
       "Toplantı özetini PDF, Slack, E-Posta veya Markdown olarak dışa aktar",
@@ -376,7 +379,6 @@ export const tr: TranslationKeys = {
       "Uygulama yükleyicisi başlatıldı. Güncelleme tamamlanıyor...",
     downloadFailed:
       "Güncelleme indirilemedi. Lütfen bağlantınızı kontrol edin.",
-    manualDownloadFallback: "Doğrudan GitHub'dan İndir",
     remindLater: "Sonra Hatırlat",
     dontShowAgainForVersion: "Bu sürümü açılışta bir daha gösterme",
     autoCheckToggle: "Açılışta Güncellemeleri Otomatik Denetle",

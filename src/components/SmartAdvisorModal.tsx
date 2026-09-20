@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useI18n } from "../locales/i18nContext";
 import { usePrivacyMode } from "../hooks/usePrivacyMode";
+import { CredentialStore } from "../services/credentialStore";
 
 export interface PickedFileInfo {
   path: string;
@@ -58,12 +59,13 @@ export const SmartAdvisorModal: React.FC<SmartAdvisorModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      const storedGroq = localStorage.getItem("echomind_groq_key") || "";
-      const storedGemini = localStorage.getItem("echomind_gemini_key") || "";
-      const storedOpenai = localStorage.getItem("echomind_openai_key") || "";
-      setGroqKey(storedGroq);
-      setGeminiKey(storedGemini);
-      setOpenaiKey(storedOpenai);
+      CredentialStore.get("echomind_groq_key").then((k) => setGroqKey(k || ""));
+      CredentialStore.get("echomind_gemini_key").then((k) =>
+        setGeminiKey(k || ""),
+      );
+      CredentialStore.get("echomind_openai_key").then((k) =>
+        setOpenaiKey(k || ""),
+      );
       setShowKeyInputForm(false);
       setInlineKeyInput("");
       setImportLanguage("auto");
@@ -118,13 +120,13 @@ export const SmartAdvisorModal: React.FC<SmartAdvisorModalProps> = ({
     if (!trimmed) return;
 
     if (selectedCloudProvider === "groq") {
-      localStorage.setItem("echomind_groq_key", trimmed);
+      CredentialStore.set("echomind_groq_key", trimmed);
       setGroqKey(trimmed);
     } else if (selectedCloudProvider === "gemini") {
-      localStorage.setItem("echomind_gemini_key", trimmed);
+      CredentialStore.set("echomind_gemini_key", trimmed);
       setGeminiKey(trimmed);
     } else {
-      localStorage.setItem("echomind_openai_key", trimmed);
+      CredentialStore.set("echomind_openai_key", trimmed);
       setOpenaiKey(trimmed);
     }
 
@@ -144,9 +146,16 @@ export const SmartAdvisorModal: React.FC<SmartAdvisorModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200 cursor-pointer"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+    >
       <div
-        className="w-full max-w-xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-6 relative overflow-hidden flex flex-col gap-5 text-slate-100"
+        className="w-full max-w-xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-6 relative overflow-hidden flex flex-col gap-5 text-slate-100 cursor-default"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Glow Ambient */}

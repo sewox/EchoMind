@@ -70,8 +70,11 @@ impl LiveSuggestionEngine {
                 suggestions.push(LiveSuggestionItem {
                     id: format!("sug-cost-{}", now_ms),
                     category: "question".to_string(),
-                    text: "What is the allocated budget ceiling or payment timeframe for this scope?".to_string(),
-                    rationale: "Budget/cost discussed. Clarifying limits prevents scope friction.".to_string(),
+                    text:
+                        "What is the allocated budget ceiling or payment timeframe for this scope?"
+                            .to_string(),
+                    rationale: "Budget/cost discussed. Clarifying limits prevents scope friction."
+                        .to_string(),
                     timestamp_ms: now_ms,
                 });
                 suggestions.push(LiveSuggestionItem {
@@ -116,8 +119,10 @@ impl LiveSuggestionEngine {
                 suggestions.push(LiveSuggestionItem {
                     id: format!("sug-timeline-{}", now_ms),
                     category: "action".to_string(),
-                    text: "Lock down the hard Go-Live deadline and phase-1 milestone dates.".to_string(),
-                    rationale: "Prevent deadline ambiguity by pinning concrete target dates.".to_string(),
+                    text: "Lock down the hard Go-Live deadline and phase-1 milestone dates."
+                        .to_string(),
+                    rationale: "Prevent deadline ambiguity by pinning concrete target dates."
+                        .to_string(),
                     timestamp_ms: now_ms,
                 });
             }
@@ -138,8 +143,10 @@ impl LiveSuggestionEngine {
                 suggestions.push(LiveSuggestionItem {
                     id: format!("sug-decision-{}", now_ms),
                     category: "question".to_string(),
-                    text: "Son onay sürecinde başka hangi paydaşlar veya departmanlar yer alacak?".to_string(),
-                    rationale: "Gizli karar vericileri ve onay basamaklarını erkenden tespit edin.".to_string(),
+                    text: "Son onay sürecinde başka hangi paydaşlar veya departmanlar yer alacak?"
+                        .to_string(),
+                    rationale: "Gizli karar vericileri ve onay basamaklarını erkenden tespit edin."
+                        .to_string(),
                     timestamp_ms: now_ms,
                 });
             } else {
@@ -187,16 +194,22 @@ impl LiveSuggestionEngine {
                 suggestions.push(LiveSuggestionItem {
                     id: format!("sug-general-{}", now_ms),
                     category: "insight".to_string(),
-                    text: "Konuşulan maddelerin sorumlusunu ve sonraki adımı netleştirmeyi unutmayın.".to_string(),
-                    rationale: "Toplantı verimliliğini artırmak için aksiyon sahiplerini belirleyin.".to_string(),
+                    text:
+                        "Konuşulan maddelerin sorumlusunu ve sonraki adımı netleştirmeyi unutmayın."
+                            .to_string(),
+                    rationale:
+                        "Toplantı verimliliğini artırmak için aksiyon sahiplerini belirleyin."
+                            .to_string(),
                     timestamp_ms: now_ms,
                 });
             } else {
                 suggestions.push(LiveSuggestionItem {
                     id: format!("sug-general-{}", now_ms),
                     category: "insight".to_string(),
-                    text: "Clarify assignee ownership and the next immediate step for this topic.".to_string(),
-                    rationale: "Keep alignment strong by assigning owners to discussed items.".to_string(),
+                    text: "Clarify assignee ownership and the next immediate step for this topic."
+                        .to_string(),
+                    rationale: "Keep alignment strong by assigning owners to discussed items."
+                        .to_string(),
                     timestamp_ms: now_ms,
                 });
             }
@@ -218,8 +231,12 @@ mod tests {
         ];
         let res = LiveSuggestionEngine::extract_heuristic_suggestions(&segments, Some("tr"));
         assert!(!res.is_empty());
-        assert!(res.iter().any(|s| s.category == "question" && s.text.contains("bütçeniz")));
-        assert!(res.iter().any(|s| s.category == "objection" && s.text.contains("ROI")));
+        assert!(res
+            .iter()
+            .any(|s| s.category == "question" && s.text.contains("bütçeniz")));
+        assert!(res
+            .iter()
+            .any(|s| s.category == "objection" && s.text.contains("ROI")));
     }
 
     #[test]
@@ -230,8 +247,12 @@ mod tests {
         ];
         let res = LiveSuggestionEngine::extract_heuristic_suggestions(&segments, Some("en"));
         assert!(!res.is_empty());
-        assert!(res.iter().any(|s| s.category == "action" && s.text.contains("deadline")));
-        assert!(res.iter().any(|s| s.category == "question" && s.text.contains("sign off")));
+        assert!(res
+            .iter()
+            .any(|s| s.category == "action" && s.text.contains("deadline")));
+        assert!(res
+            .iter()
+            .any(|s| s.category == "question" && s.text.contains("sign off")));
     }
 
     #[test]
@@ -243,7 +264,8 @@ mod tests {
             "Bugün hava çok güzel.".to_string(),
             "Evet gerçekten öyle.".to_string(),
         ];
-        let gen_res = LiveSuggestionEngine::extract_heuristic_suggestions(&generic_segments, Some("tr"));
+        let gen_res =
+            LiveSuggestionEngine::extract_heuristic_suggestions(&generic_segments, Some("tr"));
         assert!(!gen_res.is_empty());
         assert_eq!(gen_res[0].category, "insight");
     }

@@ -56,6 +56,8 @@ export interface TranslationKeys {
     searchPlaceholder: string;
     retranscribe: string;
     retranscribeTooltip: string;
+    lowQualityWarningTitle: string;
+    lowQualityWarningDesc: string;
     shareReport: string;
     shareReportTooltip: string;
     fillerFilter: {
@@ -330,7 +332,6 @@ export interface TranslationKeys {
     completed: string;
     completedDesc: string;
     downloadFailed: string;
-    manualDownloadFallback: string;
     remindLater: string;
     dontShowAgainForVersion: string;
     autoCheckToggle: string;

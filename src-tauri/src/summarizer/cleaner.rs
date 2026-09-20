@@ -1,7 +1,7 @@
+use crate::transcriber::TranscriptSegment;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::sync::OnceLock;
-use crate::transcriber::TranscriptSegment;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct CleanedSegment {
@@ -45,7 +45,8 @@ impl SpeechCleaner {
 
     fn get_de_filler_regex() -> &'static Regex {
         DE_FILLER_REGEX.get_or_init(|| {
-            Regex::new(r"(?i)\b(äh+|ähm+|halt|sozusagen|quasi|eigentlich|weisst\s+du|weißt\s+du)\b").unwrap()
+            Regex::new(r"(?i)\b(äh+|ähm+|halt|sozusagen|quasi|eigentlich|weisst\s+du|weißt\s+du)\b")
+                .unwrap()
         })
     }
 
@@ -81,7 +82,11 @@ impl SpeechCleaner {
         let mut prev_word_clean = String::new();
 
         for w in text.split_whitespace() {
-            let clean: String = w.chars().filter(|c| c.is_alphanumeric()).collect::<String>().to_lowercase();
+            let clean: String = w
+                .chars()
+                .filter(|c| c.is_alphanumeric())
+                .collect::<String>()
+                .to_lowercase();
             if !clean.is_empty() && clean == prev_word_clean {
                 removed_count += 1;
                 continue;
@@ -91,6 +96,80 @@ impl SpeechCleaner {
         }
 
         (words.join(" "), removed_count)
+    }
+
+    /// Detects repeating n-grams (1 to 6 tokens) that repeat >= 3 times sequentially.
+    /// Returns (cleaned_text, has_loop, repetition_ratio).
+    pub fn detect_and_clean_hallucination_loops(text: &str) -> (String, bool, f32) {
+        let trimmed = text.trim();
+        if trimmed.is_empty() {
+            return (String::new(), false, 0.0);
+        }
+
+        let words: Vec<&str> = trimmed.split_whitespace().collect();
+        let total_words = words.len();
+        if total_words < 4 {
+            return (trimmed.to_string(), false, 0.0);
+        }
+
+        let mut final_words: Vec<&str> = Vec::new();
+        let mut i = 0;
+        let mut max_repeated_loop_len = 0;
+        let mut has_detected_loop = false;
+
+        while i < total_words {
+            let mut best_ngram_len = 0;
+            let mut best_repeat_count = 0;
+
+            // Test n-gram lengths from 1 to 6
+            for n in 1..=6 {
+                if i + n > total_words {
+                    break;
+                }
+                let pattern = &words[i..i + n];
+                let mut repeats = 1;
+                let mut next_idx = i + n;
+
+                while next_idx + n <= total_words {
+                    let candidate = &words[next_idx..next_idx + n];
+                    let matches = pattern.iter().zip(candidate.iter()).all(|(a, b)| {
+                        let a_clean: String = a.chars().filter(|c| c.is_alphanumeric()).collect();
+                        let b_clean: String = b.chars().filter(|c| c.is_alphanumeric()).collect();
+                        a_clean.eq_ignore_ascii_case(&b_clean)
+                    });
+
+                    if matches {
+                        repeats += 1;
+                        next_idx += n;
+                    } else {
+                        break;
+                    }
+                }
+
+                if repeats >= 3 && (n * repeats) > (best_ngram_len * best_repeat_count) {
+                    best_ngram_len = n;
+                    best_repeat_count = repeats;
+                }
+            }
+
+            if best_ngram_len > 0 && best_repeat_count >= 3 {
+                has_detected_loop = true;
+                let loop_words_count = best_ngram_len * best_repeat_count;
+                max_repeated_loop_len += loop_words_count;
+
+                // Keep only 1 occurrence of the repeated phrase instead of dozens
+                final_words.extend_from_slice(&words[i..i + best_ngram_len]);
+                i += loop_words_count;
+            } else {
+                final_words.push(words[i]);
+                i += 1;
+            }
+        }
+
+        let loop_ratio = (max_repeated_loop_len as f32) / (total_words as f32);
+        let cleaned_str = final_words.join(" ");
+
+        (cleaned_str, has_detected_loop, loop_ratio)
     }
 
     pub fn clean_text(raw_text: &str, lang_code: Option<&str>) -> (String, usize) {
@@ -143,8 +222,12 @@ impl SpeechCleaner {
         }
 
         // 4. Clean punctuation spaces & multiple spaces
-        text = Self::get_punct_space_regex().replace_all(&text, "$1").to_string();
-        text = Self::get_multi_space_regex().replace_all(&text, " ").to_string();
+        text = Self::get_punct_space_regex()
+            .replace_all(&text, "$1")
+            .to_string();
+        text = Self::get_multi_space_regex()
+            .replace_all(&text, " ")
+            .to_string();
         text = text.trim().to_string();
 
         // 5. Capitalize first letter if needed
@@ -174,7 +257,8 @@ impl SpeechCleaner {
             let seg_orig_words = seg.text.split_whitespace().count();
             orig_words += seg_orig_words;
 
-            let (cleaned_text, removed) = Self::clean_text(&seg.text, lang_code.or(Some(&seg.language)));
+            let (cleaned_text, removed) =
+                Self::clean_text(&seg.text, lang_code.or(Some(&seg.language)));
             total_removed += removed;
 
             let seg_cleaned_words = cleaned_text.split_whitespace().count();
@@ -183,7 +267,11 @@ impl SpeechCleaner {
             cleaned_segments.push(CleanedSegment {
                 id: seg.id,
                 original_text: seg.text.clone(),
-                cleaned_text: if cleaned_text.is_empty() { seg.text.clone() } else { cleaned_text },
+                cleaned_text: if cleaned_text.is_empty() {
+                    seg.text.clone()
+                } else {
+                    cleaned_text
+                },
                 removed_fillers_count: removed,
             });
         }
@@ -203,7 +291,8 @@ mod tests {
 
     #[test]
     fn test_clean_turkish_fillers_and_stutters() {
-        let raw = "ııı Merhaba arkadaşlar, yani şey bugün bütçeyi bütçeyi onaylayacağız [müzik] hani.";
+        let raw =
+            "ııı Merhaba arkadaşlar, yani şey bugün bütçeyi bütçeyi onaylayacağız [müzik] hani.";
         let (cleaned, count) = SpeechCleaner::clean_text(raw, Some("tr"));
         assert!(!cleaned.contains("ııı"));
         assert!(!cleaned.contains("şey"));
@@ -260,5 +349,22 @@ mod tests {
         assert!(res.total_fillers_removed >= 2);
         assert_eq!(res.segments[0].cleaned_text, "Proje takvimini konuştuk.");
         assert_eq!(res.segments[1].cleaned_text, "Aynen katılıyorum.");
+    }
+
+    #[test]
+    fn test_detect_and_clean_hallucination_loops_sample_30s() {
+        let hallucinated = "Bu videonunize ve kanalıma ve kanalıma ve kanalıma ve kanalıma ve kanalıma ve kanalıma ve kanalıma ve kanalıma ve kanalıma ve kanalıma ve kanalıma ve kanalıma ve kanalıma ve kanalıma ve kanalıma ve kanalıma ve kanalıma ve kan";
+        let (cleaned, has_loop, ratio) =
+            SpeechCleaner::detect_and_clean_hallucination_loops(hallucinated);
+
+        assert!(has_loop, "Hallucination loop must be detected");
+        assert!(ratio > 0.60, "Loop ratio must be high: {}", ratio);
+        // Repeated phrase "ve kanalıma" must not repeat 20 times in cleaned text
+        let count = cleaned.matches("ve kanalıma").count();
+        assert!(
+            count <= 1,
+            "Expected at most 1 occurrence of 've kanalıma', got {}",
+            count
+        );
     }
 }

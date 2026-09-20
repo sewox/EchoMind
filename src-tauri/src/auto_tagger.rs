@@ -1,6 +1,6 @@
+use crate::storage::MeetingRecord;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-use crate::storage::MeetingRecord;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RelatedMeetingItem {
@@ -36,8 +36,19 @@ impl AutoTagEngine {
             text_corpus.push_str(&format!(" {}", segments_text.join(" ")));
         } else {
             // First 10 and last 10 segments for fast context
-            let first_slice = segments_text.iter().take(10).cloned().collect::<Vec<_>>().join(" ");
-            let last_slice = segments_text.iter().rev().take(10).cloned().collect::<Vec<_>>().join(" ");
+            let first_slice = segments_text
+                .iter()
+                .take(10)
+                .cloned()
+                .collect::<Vec<_>>()
+                .join(" ");
+            let last_slice = segments_text
+                .iter()
+                .rev()
+                .take(10)
+                .cloned()
+                .collect::<Vec<_>>()
+                .join(" ");
             text_corpus.push_str(&format!(" {} {}", first_slice, last_slice));
         }
 
@@ -49,67 +60,223 @@ impl AutoTagEngine {
             (
                 "Finans & Bütçe",
                 vec![
-                    "bütçe", "maliyet", "fiyat", "fatura", "ödeme", "harcama", "gelir", "gider", "finans",
-                    "budget", "cost", "price", "invoice", "payment", "expense", "revenue", "financial",
-                    "finanz", "kosten", "preis", "rechnung", "ausgaben",
-                    "coût", "facture", "paiement", "dépense", "precio", "factura", "pago", "gasto",
+                    "bütçe",
+                    "maliyet",
+                    "fiyat",
+                    "fatura",
+                    "ödeme",
+                    "harcama",
+                    "gelir",
+                    "gider",
+                    "finans",
+                    "budget",
+                    "cost",
+                    "price",
+                    "invoice",
+                    "payment",
+                    "expense",
+                    "revenue",
+                    "financial",
+                    "finanz",
+                    "kosten",
+                    "preis",
+                    "rechnung",
+                    "ausgaben",
+                    "coût",
+                    "facture",
+                    "paiement",
+                    "dépense",
+                    "precio",
+                    "factura",
+                    "pago",
+                    "gasto",
                 ],
             ),
             (
                 "Yönetim & Strateji",
                 vec![
-                    "yönetim", "strateji", "icra", "vizyon", "hedef", "yönetim kurulu", "politika",
-                    "strategy", "executive", "board", "leadership", "management", "vision", "milestone", "roadmap",
-                    "führung", "vorstand", "stratégie", "direction", "estrategia", "directiva",
+                    "yönetim",
+                    "strateji",
+                    "icra",
+                    "vizyon",
+                    "hedef",
+                    "yönetim kurulu",
+                    "politika",
+                    "strategy",
+                    "executive",
+                    "board",
+                    "leadership",
+                    "management",
+                    "vision",
+                    "milestone",
+                    "roadmap",
+                    "führung",
+                    "vorstand",
+                    "stratégie",
+                    "direction",
+                    "estrategia",
+                    "directiva",
                 ],
             ),
             (
                 "Yazılım & Teknoloji",
                 vec![
-                    "yazılım", "backend", "frontend", "api", "sunucu", "kod", "mimari", "devops", "cloud",
-                    "veritabanı", "database", "deploy", "server", "code", "architecture", "microservice", "rust",
-                    "typescript", "react", "git", "ci/cd", "docker", "aws", "gcp", "azure", "software",
-                    "entwicklung", "logiciel", "desarrollo",
+                    "yazılım",
+                    "backend",
+                    "frontend",
+                    "api",
+                    "sunucu",
+                    "kod",
+                    "mimari",
+                    "devops",
+                    "cloud",
+                    "veritabanı",
+                    "database",
+                    "deploy",
+                    "server",
+                    "code",
+                    "architecture",
+                    "microservice",
+                    "rust",
+                    "typescript",
+                    "react",
+                    "git",
+                    "ci/cd",
+                    "docker",
+                    "aws",
+                    "gcp",
+                    "azure",
+                    "software",
+                    "entwicklung",
+                    "logiciel",
+                    "desarrollo",
                 ],
             ),
             (
                 "Tasarım & UI/UX",
                 vec![
-                    "tasarım", "figma", "ui", "ux", "arayüz", "prototip", "renk", "tipografi", "bileşen",
-                    "design", "interface", "prototype", "wireframe", "typography", "layout", "user experience",
-                    "gestaltung", "conception", "diseño",
+                    "tasarım",
+                    "figma",
+                    "ui",
+                    "ux",
+                    "arayüz",
+                    "prototip",
+                    "renk",
+                    "tipografi",
+                    "bileşen",
+                    "design",
+                    "interface",
+                    "prototype",
+                    "wireframe",
+                    "typography",
+                    "layout",
+                    "user experience",
+                    "gestaltung",
+                    "conception",
+                    "diseño",
                 ],
             ),
             (
                 "Satış & Müşteri",
                 vec![
-                    "satış", "müşteri", "teklif", "sözleşme", "anlaşma", "pazarlık", "müşteri ilişkileri",
-                    "sales", "client", "customer", "contract", "deal", "lead", "proposal", "crm", "pitch",
-                    "verkauf", "kunde", "vertrag", "vente", "contrat", "ventas", "acuerdo",
+                    "satış",
+                    "müşteri",
+                    "teklif",
+                    "sözleşme",
+                    "anlaşma",
+                    "pazarlık",
+                    "müşteri ilişkileri",
+                    "sales",
+                    "client",
+                    "customer",
+                    "contract",
+                    "deal",
+                    "lead",
+                    "proposal",
+                    "crm",
+                    "pitch",
+                    "verkauf",
+                    "kunde",
+                    "vertrag",
+                    "vente",
+                    "contrat",
+                    "ventas",
+                    "acuerdo",
                 ],
             ),
             (
                 "Pazarlama & Büyüme",
                 vec![
-                    "pazarlama", "reklam", "kampanya", "büyüme", "seo", "sosyal medya", "lansman", "içerik",
-                    "marketing", "campaign", "growth", "launch", "content", "traffic", "branding", "ads",
-                    "werbung", "croissance", "publicité", "mercadeo", "campaña",
+                    "pazarlama",
+                    "reklam",
+                    "kampanya",
+                    "büyüme",
+                    "seo",
+                    "sosyal medya",
+                    "lansman",
+                    "içerik",
+                    "marketing",
+                    "campaign",
+                    "growth",
+                    "launch",
+                    "content",
+                    "traffic",
+                    "branding",
+                    "ads",
+                    "werbung",
+                    "croissance",
+                    "publicité",
+                    "mercadeo",
+                    "campaña",
                 ],
             ),
             (
                 "İnsan Kaynakları",
                 vec![
-                    "işe alım", "mülakat", "aday", "çalışan", "ik", "bordro", "terfi", "oryantasyon",
-                    "recruitment", "interview", "candidate", "employee", "hr", "talent", "onboarding", "hiring",
-                    "personal", "entretien", "recrutement", "entrevista", "contratación",
+                    "işe alım",
+                    "mülakat",
+                    "aday",
+                    "çalışan",
+                    "ik",
+                    "bordro",
+                    "terfi",
+                    "oryantasyon",
+                    "recruitment",
+                    "interview",
+                    "candidate",
+                    "employee",
+                    "hr",
+                    "talent",
+                    "onboarding",
+                    "hiring",
+                    "personal",
+                    "entretien",
+                    "recrutement",
+                    "entrevista",
+                    "contratación",
                 ],
             ),
             (
                 "Sprint & Operasyon",
                 vec![
-                    "sprint", "backlog", "jira", "retrospective", "standup", "operasyon", "görev", "takvim",
-                    "scrum", "agile", "kanban", "timeline", "operations", "task", "milestone",
-                    "aufgabe", "tâche", "tarea",
+                    "sprint",
+                    "backlog",
+                    "jira",
+                    "retrospective",
+                    "standup",
+                    "operasyon",
+                    "görev",
+                    "takvim",
+                    "scrum",
+                    "agile",
+                    "kanban",
+                    "timeline",
+                    "operations",
+                    "task",
+                    "milestone",
+                    "aufgabe",
+                    "tâche",
+                    "tarea",
                 ],
             ),
         ];
@@ -154,7 +321,8 @@ impl AutoTagEngine {
             .map(|p| p.to_lowercase())
             .collect();
 
-        let target_tokens = crate::cross_memory::CrossMeetingMemoryEngine::tokenize(&target_meeting.title);
+        let target_tokens =
+            crate::cross_memory::CrossMeetingMemoryEngine::tokenize(&target_meeting.title);
         let target_tokens_set: HashSet<String> = target_tokens.into_iter().collect();
 
         let mut related_list = Vec::new();
@@ -199,7 +367,10 @@ impl AutoTagEngine {
             // 4. Decision keyword overlap (10 pts)
             for d in &meeting.key_decisions {
                 let d_lower = d.to_lowercase();
-                if target_tags.iter().any(|tag| d_lower.contains(&tag.to_lowercase())) {
+                if target_tags
+                    .iter()
+                    .any(|tag| d_lower.contains(&tag.to_lowercase()))
+                {
                     score += 10;
                     break;
                 }
@@ -219,7 +390,7 @@ impl AutoTagEngine {
         }
 
         // Sort by similarity score descending
-        related_list.sort_by(|a, b| b.similarity_score.cmp(&a.similarity_score));
+        related_list.sort_by_key(|r| std::cmp::Reverse(r.similarity_score));
         related_list.truncate(limit);
         related_list
     }
@@ -280,7 +451,10 @@ mod tests {
             participants: Some(vec!["Ahmet".to_string(), "Zeynep".to_string()]),
             engine_used: None,
             summary_provider: None,
-            tags: Some(vec!["Finans & Bütçe".to_string(), "Yazılım & Teknoloji".to_string()]),
+            tags: Some(vec![
+                "Finans & Bütçe".to_string(),
+                "Yazılım & Teknoloji".to_string(),
+            ]),
         };
 
         let m1 = MeetingRecord {
@@ -330,7 +504,11 @@ mod tests {
         let related = AutoTagEngine::find_related_meetings(&target, &[m1.clone(), m2.clone()], 3);
         assert!(!related.is_empty());
         assert_eq!(related[0].id, "m-1");
-        assert!(related[0].common_tags.contains(&"Finans & Bütçe".to_string()));
-        assert!(related[0].common_participants.contains(&"Ahmet".to_string()));
+        assert!(related[0]
+            .common_tags
+            .contains(&"Finans & Bütçe".to_string()));
+        assert!(related[0]
+            .common_participants
+            .contains(&"Ahmet".to_string()));
     }
 }

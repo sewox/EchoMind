@@ -8,7 +8,7 @@ use std::time::Duration;
 
 fn base64_encode(data: &[u8]) -> String {
     const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let mut result = String::with_capacity((data.len() + 2) / 3 * 4);
+    let mut result = String::with_capacity(data.len().div_ceil(3) * 4);
     for chunk in data.chunks(3) {
         let b0 = chunk[0];
         let b1 = if chunk.len() > 1 { chunk[1] } else { 0 };
@@ -39,6 +39,9 @@ pub fn transcribe_audio_cloud(
     language: &str,
     model_version: Option<&str>,
 ) -> Result<Vec<TranscriptSegment>, String> {
+    // 🛡️ Security Gate: Enforce Paranoid Mode backend restriction
+    crate::security::check_cloud_access_allowed()?;
+
     if !audio_path.exists() {
         return Err(format!("Ses dosyası bulunamadı: {:?}", audio_path));
     }
@@ -179,7 +182,8 @@ fn transcribe_audio_gemini(
     language: &str,
     model_version: Option<&str>,
 ) -> Result<Vec<TranscriptSegment>, String> {
-    let file_bytes = fs::read(audio_path).map_err(|e| format!("Ses dosyası okuma hatası: {}", e))?;
+    let file_bytes =
+        fs::read(audio_path).map_err(|e| format!("Ses dosyası okuma hatası: {}", e))?;
     let b64_audio = base64_encode(&file_bytes);
 
     let client = Client::builder()
@@ -263,7 +267,10 @@ fn transcribe_audio_gemini(
     if let Ok(parsed_segs) = serde_json::from_str::<Vec<Value>>(cleaned_json) {
         for (idx, seg) in parsed_segs.iter().enumerate() {
             let start = seg.get("start").and_then(|v| v.as_f64()).unwrap_or(0.0);
-            let end = seg.get("end").and_then(|v| v.as_f64()).unwrap_or(start + 5.0);
+            let end = seg
+                .get("end")
+                .and_then(|v| v.as_f64())
+                .unwrap_or(start + 5.0);
             let speaker = seg
                 .get("speaker")
                 .and_then(|v| v.as_str())

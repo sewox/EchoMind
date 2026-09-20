@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
   MessageSquare,
@@ -15,6 +15,7 @@ import {
   Loader2,
   RotateCw,
   BarChart3,
+  AlertTriangle,
 } from "lucide-react";
 import { MeetingRecord, ActionItem, TopicBreakdown } from "../App";
 import { ExportModal } from "./ExportModal";
@@ -28,6 +29,7 @@ import { CustomTemplateModal } from "./transcript/CustomTemplateModal";
 import { MeetingAnalyticsModal } from "./transcript/MeetingAnalyticsModal";
 import { MeetingTemplate, BUILTIN_TEMPLATES } from "../types/templates";
 import { MeetingAnalytics } from "../types/analytics";
+import { CredentialStore } from "../services/credentialStore";
 import { SoundbiteResult } from "../types/soundbite";
 import { useI18n } from "../locales/i18nContext";
 import { useLiveSuggestions } from "../hooks/useLiveSuggestions";
@@ -452,19 +454,19 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
 
       if (activeEngine === "cloud_groq") {
         cloudProvider = "groq";
-        apiKey = localStorage.getItem("echomind_groq_key") || null;
+        apiKey = (await CredentialStore.get("echomind_groq_key")) || null;
         modelVersion =
           localStorage.getItem("echomind_groq_model_version") ||
           "whisper-large-v3-turbo";
       } else if (activeEngine === "cloud_gemini") {
         cloudProvider = "gemini";
-        apiKey = localStorage.getItem("echomind_gemini_key") || null;
+        apiKey = (await CredentialStore.get("echomind_gemini_key")) || null;
         modelVersion =
           localStorage.getItem("echomind_gemini_model_version") ||
           "gemini-1.5-flash";
       } else if (activeEngine === "cloud_openai") {
         cloudProvider = "openai";
-        apiKey = localStorage.getItem("echomind_openai_key") || null;
+        apiKey = (await CredentialStore.get("echomind_openai_key")) || null;
         modelVersion =
           localStorage.getItem("echomind_openai_model_version") || "whisper-1";
       }
@@ -584,13 +586,13 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
 
       if (activeEngine === "cloud_groq") {
         provider = "groq";
-        apiKey = localStorage.getItem("echomind_groq_key");
+        apiKey = await CredentialStore.get("echomind_groq_key");
       } else if (activeEngine === "cloud_gemini") {
         provider = "gemini";
-        apiKey = localStorage.getItem("echomind_gemini_key");
+        apiKey = await CredentialStore.get("echomind_gemini_key");
       } else if (activeEngine === "cloud_openai") {
         provider = "openai";
-        apiKey = localStorage.getItem("echomind_openai_key");
+        apiKey = await CredentialStore.get("echomind_openai_key");
       }
 
       const customEndpoint =
@@ -655,13 +657,13 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
 
       if (activeEngine === "cloud_groq") {
         provider = "groq";
-        apiKey = localStorage.getItem("echomind_groq_key");
+        apiKey = await CredentialStore.get("echomind_groq_key");
       } else if (activeEngine === "cloud_gemini") {
         provider = "gemini";
-        apiKey = localStorage.getItem("echomind_gemini_key");
+        apiKey = await CredentialStore.get("echomind_gemini_key");
       } else if (activeEngine === "cloud_openai") {
         provider = "openai";
-        apiKey = localStorage.getItem("echomind_openai_key");
+        apiKey = await CredentialStore.get("echomind_openai_key");
       }
 
       const customEndpoint =
@@ -705,13 +707,13 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
       let apiKey: string | null = null;
 
       if (activeEngine === "cloud_gemini") {
-        apiKey = localStorage.getItem("echomind_gemini_key");
+        apiKey = await CredentialStore.get("echomind_gemini_key");
       } else if (activeEngine === "cloud_groq") {
         provider = "groq";
-        apiKey = localStorage.getItem("echomind_groq_key");
+        apiKey = await CredentialStore.get("echomind_groq_key");
       } else if (activeEngine === "cloud_openai") {
         provider = "openai";
-        apiKey = localStorage.getItem("echomind_openai_key");
+        apiKey = await CredentialStore.get("echomind_openai_key");
       }
 
       const updated = await invoke<MeetingRecord>(
@@ -834,6 +836,14 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
   );
 
   const actionItemsCount = richSummary?.action_items?.length || 0;
+
+  const isLowQualityTranscript = useMemo(() => {
+    if (!segments || segments.length === 0) return false;
+    const avgConfidence =
+      segments.reduce((acc, s) => acc + (s.confidence || 0), 0) /
+      segments.length;
+    return avgConfidence < 0.6;
+  }, [segments]);
 
   return (
     <div className="bento-card p-0 flex flex-col flex-1 min-h-0 bg-[#0b1324] border border-white/10 rounded-2xl shadow-xl overflow-hidden relative">
@@ -1044,6 +1054,21 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
           onSeek={handleAudioSeek}
           formatPlayerTime={formatPlayerTime}
         />
+      )}
+
+      {/* Low Quality ASR Warning Banner */}
+      {isLowQualityTranscript && (
+        <div className="mx-4 mt-3 p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-start gap-3 text-amber-200 text-xs animate-in fade-in duration-150">
+          <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <span className="font-semibold text-amber-300">
+              {t("transcript.lowQualityWarningTitle") ||
+                "Transkript Güvenilirlik Uyarısı:"}
+            </span>{" "}
+            {t("transcript.lowQualityWarningDesc") ||
+              "Bu kayıtta zayıf ses sinyali veya tekrarlayan konuşma desenleri tespit edildi. Transkript güvenilirliği düşük olabilir. Daha yüksek doğruluk için Ayarlar'dan Whisper Small modelini kullanabilir veya dili manuel olarak seçebilirsiniz."}
+          </div>
+        </div>
       )}
 
       {/* Main Tab Viewport */}

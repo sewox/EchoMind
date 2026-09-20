@@ -15,9 +15,9 @@ pub struct HardwareInfo {
     pub total_ram_gb: f64,
     pub gpu_name: String,
     pub gpu_acceleration: String,
-    pub has_ane: bool,          // Apple Neural Engine
-    pub has_cuda: bool,         // NVIDIA CUDA
-    pub has_avx2: bool,         // CPU AVX2 instructions
+    pub has_ane: bool,  // Apple Neural Engine
+    pub has_cuda: bool, // NVIDIA CUDA
+    pub has_avx2: bool, // CPU AVX2 instructions
     pub summary_headline: String,
     pub recommended_ai_mode: String,
 }
@@ -53,10 +53,14 @@ impl HardwareInfo {
 
         let has_avx2 = is_avx2_supported();
 
-        let (gpu_name, gpu_acceleration, has_ane, has_cuda) = Self::detect_gpu_and_acceleration(&cpu_brand, has_avx2);
+        let (gpu_name, gpu_acceleration, has_ane, has_cuda) =
+            Self::detect_gpu_and_acceleration(&cpu_brand, has_avx2);
 
         let summary_headline = if cfg!(target_os = "macos") && cfg!(target_arch = "aarch64") {
-            format!("Apple Silicon {} Metal Hızlandırma Aktif (ANE Desteği Var)", cpu_brand)
+            format!(
+                "Apple Silicon {} Metal Hızlandırma Aktif (ANE Desteği Var)",
+                cpu_brand
+            )
         } else if has_cuda {
             format!("{} CUDA Hızlandırma Aktif", gpu_name)
         } else if has_avx2 {
@@ -66,7 +70,8 @@ impl HardwareInfo {
         };
 
         let recommended_ai_mode = if cfg!(target_os = "macos") && cfg!(target_arch = "aarch64") {
-            "Yerel Whisper-Metal (TR/EN) + Yerel Gemma 2 (2B/9B GGUF) veya Gemini 1.5 Flash".to_string()
+            "Yerel Whisper-Metal (TR/EN) + Yerel Gemma 2 (2B/9B GGUF) veya Gemini 1.5 Flash"
+                .to_string()
         } else if has_cuda {
             "Yerel Whisper-CUDA + Yerel Gemma 2 (CUDA) / Gemini 1.5 Flash".to_string()
         } else {
@@ -91,7 +96,10 @@ impl HardwareInfo {
         }
     }
 
-    fn detect_gpu_and_acceleration(_cpu_brand: &str, _has_avx2: bool) -> (String, String, bool, bool) {
+    fn detect_gpu_and_acceleration(
+        _cpu_brand: &str,
+        _has_avx2: bool,
+    ) -> (String, String, bool, bool) {
         #[cfg(target_os = "macos")]
         {
             if cfg!(target_arch = "aarch64") {
@@ -119,7 +127,8 @@ impl HardwareInfo {
                 let gpu_accel = "NVIDIA CUDA (cuBLAS / TensorRT)".to_string();
                 (gpu_name, gpu_accel, false, true)
             } else {
-                let gpu_name = get_windows_gpu_name().unwrap_or_else(|| "DirectX 12 / Vulkan GPU".to_string());
+                let gpu_name =
+                    get_windows_gpu_name().unwrap_or_else(|| "DirectX 12 / Vulkan GPU".to_string());
                 let gpu_accel = if _has_avx2 {
                     "CPU AVX2 Vector Acceleration".to_string()
                 } else {
@@ -187,7 +196,11 @@ fn get_windows_gpu_name() -> Option<String> {
         .ok()?;
     if output.status.success() {
         let stdout = String::from_utf8_lossy(&output.stdout);
-        let lines: Vec<&str> = stdout.lines().map(|l| l.trim()).filter(|l| !l.is_empty() && *l != "Name").collect();
+        let lines: Vec<&str> = stdout
+            .lines()
+            .map(|l| l.trim())
+            .filter(|l| !l.is_empty() && *l != "Name")
+            .collect();
         if let Some(first) = lines.first() {
             return Some(first.to_string());
         }

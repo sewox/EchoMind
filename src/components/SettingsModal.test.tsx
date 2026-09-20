@@ -3,11 +3,13 @@ import { render, screen, fireEvent, act } from "@testing-library/react";
 import { SettingsModal } from "./SettingsModal";
 import { I18nProvider } from "../locales/i18nContext";
 import { invoke } from "@tauri-apps/api/core";
+import { CredentialStore } from "../services/credentialStore";
 
 describe("SettingsModal Component", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    CredentialStore.clearCache();
   });
 
   const mockHardware = {
@@ -110,7 +112,6 @@ describe("SettingsModal Component", () => {
         });
       if (cmd === "test_ollama_connection")
         return Promise.resolve("Ollama sunucusu hazır: llama3.2");
-      if (cmd === "save_api_keys") return Promise.resolve();
       return Promise.resolve();
     });
 
@@ -119,6 +120,11 @@ describe("SettingsModal Component", () => {
         <SettingsModal {...defaultProps} />
       </I18nProvider>,
     );
+
+    // Wait for initial credential loading
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 10));
+    });
 
     // Switch to AI Services tab
     const apiKeysTab = screen.getByRole("button", {
@@ -172,9 +178,10 @@ describe("SettingsModal Component", () => {
     await act(async () => {
       fireEvent.click(saveKeysBtn);
     });
-    expect(localStorage.getItem("echomind_groq_key")).toBe(
+    expect(CredentialStore.getSync("echomind_groq_key")).toBe(
       "gsk_test_settings_key",
     );
+    expect(localStorage.getItem("echomind_groq_key")).toBeNull();
   });
 
   it("renders language selection tab and changes language", async () => {
@@ -280,6 +287,11 @@ describe("SettingsModal Component", () => {
       </I18nProvider>,
     );
 
+    // Wait for initial credential load
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 10));
+    });
+
     // AI Services tab
     const aiServicesTab = screen.getByRole("button", {
       name: /Yapay Zeka Servisleri/i,
@@ -322,12 +334,14 @@ describe("SettingsModal Component", () => {
       fireEvent.click(saveBtn);
     });
 
-    expect(localStorage.getItem("echomind_gemini_key")).toBe(
+    expect(CredentialStore.getSync("echomind_gemini_key")).toBe(
       "AIzaSy_test_gemini_key",
     );
-    expect(localStorage.getItem("echomind_openai_key")).toBe(
+    expect(localStorage.getItem("echomind_gemini_key")).toBeNull();
+    expect(CredentialStore.getSync("echomind_openai_key")).toBe(
       "sk-proj-test_openai_key",
     );
+    expect(localStorage.getItem("echomind_openai_key")).toBeNull();
   });
 
   it("handles Ollama connection test success and failure", async () => {
@@ -616,7 +630,7 @@ describe("SettingsModal Component", () => {
       fireEvent.click(checkBtn);
     });
 
-    expect(onOpenUpdateModal).toHaveBeenCalled();
+    expect(onOpenUpdateModal).not.toHaveBeenCalled();
     expect(screen.getByText(/Yeni Sürüm Mevcut/i)).toBeInTheDocument();
 
     // Now test error case
