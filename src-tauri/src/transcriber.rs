@@ -223,6 +223,30 @@ impl GlobalTranscriberEngine {
         let is_auto = language.is_empty() || language.eq_ignore_ascii_case("auto");
         let whisper_lang = if is_auto { None } else { Some(language) };
 
+        // When the language is auto-detected, a low detection probability (e.g. p≈0.24)
+        // is a strong signal that the audio is noisy/ambiguous even if Whisper still
+        // produces fluent-looking, high-token-probability garbage text. Run one cheap
+        // encode-only pass on the first chunk to get that probability and fold it into
+        // every segment's confidence score below, instead of trusting token probability
+        // alone (which doesn't catch this failure mode).
+        let lang_confidence_factor: f32 = if is_auto {
+            natural_chunks
+                .first()
+                .and_then(|(_, first_chunk_samples)| {
+                    ctx.create_state()
+                        .and_then(|mut lang_state| {
+                            lang_state.pcm_to_mel(first_chunk_samples, n_threads as usize)?;
+                            lang_state.encode(0, n_threads as usize)?;
+                            lang_state.lang_detect(0, n_threads as usize)
+                        })
+                        .ok()
+                })
+                .and_then(|(lang_id, probs)| probs.get(lang_id as usize).copied())
+                .unwrap_or(1.0)
+        } else {
+            1.0
+        };
+
         let prompt = match language {
             "tr" => "Bu bir Türkçe iş toplantısı ve diyalog ses kaydı dökümüdür. Lütfen Türkçe imla kurallarına, noktalama işaretlerine ve tam cümle yapılarına uygun olarak döküm yapınız.",
             "en" => "This is an English business meeting, discussion, and dialogue audio recording. Please transcribe accurately with proper English punctuation, grammar, and technical terminology.",
@@ -345,7 +369,8 @@ impl GlobalTranscriberEngine {
                     };
 
                     let no_speech_p = seg.no_speech_probability();
-                    let mut calc_confidence = avg_token_prob * (1.0 - (no_speech_p * 0.5));
+                    let mut calc_confidence =
+                        avg_token_prob * (1.0 - (no_speech_p * 0.5)) * lang_confidence_factor;
 
                     if has_loop {
                         // Penalize confidence if any repetition loop was stripped
