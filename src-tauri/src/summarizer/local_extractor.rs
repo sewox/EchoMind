@@ -70,9 +70,30 @@ impl LocalSummaryExtractor {
         }
     }
 
-    /// Normalizes and cleans assignee names, stripping meaningless placeholders like @Fully, PENDING, null.
+    /// Normalizes and cleans assignee names, stripping meaningless placeholders like @Fully, PENDING, null, TODO.
+    /// Ensures only valid real names or professional roles are kept.
     pub fn clean_assignee(raw_assignee: Option<&str>, _task_text: &str) -> Option<String> {
-        let ass = raw_assignee?.trim().trim_start_matches('@').trim();
+        let raw = raw_assignee?;
+        // Strip markdown, wrappers, prefixes like @, *, [, ], (, ), quotes
+        let ass = raw
+            .trim()
+            .trim_matches(|c: char| {
+                c == '@'
+                    || c == '*'
+                    || c == '_'
+                    || c == '['
+                    || c == ']'
+                    || c == '('
+                    || c == ')'
+                    || c == '"'
+                    || c == '\''
+                    || c == '`'
+                    || c == '#'
+                    || c == ':'
+                    || c == ';'
+            })
+            .trim();
+
         if ass.is_empty() {
             return None;
         }
@@ -81,32 +102,75 @@ impl LocalSummaryExtractor {
         let invalid_assignees = [
             "fully",
             "pending",
+            "todo",
+            "to-do",
+            "to do",
+            "in progress",
+            "doing",
+            "done",
+            "completed",
+            "action",
+            "task",
+            "assigned",
+            "unassigned",
             "null",
+            "nil",
             "none",
             "tbd",
             "n/a",
             "na",
             "unknown",
-            "unassigned",
             "speaker",
             "speaker 1",
             "speaker 2",
             "speaker 3",
+            "speaker 4",
             "konuşmacı",
             "konuşmacı 1",
             "konuşmacı 2",
             "belirsiz",
             "yok",
+            "atanmadı",
+            "atanmamış",
             "all",
             "everyone",
             "team",
             "ekip",
             "herkes",
+            "user",
+            "attendee",
+            "participant",
+            "katılımcı",
+            "system",
+            "assistant",
+            "ai",
+            "bot",
+            "admin",
+            "host",
+            "me",
+            "you",
+            "us",
+            "them",
         ];
 
         if invalid_assignees.iter().any(|&inv| {
-            lower == inv || lower.starts_with("speaker_") || lower.starts_with("speaker ")
+            lower == inv
+                || lower.starts_with("speaker_")
+                || lower.starts_with("speaker ")
+                || lower.starts_with("konuşmacı_")
+                || lower.starts_with("konuşmacı ")
+                || lower.starts_with("participant ")
+                || lower.starts_with("katılımcı ")
+                || lower.starts_with("pending ")
+                || lower.starts_with("todo ")
+                || lower.starts_with("fully ")
         }) {
+            return None;
+        }
+
+        // Must contain at least one alphabetic character and have length >= 2
+        let has_alphabetic = ass.chars().any(|c| c.is_alphabetic());
+        if !has_alphabetic || ass.chars().count() < 2 {
             return None;
         }
 
@@ -553,7 +617,51 @@ mod tests {
             None
         );
         assert_eq!(
+            LocalSummaryExtractor::clean_assignee(Some("TODO"), "Task"),
+            None
+        );
+        assert_eq!(
+            LocalSummaryExtractor::clean_assignee(Some("[TODO]"), "Task"),
+            None
+        );
+        assert_eq!(
+            LocalSummaryExtractor::clean_assignee(Some("**Fully**"), "Task"),
+            None
+        );
+        assert_eq!(
             LocalSummaryExtractor::clean_assignee(Some("Speaker 1"), "Task"),
+            None
+        );
+        assert_eq!(
+            LocalSummaryExtractor::clean_assignee(Some("speaker_2"), "Task"),
+            None
+        );
+        assert_eq!(
+            LocalSummaryExtractor::clean_assignee(Some("konuşmacı 1"), "Task"),
+            None
+        );
+        assert_eq!(
+            LocalSummaryExtractor::clean_assignee(Some("Unassigned"), "Task"),
+            None
+        );
+        assert_eq!(
+            LocalSummaryExtractor::clean_assignee(Some("N/A"), "Task"),
+            None
+        );
+        assert_eq!(
+            LocalSummaryExtractor::clean_assignee(Some("None"), "Task"),
+            None
+        );
+        assert_eq!(
+            LocalSummaryExtractor::clean_assignee(Some("TBD"), "Task"),
+            None
+        );
+        assert_eq!(
+            LocalSummaryExtractor::clean_assignee(Some("@"), "Task"),
+            None
+        );
+        assert_eq!(
+            LocalSummaryExtractor::clean_assignee(Some(""), "Task"),
             None
         );
         assert_eq!(
@@ -563,6 +671,10 @@ mod tests {
         assert_eq!(
             LocalSummaryExtractor::clean_assignee(Some("Sarah Connor"), "Task"),
             Some("Sarah Connor".to_string())
+        );
+        assert_eq!(
+            LocalSummaryExtractor::clean_assignee(Some("DevOps Lead"), "Task"),
+            Some("DevOps Lead".to_string())
         );
     }
 

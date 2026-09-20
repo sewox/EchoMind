@@ -390,7 +390,7 @@ impl AutoTagEngine {
         }
 
         // Sort by similarity score descending
-        related_list.sort_by(|a, b| b.similarity_score.cmp(&a.similarity_score));
+        related_list.sort_by_key(|r| std::cmp::Reverse(r.similarity_score));
         related_list.truncate(limit);
         related_list
     }

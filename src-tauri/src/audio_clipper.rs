@@ -72,7 +72,7 @@ impl AudioClipper {
             .map_err(|e| format!("WAV dosyası oluşturulamadı: {}", e))?;
 
         for &sample in slice {
-            let clamped = sample.max(-1.0).min(1.0);
+            let clamped = sample.clamp(-1.0, 1.0);
             let sample_i16 = (clamped * 32767.0) as i16;
             writer
                 .write_sample(sample_i16)

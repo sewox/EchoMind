@@ -133,7 +133,7 @@ impl MeetingExporter {
                 for h in highlights {
                     md.push_str(&format!("- {}\n", h));
                 }
-                md.push_str("\n");
+                md.push('\n');
             }
         }
 
@@ -143,9 +143,13 @@ impl MeetingExporter {
                 md.push_str(&format!("### {}\n", labels.action_items_title));
                 for a in actions {
                     let check = if a.is_completed { "[x]" } else { "[ ]" };
-                    let assignee_str = a
-                        .assignee
-                        .as_deref()
+                    let clean_ass = a.assignee.as_deref().and_then(|p| {
+                        crate::summarizer::local_extractor::LocalSummaryExtractor::clean_assignee(
+                            Some(p),
+                            &a.task,
+                        )
+                    });
+                    let assignee_str = clean_ass
                         .map(|p| format!(" ➔ **{}**", p))
                         .unwrap_or_default();
                     let cite_str = if !a.source_citations.is_empty() {
@@ -165,7 +169,7 @@ impl MeetingExporter {
                         check, a.task, assignee_str, cite_str
                     ));
                 }
-                md.push_str("\n");
+                md.push('\n');
             }
         }
 
@@ -176,7 +180,7 @@ impl MeetingExporter {
                 for p in phase1 {
                     md.push_str(&format!("- {}\n", p));
                 }
-                md.push_str("\n");
+                md.push('\n');
             }
         }
 
@@ -187,7 +191,7 @@ impl MeetingExporter {
                 for p in phase2 {
                     md.push_str(&format!("- {}\n", p));
                 }
-                md.push_str("\n");
+                md.push('\n');
             }
         }
 
@@ -200,7 +204,7 @@ impl MeetingExporter {
                     for b in &t.bullet_points {
                         md.push_str(&format!("- {}\n", b));
                     }
-                    md.push_str("\n");
+                    md.push('\n');
                 }
             }
         }
@@ -522,7 +526,13 @@ body {
                     html.push_str("<div class=\"checkbox\"></div>\n");
                     html.push_str("<div class=\"action-content\">\n");
                     html.push_str(&format!("<div>{}</div>\n", escape_html(&a.task)));
-                    if let Some(ref ass) = a.assignee {
+                    let clean_ass = a.assignee.as_deref().and_then(|p| {
+                        crate::summarizer::local_extractor::LocalSummaryExtractor::clean_assignee(
+                            Some(p),
+                            &a.task,
+                        )
+                    });
+                    if let Some(ref ass) = clean_ass {
                         html.push_str(&format!(
                             "<span class=\"assignee-badge\">{}: {}</span>\n",
                             labels.assignee_label,
@@ -661,7 +671,7 @@ body {
                 for h in highlights {
                     text.push_str(&format!("• {}\n", h));
                 }
-                text.push_str("\n");
+                text.push('\n');
             }
         }
 
@@ -681,7 +691,7 @@ body {
                         .unwrap_or_default();
                     text.push_str(&format!("• {} {}{}\n", status, a.task, assignee));
                 }
-                text.push_str("\n");
+                text.push('\n');
             }
         }
 
@@ -691,7 +701,7 @@ body {
                 for p in phase1 {
                     text.push_str(&format!("• {}\n", p));
                 }
-                text.push_str("\n");
+                text.push('\n');
             }
         }
 
@@ -701,7 +711,7 @@ body {
                 for p in phase2 {
                     text.push_str(&format!("• {}\n", p));
                 }
-                text.push_str("\n");
+                text.push('\n');
             }
         }
 
@@ -757,7 +767,7 @@ body {
                 ));
             }
         }
-        slack.push_str("\n");
+        slack.push('\n');
 
         if let Some(goal) = goal_opt {
             slack.push_str(&format!("*{}*\n> {}\n\n", labels.meeting_goal_title, goal));
@@ -769,7 +779,7 @@ body {
                 for h in highlights {
                     slack.push_str(&format!("• {}\n", h));
                 }
-                slack.push_str("\n");
+                slack.push('\n');
             }
         }
 
@@ -785,7 +795,7 @@ body {
                         .unwrap_or_default();
                     slack.push_str(&format!("{} *{}*{}\n", box_emoji, a.task, assignee));
                 }
-                slack.push_str("\n");
+                slack.push('\n');
             }
         }
 
@@ -795,7 +805,7 @@ body {
                 for p in phase1 {
                     slack.push_str(&format!("• {}\n", p));
                 }
-                slack.push_str("\n");
+                slack.push('\n');
             }
         }
 
@@ -805,7 +815,7 @@ body {
                 for p in phase2 {
                     slack.push_str(&format!("• {}\n", p));
                 }
-                slack.push_str("\n");
+                slack.push('\n');
             }
         }
 
@@ -960,7 +970,7 @@ body {
                 for h in highlights {
                     body.push_str(&format!("• {}\n", h));
                 }
-                body.push_str("\n");
+                body.push('\n');
             }
         }
 
@@ -984,7 +994,7 @@ body {
                         .unwrap_or_default();
                     body.push_str(&format!("• {} {}{}\n", status, a.task, assignee_str));
                 }
-                body.push_str("\n");
+                body.push('\n');
             }
         }
 
@@ -994,7 +1004,7 @@ body {
                 for p in phase1 {
                     body.push_str(&format!("• {}\n", p));
                 }
-                body.push_str("\n");
+                body.push('\n');
             }
         }
 
@@ -1080,7 +1090,7 @@ body {
         format!(
             "BEGIN:VCALENDAR\r\n\
 VERSION:2.0\r\n\
-PRODID:-//EchoMind AI//EchoMind Assistant v0.2.3//EN\r\n\
+PRODID:-//EchoMind AI//EchoMind Assistant v0.2.4//EN\r\n\
 CALSCALE:GREGORIAN\r\n\
 METHOD:REQUEST\r\n\
 BEGIN:VEVENT\r\n\
@@ -1159,8 +1169,8 @@ mod tests {
     #[test]
     fn test_format_rfc5545_datetime() {
         assert_eq!(
-            MeetingExporter::format_rfc5545_datetime("2026-09-20T10:00:00.000Z"),
-            "20260920T100000Z"
+            MeetingExporter::format_rfc5545_datetime("2026-09-20T14:30:45Z"),
+            "20260920T143045Z"
         );
         assert_eq!(
             MeetingExporter::format_rfc5545_datetime("2026-09-20 14:30:45"),
@@ -1170,5 +1180,52 @@ mod tests {
             MeetingExporter::format_rfc5545_datetime("2026-09-20"),
             "20260920T090000Z"
         );
+    }
+
+    #[test]
+    fn test_export_notes_markdown_clean_assignee() {
+        use crate::storage::ActionItem;
+
+        let action1 = ActionItem {
+            task: "Fix pipeline".to_string(),
+            assignee: Some("PENDING".to_string()),
+            source_citations: Vec::new(),
+            is_completed: false,
+        };
+        let action2 = ActionItem {
+            task: "Database migration".to_string(),
+            assignee: Some("Sarah Jenkins".to_string()),
+            source_citations: Vec::new(),
+            is_completed: false,
+        };
+
+        let record = MeetingRecord {
+            id: "test_wip".to_string(),
+            title: "Sync".to_string(),
+            date_formatted: "2026-09-20 10:00:00".to_string(),
+            duration_seconds: 0,
+            duration_formatted: "00:00".to_string(),
+            audio_file_path: None,
+            segments: Vec::new(),
+            summary: String::new(),
+            key_decisions: Vec::new(),
+            meeting_goal: None,
+            key_highlights: None,
+            action_items: Some(vec![action1, action2]),
+            phase1_agreed: None,
+            phase2_deferred: None,
+            detailed_topics: None,
+            participants: None,
+            engine_used: None,
+            summary_provider: None,
+            tags: None,
+        };
+
+        let md = MeetingExporter::export_notes_markdown(&record, None, None);
+        // "PENDING" is a meaningless placeholder assignee and must be stripped entirely.
+        assert!(md.contains("- [ ] Fix pipeline\n"));
+        assert!(!md.contains("PENDING"));
+        // A real assignee name must still render with the ➔ marker.
+        assert!(md.contains("- [ ] Database migration ➔ **Sarah Jenkins**\n"));
     }
 }

@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::{Read, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tauri::Emitter;
 
@@ -231,7 +231,11 @@ pub fn download_and_install_update(
         }
     };
 
-    if !target_url.starts_with("https://github.com/")
+    // Scoped to this project's own release assets only: a generic "https://github.com/"
+    // prefix would also accept a download URL pointing at any attacker-controlled repo.
+    // objects.githubusercontent.com is GitHub's own CDN redirect target for large assets
+    // and uses opaque signed object keys, so it can't be scoped by path the same way.
+    if !target_url.starts_with("https://github.com/sewox/EchoMind/releases/download/")
         && !target_url.starts_with("https://objects.githubusercontent.com/")
     {
         return Err("Güvenli olmayan güncelleme adresi.".to_string());
@@ -240,7 +244,7 @@ pub fn download_and_install_update(
     let raw_name = filename.unwrap_or_else(|| {
         target_url
             .split('/')
-            .last()
+            .next_back()
             .unwrap_or("echomind_update_package")
             .to_string()
     });
@@ -380,9 +384,7 @@ pub fn download_and_install_update(
     Ok(path_str)
 }
 
-fn launch_installer(path: &PathBuf) -> Result<(), String> {
-    let _path_str = path.to_string_lossy();
-
+fn launch_installer(path: &Path) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
         // On macOS, open the .dmg or update file with the system default handler
@@ -394,6 +396,7 @@ fn launch_installer(path: &PathBuf) -> Result<(), String> {
 
     #[cfg(target_os = "windows")]
     {
+        let path_str = path.to_string_lossy();
         if path_str.ends_with(".msi") {
             std::process::Command::new("msiexec")
                 .args(["/i", &path_str, "/passive"])
@@ -423,42 +426,6 @@ fn launch_installer(path: &PathBuf) -> Result<(), String> {
     Ok(())
 }
 
-#[tauri::command]
-pub fn open_release_url(url: String) -> Result<(), String> {
-    let clean_url = url.trim();
-    if clean_url.is_empty()
-        || (!clean_url.starts_with("https://github.com/") && !clean_url.starts_with("https://"))
-    {
-        return Err("Geçersiz veya güvensiz URL formatı".to_string());
-    }
-
-    #[cfg(target_os = "macos")]
-    {
-        std::process::Command::new("open")
-            .arg(clean_url)
-            .spawn()
-            .map_err(|e| format!("Tarayıcı açılamadı: {}", e))?;
-    }
-
-    #[cfg(target_os = "windows")]
-    {
-        std::process::Command::new("cmd")
-            .args(["/C", "start", "", clean_url])
-            .spawn()
-            .map_err(|e| format!("Tarayıcı açılamadı: {}", e))?;
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-        std::process::Command::new("xdg-open")
-            .arg(clean_url)
-            .spawn()
-            .map_err(|e| format!("Tarayıcı açılamadı: {}", e))?;
-    }
-
-    Ok(())
-}
-
 #[cfg(test)]
 pub mod tests {
     use super::*;
@@ -479,14 +446,6 @@ pub mod tests {
         assert!(!is_version_newer("0.1.9", "0.2.0"));
         assert!(!is_version_newer("0.2.0", "0.2.1"));
         assert!(!is_version_newer("0.0.1", "1.0.0"));
-    }
-
-    #[test]
-    fn test_open_release_url_validation() {
-        assert!(open_release_url("javascript:alert(1)".to_string()).is_err());
-        assert!(open_release_url("file:///etc/passwd".to_string()).is_err());
-        assert!(open_release_url("".to_string()).is_err());
-        assert!(open_release_url("https://github.com/sewox/EchoMind/releases".to_string()).is_ok());
     }
 
     #[test]

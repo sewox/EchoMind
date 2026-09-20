@@ -67,6 +67,16 @@ pub struct StorageEngine {
 }
 
 pub fn get_storage_dir() -> PathBuf {
+    // Tests must never read or write the real project `data/` directory: a decrypt
+    // failure on committed demo data (e.g. encrypted under a different machine's
+    // key) plus a subsequent save would silently overwrite it with empty/test data.
+    // This bit the repo's own `data/meetings_history.json` once already.
+    #[cfg(test)]
+    {
+        std::env::temp_dir().join("echomind_test_data")
+    }
+
+    #[cfg(not(test))]
     if let Ok(cwd) = std::env::current_dir() {
         // If cwd is inside src-tauri (e.g. during cargo run), step out to project root
         let root = if cwd.ends_with("src-tauri") {
@@ -76,7 +86,14 @@ pub fn get_storage_dir() -> PathBuf {
         };
         return root.join("data");
     }
+    #[cfg(not(test))]
     PathBuf::from("data")
+}
+
+impl Default for StorageEngine {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl StorageEngine {
@@ -116,6 +133,28 @@ impl StorageEngine {
             }
             Err(e) => {
                 eprintln!("⚠️ Şifreli veritabanı yükleme uyarısı: {}", e);
+                // A decrypt/parse failure must never be treated as "no history": if the
+                // caller proceeds with an empty in-memory list and later calls
+                // save_to_disk(), that would silently overwrite the real (but unreadable)
+                // file with nothing. Preserve the original bytes as a backup first, so a
+                // corrupt or undecryptable file can never be permanently lost.
+                if let Ok(meta) = fs::metadata(&self.file_path) {
+                    if meta.len() > 0 {
+                        let timestamp = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .map(|d| d.as_secs())
+                            .unwrap_or(0);
+                        let backup_path = self
+                            .file_path
+                            .with_extension(format!("json.corrupt-{}", timestamp));
+                        if fs::copy(&self.file_path, &backup_path).is_ok() {
+                            eprintln!(
+                                "⚠️ Okunamayan veritabanı kaybolmaması için yedeklendi: {}",
+                                backup_path.display()
+                            );
+                        }
+                    }
+                }
                 Ok(Vec::new())
             }
         }
@@ -360,7 +399,7 @@ pub fn save_current_meeting(title: String, duration_seconds: u64) -> Result<Meet
 
     // Deduplicate segments (avoid any accidental duplicate timestamps/texts)
     let mut deduplicated_segments: Vec<TranscriptSegment> = Vec::new();
-    for (_idx, seg) in segments.into_iter().enumerate() {
+    for seg in segments.into_iter() {
         let is_dup = deduplicated_segments.iter().any(|existing| {
             existing.start_time_ms == seg.start_time_ms
                 && existing.end_time_ms == seg.end_time_ms
@@ -632,6 +671,56 @@ mod tests {
         let metadata = fs::metadata(&test_flac_path).unwrap();
         assert!(metadata.len() > 0);
         let _ = fs::remove_dir_all(&sample_dir);
+    }
+
+    #[test]
+    fn test_load_from_disk_backs_up_undecryptable_file_instead_of_losing_it() {
+        let temp_dir = std::env::temp_dir();
+        let file_path = temp_dir.join(format!("echomind_test_corrupt_{}.json", std::process::id()));
+
+        // Bytes that look like the current AEAD format but are not valid ciphertext
+        // for this installation's key — e.g. a file from a different machine/user.
+        let mut fake_ciphertext = b"ECHOMIND_ENC_V2\0".to_vec();
+        fake_ciphertext.extend_from_slice(&[0u8; 12]); // nonce
+        fake_ciphertext.extend_from_slice(b"not a real ciphertext, will fail auth");
+        fs::write(&file_path, &fake_ciphertext).unwrap();
+
+        let engine = StorageEngine {
+            file_path: file_path.clone(),
+            meetings: Arc::new(Mutex::new(Vec::new())),
+        };
+
+        let result = engine.load_from_disk().unwrap();
+        assert!(result.is_empty());
+
+        // The original undecryptable bytes must still exist somewhere on disk.
+        let parent = file_path.parent().unwrap();
+        let stem = file_path.file_stem().unwrap().to_string_lossy();
+        let backup_found = fs::read_dir(parent)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .any(|e| {
+                let name = e.file_name().to_string_lossy().to_string();
+                name.starts_with(&format!("{}.json.corrupt-", stem))
+                    && fs::read(e.path())
+                        .map(|b| b == fake_ciphertext)
+                        .unwrap_or(false)
+            });
+        assert!(
+            backup_found,
+            "undecryptable file must be backed up, never silently discarded"
+        );
+
+        // Cleanup
+        let _ = fs::remove_file(&file_path);
+        if let Ok(entries) = fs::read_dir(parent) {
+            for e in entries.filter_map(|e| e.ok()) {
+                let name = e.file_name().to_string_lossy().to_string();
+                if name.starts_with(&format!("{}.json.corrupt-", stem)) {
+                    let _ = fs::remove_file(e.path());
+                }
+            }
+        }
     }
 
     #[test]

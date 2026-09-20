@@ -105,8 +105,9 @@ mod e2e_qa_suite {
         for i in 0..10 {
             let start = i * 60 * sr;
             let end = start + 25 * sr;
-            for j in start..end {
-                mock_audio[j] = (j as f32 * 0.05).sin() * 0.4;
+            for (offset, sample) in mock_audio[start..end].iter_mut().enumerate() {
+                let j = start + offset;
+                *sample = (j as f32 * 0.05).sin() * 0.4;
             }
         }
 

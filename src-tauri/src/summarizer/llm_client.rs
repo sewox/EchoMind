@@ -171,6 +171,7 @@ YALNIZCA VE YALNIZCA AŞAĞIDAKİ GEÇERLİ JSON ŞEMASINDA YANIT VER:\n\
         )
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn generate_openai_compatible_summary(
         segments: &[TranscriptSegment],
         api_key: &str,

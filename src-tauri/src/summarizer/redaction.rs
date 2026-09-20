@@ -70,7 +70,7 @@ impl TranscriptRedactor {
 
     /// Run full auto-redaction on a list of segments
     pub fn redact_segments(
-        segments: &mut Vec<TranscriptSegment>,
+        segments: &mut [TranscriptSegment],
         provider: Option<&str>,
         api_key: Option<&str>,
     ) {

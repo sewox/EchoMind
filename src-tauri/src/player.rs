@@ -30,6 +30,12 @@ pub struct PlayerHandle {
     sender: Sender<PlayerCommand>,
 }
 
+impl Default for PlayerHandle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PlayerHandle {
     pub fn new() -> Self {
         let (tx, rx) = channel::<PlayerCommand>();

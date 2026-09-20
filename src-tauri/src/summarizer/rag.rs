@@ -90,16 +90,15 @@ impl RAGEngine {
         for m in meetings {
             let mut matched = false;
 
-            if is_action_intent
+            let action_intent_matched = is_action_intent
                 && m.action_items
                     .as_ref()
                     .map(|a| !a.is_empty())
-                    .unwrap_or(false)
-            {
-                matched = true;
-            } else if is_decision_intent && !m.key_decisions.is_empty() {
-                matched = true;
-            } else if is_goal_intent && m.meeting_goal.is_some() {
+                    .unwrap_or(false);
+            let decision_intent_matched = is_decision_intent && !m.key_decisions.is_empty();
+            let goal_intent_matched = is_goal_intent && m.meeting_goal.is_some();
+
+            if action_intent_matched || decision_intent_matched || goal_intent_matched {
                 matched = true;
             } else {
                 for t in &tokens {
@@ -301,7 +300,7 @@ impl RAGEngine {
             }
         }
 
-        results.sort_by(|a, b| b.score.cmp(&a.score));
+        results.sort_by_key(|r| std::cmp::Reverse(r.score));
         results
     }
 
@@ -524,7 +523,7 @@ Kullanıcının sorusunu bu verilere dayanarak net, akıcı, profesyonel ve Tür
                                 status_badge, a.task, assignee
                             ));
                         }
-                        ans.push_str("\n");
+                        ans.push('\n');
                     }
                 }
             }
@@ -558,7 +557,7 @@ Kullanıcının sorusunu bu verilere dayanarak net, akıcı, profesyonel ve Tür
                         total_decisions += 1;
                         ans.push_str(&format!("• {}\n", d));
                     }
-                    ans.push_str("\n");
+                    ans.push('\n');
                 }
             }
 
@@ -589,7 +588,7 @@ Kullanıcının sorusunu bu verilere dayanarak net, akıcı, profesyonel ve Tür
                         ans.push_str(&format!("• **Ertelenen Konular:** {}\n", p2.join(", ")));
                     }
                 }
-                ans.push_str("\n");
+                ans.push('\n');
             }
             ans.push_str("--------------------------------------------------\n");
             ans.push_str("*EchoMind Local RAG Pipeline & Semantic Knowledge Retrieval Engine*");
@@ -694,7 +693,7 @@ Kullanıcının sorusunu bu verilere dayanarak net, akıcı, profesyonel ve Tür
             for (mtg_title, mtg_date, dec) in matching_decisions.iter().take(6) {
                 ans.push_str(&format!("• **{}** (*{} - {}*)\n", dec, mtg_title, mtg_date));
             }
-            ans.push_str("\n");
+            ans.push('\n');
         }
 
         if !matching_actions.is_empty() {
@@ -711,7 +710,7 @@ Kullanıcının sorusunu bu verilere dayanarak net, akıcı, profesyonel ve Tür
                     act.task, assignee, status_badge, mtg_title, mtg_date
                 ));
             }
-            ans.push_str("\n");
+            ans.push('\n');
         }
 
         if !matching_topics.is_empty() {
@@ -725,7 +724,7 @@ Kullanıcının sorusunu bu verilere dayanarak net, akıcı, profesyonel ve Tür
                     ans.push_str(&format!("  - {}\n", b));
                 }
             }
-            ans.push_str("\n");
+            ans.push('\n');
         }
 
         ans.push_str("--------------------------------------------------\n");

@@ -7,6 +7,7 @@ use std::time::Instant;
 pub struct SummaryTranslator;
 
 impl SummaryTranslator {
+    #[allow(clippy::too_many_arguments)]
     pub fn translate_summary(
         summary: &SummaryResult,
         target_language: &str,
@@ -189,6 +190,7 @@ STRICT CONTEXT & INTEGRITY PRESERVATION RULES:\n\
         Err("Gemini çeviri isteği başarısız oldu".to_string())
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn translate_with_openai_compatible(
         system_prompt: &str,
         user_prompt: &str,

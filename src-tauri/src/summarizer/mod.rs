@@ -26,6 +26,12 @@ use std::time::Instant;
 
 pub struct SummarizerEngine;
 
+impl Default for SummarizerEngine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SummarizerEngine {
     pub fn new() -> Self {
         Self
@@ -125,6 +131,7 @@ impl SummarizerEngine {
         LocalSummaryExtractor::generate_local_heuristic_summary(segments, start_time)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn translate_summary(
         summary: &SummaryResult,
         target_language: &str,
@@ -637,12 +644,12 @@ pub async fn save_meeting_export_file(
         .filter(|c| c.is_alphanumeric())
         .collect();
     let dialog = rfd::AsyncFileDialog::new()
-        .set_file_name(&format!("EchoMind_Rapor_{}.{}", safe_id, safe_ext))
+        .set_file_name(format!("EchoMind_Rapor_{}.{}", safe_id, safe_ext))
         .add_filter(file_filter_name, &[default_ext]);
 
     if let Some(file_handle) = dialog.save_file().await {
         let path = file_handle.path();
-        std::fs::write(&path, content.as_bytes())
+        std::fs::write(path, content.as_bytes())
             .map_err(|e| format!("Dosya kaydedilemedi: {}", e))?;
         Ok(path.to_string_lossy().to_string())
     } else {

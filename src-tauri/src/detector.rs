@@ -5,6 +5,14 @@ use std::time::Duration;
 use sysinfo::System;
 use tauri::{AppHandle, Emitter, Manager};
 
+/// Escapes a value for safe interpolation inside a double-quoted AppleScript string literal.
+/// All current callers pass hardcoded app names, but this closes the injection path
+/// (e.g. `do shell script` via an unescaped quote/backslash) for any future caller that doesn't.
+#[cfg(target_os = "macos")]
+fn escape_applescript_string(input: &str) -> String {
+    input.replace('\\', "\\\\").replace('"', "\\\"")
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct MeetingAppInfo {
     pub app_id: String,
@@ -52,6 +60,12 @@ pub struct MeetingDetector {
     pub is_running: Arc<Mutex<bool>>,
     pub detected_apps: Arc<Mutex<Vec<MeetingAppInfo>>>,
     pub settings: Arc<Mutex<DetectorSettings>>,
+}
+
+impl Default for MeetingDetector {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl MeetingDetector {
@@ -121,7 +135,7 @@ impl MeetingDetector {
             let mut found = false;
             let mut matched_proc_name = String::new();
 
-            for (_pid, process) in sys.processes() {
+            for process in sys.processes().values() {
                 let proc_name = process.name().to_string_lossy().to_lowercase();
                 let base_name = proc_name.strip_suffix(".exe").unwrap_or(&proc_name);
 
@@ -194,15 +208,16 @@ impl MeetingDetector {
                 .collect();
 
             for browser in running_browsers {
+                let safe_browser = escape_applescript_string(browser);
                 let script = if browser == "Safari" {
                     format!(
                         "tell application \"{}\" to if running then get {{name, URL}} of tabs of every window",
-                        browser
+                        safe_browser
                     )
                 } else {
                     format!(
                         "tell application \"{}\" to if running then get {{title, URL}} of tabs of every window & name of every window",
-                        browser
+                        safe_browser
                     )
                 };
 
@@ -221,7 +236,7 @@ impl MeetingDetector {
                             || titles_str.contains("google meet")
                         {
                             let meeting_code = raw_stdout
-                                .split(|c: char| c == ',' || c == ' ' || c == '\n')
+                                .split([',', ' ', '\n'])
                                 .find(|chunk| chunk.contains("meet.google.com/"))
                                 .and_then(|url| url.split("meet.google.com/").nth(1))
                                 .map(|code| code.split('?').next().unwrap_or(code))
@@ -586,7 +601,8 @@ impl MeetingDetector {
 
                             #[cfg(target_os = "macos")]
                             {
-                                let app_name = &current_primary.display_name;
+                                let app_name =
+                                    escape_applescript_string(&current_primary.display_name);
                                 let notif_script = format!(
                                     "display notification \"{} toplantısı başladı. Kaydı başlatmak için tıklayın.\" with title \"EchoMind Asistan\" subtitle \"Toplantı Başladı\" sound name \"Glass\"",
                                     app_name
@@ -781,11 +797,11 @@ mod tests {
     fn test_detector_status_and_settings() {
         let detector = MeetingDetector::new();
         let status = detector.get_status();
-        assert_eq!(status.is_active, false);
+        assert!(!status.is_active);
         assert_eq!(status.active_count, 0);
-        assert_eq!(status.settings.enabled, true);
-        assert_eq!(status.settings.auto_start_record, false);
-        assert_eq!(status.settings.auto_stop_on_app_close, true);
+        assert!(status.settings.enabled);
+        assert!(!status.settings.auto_start_record);
+        assert!(status.settings.auto_stop_on_app_close);
 
         // Update settings
         let updated = detector.update_settings(DetectorSettings {
@@ -795,8 +811,8 @@ mod tests {
             ignored_apps: vec!["discord".to_string()],
         });
 
-        assert_eq!(updated.settings.auto_start_record, true);
-        assert_eq!(updated.settings.auto_stop_on_app_close, false);
+        assert!(updated.settings.auto_start_record);
+        assert!(!updated.settings.auto_stop_on_app_close);
         assert_eq!(updated.settings.ignored_apps, vec!["discord".to_string()]);
     }
 }

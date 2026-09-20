@@ -591,6 +591,7 @@ pub async fn process_audio_file_path(
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn retranscribe_meeting(
     meeting_id: String,
     language: Option<String>,
@@ -831,29 +832,6 @@ pub async fn pick_and_import_audio_file(
         }
         None => Ok(None),
     }
-}
-
-#[tauri::command]
-pub fn read_audio_file_bytes(file_path: String) -> Result<Vec<u8>, String> {
-    let mut path = PathBuf::from(&file_path);
-
-    if !path.exists() {
-        if let Ok(cwd) = std::env::current_dir() {
-            let alt1 = cwd.join(&file_path);
-            let alt2 = cwd.join("src-tauri").join(&file_path);
-            if alt1.exists() {
-                path = alt1;
-            } else if alt2.exists() {
-                path = alt2;
-            }
-        }
-    }
-
-    if !path.exists() {
-        return Err(format!("Ses dosyası diskte bulunamadı: {}", file_path));
-    }
-
-    std::fs::read(&path).map_err(|e| format!("Dosya okuma hatası: {}", e))
 }
 
 #[cfg(test)]

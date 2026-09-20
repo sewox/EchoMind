@@ -63,6 +63,12 @@ impl<'a> Drop for TranscribeGuard<'a> {
     }
 }
 
+impl Default for GlobalTranscriberEngine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl GlobalTranscriberEngine {
     pub fn new() -> Self {
         // Zero-RAM Idle Startup:
@@ -88,7 +94,7 @@ impl GlobalTranscriberEngine {
         };
 
         if self.init_model(&model_path).is_err() {
-            let _ = self.init_model("models/ggml-base.bin")?;
+            self.init_model("models/ggml-base.bin")?;
         }
         Ok(())
     }
@@ -427,7 +433,7 @@ pub fn split_audio_at_natural_pauses(
         return Vec::new();
     }
 
-    let target_chunk_samples = (target_chunk_sec as usize) * (sample_rate as usize);
+    let target_chunk_samples = target_chunk_sec * (sample_rate as usize);
     if samples.len() <= target_chunk_samples {
         return vec![(0, samples.to_vec())];
     }

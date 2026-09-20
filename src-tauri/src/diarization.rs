@@ -35,10 +35,12 @@ pub fn extract_segment_features(samples: &[f32], sample_rate: u32) -> AcousticFe
 
     if samples.len() < frame_size {
         // Fallback for extremely short bursts
-        let mut feats = AcousticFeatures::default();
-        feats.rms_energy =
+        let rms_energy =
             (samples.iter().map(|&s| s * s).sum::<f32>() / samples.len().max(1) as f32).sqrt();
-        return feats;
+        return AcousticFeatures {
+            rms_energy,
+            ..Default::default()
+        };
     }
 
     let min_lag = (sample_rate / 400) as usize; // ~40 samples (400 Hz)
@@ -231,8 +233,7 @@ pub fn cluster_speakers(
                 .filter_map(|(idx, &c)| if c == c_i { Some(idx) } else { None })
                 .collect();
 
-            for j in (i + 1)..unique_clusters.len() {
-                let c_j = unique_clusters[j];
+            for &c_j in &unique_clusters[(i + 1)..] {
                 let segs_j: Vec<usize> = cluster_assignments
                     .iter()
                     .enumerate()
@@ -647,10 +648,14 @@ mod tests {
 
     #[test]
     fn test_acoustic_distance_stability() {
-        let mut a = AcousticFeatures::default();
-        a.pitch_f0 = 130.0;
-        let mut b = AcousticFeatures::default();
-        b.pitch_f0 = 140.0;
+        let a = AcousticFeatures {
+            pitch_f0: 130.0,
+            ..Default::default()
+        };
+        let b = AcousticFeatures {
+            pitch_f0: 140.0,
+            ..Default::default()
+        };
 
         let dist = acoustic_distance(&a, &b);
         assert!(dist < 0.3); // Close pitch should have low acoustic distance

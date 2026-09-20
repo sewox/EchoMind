@@ -64,6 +64,12 @@ pub struct AudioDeviceInfo {
     pub default_sample_rate: u32,
 }
 
+impl Default for GlobalAudioEngine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl GlobalAudioEngine {
     pub fn new() -> Self {
         GlobalAudioEngine {
@@ -462,7 +468,7 @@ fn process_audio_data(
 
     // 5. Resample to 16000 Hz Mono
     let target_sample_rate = 16000.0;
-    let ratio = src_sample_rate as f64 / target_sample_rate as f64;
+    let ratio = src_sample_rate as f64 / target_sample_rate;
     let resampled_len = (filtered_mono.len() as f64 / ratio) as usize;
 
     let mut resampled_pcm = Vec::with_capacity(resampled_len);
@@ -564,6 +570,17 @@ pub fn start_meeting_recording(
 
 #[tauri::command]
 pub fn stop_audio_capture() -> Result<AudioStatus, String> {
+    let engine = get_global_audio_engine();
+    engine.stop()?;
+    Ok(engine.get_status())
+}
+
+/// Stops capture without persisting the meeting, for the "discard recording" UI flow.
+/// The audio engine itself never writes to disk on stop, so this is functionally
+/// identical to `stop_audio_capture`; the distinct command name lets the frontend
+/// skip its post-stop save step when the user explicitly cancels.
+#[tauri::command]
+pub fn cancel_audio_capture() -> Result<AudioStatus, String> {
     let engine = get_global_audio_engine();
     engine.stop()?;
     Ok(engine.get_status())
