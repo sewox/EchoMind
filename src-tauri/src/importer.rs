@@ -11,6 +11,20 @@ use symphonia::core::probe::Hint;
 
 use crate::storage::MeetingRecord;
 
+/// Appends a visible warning when the local Whisper engine silently fell back to a
+/// smaller/lower-quality model because the selected one failed to load (e.g. not
+/// yet downloaded) — otherwise this only shows up if the user checks Settings.
+fn with_model_fallback_warning(label: String) -> String {
+    if crate::transcriber::get_global_transcriber()
+        .get_model_status()
+        .used_fallback_model
+    {
+        format!("{} ⚠️ (İstenen model yüklenemedi, Base'e düşüldü)", label)
+    } else {
+        label
+    }
+}
+
 /// Decodes any external audio file (.mp3, .m4a, .opus, .ogg, .wav, .flac, .aac, .3gp, .caf) into 16,000 Hz Mono float32 PCM samples.
 pub fn decode_audio_file_to_pcm16k(file_path: &Path) -> Result<(Vec<f32>, u64), String> {
     let file = File::open(file_path).map_err(|e| format!("Ses dosyası açılamadı: {}", e))?;
@@ -352,10 +366,10 @@ pub async fn import_audio_file(
             if !key.trim().is_empty() {
                 format!("⚡ Bulut Zekası ({})", prov.to_uppercase())
             } else {
-                "🔒 Bilgisayarınızda (Standart Mod)".to_string()
+                with_model_fallback_warning("🔒 Bilgisayarınızda (Standart Mod)".to_string())
             }
         } else {
-            "🔒 Bilgisayarınızda (Standart Mod)".to_string()
+            with_model_fallback_warning("🔒 Bilgisayarınızda (Standart Mod)".to_string())
         };
 
         let final_title = if let Some(ref st) = summary_res.smart_title {
@@ -754,7 +768,7 @@ pub async fn retranscribe_meeting(
                     Some("base") => "Hızlı Mod",
                     _ => "Standart Mod",
                 };
-                format!("🔒 Bilgisayarınızda ({})", model_name)
+                with_model_fallback_warning(format!("🔒 Bilgisayarınızda ({})", model_name))
             }
         } else {
             let model_name = match model_version.as_deref() {
