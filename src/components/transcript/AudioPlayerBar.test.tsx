@@ -43,4 +43,18 @@ describe("AudioPlayerBar Component", () => {
     const pauseBtn = screen.getByRole("button", { name: /Durdur/i });
     expect(pauseBtn).toBeInTheDocument();
   });
+
+  it("falls back to a default duration and title when none are provided", () => {
+    render(
+      <AudioPlayerBar
+        {...defaultProps}
+        audioDuration={0}
+        meetingDuration={undefined}
+        meetingTitle={undefined}
+      />,
+    );
+
+    expect(screen.getByText("Toplantı Ses Kaydı")).toBeInTheDocument();
+    expect(screen.getByText("01:05 / 01:40")).toBeInTheDocument();
+  });
 });

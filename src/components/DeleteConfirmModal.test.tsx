@@ -98,4 +98,17 @@ describe("DeleteConfirmModal Component", () => {
     expect(onConfirm).not.toHaveBeenCalled();
     expect(onClose).toHaveBeenCalledTimes(1);
   });
+
+  it("falls back to a placeholder title when the meeting has no title", () => {
+    render(
+      <DeleteConfirmModal
+        isOpen={true}
+        meeting={{ ...mockMeeting, title: "" }}
+        onConfirm={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("İsimsiz Toplantı")).toBeInTheDocument();
+  });
 });
