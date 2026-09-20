@@ -231,49 +231,51 @@ impl GlobalTranscriberEngine {
             .as_mut()
             .ok_or_else(|| "Whisper modeli henüz yüklü değil".to_string())?;
 
-        // VAD-Based Intelligent Natural Pause Audio Slicing:
-        // Slices audio strictly at natural silence dips between sentences (approx 4-5 minutes nominal).
-        // This eliminates cutting words in the middle and avoids Whisper hallucination loops.
-        let natural_chunks = split_audio_at_natural_pauses(samples, 16000, 240);
-
         let cpu_count = std::thread::available_parallelism()
             .map(|n| n.get())
             .unwrap_or(8);
         let n_threads = (cpu_count.saturating_sub(1)).clamp(4, 12) as i32;
         let is_auto = language.is_empty() || language.eq_ignore_ascii_case("auto");
-        let whisper_lang = if is_auto { None } else { Some(language) };
 
-        // When the language is auto-detected, a low detection probability (e.g. p≈0.24)
-        // is a strong signal that the audio is noisy/ambiguous even if Whisper still
-        // produces fluent-looking, high-token-probability garbage text. Run one cheap
-        // encode-only pass on the first chunk to get that probability and fold it into
-        // every segment's confidence score below, instead of trusting token probability
-        // alone (which doesn't catch this failure mode).
-        let lang_confidence_factor: f32 = if is_auto {
-            natural_chunks
-                .first()
-                .and_then(|(_, first_chunk_samples)| {
-                    ctx.create_state()
-                        .and_then(|mut lang_state| {
-                            lang_state.pcm_to_mel(first_chunk_samples, n_threads as usize)?;
-                            lang_state.encode(0, n_threads as usize)?;
-                            lang_state.lang_detect(0, n_threads as usize)
-                        })
-                        .ok()
-                })
-                .and_then(|(lang_id, probs)| probs.get(lang_id as usize).copied())
-                .unwrap_or(1.0)
+        // VAD-Based Intelligent Natural Pause Audio Slicing:
+        // Slices audio strictly at natural silence dips between sentences.
+        // This eliminates cutting words in the middle and avoids Whisper hallucination loops.
+        //
+        // In auto-detect mode, Whisper only detects language ONCE per full() call and then
+        // decodes the entire chunk under that single language — a recording that switches
+        // between several unrelated languages mid-meeting (e.g. TR → EN → KO → RU) gets
+        // everything after the first language forced through the wrong token space,
+        // producing silence/garbage for every later block (verified against a real
+        // TR→EN→DE→FR golden fixture). segment_by_detected_language() below solves this
+        // properly by detecting language on short natural-pause-aligned probe windows across
+        // the whole recording first, then merging consecutive same-language windows into
+        // decode chunks — so each language block gets decoded under its own, already-known
+        // language instead of whatever Whisper locks onto first. For an explicit (non-auto)
+        // language selection there's no ambiguity to resolve, so it keeps the simple single
+        // forced-language chunking.
+        let decode_chunks: Vec<DecodeChunk> = if is_auto {
+            segment_by_detected_language(ctx, samples, n_threads)
         } else {
-            1.0
+            split_audio_at_natural_pauses(samples, 16000, 240)
+                .into_iter()
+                .map(|(offset_ms, chunk_samples)| DecodeChunk {
+                    offset_ms,
+                    samples: chunk_samples,
+                    forced_lang: Some(language.to_string()),
+                    lang_confidence: 1.0,
+                })
+                .collect()
         };
 
-        let prompt = match language {
-            "tr" => "Bu bir Türkçe iş toplantısı ve diyalog ses kaydı dökümüdür. Lütfen Türkçe imla kurallarına, noktalama işaretlerine ve tam cümle yapılarına uygun olarak döküm yapınız.",
-            "en" => "This is an English business meeting, discussion, and dialogue audio recording. Please transcribe accurately with proper English punctuation, grammar, and technical terminology.",
-            "de" => "Dies ist eine geschäftliche Besprechung und Dialogaufnahme. Bitte transkribieren Sie mit korrekter Grammatik und Zeichensetzung.",
-            "fr" => "Il s'agit d'un enregistrement d'une réunion professionnelle et d'un dialogue. Veuillez transcrire avec une ponctuation correcte et une grammaire naturelle.",
-            "es" => "Esta es una grabación de una reunión de negocios y diálogo. Transcriba con la puntuación correcta y una gramática adecuada.",
-            _ => "Multilingual business meeting and dialogue audio recording. Please accurately transcribe spoken speech with natural punctuation and terminology.",
+        let prompt_for = |lang: Option<&str>| -> &'static str {
+            match lang.unwrap_or("") {
+                "tr" => "Bu bir Türkçe iş toplantısı ve diyalog ses kaydı dökümüdür. Lütfen Türkçe imla kurallarına, noktalama işaretlerine ve tam cümle yapılarına uygun olarak döküm yapınız.",
+                "en" => "This is an English business meeting, discussion, and dialogue audio recording. Please transcribe accurately with proper English punctuation, grammar, and technical terminology.",
+                "de" => "Dies ist eine geschäftliche Besprechung und Dialogaufnahme. Bitte transkribieren Sie mit korrekter Grammatik und Zeichensetzung.",
+                "fr" => "Il s'agit d'un enregistrement d'une réunion professionnelle et d'un dialogue. Veuillez transcrire avec une ponctuation correcte et une grammaire naturelle.",
+                "es" => "Esta es una grabación de una reunión de negocios y diálogo. Transcriba con la puntuación correcta y una gramática adecuada.",
+                _ => "Multilingual business meeting and dialogue audio recording. Please accurately transcribe spoken speech with natural punctuation and terminology.",
+            }
         };
 
         let mut new_segments = Vec::new();
@@ -284,14 +286,19 @@ impl GlobalTranscriberEngine {
 
         let total_duration_ms = ((samples.len() as f64 / 16000.0) * 1000.0) as u64;
 
-        for (chunk_idx, (chunk_time_offset_ms, chunk_samples)) in natural_chunks.iter().enumerate()
-        {
+        for (chunk_idx, chunk) in decode_chunks.iter().enumerate() {
+            let chunk_time_offset_ms = chunk.offset_ms;
+            let chunk_samples = &chunk.samples;
+            let lang_confidence_factor = chunk.lang_confidence;
+            let chunk_whisper_lang = chunk.forced_lang.as_deref();
+            let prompt = prompt_for(chunk_whisper_lang);
+
             let mut state_ctx = ctx
                 .create_state()
                 .map_err(|e| format!("Whisper state hatası: {}", e))?;
             let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 5 });
             params.set_n_threads(n_threads);
-            params.set_language(whisper_lang);
+            params.set_language(chunk_whisper_lang);
             params.set_initial_prompt(prompt);
             params.set_no_context(true); // Isolate chunks from previous hallucination loops
             params.set_single_segment(false);
@@ -484,7 +491,12 @@ pub fn split_audio_at_natural_pauses(
         return vec![(0, samples.to_vec())];
     }
 
-    let search_window_samples = 15 * (sample_rate as usize); // 15 seconds search window
+    // The pause search window must stay smaller than the target chunk itself, or the
+    // "ideal" split point can wander back near the start of the chunk (or past its end)
+    // once callers started passing much shorter targets (e.g. 8-15s probe windows for
+    // language-switch detection) — this used to be a flat 15s regardless of target.
+    let search_window_sec = (target_chunk_sec / 3).clamp(1, 15);
+    let search_window_samples = search_window_sec * (sample_rate as usize);
     let frame_size = (sample_rate as usize) / 4; // 250ms RMS frame
 
     let mut result = Vec::new();
@@ -527,6 +539,84 @@ pub fn split_audio_at_natural_pauses(
     }
 
     result
+}
+
+/// A ready-to-decode audio chunk with the language it should be forced to (already
+/// determined — either by the user's explicit selection or by `segment_by_detected_language`
+/// below) and that language's detection confidence, folded into the chunk's segments later.
+struct DecodeChunk {
+    offset_ms: u64,
+    samples: Vec<f32>,
+    forced_lang: Option<String>,
+    lang_confidence: f32,
+}
+
+/// Splits a recording into decode-ready chunks aligned to actual language boundaries,
+/// instead of an arbitrary duration. Whisper only auto-detects language ONCE per `full()`
+/// call and decodes everything passed to that call under that single language, so a
+/// recording that switches between several unrelated languages (e.g. Turkish → English →
+/// Korean → Russian in the same meeting) needs each language's audio isolated into its own
+/// chunk to be transcribed correctly at all — a fixed chunk duration will eventually bundle
+/// two different languages together no matter how it's tuned.
+///
+/// Two passes:
+/// 1. Probe: slice the recording into short (8s) natural-pause-aligned windows and detect
+///    each window's dominant language via a cheap encode-only pass (no full decode).
+/// 2. Merge: fold consecutive windows sharing the same detected language into one run, so a
+///    long monolingual stretch still becomes one reasonably-sized decode chunk (capped at
+///    ~180s) rather than being fragmented into dozens of tiny ones.
+fn segment_by_detected_language(
+    ctx: &WhisperContext,
+    samples: &[f32],
+    n_threads: i32,
+) -> Vec<DecodeChunk> {
+    const PROBE_WINDOW_SEC: usize = 8;
+    const MAX_RUN_SAMPLES: usize = 180 * 16000;
+
+    let probe_windows = split_audio_at_natural_pauses(samples, 16000, PROBE_WINDOW_SEC);
+
+    let detect_window = |window_samples: &[f32]| -> (Option<String>, f32) {
+        let detection = ctx.create_state().ok().and_then(|mut lang_state| {
+            lang_state
+                .pcm_to_mel(window_samples, n_threads as usize)
+                .ok()?;
+            lang_state.encode(0, n_threads as usize).ok()?;
+            lang_state.lang_detect(0, n_threads as usize).ok()
+        });
+        match detection {
+            Some((lang_id, probs)) => {
+                let prob = probs.get(lang_id as usize).copied().unwrap_or(1.0);
+                let code = whisper_rs::get_lang_str(lang_id).map(|s| s.to_string());
+                (code, prob)
+            }
+            None => (None, 1.0),
+        }
+    };
+
+    let mut runs: Vec<DecodeChunk> = Vec::new();
+    for (offset_ms, window_samples) in probe_windows {
+        let (lang_code, prob) = detect_window(&window_samples);
+
+        let can_extend_last = runs
+            .last()
+            .map(|run| run.forced_lang == lang_code && run.samples.len() < MAX_RUN_SAMPLES)
+            .unwrap_or(false);
+
+        if can_extend_last {
+            let run = runs.last_mut().unwrap();
+            run.samples.extend_from_slice(&window_samples);
+            run.lang_confidence = run.lang_confidence.min(prob);
+        } else {
+            runs.push(DecodeChunk {
+                offset_ms,
+                samples: window_samples,
+                forced_lang: lang_code,
+                lang_confidence: prob,
+            });
+        }
+    }
+
+    runs
 }
 
 pub fn get_global_transcriber() -> &'static GlobalTranscriberEngine {
