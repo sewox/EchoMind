@@ -1075,7 +1075,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   {t("updater.checkNowButton") || "Uygulama Güncellemeleri"}
                 </span>
                 <span className="text-[10px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 px-2 py-0.5 rounded-full font-bold">
-                  v0.2.4
+                  v0.2.5
                 </span>
               </div>
 
@@ -1113,8 +1113,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400 font-medium">
                       <Check className="w-3.5 h-3.5" />
                       {t("updater.upToDateDesc", {
-                        version: updateStatus.version || "v0.2.4",
-                      }) || "EchoMind güncel (v0.2.4)."}
+                        version: updateStatus.version || "v0.2.5",
+                      }) || "EchoMind güncel (v0.2.5)."}
                     </span>
                   )}
                   {updateStatus.state === "updateAvailable" && (
