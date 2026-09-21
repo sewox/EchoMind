@@ -102,6 +102,46 @@ fn get_dismissed_session() -> &'static Mutex<Option<String>> {
     DISMISSED_SESSION_ID.get_or_init(|| Mutex::new(None))
 }
 
+/// Scans AppleScript tab-title/URL output for the first *valid* Google Meet
+/// room code among every `meet.google.com/` occurrence — not just the first
+/// one. Real bug, reproduced live (Grok Bot's v0.2.10 re-test): when a
+/// leftover `/home` (or `/landing`/`/new`) tab from a previously-ended
+/// meeting stays open, and that leftover tab happens to be the *first*
+/// `meet.google.com/` occurrence in the multi-tab AppleScript dump, the old
+/// code took only that first match, saw it was home/invalid, and gave up —
+/// even though a second, genuinely active room URL was present later in the
+/// very same output. That made a brand-new meeting undetectable (no island,
+/// no "meeting-detected", and — since the same signal feeds end-detection —
+/// no prompt auto-stop either) for as long as the stale home tab stayed
+/// open. A directly-observed active room URL is stronger, more current
+/// evidence than a phrase possibly left over in some other tab's title, so
+/// this supersedes the old whole-output phrase-based leave check.
+fn extract_active_meet_code(raw_stdout: &str) -> Option<String> {
+    for chunk in raw_stdout.split([',', ' ', '\n']) {
+        if !chunk.contains("meet.google.com/") {
+            continue;
+        }
+        let code = chunk
+            .split("meet.google.com/")
+            .nth(1)
+            .map(|c| c.split('?').next().unwrap_or(c))
+            .map(|c| c.trim_matches(|ch: char| !ch.is_alphanumeric() && ch != '-'))
+            .unwrap_or("");
+
+        let is_invalid = code.is_empty()
+            || code == "landing"
+            || code == "home"
+            || code == "new"
+            || code.starts_with("_meet");
+        let looks_like_room = code.contains('-') || code.len() >= 9;
+
+        if !is_invalid && looks_like_room {
+            return Some(code.to_string());
+        }
+    }
+    None
+}
+
 /// Whether a freshly detected meeting should pop up the floating island prompt.
 /// Never while a recording is already running — there's nothing to prompt for,
 /// and it would just overlay/block the main window (matching the existing
@@ -289,70 +329,23 @@ impl MeetingDetector {
                             || titles_str.contains("meet -")
                             || titles_str.contains("google meet")
                         {
-                            let meeting_code = raw_stdout
-                                .split([',', ' ', '\n'])
-                                .find(|chunk| chunk.contains("meet.google.com/"))
-                                .and_then(|url| url.split("meet.google.com/").nth(1))
-                                .map(|code| code.split('?').next().unwrap_or(code))
-                                .map(|code| {
-                                    code.trim_matches(|c: char| !c.is_alphanumeric() && c != '-')
-                                })
-                                .filter(|s| !s.is_empty())
-                                .unwrap_or("");
+                            if let Some(meeting_code) = extract_active_meet_code(&raw_stdout) {
+                                if !results.iter().any(|r| r.app_id == "meet") {
+                                    let proc_name =
+                                        format!("{} (Google Meet - {})", browser, meeting_code);
+                                    let rec_title = format!(
+                                        "Google Meet Toplantısı ({}) - {}",
+                                        meeting_code, date_str
+                                    );
 
-                            let is_left_or_home = meeting_code.is_empty()
-                                || meeting_code == "landing"
-                                || meeting_code == "home"
-                                || meeting_code == "new"
-                                || meeting_code.starts_with("_meet")
-                                || titles_str.contains("ayrıldınız")
-                                || titles_str.contains("ayrıldın")
-                                || titles_str.contains("toplantıdan ayrıldınız")
-                                || titles_str.contains("görüşmeden ayrıldınız")
-                                || titles_str.contains("left the meeting")
-                                || titles_str.contains("left the call")
-                                || titles_str.contains("you left the")
-                                || titles_str.contains("you've left")
-                                || titles_str.contains("left the video call")
-                                || titles_str.contains("görüşme sonlandırıldı")
-                                || titles_str.contains("görüşme sona erdi")
-                                || titles_str.contains("toplantı sona erdi")
-                                || titles_str.contains("sona erdi")
-                                || titles_str.contains("görüşmeden çıktınız")
-                                || titles_str.contains("toplantı sonlandırıldı")
-                                || titles_str.contains("toplantı bitti")
-                                || titles_str.contains("call ended")
-                                || titles_str.contains("meeting ended")
-                                || titles_str.contains("the call has ended")
-                                || titles_str.contains("besprechung beendet")
-                                || titles_str.contains("reunión finalizada")
-                                || titles_str.contains("réunion terminée")
-                                || titles_str.contains("katılmaya hazır")
-                                || titles_str.contains("ready to join")
-                                || titles_str.contains("ana sayfa")
-                                || titles_str.contains("rejoin")
-                                || titles_str.contains("tekrar katıl")
-                                || titles_str.contains("return to home screen")
-                                || titles_str.contains("ana ekrana dön");
-
-                            let is_valid_room = !is_left_or_home
-                                && (meeting_code.contains('-') || meeting_code.len() >= 9);
-
-                            if is_valid_room && !results.iter().any(|r| r.app_id == "meet") {
-                                let proc_name =
-                                    format!("{} (Google Meet - {})", browser, meeting_code);
-                                let rec_title = format!(
-                                    "Google Meet Toplantısı ({}) - {}",
-                                    meeting_code, date_str
-                                );
-
-                                results.push(MeetingAppInfo {
-                                    app_id: "meet".to_string(),
-                                    display_name: "Google Meet".to_string(),
-                                    process_name: proc_name,
-                                    is_running: true,
-                                    recommended_title: rec_title,
-                                });
+                                    results.push(MeetingAppInfo {
+                                        app_id: "meet".to_string(),
+                                        display_name: "Google Meet".to_string(),
+                                        process_name: proc_name,
+                                        is_running: true,
+                                        recommended_title: rec_title,
+                                    });
+                                }
                             }
                         }
 
@@ -862,6 +855,53 @@ mod tests {
         assert!(updated.settings.auto_start_record);
         assert!(!updated.settings.auto_stop_on_app_close);
         assert_eq!(updated.settings.ignored_apps, vec!["discord".to_string()]);
+    }
+
+    #[test]
+    fn test_extract_active_meet_code_finds_valid_room_when_first() {
+        let raw = "Google Meet, https://meet.google.com/dhx-khct-ude, EchoMind AI Assistant";
+        assert_eq!(
+            extract_active_meet_code(raw),
+            Some("dhx-khct-ude".to_string())
+        );
+    }
+
+    #[test]
+    fn test_extract_active_meet_code_returns_none_when_only_home() {
+        let raw = "Google Meet, https://meet.google.com/home, EchoMind AI Assistant";
+        assert_eq!(extract_active_meet_code(raw), None);
+    }
+
+    #[test]
+    fn test_extract_active_meet_code_skips_leading_home_finds_later_valid_room() {
+        // Exact shape of Grok Bot's v0.2.10 live repro (sticky_repro_r2.txt): a
+        // leftover /home tab from a previously-ended meeting is still open,
+        // and a genuinely active second meeting's room URL appears later in
+        // the same multi-tab AppleScript dump. The old code took only the
+        // first meet.google.com/ match (the stale /home one) and gave up.
+        let raw = "Google Meet, https://meet.google.com/home, \
+                    Meet - dhx-khct-ude, https://meet.google.com/dhx-khct-ude, \
+                    EchoMind AI Assistant";
+        assert_eq!(
+            extract_active_meet_code(raw),
+            Some("dhx-khct-ude".to_string())
+        );
+    }
+
+    #[test]
+    fn test_extract_active_meet_code_skips_landing_and_new() {
+        let raw = "Meet, https://meet.google.com/landing, \
+                    Meet, https://meet.google.com/new, \
+                    Meet - sgi-qgxg-gvx, https://meet.google.com/sgi-qgxg-gvx";
+        assert_eq!(
+            extract_active_meet_code(raw),
+            Some("sgi-qgxg-gvx".to_string())
+        );
+    }
+
+    #[test]
+    fn test_extract_active_meet_code_none_when_no_meet_url_present() {
+        assert_eq!(extract_active_meet_code("New Tab, Google Chrome"), None);
     }
 
     #[test]
