@@ -1,4 +1,5 @@
 import React from "react";
+import packageJson from "../../package.json";
 
 interface IconProps {
   className?: string;
@@ -35,7 +36,7 @@ export const EchoMindLogo: React.FC<{
             EchoMind
           </span>
           <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-400 font-normal border border-white/5">
-            v0.2.7
+            v{packageJson.version}
           </span>
         </div>
         {showTagline && (

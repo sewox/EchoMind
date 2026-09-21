@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Core permissions for the app's windows. This project had no capabilities file at all, which under Tauri v2's ACL model silently denies every core/plugin-provided webview command (window/event/webview/etc.) while leaving the app's own #[tauri::command] handlers unaffected (those aren't ACL-gated). This was never noticed because nothing in the app exercised a gated core command in a way that surfaced an error message until the first-run banner's listen(\"model-download-progress\") call started failing on plugin:event|listen — see Grok Bot's v0.2.8 QA report. core:default covers every listen()/emit() call site in the frontend (App.tsx, MeetingIslandWindow, UpdateModal, useFirstRunModelSetup, useMeetingDetector, useAudioRecording), not just the one that happened to surface it.",
+  "windows": ["main", "island"],
+  "permissions": ["core:default"]
+}

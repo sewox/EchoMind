@@ -3,14 +3,15 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { EchoMindLogo } from "./EchoMindLogo";
 import { CloudPrivacyConfirmModal } from "./CloudPrivacyConfirmModal";
 import { I18nProvider } from "../locales/i18nContext";
+import packageJson from "../../package.json";
 
 describe("EchoMindLogo Component", () => {
-  it("renders logo with responsive image and brand title", () => {
+  it("renders logo with responsive image, brand title, and the current package version", () => {
     const { container } = render(<EchoMindLogo showTagline={true} />);
     expect(container.querySelector("img")).toBeInTheDocument();
     expect(screen.getByText("EchoMind")).toBeInTheDocument();
     expect(screen.getByText("EchoMind Offline Assistant")).toBeInTheDocument();
-    expect(screen.getByText("v0.2.7")).toBeInTheDocument();
+    expect(screen.getByText(`v${packageJson.version}`)).toBeInTheDocument();
   });
 });
 
