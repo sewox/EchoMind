@@ -610,7 +610,7 @@ pub async fn save_meeting_export_file(
             "ics" | "calendar" => (
                 MeetingExporter::export_calendar_ics(
                     &format!("Follow-up: {}", target.title),
-                    &chrono::Utc::now().to_rfc3339(),
+                    &MeetingExporter::default_followup_start_iso(),
                     30,
                     &format!(
                         "Toplantı Takibi: {}\nEchoMind AI ile oluşturuldu.",
@@ -703,7 +703,7 @@ pub fn export_followup_bundle(
     let slack_md = SummarizerEngine::export_notes_slack_markdown(target, summary_ref, lang_ref);
     let ics_content = MeetingExporter::export_calendar_ics(
         &format!("Takip: {}", target.title),
-        &chrono::Utc::now().to_rfc3339(),
+        &MeetingExporter::default_followup_start_iso(),
         30,
         &format!("EchoMind Takip Toplantısı - {}", target.title),
         None,
