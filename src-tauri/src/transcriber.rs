@@ -122,8 +122,19 @@ impl GlobalTranscriberEngine {
     }
 
     pub fn init_model(&self, model_path: &str) -> Result<(), String> {
+        // `model_path` may be a bare filename, a legacy "models/ggml-*.bin"-style
+        // identifier, or (once already resolved once) a full path from a previous
+        // call — only the filename is meaningful for locating the real file.
+        let filename = Path::new(model_path)
+            .file_name()
+            .map(|f| f.to_string_lossy().to_string())
+            .unwrap_or_else(|| model_path.to_string());
+
+        let stable_path = crate::storage::get_models_dir().join(&filename);
         let path = Path::new(model_path);
-        let actual_path = if path.exists() {
+        let actual_path = if stable_path.exists() {
+            stable_path
+        } else if path.exists() {
             path.to_path_buf()
         } else {
             let alt = Path::new("src-tauri").join(model_path);
@@ -716,11 +727,14 @@ pub fn get_available_models() -> Vec<ModelInfo> {
     let state = engine.state.lock().unwrap();
     let current_selected_path = &state.selected_model_path;
 
+    let stable_models_dir = crate::storage::get_models_dir();
     let base_models_dir = Path::new("models");
     let alt_models_dir = Path::new("src-tauri/models");
 
     let is_present = |filename: &str| {
-        base_models_dir.join(filename).exists() || alt_models_dir.join(filename).exists()
+        stable_models_dir.join(filename).exists()
+            || base_models_dir.join(filename).exists()
+            || alt_models_dir.join(filename).exists()
     };
 
     vec![
@@ -841,9 +855,27 @@ pub fn download_whisper_model(app: tauri::AppHandle, model_key: String) -> Resul
         .find(|m| m.key == model_key)
         .ok_or_else(|| format!("Model bulunamadı: {}", model_key))?;
 
-    let target_dir = Path::new("models");
+    let target_dir = crate::storage::get_models_dir();
     if !target_dir.exists() {
-        let _ = std::fs::create_dir_all(target_dir);
+        if let Err(e) = std::fs::create_dir_all(&target_dir) {
+            let msg = format!(
+                "Model klasörü oluşturulamadı ({}): {}",
+                target_dir.display(),
+                e
+            );
+            let _ = app.emit(
+                "model-download-progress",
+                ModelDownloadProgressPayload {
+                    model_key: model_key.clone(),
+                    percentage: 0.0,
+                    downloaded_bytes: 0,
+                    total_bytes: 0,
+                    status: "error".to_string(),
+                    error: Some(msg.clone()),
+                },
+            );
+            return Err(msg);
+        }
     }
     let target_file = target_dir.join(&model.filename);
 
