@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::fs::{self, File};
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
 
 use flacenc::bitsink::ByteSink;
@@ -66,28 +66,208 @@ pub struct StorageEngine {
     pub meetings: Arc<Mutex<Vec<MeetingRecord>>>,
 }
 
-pub fn get_storage_dir() -> PathBuf {
-    // Tests must never read or write the real project `data/` directory: a decrypt
-    // failure on committed demo data (e.g. encrypted under a different machine's
-    // key) plus a subsequent save would silently overwrite it with empty/test data.
-    // This bit the repo's own `data/meetings_history.json` once already.
-    #[cfg(test)]
-    {
-        std::env::temp_dir().join("echomind_test_data")
-    }
+// These helpers back the release-build branch of `resolve_persistent_dir` below
+// (excluded from dev/`debug_assertions` builds, since those keep the old
+// CWD-relative behavior) but are directly unit-tested, hence `any(test, ...)`.
+#[cfg(any(test, not(debug_assertions)))]
+const APP_DIR_NAME: &str = "echomind";
+#[cfg(any(test, not(debug_assertions)))]
+const APP_BUNDLE_ID: &str = "com.echomind.assistant";
 
-    #[cfg(not(test))]
+/// Computes the OS-standard, per-user, CWD-independent app data root for the given
+/// platform id ("macos" | "windows" | "linux" | anything else), using `get_env` to
+/// look up the handful of env vars each platform relies on. Pure and injectable so
+/// it's unit-testable without mutating real process env vars (unsafe to do under
+/// Rust's parallel test runner). Returns None if the platform's expected env var
+/// isn't set (essentially never on a real desktop install) or the platform isn't
+/// one of the three we ship to — callers fall back to legacy CWD-relative behavior.
+#[cfg(any(test, not(debug_assertions)))]
+fn os_standard_app_root_for(
+    target_os: &str,
+    get_env: &dyn Fn(&str) -> Option<String>,
+) -> Option<PathBuf> {
+    match target_os {
+        "macos" => get_env("HOME").map(|home| {
+            PathBuf::from(home)
+                .join("Library")
+                .join("Application Support")
+                .join(APP_BUNDLE_ID)
+        }),
+        "windows" => get_env("APPDATA").map(|appdata| PathBuf::from(appdata).join(APP_DIR_NAME)),
+        "linux" => {
+            if let Some(xdg) = get_env("XDG_DATA_HOME").filter(|v| !v.is_empty()) {
+                return Some(PathBuf::from(xdg).join(APP_DIR_NAME));
+            }
+            get_env("HOME").map(|home| {
+                PathBuf::from(home)
+                    .join(".local")
+                    .join("share")
+                    .join(APP_DIR_NAME)
+            })
+        }
+        _ => None,
+    }
+}
+
+#[cfg(all(not(test), not(debug_assertions)))]
+fn os_standard_app_root() -> Option<PathBuf> {
+    let target_os = std::env::consts::OS;
+    os_standard_app_root_for(target_os, &|key| std::env::var(key).ok())
+}
+
+/// The old CWD-relative resolution (kept for dev builds and as a migration/fallback
+/// source): resolves `subdir` against the process's current working directory,
+/// stepping out of `src-tauri/` to the project root first if that's where we are
+/// (the `cargo run` / `cargo tauri dev` case).
+fn legacy_cwd_relative_dir(subdir: &str) -> PathBuf {
     if let Ok(cwd) = std::env::current_dir() {
-        // If cwd is inside src-tauri (e.g. during cargo run), step out to project root
         let root = if cwd.ends_with("src-tauri") {
             cwd.parent().unwrap_or(&cwd).to_path_buf()
         } else {
             cwd
         };
-        return root.join("data");
+        return root.join(subdir);
     }
-    #[cfg(not(test))]
-    PathBuf::from("data")
+    PathBuf::from(subdir)
+}
+
+#[cfg(any(test, not(debug_assertions)))]
+fn copy_dir_recursive(src: &std::path::Path, dst: &std::path::Path) -> std::io::Result<()> {
+    fs::create_dir_all(dst)?;
+    for entry in fs::read_dir(src)? {
+        let entry = entry?;
+        let path = entry.path();
+        let dest_path = dst.join(entry.file_name());
+        if path.is_dir() {
+            copy_dir_recursive(&path, &dest_path)?;
+        } else {
+            fs::copy(&path, &dest_path)?;
+        }
+    }
+    Ok(())
+}
+
+/// Best-effort, non-destructive migration: if `new_dir` doesn't exist yet (first
+/// time a release build resolves it), and one of `candidates` exists with
+/// content, copy it into `new_dir`. Each candidate is only ever copied from,
+/// never deleted or modified — so a bug here can never lose data, at worst it
+/// leaves the user exactly where they'd be without migration (a fresh, empty
+/// `new_dir`).
+#[cfg(any(test, not(debug_assertions)))]
+fn migrate_legacy_dir_if_present(new_dir: &std::path::Path, candidates: Vec<PathBuf>) {
+    if new_dir.exists() {
+        return;
+    }
+
+    for candidate in candidates {
+        if candidate == *new_dir || !candidate.is_dir() {
+            continue;
+        }
+        if let Some(parent) = new_dir.parent() {
+            let _ = fs::create_dir_all(parent);
+        }
+        if copy_dir_recursive(&candidate, new_dir).is_ok() {
+            eprintln!(
+                "ℹ️ [Migration] {:?} içeriği {:?} konumuna taşındı (eski dosyalar korunuyor, silinmedi).",
+                candidate, new_dir
+            );
+            return;
+        } else {
+            // Partial/failed copy: don't leave a half-migrated directory behind to
+            // be mistaken for "already migrated" on the next launch.
+            let _ = fs::remove_dir_all(new_dir);
+        }
+    }
+}
+
+/// Resolves a persistent directory for `subdir` ("data" or "models"), given the
+/// dev-build resolution (`dev_dir`, run only under `debug_assertions`, i.e.
+/// `cargo run` / `cargo tauri dev`) and the candidate legacy locations to try
+/// migrating from on a release build's first run. Strategy per build context:
+/// - test: an isolated temp directory — tests must never touch real user/dev state.
+/// - dev: `dev_dir()`, unchanged from the previous CWD-relative behavior — keeps
+///   the existing developer workflow (e.g. the committed demo `data/` fixture, or
+///   models already sitting in `src-tauri/models/`) working exactly as before.
+/// - release (what actually ships to users): a stable, OS-standard, per-user
+///   directory instead of the process's CWD, which is unpredictable for a
+///   packaged app (desktop icon vs terminal vs launcher) and can be entirely
+///   non-writable (e.g. a Linux .deb installs under /usr/bin). Best-effort
+///   migrates the first matching legacy candidate into the new location on first
+///   use so upgrading users don't appear to lose their data or models.
+#[cfg_attr(any(test, debug_assertions), allow(unused_variables))]
+fn resolve_persistent_dir(
+    subdir: &str,
+    dev_dir: impl Fn() -> PathBuf,
+    legacy_candidates: impl Fn() -> Vec<PathBuf>,
+) -> PathBuf {
+    #[cfg(test)]
+    {
+        std::env::temp_dir().join(format!("echomind_test_{}", subdir))
+    }
+
+    #[cfg(all(not(test), debug_assertions))]
+    {
+        dev_dir()
+    }
+
+    #[cfg(all(not(test), not(debug_assertions)))]
+    {
+        match os_standard_app_root() {
+            Some(root) => {
+                let dir = root.join(subdir);
+                migrate_legacy_dir_if_present(&dir, legacy_candidates());
+                dir
+            }
+            None => dev_dir(),
+        }
+    }
+}
+
+/// Executable-relative fallback candidate for migration: `<exe_dir>/<subdir>`,
+/// covering the (uncommon but possible) case of a previous release build having
+/// been run with data/models placed next to the binary itself.
+fn exe_relative_candidate(subdir: &str) -> Option<PathBuf> {
+    std::env::current_exe()
+        .ok()
+        .and_then(|exe| exe.parent().map(|dir| dir.join(subdir)))
+}
+
+pub fn get_storage_dir() -> PathBuf {
+    resolve_persistent_dir(
+        "data",
+        || legacy_cwd_relative_dir("data"),
+        || {
+            let mut candidates = vec![legacy_cwd_relative_dir("data")];
+            candidates.extend(exe_relative_candidate("data"));
+            candidates
+        },
+    )
+}
+
+/// Where Whisper `.bin` model files live. See `resolve_persistent_dir` for the
+/// test/dev/release resolution strategy — same stability guarantee as
+/// `get_storage_dir()`, kept separate since models and app data are independent
+/// (a user can wipe/reinstall one without touching the other).
+///
+/// Unlike `data/` (which lives at the project root), models live inside
+/// `src-tauri/models/` in this repo, and `tauri dev` runs `cargo` with its CWD
+/// already set to `src-tauri/` — so the dev/legacy resolution here must NOT step
+/// out to the project root the way `legacy_cwd_relative_dir` does for `data/`.
+pub fn get_models_dir() -> PathBuf {
+    resolve_persistent_dir(
+        "models",
+        || PathBuf::from("models"),
+        || {
+            vec![
+                PathBuf::from("models"),
+                Path::new("src-tauri").join("models"),
+                legacy_cwd_relative_dir("models"),
+            ]
+            .into_iter()
+            .chain(exe_relative_candidate("models"))
+            .collect()
+        },
+    )
 }
 
 impl Default for StorageEngine {
@@ -609,6 +789,129 @@ pub fn get_all_tags() -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn env_map(pairs: &[(&str, &str)]) -> impl Fn(&str) -> Option<String> {
+        let pairs: Vec<(String, String)> = pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect();
+        move |key: &str| pairs.iter().find(|(k, _)| k == key).map(|(_, v)| v.clone())
+    }
+
+    #[test]
+    fn test_os_standard_root_macos_uses_application_support() {
+        let get_env = env_map(&[("HOME", "/Users/alice")]);
+        let root = os_standard_app_root_for("macos", &get_env).unwrap();
+        assert_eq!(
+            root,
+            PathBuf::from("/Users/alice/Library/Application Support/com.echomind.assistant")
+        );
+    }
+
+    #[test]
+    fn test_os_standard_root_windows_uses_appdata() {
+        let get_env = env_map(&[("APPDATA", r"C:\Users\alice\AppData\Roaming")]);
+        let root = os_standard_app_root_for("windows", &get_env).unwrap();
+        assert_eq!(
+            root,
+            PathBuf::from(r"C:\Users\alice\AppData\Roaming").join("echomind")
+        );
+    }
+
+    #[test]
+    fn test_os_standard_root_linux_prefers_xdg_data_home() {
+        let get_env = env_map(&[
+            ("XDG_DATA_HOME", "/home/alice/.data"),
+            ("HOME", "/home/alice"),
+        ]);
+        let root = os_standard_app_root_for("linux", &get_env).unwrap();
+        assert_eq!(root, PathBuf::from("/home/alice/.data/echomind"));
+    }
+
+    #[test]
+    fn test_os_standard_root_linux_falls_back_to_home_when_xdg_unset() {
+        let get_env = env_map(&[("HOME", "/home/alice")]);
+        let root = os_standard_app_root_for("linux", &get_env).unwrap();
+        assert_eq!(root, PathBuf::from("/home/alice/.local/share/echomind"));
+    }
+
+    #[test]
+    fn test_os_standard_root_linux_ignores_empty_xdg_data_home() {
+        let get_env = env_map(&[("XDG_DATA_HOME", ""), ("HOME", "/home/alice")]);
+        let root = os_standard_app_root_for("linux", &get_env).unwrap();
+        assert_eq!(root, PathBuf::from("/home/alice/.local/share/echomind"));
+    }
+
+    #[test]
+    fn test_os_standard_root_none_when_env_missing() {
+        let get_env = env_map(&[]);
+        assert!(os_standard_app_root_for("macos", &get_env).is_none());
+        assert!(os_standard_app_root_for("windows", &get_env).is_none());
+        assert!(os_standard_app_root_for("linux", &get_env).is_none());
+    }
+
+    #[test]
+    fn test_os_standard_root_none_for_unknown_platform() {
+        let get_env = env_map(&[("HOME", "/home/alice")]);
+        assert!(os_standard_app_root_for("freebsd", &get_env).is_none());
+    }
+
+    #[test]
+    fn test_migrate_copies_legacy_dir_without_deleting_source() {
+        let base = std::env::temp_dir().join(format!(
+            "echomind_migrate_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let legacy = base.join("legacy");
+        let new_dir = base.join("new");
+        fs::create_dir_all(legacy.join("recordings")).unwrap();
+        fs::write(legacy.join("meetings_history.json"), b"hello").unwrap();
+        fs::write(legacy.join("recordings").join("a.flac"), b"audio").unwrap();
+
+        copy_dir_recursive(&legacy, &new_dir).unwrap();
+
+        assert!(
+            legacy.join("meetings_history.json").exists(),
+            "source must survive a copy-based migration"
+        );
+        assert_eq!(
+            fs::read(new_dir.join("meetings_history.json")).unwrap(),
+            b"hello"
+        );
+        assert_eq!(
+            fs::read(new_dir.join("recordings").join("a.flac")).unwrap(),
+            b"audio"
+        );
+
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn test_migrate_is_noop_when_new_dir_already_exists() {
+        let base = std::env::temp_dir().join(format!(
+            "echomind_migrate_noop_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let new_dir = base.join("new");
+        fs::create_dir_all(&new_dir).unwrap();
+        fs::write(new_dir.join("marker.txt"), b"already here").unwrap();
+
+        // A nonexistent legacy candidate must never be treated as a signal to wipe
+        // an already-initialized new_dir.
+        migrate_legacy_dir_if_present(&new_dir, vec![base.join("nonexistent-legacy")]);
+        assert_eq!(
+            fs::read(new_dir.join("marker.txt")).unwrap(),
+            b"already here"
+        );
+
+        let _ = fs::remove_dir_all(&base);
+    }
 
     #[test]
     fn test_storage_add_and_delete() {

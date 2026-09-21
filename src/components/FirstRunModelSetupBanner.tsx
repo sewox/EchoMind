@@ -43,7 +43,9 @@ export const FirstRunModelSetupBanner: React.FC<
                 ? "Yerel model hazır"
                 : progress.status === "error"
                   ? "Model indirilemedi"
-                  : `Yerel konuşma tanıma modeli indiriliyor (${progress.model_key})`}
+                  : progress.model_key
+                    ? `Yerel konuşma tanıma modeli indiriliyor (${progress.model_key})`
+                    : "Yerel konuşma tanıma modeli hazırlanıyor…"}
             </div>
             <p className="text-[11px] text-slate-400 mt-0.5">
               {progress.status === "completed"
@@ -52,6 +54,14 @@ export const FirstRunModelSetupBanner: React.FC<
                   ? "Şu an olmadı ama sorun değil — Ayarlar > Model Merkezi'nden istediğiniz zaman manuel indirebilirsiniz."
                   : "Arka planda çalışır, toplantı kaydına başlamanızı engellemez."}
             </p>
+            {progress.status === "error" && progress.error && (
+              <p
+                className="text-[10px] text-rose-400/80 font-mono mt-1 break-all"
+                data-testid="first-run-model-setup-error-detail"
+              >
+                {progress.error}
+              </p>
+            )}
             {progress.status === "downloading" && (
               <>
                 <div className="mt-2 w-full h-1.5 rounded-full bg-slate-800 overflow-hidden border border-slate-700/60">
