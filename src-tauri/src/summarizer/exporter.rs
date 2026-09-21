@@ -1090,7 +1090,7 @@ body {
         format!(
             "BEGIN:VCALENDAR\r\n\
 VERSION:2.0\r\n\
-PRODID:-//EchoMind AI//EchoMind Assistant v0.2.6//EN\r\n\
+PRODID:-//EchoMind AI//EchoMind Assistant v0.2.7//EN\r\n\
 CALSCALE:GREGORIAN\r\n\
 METHOD:REQUEST\r\n\
 BEGIN:VEVENT\r\n\
