@@ -674,7 +674,15 @@ pub fn recommended_model_key(total_ram_gb: f64) -> &'static str {
 #[tauri::command]
 pub fn get_recommended_model_key() -> String {
     let hw = crate::hardware::HardwareInfo::detect();
-    recommended_model_key(hw.total_ram_gb).to_string()
+    let key = recommended_model_key(hw.total_ram_gb).to_string();
+    // v0.2.7 QA saw the frontend's first-run auto-download silently fail before
+    // any progress ever painted; this command is the first Rust call in that
+    // path, so a log line here narrows down whether it's even being reached.
+    println!(
+        "[FirstRunModelSetup] get_recommended_model_key: ram={:.1}GB -> {}",
+        hw.total_ram_gb, key
+    );
+    key
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -823,6 +831,10 @@ pub fn switch_transcription_model(model_key: String) -> Result<ModelStatus, Stri
 
 #[tauri::command]
 pub fn download_whisper_model(app: tauri::AppHandle, model_key: String) -> Result<String, String> {
+    println!(
+        "[FirstRunModelSetup] download_whisper_model called: {}",
+        model_key
+    );
     let models = get_available_models();
     let model = models
         .into_iter()

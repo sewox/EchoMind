@@ -86,4 +86,41 @@ describe("FirstRunModelSetupBanner", () => {
     expect(screen.getByText("Model indirilemedi")).toBeInTheDocument();
     expect(screen.getByText(/Model Merkezi/)).toBeInTheDocument();
   });
+
+  it("shows the raw error message for diagnosis when present", () => {
+    render(
+      <FirstRunModelSetupBanner
+        progress={{
+          model_key: "",
+          percentage: 0,
+          downloaded_bytes: 0,
+          total_bytes: 0,
+          status: "error",
+          error: "hardware detect failed",
+        }}
+        onDismiss={vi.fn()}
+      />,
+    );
+    expect(
+      screen.getByTestId("first-run-model-setup-error-detail"),
+    ).toHaveTextContent("hardware detect failed");
+  });
+
+  it("shows a generic placeholder before the model key is known", () => {
+    render(
+      <FirstRunModelSetupBanner
+        progress={{
+          model_key: "",
+          percentage: 0,
+          downloaded_bytes: 0,
+          total_bytes: 0,
+          status: "downloading",
+        }}
+        onDismiss={vi.fn()}
+      />,
+    );
+    expect(
+      screen.getByText("Yerel konuşma tanıma modeli hazırlanıyor…"),
+    ).toBeInTheDocument();
+  });
 });
