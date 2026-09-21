@@ -13,6 +13,52 @@ fn escape_applescript_string(input: &str) -> String {
     input.replace('\\', "\\\\").replace('"', "\\\"")
 }
 
+/// Runs `osascript -e <script>` with a hard wall-clock timeout. Every call site in
+/// the detection hot path (scan_processes' browser tab scan, is_app_in_active_call's
+/// per-app checks) used to call `Command::output()` directly, which blocks with no
+/// timeout at all — a single slow AppleScript call (a browser with many open tabs,
+/// a busy system, an unresponsive app) could stall the entire 1s polling loop
+/// indefinitely, silently blowing past the "island exits Aktif within 5s of the
+/// meeting ending" bound the loop is designed to meet, since the loop can't even
+/// reach its next iteration until the current one returns. Returns the trimmed
+/// stdout on success, None on timeout/spawn/exit failure — callers already treat a
+/// failed osascript call as "unknown" via their existing `.unwrap_or(...)` fallback.
+#[cfg(target_os = "macos")]
+fn run_osascript_with_timeout(script: &str, timeout: Duration) -> Option<String> {
+    let mut child = std::process::Command::new("osascript")
+        .args(["-e", script])
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .ok()?;
+
+    let start = std::time::Instant::now();
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                if !status.success() {
+                    return None;
+                }
+                use std::io::Read;
+                let mut stdout = String::new();
+                if let Some(mut out) = child.stdout.take() {
+                    let _ = out.read_to_string(&mut stdout);
+                }
+                return Some(stdout);
+            }
+            Ok(None) => {
+                if start.elapsed() >= timeout {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return None;
+                }
+                thread::sleep(Duration::from_millis(50));
+            }
+            Err(_) => return None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct MeetingAppInfo {
     pub app_id: String,
@@ -333,16 +379,15 @@ impl MeetingDetector {
         #[cfg(target_os = "macos")]
         {
             match _app_id {
-                "facetime" => {
-                    std::process::Command::new("osascript")
-                        .args(["-e", "tell application \"System Events\" to return (exists (processes where name is \"FaceTime\"))"])
-                        .output()
-                        .map(|out| {
-                            let s = String::from_utf8_lossy(&out.stdout).trim().to_lowercase();
-                            s == "true" || s.is_empty()
-                        })
-                        .unwrap_or(true)
-                }
+                "facetime" => run_osascript_with_timeout(
+                    "tell application \"System Events\" to return (exists (processes where name is \"FaceTime\"))",
+                    Duration::from_millis(1500),
+                )
+                .map(|s| {
+                    let s = s.trim().to_lowercase();
+                    s == "true" || s.is_empty()
+                })
+                .unwrap_or(true),
                 "teams" => {
                     let script = "tell application \"System Events\"
                         if exists (processes where name contains \"Teams\") then
@@ -358,13 +403,8 @@ impl MeetingDetector {
                         end if
                         return \"true\"
                     end tell";
-                    std::process::Command::new("osascript")
-                        .args(["-e", script])
-                        .output()
-                        .map(|out| {
-                            let s = String::from_utf8_lossy(&out.stdout).trim().to_lowercase();
-                            s != "false"
-                        })
+                    run_osascript_with_timeout(script, Duration::from_millis(1500))
+                        .map(|s| s.trim().to_lowercase() != "false")
                         .unwrap_or(true)
                 }
                 "slack" => {
@@ -382,13 +422,8 @@ impl MeetingDetector {
                         end if
                         return \"true\"
                     end tell";
-                    std::process::Command::new("osascript")
-                        .args(["-e", script])
-                        .output()
-                        .map(|out| {
-                            let s = String::from_utf8_lossy(&out.stdout).trim().to_lowercase();
-                            s != "false"
-                        })
+                    run_osascript_with_timeout(script, Duration::from_millis(1500))
+                        .map(|s| s.trim().to_lowercase() != "false")
                         .unwrap_or(true)
                 }
                 "zoom" => {
@@ -415,13 +450,8 @@ impl MeetingDetector {
                         end if
                         return \"true\"
                     end tell";
-                    std::process::Command::new("osascript")
-                        .args(["-e", script])
-                        .output()
-                        .map(|out| {
-                            let s = String::from_utf8_lossy(&out.stdout).trim().to_lowercase();
-                            s != "false"
-                        })
+                    run_osascript_with_timeout(script, Duration::from_millis(1500))
+                        .map(|s| s.trim().to_lowercase() != "false")
                         .unwrap_or(true)
                 }
                 "discord" => {
@@ -439,13 +469,8 @@ impl MeetingDetector {
                         end if
                         return \"true\"
                     end tell";
-                    std::process::Command::new("osascript")
-                        .args(["-e", script])
-                        .output()
-                        .map(|out| {
-                            let s = String::from_utf8_lossy(&out.stdout).trim().to_lowercase();
-                            s != "false"
-                        })
+                    run_osascript_with_timeout(script, Duration::from_millis(1500))
+                        .map(|s| s.trim().to_lowercase() != "false")
                         .unwrap_or(true)
                 }
                 _ => true,
@@ -814,5 +839,32 @@ mod tests {
         assert!(updated.settings.auto_start_record);
         assert!(!updated.settings.auto_stop_on_app_close);
         assert_eq!(updated.settings.ignored_apps, vec!["discord".to_string()]);
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn test_run_osascript_with_timeout_returns_output_on_success() {
+        let out = run_osascript_with_timeout("return \"hello\"", Duration::from_secs(5));
+        assert_eq!(out.as_deref(), Some("hello\n"));
+    }
+
+    // Proves the "island exits Aktif within 5s" bound actually holds even if a
+    // single AppleScript call hangs (e.g. a browser with many tabs, a busy
+    // system): a deliberately slow script must be killed at the timeout, not
+    // silently block the caller for its own full duration.
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn test_run_osascript_with_timeout_kills_hung_script_within_bound() {
+        let start = std::time::Instant::now();
+        let out =
+            run_osascript_with_timeout("delay 5\nreturn \"too late\"", Duration::from_millis(300));
+        let elapsed = start.elapsed();
+
+        assert!(out.is_none(), "a hung script must time out, not succeed");
+        assert!(
+            elapsed < Duration::from_secs(2),
+            "timeout must be enforced promptly, took {:?}",
+            elapsed
+        );
     }
 }
