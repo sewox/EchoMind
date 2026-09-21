@@ -538,11 +538,41 @@ pub fn get_global_audio_engine() -> &'static GlobalAudioEngine {
     ENGINE.get_or_init(GlobalAudioEngine::new)
 }
 
+/// Fires a one-time, OS-level notification when a recording starts using only
+/// the microphone. The in-app warning badge (App.tsx) only helps if EchoMind's
+/// own window is actually visible and in the foreground — but during a real
+/// call the user is looking at Zoom/Meet/Teams, not this app, so an in-app-only
+/// warning can go completely unseen. A system notification reaches the user
+/// regardless of which app currently has focus.
+#[cfg(target_os = "macos")]
+fn notify_mic_only_capture() {
+    let script = "display notification \"Şu an yalnızca mikrofon yakalanıyor. Sistem sesi (Zoom / Meet / Teams) desteklenmiyor.\" with title \"EchoMind Asistan\" subtitle \"Sistem Sesi Yakalanmıyor\" sound name \"Basso\"";
+    let _ = std::process::Command::new("osascript")
+        .args(["-e", script])
+        .spawn();
+}
+
+#[cfg(not(target_os = "macos"))]
+fn notify_mic_only_capture() {}
+
+/// Whether the mic-only notification should fire: exactly once, on the
+/// transition from "not recording" into "actively recording without
+/// loopback" — never on a no-op start-while-already-recording call (`start()`
+/// itself is a no-op in that case), and never when loopback is active.
+fn should_notify_mic_only(was_already_recording: bool, status: &AudioStatus) -> bool {
+    !was_already_recording && status.is_recording && !status.is_loopback
+}
+
 #[tauri::command]
 pub fn start_audio_capture(device_name: Option<String>) -> Result<AudioStatus, String> {
     let engine = get_global_audio_engine();
+    let was_already_recording = engine.get_status().is_recording;
     engine.start(device_name)?;
-    Ok(engine.get_status())
+    let status = engine.get_status();
+    if should_notify_mic_only(was_already_recording, &status) {
+        notify_mic_only_capture();
+    }
+    Ok(status)
 }
 
 #[tauri::command]
@@ -553,6 +583,7 @@ pub fn start_meeting_recording(
 ) -> Result<AudioStatus, String> {
     use tauri::{Emitter, Manager};
     let engine = get_global_audio_engine();
+    let was_already_recording = engine.get_status().is_recording;
     engine.start(device_name)?;
     let title = meeting_title.unwrap_or_else(|| "Google Meet Toplantısı".to_string());
     println!("🎙️ start_meeting_recording çağrıldı: {:?}", title);
@@ -565,7 +596,11 @@ pub fn start_meeting_recording(
     if let Some(island_win) = app_handle.get_webview_window("island") {
         let _ = island_win.hide();
     }
-    Ok(engine.get_status())
+    let status = engine.get_status();
+    if should_notify_mic_only(was_already_recording, &status) {
+        notify_mic_only_capture();
+    }
+    Ok(status)
 }
 
 #[tauri::command]
@@ -649,5 +684,42 @@ mod tests {
         normalize_audio_samples(&mut mock_pcm);
         let max_peak = mock_pcm.iter().map(|s| s.abs()).fold(0.0f32, f32::max);
         assert!((max_peak - 0.90).abs() < 0.01);
+    }
+
+    fn status(is_recording: bool, is_loopback: bool) -> AudioStatus {
+        AudioStatus {
+            is_recording,
+            mic_level: 0.0,
+            sys_level: 0.0,
+            is_speaking: false,
+            sample_rate: 16000,
+            channels: 1,
+            buffered_samples: 0,
+            is_loopback,
+            has_loopback_device: false,
+            active_device_name: None,
+        }
+    }
+
+    #[test]
+    fn test_should_notify_mic_only_fires_on_fresh_mic_only_start() {
+        assert!(should_notify_mic_only(false, &status(true, false)));
+    }
+
+    #[test]
+    fn test_should_notify_mic_only_never_fires_with_loopback_active() {
+        assert!(!should_notify_mic_only(false, &status(true, true)));
+    }
+
+    #[test]
+    fn test_should_notify_mic_only_never_fires_on_noop_restart() {
+        // start() is a no-op if already recording; a redundant call must not
+        // re-notify a user who already saw the warning for this session.
+        assert!(!should_notify_mic_only(true, &status(true, false)));
+    }
+
+    #[test]
+    fn test_should_notify_mic_only_never_fires_if_start_failed() {
+        assert!(!should_notify_mic_only(false, &status(false, false)));
     }
 }

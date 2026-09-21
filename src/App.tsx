@@ -893,16 +893,22 @@ export function App() {
             </span>
           </div>
 
-          {/* Loopback / System Audio Warning Badge during recording */}
+          {/* Loopback / System Audio Warning Badge during recording. A matching
+              OS-level notification also fires once when recording starts
+              mic-only (see notify_mic_only_capture in audio.rs), since this
+              in-app badge is only visible if the app itself is in the
+              foreground — not the case during a real call. */}
           {isRecording && !audioStatus?.is_loopback && (
             <button
               type="button"
               onClick={() => setIsSettingsOpen(true)}
               className="px-2.5 py-1 rounded-full bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-[11px] text-amber-300 flex items-center gap-1.5 transition"
-              title="Karşı tarafın sesini (Zoom/Meet vb.) net kaydetmek için ses ayarlarından Loopback seçebilirsiniz"
+              title="Şu an yalnızca mikrofon yakalanıyor. Sistem sesi (Zoom / Meet / Teams) desteklenmiyor. Karşı tarafın sesini de kaydetmek için ses ayarlarından Loopback seçebilirsiniz."
             >
               <Volume2 className="w-3 h-3 text-amber-400" />
-              <span>Sadece Mikrofon (Karşı taraf için Loopback seçin)</span>
+              <span>
+                Sadece Mikrofon — Sistem Sesi (Zoom/Meet/Teams) Desteklenmiyor
+              </span>
             </button>
           )}
 
