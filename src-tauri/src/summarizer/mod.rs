@@ -68,6 +68,16 @@ impl SummarizerEngine {
 
         let prov_norm = provider.to_lowercase();
 
+        // Tracks whether a requested cloud provider was specifically rejected by
+        // Paranoid Mode (as opposed to no key being configured, or an unrelated
+        // network/API failure). Grok Bot's v0.2.9 re-test found that this case
+        // silently fell through to the local heuristic summary with a generic
+        // "offline" label indistinguishable from "no cloud was ever requested" —
+        // the user never learns *why* they didn't get the cloud summary they
+        // asked for. The backend reject itself was always correct (no data ever
+        // left the device); only the user-facing signal was missing.
+        let mut paranoid_blocked = false;
+
         // 1. Try Online Cloud APIs if requested and API key is provided
         if let Some(key) = api_key {
             let clean_key = key.trim();
@@ -81,7 +91,12 @@ impl SummarizerEngine {
                         start_time,
                     ) {
                         Ok(res) => return res,
-                        Err(e) => eprintln!("❌ Gemini summary generation error: {}", e),
+                        Err(e) => {
+                            if e.contains("PARANOID_MODE_RESTRICTION") {
+                                paranoid_blocked = true;
+                            }
+                            eprintln!("❌ Gemini summary generation error: {}", e);
+                        }
                     }
                 } else if prov_norm.contains("openai") {
                     match LLMClient::generate_openai_compatible_summary(
@@ -95,7 +110,12 @@ impl SummarizerEngine {
                         start_time,
                     ) {
                         Ok(res) => return res,
-                        Err(e) => eprintln!("❌ OpenAI summary generation error: {}", e),
+                        Err(e) => {
+                            if e.contains("PARANOID_MODE_RESTRICTION") {
+                                paranoid_blocked = true;
+                            }
+                            eprintln!("❌ OpenAI summary generation error: {}", e);
+                        }
                     }
                 } else if prov_norm.contains("groq") {
                     match LLMClient::generate_openai_compatible_summary(
@@ -109,14 +129,19 @@ impl SummarizerEngine {
                         start_time,
                     ) {
                         Ok(res) => return res,
-                        Err(e) => eprintln!("❌ Groq summary generation error: {}", e),
+                        Err(e) => {
+                            if e.contains("PARANOID_MODE_RESTRICTION") {
+                                paranoid_blocked = true;
+                            }
+                            eprintln!("❌ Groq summary generation error: {}", e);
+                        }
                     }
                 }
             }
         }
 
         // 2. Try Local LLM Server (Ollama / Local Server)
-        if let Ok(ollama_res) = LLMClient::generate_ollama_summary(
+        if let Ok(mut ollama_res) = LLMClient::generate_ollama_summary(
             segments,
             custom_endpoint,
             custom_model,
@@ -124,11 +149,23 @@ impl SummarizerEngine {
             custom_prompt,
             start_time,
         ) {
+            if paranoid_blocked {
+                ollama_res.provider_used = format!(
+                    "🔒 Paranoid Mod — Bulut İsteği Engellendi ({})",
+                    ollama_res.provider_used
+                );
+            }
             return ollama_res;
         }
 
         // 3. Fallback to Multi-lingual Smart Heuristic Extractor (Zero-RAM, Offline)
-        LocalSummaryExtractor::generate_local_heuristic_summary(segments, start_time)
+        let mut result =
+            LocalSummaryExtractor::generate_local_heuristic_summary(segments, start_time);
+        if paranoid_blocked {
+            result.provider_used =
+                "🔒 Paranoid Mod Aktif — Bulut Özeti Engellendi, Yerel Özet Kullanıldı".to_string();
+        }
+        result
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -989,6 +1026,82 @@ mod tests {
         assert!(!result.meeting_goal.is_empty());
         assert!(!result.action_items.is_empty());
         assert_eq!(result.provider_used, "🔒 Cihaz İçi Hızlı Özet (Çevrimdışı)");
+    }
+
+    #[test]
+    fn test_generate_summary_labels_paranoid_blocked_fallback_distinctly() {
+        // Grok Bot's v0.2.9 re-test: requesting a cloud summary while Paranoid
+        // Mode is active silently degraded to the same generic "offline" label
+        // used when no cloud provider was ever requested — the user had no way
+        // to tell "Paranoid blocked this" apart from "you didn't ask for cloud".
+        use crate::security::{set_global_privacy_mode, BackendPrivacyMode};
+        let _guard = crate::security::privacy_mode_test_lock()
+            .lock()
+            .unwrap_or_else(|p| p.into_inner());
+        set_global_privacy_mode(BackendPrivacyMode::Paranoid);
+
+        let segments = vec![TranscriptSegment {
+            id: 1,
+            speaker_id: "spk1".to_string(),
+            speaker_name: "Ramazan".to_string(),
+            start_time_ms: 0,
+            end_time_ms: 5000,
+            timestamp_formatted: "00:00 -> 00:05".to_string(),
+            text: "Proje planlamasını yarın tamamlayacağız.".to_string(),
+            language: "tr".to_string(),
+            confidence: 0.99,
+        }];
+
+        let result = SummarizerEngine::generate_summary(
+            &segments,
+            "openai",
+            Some("fake-leftover-api-key"),
+            None,
+            None,
+            None,
+            None,
+        );
+
+        assert!(
+            result.provider_used.contains("Paranoid"),
+            "expected a Paranoid-specific label, got: {}",
+            result.provider_used
+        );
+        // The offline summary must still be produced — Paranoid Mode degrades
+        // gracefully, it never leaves the user with nothing.
+        assert!(!result.summary.is_empty());
+
+        set_global_privacy_mode(BackendPrivacyMode::Paranoid);
+    }
+
+    #[test]
+    fn test_generate_summary_no_paranoid_label_when_cloud_was_never_requested() {
+        use crate::security::{set_global_privacy_mode, BackendPrivacyMode};
+        let _guard = crate::security::privacy_mode_test_lock()
+            .lock()
+            .unwrap_or_else(|p| p.into_inner());
+        set_global_privacy_mode(BackendPrivacyMode::Paranoid);
+
+        let segments = vec![TranscriptSegment {
+            id: 1,
+            speaker_id: "spk1".to_string(),
+            speaker_name: "Ramazan".to_string(),
+            start_time_ms: 0,
+            end_time_ms: 5000,
+            timestamp_formatted: "00:00 -> 00:05".to_string(),
+            text: "Proje planlamasını yarın tamamlayacağız.".to_string(),
+            language: "tr".to_string(),
+            confidence: 0.99,
+        }];
+
+        // No api_key at all: the user never asked for cloud, so Paranoid Mode
+        // wasn't the reason for the offline summary — must not claim it was.
+        let result =
+            SummarizerEngine::generate_summary(&segments, "local", None, None, None, None, None);
+
+        assert!(!result.provider_used.contains("Paranoid"));
+
+        set_global_privacy_mode(BackendPrivacyMode::Paranoid);
     }
 
     #[test]

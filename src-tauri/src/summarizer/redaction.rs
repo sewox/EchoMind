@@ -190,6 +190,10 @@ mod tests {
 
     #[test]
     fn test_redact_segments_paranoid_mode_never_calls_cloud() {
+        let _guard = crate::security::privacy_mode_test_lock()
+            .lock()
+            .unwrap_or_else(|p| p.into_inner());
+
         // A saved API key from a previous, less strict privacy mode must not be
         // enough to leak transcript content once Paranoid Mode is (re-)active —
         // this was a real gap: redact_segments() had no gate at all before this
@@ -218,6 +222,9 @@ mod tests {
 
     #[test]
     fn test_redact_segments_offline_pass_still_runs_in_paranoid_mode() {
+        let _guard = crate::security::privacy_mode_test_lock()
+            .lock()
+            .unwrap_or_else(|p| p.into_inner());
         set_global_privacy_mode(BackendPrivacyMode::Paranoid);
 
         let mut segments = vec![sample_segment("fatu rayı ödemesi yarın")];
