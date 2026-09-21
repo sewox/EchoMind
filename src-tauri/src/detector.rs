@@ -102,6 +102,14 @@ fn get_dismissed_session() -> &'static Mutex<Option<String>> {
     DISMISSED_SESSION_ID.get_or_init(|| Mutex::new(None))
 }
 
+/// Whether a freshly detected meeting should pop up the floating island prompt.
+/// Never while a recording is already running — there's nothing to prompt for,
+/// and it would just overlay/block the main window (matching the existing
+/// hide-while-recording behavior in the polling loop).
+fn should_show_island_on_detection(is_recording_now: bool) -> bool {
+    !is_recording_now
+}
+
 pub struct MeetingDetector {
     pub is_running: Arc<Mutex<bool>>,
     pub detected_apps: Arc<Mutex<Vec<MeetingAppInfo>>>,
@@ -624,6 +632,21 @@ impl MeetingDetector {
                             );
                             let _ = handle.emit("meeting-detected", &filtered_active);
 
+                            // Actually show the floating island prompt. This call
+                            // was missing entirely: show_island_window existed
+                            // only as a frontend-invokable command that nothing
+                            // in the app ever called — the "meeting-detected"
+                            // event alone only updated React state, it never
+                            // made the island window visible. Confirmed live by
+                            // Grok Bot's v0.2.9 re-test: joining a real Google
+                            // Meet call never produced a second (island) window
+                            // at all. Skip it if a recording is already running,
+                            // matching the existing hide-while-recording logic
+                            // just above — there's nothing to prompt for then.
+                            if should_show_island_on_detection(is_recording_now) {
+                                let _ = show_island_window(handle.clone());
+                            }
+
                             #[cfg(target_os = "macos")]
                             {
                                 let app_name =
@@ -839,6 +862,16 @@ mod tests {
         assert!(updated.settings.auto_start_record);
         assert!(!updated.settings.auto_stop_on_app_close);
         assert_eq!(updated.settings.ignored_apps, vec!["discord".to_string()]);
+    }
+
+    #[test]
+    fn test_should_show_island_on_detection() {
+        // Regression guard: show_island_window() used to be wired up nowhere at
+        // all, so the island never appeared for a real meeting (Grok Bot's
+        // v0.2.9 live re-test). This locks in the intended gating now that the
+        // call site actually exists.
+        assert!(should_show_island_on_detection(false));
+        assert!(!should_show_island_on_detection(true));
     }
 
     #[cfg(target_os = "macos")]
