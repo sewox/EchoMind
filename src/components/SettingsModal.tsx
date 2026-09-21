@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Settings,
   Cpu,
@@ -100,6 +100,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const [isAudioTesting, setIsAudioTesting] = useState<boolean>(false);
   const [showLoopbackGuide, setShowLoopbackGuide] = useState<boolean>(false);
+  const audioTestTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+  useEffect(() => {
+    return () => {
+      if (audioTestTimeoutRef.current) {
+        clearTimeout(audioTestTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleTestAudio = async () => {
     if (isAudioTesting) return;
@@ -109,7 +119,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         deviceName:
           selectedAudioDevice === "default" ? null : selectedAudioDevice,
       });
-      setTimeout(async () => {
+      if (audioTestTimeoutRef.current) {
+        clearTimeout(audioTestTimeoutRef.current);
+      }
+      audioTestTimeoutRef.current = setTimeout(async () => {
         try {
           await invoke("stop_mic_preview");
         } catch {}
@@ -150,6 +163,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     openai: false,
   });
   const [savedSuccess, setSavedSuccess] = useState<boolean>(false);
+  const savedSuccessTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+  useEffect(() => {
+    return () => {
+      if (savedSuccessTimeoutRef.current) {
+        clearTimeout(savedSuccessTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Software Updater State
   const [autoCheckUpdates, setAutoCheckUpdates] = useState<boolean>(true);
@@ -365,7 +388,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
 
     setSavedSuccess(true);
-    setTimeout(() => {
+    if (savedSuccessTimeoutRef.current) {
+      clearTimeout(savedSuccessTimeoutRef.current);
+    }
+    savedSuccessTimeoutRef.current = setTimeout(() => {
       setSavedSuccess(false);
     }, 2500);
   };
