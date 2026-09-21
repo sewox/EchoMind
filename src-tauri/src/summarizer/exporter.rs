@@ -1065,6 +1065,77 @@ body {
         out
     }
 
+    /// A sensible default start time for an auto-generated follow-up meeting
+    /// invite: the next business day (skipping Sat/Sun) at 10:00 local time.
+    /// Callers used to pass `Utc::now()` as the start time, which produces a
+    /// calendar invite for a meeting that starts immediately (or has already
+    /// passed by the time anyone opens it) — not something you could actually
+    /// send to a team.
+    pub fn default_followup_start_iso() -> String {
+        use chrono::{Datelike, Duration, Local, TimeZone, Weekday};
+
+        let today = Local::now().date_naive();
+        let mut candidate = today + Duration::days(1);
+        while matches!(candidate.weekday(), Weekday::Sat | Weekday::Sun) {
+            candidate += Duration::days(1);
+        }
+
+        match Local.with_ymd_and_hms(
+            candidate.year(),
+            candidate.month(),
+            candidate.day(),
+            10,
+            0,
+            0,
+        ) {
+            chrono::LocalResult::Single(dt) => dt.to_rfc3339(),
+            chrono::LocalResult::Ambiguous(dt, _) => dt.to_rfc3339(),
+            // Extremely rare DST-gap edge case; fall back to a fixed UTC instant
+            // rather than failing the export outright.
+            chrono::LocalResult::None => format!("{}T10:00:00Z", candidate.format("%Y-%m-%d")),
+        }
+    }
+
+    /// Folds long ICS content lines per RFC 5545 §3.1: a content line longer than
+    /// 75 octets must be split into multiple physical lines, each continuation
+    /// line prefixed with a single space. Without this, a long meeting title or
+    /// description produces a single line well past the spec limit, which some
+    /// calendar parsers handle fine but is not actually RFC 5545 compliant.
+    /// Never splits in the middle of a multi-byte UTF-8 character.
+    fn fold_ics_lines(body: &str) -> String {
+        const MAX_OCTETS: usize = 75;
+        let mut out = String::with_capacity(body.len() + 32);
+        for line in body.split("\r\n") {
+            if line.is_empty() {
+                continue;
+            }
+            let bytes = line.as_bytes();
+            if bytes.len() <= MAX_OCTETS {
+                out.push_str(line);
+                out.push_str("\r\n");
+                continue;
+            }
+            let mut start = 0;
+            let mut first = true;
+            while start < bytes.len() {
+                // Continuation lines lose one octet of budget to their leading space.
+                let budget = if first { MAX_OCTETS } else { MAX_OCTETS - 1 };
+                let mut end = (start + budget).min(bytes.len());
+                while end > start && !line.is_char_boundary(end) {
+                    end -= 1;
+                }
+                if !first {
+                    out.push(' ');
+                }
+                out.push_str(&line[start..end]);
+                out.push_str("\r\n");
+                start = end;
+                first = false;
+            }
+        }
+        out
+    }
+
     /// Generates a standard RFC 5545 iCalendar (.ics) event string for follow-up meetings.
     pub fn export_calendar_ics(
         meeting_title: &str,
@@ -1087,10 +1158,10 @@ body {
         let clean_summary = Self::escape_rfc5545_text(meeting_title);
         let clean_loc = Self::escape_rfc5545_text(loc);
 
-        format!(
+        let unfolded = format!(
             "BEGIN:VCALENDAR\r\n\
 VERSION:2.0\r\n\
-PRODID:-//EchoMind AI//EchoMind Assistant v0.2.7//EN\r\n\
+PRODID:-//EchoMind AI//EchoMind Assistant v{prodid_ver}//EN\r\n\
 CALSCALE:GREGORIAN\r\n\
 METHOD:REQUEST\r\n\
 BEGIN:VEVENT\r\n\
@@ -1109,6 +1180,7 @@ DESCRIPTION:Reminder: {summary}\r\n\
 END:VALARM\r\n\
 END:VEVENT\r\n\
 END:VCALENDAR\r\n",
+            prodid_ver = env!("CARGO_PKG_VERSION"),
             uid = uid,
             dtstamp = dtstamp,
             dtstart = dtstart,
@@ -1116,7 +1188,9 @@ END:VCALENDAR\r\n",
             summary = clean_summary,
             desc = clean_desc,
             loc = clean_loc
-        )
+        );
+
+        Self::fold_ics_lines(&unfolded)
     }
 }
 
@@ -1164,6 +1238,69 @@ mod tests {
         assert!(ics.contains("LOCATION:Zoom Room\\, HQ"));
         assert!(ics.contains("DESCRIPTION:Follow-up discussion on Q4 goals\\;\\nNext steps."));
         assert!(ics.contains("END:VCALENDAR"));
+    }
+
+    #[test]
+    fn test_export_calendar_ics_prodid_reflects_current_version_not_a_stale_string() {
+        let ics =
+            MeetingExporter::export_calendar_ics("Title", "2026-09-20T10:00:00Z", 30, "Desc", None);
+        let expected = format!(
+            "PRODID:-//EchoMind AI//EchoMind Assistant v{}//EN",
+            env!("CARGO_PKG_VERSION")
+        );
+        assert!(
+            ics.contains(&expected),
+            "expected PRODID to contain {:?}, got: {}",
+            expected,
+            ics
+        );
+    }
+
+    #[test]
+    fn test_export_calendar_ics_folds_long_lines_per_rfc5545() {
+        let long_summary = "A very long follow-up meeting title that goes on and on well past the seventy five octet line length limit RFC 5545 imposes on content lines";
+        let ics = MeetingExporter::export_calendar_ics(
+            long_summary,
+            "2026-09-20T10:00:00Z",
+            30,
+            "short description",
+            None,
+        );
+
+        for line in ics.split("\r\n") {
+            assert!(
+                line.len() <= 75,
+                "unfolded line exceeds 75 octets ({}): {:?}",
+                line.len(),
+                line
+            );
+        }
+
+        // Continuation lines (per RFC 5545 folding) must start with a single space.
+        assert!(ics.contains("\r\n "));
+
+        // Unfolding (dropping "\r\n " sequences) must reconstruct the original text.
+        let unfolded = ics.replace("\r\n ", "");
+        assert!(unfolded.contains(long_summary));
+    }
+
+    #[test]
+    fn test_default_followup_start_is_a_future_weekday_at_ten_am() {
+        use chrono::{Datelike, Local, Timelike, Weekday};
+
+        let iso = MeetingExporter::default_followup_start_iso();
+        let parsed = chrono::DateTime::parse_from_rfc3339(&iso)
+            .expect("default_followup_start_iso must produce a valid RFC 3339 timestamp");
+        let local = parsed.with_timezone(&Local);
+
+        assert!(
+            local > Local::now(),
+            "follow-up default must be in the future, not \"now\": {}",
+            iso
+        );
+        assert_ne!(local.weekday(), Weekday::Sat);
+        assert_ne!(local.weekday(), Weekday::Sun);
+        assert_eq!(local.hour(), 10);
     }
 
     #[test]

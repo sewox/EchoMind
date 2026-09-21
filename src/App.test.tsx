@@ -2983,7 +2983,7 @@ describe("App Top-Level Integration", () => {
     );
 
     const badge = await screen.findByText(
-      /Sadece Mikrofon \(Karşı taraf için Loopback seçin\)/i,
+      /Sadece Mikrofon — Sistem Sesi \(Zoom\/Meet\/Teams\) Desteklenmiyor/i,
     );
     await act(async () => {
       fireEvent.click(badge);

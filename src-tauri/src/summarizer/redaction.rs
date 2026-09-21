@@ -79,7 +79,15 @@ impl TranscriptRedactor {
             seg.text = Self::clean_phonetic_errors_offline(&seg.text);
         }
 
-        // Step 2: If Online AI API key is available, run deep contextual redaction
+        // Step 2: If Online AI API key is available, run deep contextual redaction.
+        // This sends the full transcript text to a cloud LLM, so it must respect the
+        // same Paranoid Mode hard-reject as every other cloud entry point — the
+        // caller may still be holding a saved API key from a previous, less strict
+        // privacy mode, and that key alone must never be enough to leak transcript
+        // content while Paranoid Mode is active.
+        if crate::security::check_cloud_access_allowed().is_err() {
+            return;
+        }
         if let Some(key) = api_key {
             let clean_key = key.trim();
             if !clean_key.is_empty() && !segments.is_empty() {
@@ -158,5 +166,72 @@ impl TranscriptRedactor {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::security::{set_global_privacy_mode, BackendPrivacyMode};
+
+    fn sample_segment(text: &str) -> TranscriptSegment {
+        TranscriptSegment {
+            id: 0,
+            speaker_id: "Konuşmacı 1".to_string(),
+            speaker_name: "Konuşmacı 1".to_string(),
+            start_time_ms: 0,
+            end_time_ms: 1000,
+            timestamp_formatted: "00:00 -> 00:01".to_string(),
+            text: text.to_string(),
+            language: "tr".to_string(),
+            confidence: 0.9,
+        }
+    }
+
+    #[test]
+    fn test_redact_segments_paranoid_mode_never_calls_cloud() {
+        let _guard = crate::security::privacy_mode_test_lock()
+            .lock()
+            .unwrap_or_else(|p| p.into_inner());
+
+        // A saved API key from a previous, less strict privacy mode must not be
+        // enough to leak transcript content once Paranoid Mode is (re-)active —
+        // this was a real gap: redact_segments() had no gate at all before this
+        // fix, unlike every other cloud entry point in the app.
+        set_global_privacy_mode(BackendPrivacyMode::Paranoid);
+
+        let original_text = "Proje planlamasını yarın tamamlayacağız.";
+        let mut segments = vec![sample_segment(original_text)];
+
+        TranscriptRedactor::redact_segments(
+            &mut segments,
+            Some("gemini"),
+            Some("fake-leftover-api-key-from-balanced-mode"),
+        );
+
+        // If the cloud pass had run, it would have overwritten text/speaker_name
+        // from the (unreachable, since we're offline in this test) mock response.
+        // Only the offline pass may have touched it, and this input has no
+        // matching phonetic pattern, so it must come through byte-for-byte.
+        assert_eq!(segments[0].text, original_text);
+        assert_eq!(segments[0].speaker_name, "Konuşmacı 1");
+
+        // Reset to default for test isolation, matching security.rs's own tests.
+        set_global_privacy_mode(BackendPrivacyMode::Paranoid);
+    }
+
+    #[test]
+    fn test_redact_segments_offline_pass_still_runs_in_paranoid_mode() {
+        let _guard = crate::security::privacy_mode_test_lock()
+            .lock()
+            .unwrap_or_else(|p| p.into_inner());
+        set_global_privacy_mode(BackendPrivacyMode::Paranoid);
+
+        let mut segments = vec![sample_segment("fatu rayı ödemesi yarın")];
+        TranscriptRedactor::redact_segments(&mut segments, None, None);
+
+        assert_eq!(segments[0].text, "faturayı ödemesi yarın");
+
+        set_global_privacy_mode(BackendPrivacyMode::Paranoid);
     }
 }

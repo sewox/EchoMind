@@ -42,6 +42,20 @@ pub fn set_global_privacy_mode(mode: BackendPrivacyMode) {
     PRIVACY_MODE.store(mode as u8, Ordering::SeqCst);
 }
 
+/// `PRIVACY_MODE` is a single process-global `AtomicU8`, and `cargo test` runs
+/// tests in parallel by default. Any test that calls `set_global_privacy_mode`
+/// must hold this lock for its full duration — otherwise two such tests running
+/// concurrently can stomp on each other's mode (test A sets Paranoid, test B
+/// concurrently sets Balanced, test A's assertions now see the wrong mode).
+/// This is a real hazard, not a theoretical one: it's what a test-only helper
+/// like this exists to close off, rather than leaving privacy-mode tests to
+/// occasionally flake under `cargo test`'s default parallelism.
+#[cfg(test)]
+pub(crate) fn privacy_mode_test_lock() -> &'static std::sync::Mutex<()> {
+    static LOCK: std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();
+    LOCK.get_or_init(|| std::sync::Mutex::new(()))
+}
+
 /// Enforces hard reject on any external cloud API call if Paranoid mode is active.
 pub fn check_cloud_access_allowed() -> Result<(), String> {
     let mode = get_global_privacy_mode();
@@ -345,6 +359,10 @@ mod tests {
 
     #[test]
     fn test_paranoid_mode_hard_rejects_cloud_calls() {
+        let _guard = privacy_mode_test_lock()
+            .lock()
+            .unwrap_or_else(|p| p.into_inner());
+
         // Set to Paranoid mode
         set_global_privacy_mode(BackendPrivacyMode::Paranoid);
         assert_eq!(get_global_privacy_mode(), BackendPrivacyMode::Paranoid);
@@ -376,6 +394,10 @@ mod tests {
 
     #[test]
     fn test_privacy_mode_tauri_command_roundtrip() {
+        let _guard = privacy_mode_test_lock()
+            .lock()
+            .unwrap_or_else(|p| p.into_inner());
+
         assert_eq!(
             set_privacy_mode("balanced".to_string()).unwrap(),
             "balanced"

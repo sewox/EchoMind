@@ -1,9 +1,27 @@
+use super::cleaner::SpeechCleaner;
 use super::types::SummaryResult;
 use crate::storage::{ActionItem, TopicBreakdown};
 use crate::transcriber::TranscriptSegment;
 use std::time::Instant;
 
 pub struct LocalSummaryExtractor;
+
+/// Task text longer than this (after filler cleanup) is truncated at the nearest
+/// word boundary. Without a cap, a single long, rambling raw utterance becomes the
+/// entire action item verbatim, which reads as a transcript fragment rather than a
+/// task someone could actually act on.
+const MAX_ACTION_TASK_CHARS: usize = 220;
+
+fn truncate_at_word_boundary(text: &str, max_chars: usize) -> String {
+    if text.chars().count() <= max_chars {
+        return text.to_string();
+    }
+    let truncated: String = text.chars().take(max_chars).collect();
+    match truncated.rfind(' ') {
+        Some(idx) if idx > 0 => format!("{}…", &truncated[..idx]),
+        _ => format!("{}…", truncated),
+    }
+}
 
 impl LocalSummaryExtractor {
     /// Cleans and sanitizes raw conversational speech fragments into clear, professional action items.
@@ -12,6 +30,18 @@ impl LocalSummaryExtractor {
         if trimmed.is_empty() {
             return String::new();
         }
+
+        // Strip disfluencies (stutters, "şey"/"yani"/"um"/"uh"-style fillers, noise
+        // markers) before anything else — otherwise those pass straight through into
+        // the final action item text, which is exactly what makes it read like a raw
+        // transcript fragment instead of a task.
+        let lang_hint = if is_english { "en" } else { "tr" };
+        let (defillered, _) = SpeechCleaner::clean_text(trimmed, Some(lang_hint));
+        let trimmed: &str = if defillered.is_empty() {
+            trimmed
+        } else {
+            &defillered
+        };
 
         // Remove conversational filler prefixes
         let mut cleaned = trimmed.to_string();
@@ -64,10 +94,12 @@ impl LocalSummaryExtractor {
 
         // Ensure capitalized first letter
         let mut chars = cleaned.chars();
-        match chars.next() {
+        let capitalized = match chars.next() {
             None => String::new(),
             Some(f) => f.to_uppercase().collect::<String>() + chars.as_str(),
-        }
+        };
+
+        truncate_at_word_boundary(&capitalized, MAX_ACTION_TASK_CHARS)
     }
 
     /// Normalizes and cleans assignee names, stripping meaningless placeholders like @Fully, PENDING, null, TODO.
@@ -603,6 +635,41 @@ mod tests {
         assert_eq!(
             LocalSummaryExtractor::clean_action_task("lütfen veritabanı yedeğini alın", false),
             "Veritabanı yedeğini alın"
+        );
+    }
+
+    #[test]
+    fn test_clean_action_task_strips_mid_sentence_fillers_not_just_leading_prefix() {
+        // Regression: previously only a leading prefix was stripped, so filler words
+        // anywhere else in the raw utterance passed straight through into the task
+        // text, making it read like a pasted transcript fragment rather than a task.
+        let raw = "şey, yani raporu hani müşteriye ııı yarın göndereceğim";
+        let cleaned = LocalSummaryExtractor::clean_action_task(raw, false);
+        assert!(
+            !cleaned.to_lowercase().contains("şey")
+                && !cleaned.to_lowercase().contains("yani")
+                && !cleaned.to_lowercase().contains("hani"),
+            "filler words must be removed from the middle of the task, got: {}",
+            cleaned
+        );
+        assert!(cleaned.contains("raporu"));
+        assert!(cleaned.contains("göndereceğim"));
+    }
+
+    #[test]
+    fn test_clean_action_task_truncates_pathologically_long_raw_segments() {
+        let long_ramble = "bu konuyu ele almamız lazım çünkü geçen hafta müşteri bize ulaştı ve dedi ki bu özelliği istiyoruz ama biz henüz başlamadık o yüzden ben bunu üstleneyim ve gelecek hafta bitireyim ve sonrasında ekiple paylaşayım ve herkes gözden geçirsin ondan sonra yayına alalım ve müşteriye haber verelim ki memnun olsunlar";
+        let cleaned = LocalSummaryExtractor::clean_action_task(long_ramble, false);
+        assert!(
+            cleaned.chars().count() <= MAX_ACTION_TASK_CHARS,
+            "task text must be bounded, got {} chars: {}",
+            cleaned.chars().count(),
+            cleaned
+        );
+        assert!(
+            cleaned.ends_with('…'),
+            "truncated task should be marked, got: {}",
+            cleaned
         );
     }
 
