@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::mpsc::{channel, Sender};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
+use std::time::{Duration, Instant};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AudioStatus {
@@ -78,6 +79,46 @@ impl GlobalAudioEngine {
             preview_tx: Mutex::new(None),
             active_device_name: Mutex::new(None),
         }
+    }
+
+    /// A short-lived cache in front of `list_devices()`, used only by the
+    /// frequently-polled `get_status()` path. Grok Bot's v0.2.11 live re-test
+    /// reproduced a real hang: a thread sample showed the app blocked inside
+    /// CoreAudio's `AudioDeviceSetProperty`, reached via
+    /// `get_status -> list_devices`, right after a meeting ended while a
+    /// recording was active — i.e. exactly when another thread is also
+    /// touching CoreAudio to build/tear down the input stream, so the two
+    /// concurrent CoreAudio device-enumeration calls contended on the same
+    /// HAL lock. `list_devices()` itself does `host.input_devices()` plus a
+    /// `default_input_config()` HAL round-trip per device — not something
+    /// that should run on every ~1s status poll when the device list rarely
+    /// changes mid-session. `list_audio_devices` (the explicit device-picker
+    /// command, called rarely) still always calls `list_devices()` directly
+    /// for a fresh scan; only the hot status-poll path is cached.
+    fn cached_list_devices() -> Vec<AudioDeviceInfo> {
+        // The frontend polls get_audio_status every 500ms for the whole app
+        // session (not just while recording), so even a 2s TTL would still
+        // mean roughly one real CoreAudio enumeration every 4th poll. The
+        // loopback-device fields this feeds only need to reflect a device
+        // being plugged in/out or the user switching devices in Settings —
+        // both are rare, deliberate actions — so a longer window trades
+        // nothing perceptible for a much larger cut in CoreAudio call
+        // frequency (and therefore contention risk with the stream
+        // build/teardown thread).
+        const TTL: Duration = Duration::from_secs(5);
+        static CACHE: OnceLock<Mutex<(Instant, Vec<AudioDeviceInfo>)>> = OnceLock::new();
+        let cache = CACHE.get_or_init(|| {
+            Mutex::new((
+                Instant::now().checked_sub(TTL).unwrap_or_else(Instant::now),
+                Vec::new(),
+            ))
+        });
+        let mut guard = cache.lock().unwrap();
+        if guard.0.elapsed() >= TTL {
+            guard.1 = Self::list_devices();
+            guard.0 = Instant::now();
+        }
+        guard.1.clone()
     }
 
     pub fn list_devices() -> Vec<AudioDeviceInfo> {
@@ -366,7 +407,7 @@ impl GlobalAudioEngine {
     pub fn get_status(&self) -> AudioStatus {
         let state = self.state.lock().unwrap();
         let dev_name = self.active_device_name.lock().unwrap().clone();
-        let devices = Self::list_devices();
+        let devices = Self::cached_list_devices();
         let has_loopback = devices.iter().any(|d| d.is_loopback);
         let is_loopback = match &dev_name {
             Some(name) => devices
@@ -677,6 +718,35 @@ pub fn open_audio_midi_setup() -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_cached_list_devices_short_circuits_repeated_enumeration() {
+        // The exact hot path Grok Bot's v0.2.11 live re-test found hanging:
+        // get_status() polled every 500ms called list_devices() (a real
+        // CoreAudio enumeration) every single time. Proves the TTL cache
+        // actually short-circuits repeat calls instead of just existing —
+        // a burst of cached calls must not cost anywhere near what that many
+        // independent real enumerations would.
+        let _ = GlobalAudioEngine::cached_list_devices(); // warm the cache
+
+        let start = std::time::Instant::now();
+        for _ in 0..200 {
+            let _ = GlobalAudioEngine::cached_list_devices();
+        }
+        let cached_elapsed = start.elapsed();
+
+        let start = std::time::Instant::now();
+        let _ = GlobalAudioEngine::list_devices();
+        let one_real_call = start.elapsed();
+
+        assert!(
+            cached_elapsed < one_real_call * 20 + Duration::from_millis(50),
+            "200 cached calls took {:?}, one real enumeration took {:?} — \
+             the cache does not appear to be short-circuiting repeated calls",
+            cached_elapsed,
+            one_real_call
+        );
+    }
 
     #[test]
     fn test_audio_filter_and_normalize() {
