@@ -1,9 +1,11 @@
 use crate::storage::get_storage_dir;
 use chacha20poly1305::aead::{KeyInit, OsRng};
 use chacha20poly1305::ChaCha20Poly1305;
+#[cfg(not(test))]
 use std::collections::HashSet;
 use std::fs;
 use std::path::PathBuf;
+#[cfg(not(test))]
 use std::sync::Mutex;
 
 #[cfg(not(test))]
@@ -45,6 +47,7 @@ pub enum KeySource {
 }
 
 impl KeySource {
+    #[cfg(not(test))]
     fn as_log_label(self) -> &'static str {
         match self {
             KeySource::Keychain => "keychain",
@@ -155,6 +158,7 @@ fn get_or_create_fallback_key(fallback_filename: &str) -> [u8; 32] {
     new_key
 }
 
+#[cfg(not(test))]
 fn log_key_source_once(account: &str, source: KeySource) {
     static LOGGED: Mutex<Option<HashSet<String>>> = Mutex::new(None);
     let mut guard = LOGGED.lock().unwrap_or_else(|e| e.into_inner());

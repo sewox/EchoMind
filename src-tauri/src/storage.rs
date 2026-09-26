@@ -640,7 +640,7 @@ pub fn get_all_meetings() -> Vec<MeetingRecord> {
 /// publishes `Done` or `Nothing` — never surface a bare error for races.
 #[derive(Clone)]
 enum SessionSaveOutcome {
-    Done(MeetingRecord),
+    Done(Box<MeetingRecord>),
     Nothing,
 }
 
@@ -711,11 +711,7 @@ pub fn prepare_for_quit() {
     }
 }
 
-fn run_detached_fallback_transcription(
-    app: tauri::AppHandle,
-    meeting_id: String,
-    pcm: Vec<f32>,
-) {
+fn run_detached_fallback_transcription(app: tauri::AppHandle, meeting_id: String, pcm: Vec<f32>) {
     use tauri::Emitter;
 
     let transcriber = crate::transcriber::get_global_transcriber();
@@ -795,7 +791,7 @@ fn save_current_meeting_blocking(
                     Some(cache) if cache.session_id == session_id => {
                         if let Some(ref outcome) = cache.outcome {
                             return match outcome {
-                                SessionSaveOutcome::Done(m) => Ok((m.clone(), None)),
+                                SessionSaveOutcome::Done(m) => Ok(((**m).clone(), None)),
                                 SessionSaveOutcome::Nothing => Err(NOTHING_TO_SAVE.to_string()),
                             };
                         }
@@ -879,12 +875,11 @@ fn save_current_meeting_blocking(
             }
         }
 
-        let pending_pcm =
-            if deduplicated_segments.is_empty() && raw_pcm_buffer.len() >= 16000 {
-                Some(raw_pcm_buffer)
-            } else {
-                None
-            };
+        let pending_pcm = if deduplicated_segments.is_empty() && raw_pcm_buffer.len() >= 16000 {
+            Some(raw_pcm_buffer)
+        } else {
+            None
+        };
 
         let meeting = MeetingRecord {
             id,
@@ -926,7 +921,7 @@ fn save_current_meeting_blocking(
         Ok((saved, _)) => {
             *gate = Some(SessionSaveCache {
                 session_id,
-                outcome: Some(SessionSaveOutcome::Done(saved.clone())),
+                outcome: Some(SessionSaveOutcome::Done(Box::new(saved.clone()))),
             });
         }
         Err(_) => {
