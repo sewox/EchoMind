@@ -120,8 +120,13 @@ export function useMeetingDetector({
 
             if (apps.length > 0 && !isRecordingRef.current) {
               const primary = apps[0];
-              if (settingsRef.current.auto_start_record) {
-                onAutoStartRef.current?.(primary);
+              // Auto-start only when a handler is wired (e.g. storage unlocked).
+              // Otherwise fall back to the island/prompt so the user can start later.
+              if (
+                settingsRef.current.auto_start_record &&
+                onAutoStartRef.current
+              ) {
+                onAutoStartRef.current(primary);
               } else {
                 setPromptApp(primary);
               }

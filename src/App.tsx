@@ -456,7 +456,10 @@ export function App() {
 
   useMeetingDetector({
     isRecording,
-    onAutoStartMeeting: handleAutoStartMeeting,
+    // Do not auto-start capture until secure storage is unlocked — quit during
+    // Keychain wait cannot encrypt a meeting (#59). Island/manual start is also
+    // gated in Rust via require_storage_ready on start_*_capture commands.
+    onAutoStartMeeting: storageReady ? handleAutoStartMeeting : undefined,
     onAutoStopMeeting: handleAutoStopMeeting,
   });
 

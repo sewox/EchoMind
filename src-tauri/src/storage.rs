@@ -834,7 +834,9 @@ pub enum QuitPersistResult {
 /// If a recording is active: stop capture, claim PCM once, write FLAC + meeting
 /// with `transcript_pending` (empty transcript). Never runs Whisper.
 pub fn persist_active_recording_on_quit() -> QuitPersistResult {
-    // Never block quit on a pending Keychain prompt — skip encrypted persist.
+    // Capture commands refuse to start until storage is ready, so an active
+    // session during unlock should not occur. Defense in depth: if it somehow
+    // does, never block quit on Keychain — skip encrypted persist (no hang).
     if !crate::secure_key::is_key_unlock_ready() && crate::secure_key::is_key_unlock_in_progress() {
         let audio_engine = crate::audio::get_global_audio_engine();
         if audio_engine.get_status().is_recording {
@@ -2140,6 +2142,8 @@ mod tests {
 
     #[test]
     fn test_quit_persist_skips_when_keychain_unlock_pending() {
+        // Defense-in-depth only: start_audio_capture / start_meeting_recording
+        // refuse storage_not_ready, so production should never be recording here.
         let _unlock = crate::secure_key::key_unlock_test_lock()
             .lock()
             .unwrap_or_else(|e| e.into_inner());
