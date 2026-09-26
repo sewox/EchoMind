@@ -27,6 +27,8 @@ export const en: TranslationKeys = {
     storageUnlocking: "Opening secure storage…",
     storageUnlockHint:
       "Waiting for Keychain access. The window stays responsive; your history loads after you allow access.",
+    historyRecoveryNotice:
+      "Previous encrypted history could not be opened in this version; backups were kept. New recordings are now protected with Keychain.",
   },
   nav: {
     startListening: "Start Listening",
