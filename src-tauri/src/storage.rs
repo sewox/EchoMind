@@ -575,9 +575,7 @@ pub fn should_show_history_recovery_notice(
     has_corrupt_backup: bool,
     dismissed: bool,
 ) -> bool {
-    !dismissed
-        && key_source == crate::secure_key::KeySource::NewKeyCreated
-        && has_corrupt_backup
+    !dismissed && key_source == crate::secure_key::KeySource::NewKeyCreated && has_corrupt_backup
 }
 
 /// True when `{history_file_name}.corrupt-*` siblings exist next to the history file
