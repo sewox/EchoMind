@@ -49,7 +49,8 @@ jobs:
             librsvg2-dev \
             patchelf \
             libasound2-dev \
-            libssl-dev
+            libssl-dev \
+            libdbus-1-dev
 
       - name: Install NPM Dependencies
         run: npm ci
