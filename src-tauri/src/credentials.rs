@@ -1,4 +1,6 @@
-use crate::secure_key::get_or_create_key;
+use crate::secure_key::{
+    resolve_key_nonblocking, CREDENTIAL_VAULT_ACCOUNT, CREDENTIAL_VAULT_FALLBACK, STORAGE_NOT_READY,
+};
 use crate::storage::get_storage_dir;
 use chacha20poly1305::aead::{Aead, AeadCore, KeyInit, OsRng};
 use chacha20poly1305::{ChaCha20Poly1305, Key, Nonce};
@@ -10,9 +12,9 @@ use std::sync::Mutex;
 const MAGIC_HEADER_V2: &[u8] = b"ECHOMIND_VAULT_V2\0";
 const NONCE_LEN: usize = 12;
 
-fn cipher() -> ChaCha20Poly1305 {
-    let key = get_or_create_key("credential_vault_key", "vault.key");
-    ChaCha20Poly1305::new(Key::from_slice(&key))
+fn cipher() -> Result<ChaCha20Poly1305, String> {
+    let key = resolve_key_nonblocking(CREDENTIAL_VAULT_ACCOUNT, CREDENTIAL_VAULT_FALLBACK)?;
+    Ok(ChaCha20Poly1305::new(Key::from_slice(&key)))
 }
 
 /// Decrypts the legacy vault format: a naive reversible XOR obfuscation with no
@@ -64,7 +66,11 @@ fn load_vault() -> HashMap<String, String> {
             return HashMap::new();
         }
         let (nonce_bytes, ciphertext) = rest.split_at(NONCE_LEN);
-        let cipher = cipher();
+        let cipher = match cipher() {
+            Ok(c) => c,
+            Err(e) if e == STORAGE_NOT_READY => return HashMap::new(),
+            Err(_) => return HashMap::new(),
+        };
         let nonce = Nonce::from_slice(nonce_bytes);
         return cipher
             .decrypt(nonce, ciphertext)
@@ -82,7 +88,7 @@ fn save_vault(map: &HashMap<String, String>) -> Result<(), String> {
     let path = get_vault_path();
     let json_bytes = serde_json::to_vec(map).map_err(|e| format!("JSON serialize error: {}", e))?;
 
-    let cipher = cipher();
+    let cipher = cipher()?;
     let nonce = ChaCha20Poly1305::generate_nonce(&mut OsRng);
     let ciphertext = cipher
         .encrypt(&nonce, json_bytes.as_slice())
@@ -99,6 +105,7 @@ fn save_vault(map: &HashMap<String, String>) -> Result<(), String> {
 
 #[tauri::command]
 pub fn save_secure_credential(key_name: String, key_value: String) -> Result<(), String> {
+    crate::storage::require_storage_ready()?;
     let _guard = VAULT_LOCK.lock().map_err(|e| e.to_string())?;
     let mut vault = load_vault();
     if key_value.trim().is_empty() {
@@ -111,6 +118,7 @@ pub fn save_secure_credential(key_name: String, key_value: String) -> Result<(),
 
 #[tauri::command]
 pub fn get_secure_credential(key_name: String) -> Result<Option<String>, String> {
+    crate::storage::require_storage_ready()?;
     let _guard = VAULT_LOCK.lock().map_err(|e| e.to_string())?;
     let vault = load_vault();
     Ok(vault.get(&key_name).cloned())
@@ -118,6 +126,7 @@ pub fn get_secure_credential(key_name: String) -> Result<Option<String>, String>
 
 #[tauri::command]
 pub fn delete_secure_credential(key_name: String) -> Result<(), String> {
+    crate::storage::require_storage_ready()?;
     let _guard = VAULT_LOCK.lock().map_err(|e| e.to_string())?;
     let mut vault = load_vault();
     vault.remove(&key_name);
@@ -137,7 +146,7 @@ mod tests {
         );
 
         let json_bytes = serde_json::to_vec(&map).unwrap();
-        let cipher = cipher();
+        let cipher = cipher().unwrap();
         let nonce = ChaCha20Poly1305::generate_nonce(&mut OsRng);
         let ciphertext = cipher.encrypt(&nonce, json_bytes.as_slice()).unwrap();
 

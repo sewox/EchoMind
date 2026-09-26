@@ -2,7 +2,19 @@ import { useState, useEffect, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { MeetingRecord } from "../App";
 
-export function useMeetingManager() {
+const STORAGE_NOT_READY = "storage_not_ready";
+
+function isStorageNotReadyError(err: unknown): boolean {
+  if (typeof err === "string") return err.includes(STORAGE_NOT_READY);
+  if (err && typeof err === "object" && "message" in err) {
+    return String((err as { message: unknown }).message).includes(
+      STORAGE_NOT_READY,
+    );
+  }
+  return String(err).includes(STORAGE_NOT_READY);
+}
+
+export function useMeetingManager(storageReady = true) {
   const [pastMeetings, setPastMeetings] = useState<MeetingRecord[]>([]);
   const [selectedMeeting, setSelectedMeeting] = useState<MeetingRecord | null>(
     null,
@@ -21,13 +33,17 @@ export function useMeetingManager() {
       const meetings = await invoke<MeetingRecord[]>("get_all_meetings");
       setPastMeetings(Array.isArray(meetings) ? meetings : []);
     } catch (err) {
+      if (isStorageNotReadyError(err)) {
+        return;
+      }
       console.error("Failed to fetch past meetings:", err);
     }
   };
 
   useEffect(() => {
+    if (!storageReady) return;
     fetchPastMeetings();
-  }, []);
+  }, [storageReady]);
 
   const handleDeleteMeeting = async (id: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();

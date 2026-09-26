@@ -24,6 +24,9 @@ export const es: TranslationKeys = {
     minutes: "min",
     seconds: "s",
     hours: "h",
+    storageUnlocking: "Abriendo almacenamiento seguro…",
+    storageUnlockHint:
+      "Esperando acceso al llavero. La ventana sigue respondiendo; el historial se carga tras permitir el acceso.",
   },
   nav: {
     startListening: "Iniciar Escucha",

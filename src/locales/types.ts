@@ -22,6 +22,8 @@ export interface TranslationKeys {
     minutes: string;
     seconds: string;
     hours: string;
+    storageUnlocking: string;
+    storageUnlockHint: string;
   };
   nav: {
     startListening: string;

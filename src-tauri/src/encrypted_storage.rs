@@ -1,4 +1,4 @@
-use crate::secure_key::get_or_create_key;
+use crate::secure_key::{resolve_key_nonblocking, DATA_AT_REST_ACCOUNT, DATA_AT_REST_FALLBACK};
 use chacha20poly1305::aead::{Aead, AeadCore, KeyInit, OsRng};
 use chacha20poly1305::{ChaCha20Poly1305, Key, Nonce};
 use std::fs;
@@ -8,15 +8,15 @@ const MAGIC_HEADER_V1: &[u8] = b"ECHOMIND_ENC_V1\0";
 const MAGIC_HEADER_V2: &[u8] = b"ECHOMIND_ENC_V2\0";
 const NONCE_LEN: usize = 12;
 
-fn cipher() -> ChaCha20Poly1305 {
-    let key = get_or_create_key("data_at_rest_key", "storage.key");
-    ChaCha20Poly1305::new(Key::from_slice(&key))
+fn cipher() -> Result<ChaCha20Poly1305, String> {
+    let key = resolve_key_nonblocking(DATA_AT_REST_ACCOUNT, DATA_AT_REST_FALLBACK)?;
+    Ok(ChaCha20Poly1305::new(Key::from_slice(&key)))
 }
 
 /// Encrypts and writes raw bytes to disk with authenticated ChaCha20-Poly1305 encryption.
 /// Format: `ECHOMIND_ENC_V2\0` + 12-byte random nonce + ciphertext (includes the auth tag).
 pub fn write_encrypted_file<P: AsRef<Path>>(path: P, plaintext: &[u8]) -> Result<(), String> {
-    let cipher = cipher();
+    let cipher = cipher()?;
     let nonce = ChaCha20Poly1305::generate_nonce(&mut OsRng);
     let ciphertext = cipher
         .encrypt(&nonce, plaintext)
@@ -77,7 +77,7 @@ pub fn read_encrypted_file<P: AsRef<Path>>(path: P) -> Result<Vec<u8>, String> {
             return Err("Şifreli dosya bozuk: nonce eksik".to_string());
         }
         let (nonce_bytes, ciphertext) = rest.split_at(NONCE_LEN);
-        let cipher = cipher();
+        let cipher = cipher()?;
         let nonce = Nonce::from_slice(nonce_bytes);
         return cipher.decrypt(nonce, ciphertext).map_err(|_| {
             "Şifre çözme hatası: veri bozuk veya bütünlük doğrulaması başarısız".to_string()
@@ -269,5 +269,36 @@ mod tests {
         assert!(raw_after_upgrade.starts_with(MAGIC_HEADER_V2));
 
         let _ = fs::remove_file(file_path);
+    }
+}
+
+#[cfg(test)]
+mod unlock_gate_tests {
+    use super::*;
+    use crate::secure_key::{
+        begin_key_unlock, key_unlock_test_lock, mark_keys_ready, reset_key_unlock_state_for_test,
+        STORAGE_NOT_READY,
+    };
+
+    #[test]
+    fn test_write_encrypted_refuses_while_unlock_in_progress() {
+        let _lock = key_unlock_test_lock()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        reset_key_unlock_state_for_test();
+        assert!(begin_key_unlock());
+
+        let path = std::env::temp_dir().join(format!(
+            "echomind_test_not_ready_{}.dat",
+            std::process::id()
+        ));
+        let err = write_encrypted_file(&path, b"secret").unwrap_err();
+        assert_eq!(err, STORAGE_NOT_READY);
+
+        mark_keys_ready();
+        // Ready but uncached still sync-resolves in tests (NotStarted was replaced by Ready
+        // after mark; resolve_key_nonblocking allows blocking when not InProgress).
+        reset_key_unlock_state_for_test();
+        let _ = fs::remove_file(path);
     }
 }

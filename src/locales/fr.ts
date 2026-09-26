@@ -24,6 +24,9 @@ export const fr: TranslationKeys = {
     minutes: "min",
     seconds: "sec",
     hours: "h",
+    storageUnlocking: "Ouverture du stockage sécurisé…",
+    storageUnlockHint:
+      "En attente de l'accès au trousseau. La fenêtre reste réactive ; votre historique se charge après autorisation.",
   },
   nav: {
     startListening: "Démarrer l'écoute",

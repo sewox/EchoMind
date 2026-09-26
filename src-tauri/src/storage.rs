@@ -352,13 +352,13 @@ impl StorageEngine {
         }
 
         let file_path = storage_dir.join("meetings_history.json");
-        let engine = StorageEngine {
+        // Do NOT call load_from_disk / Keychain here — that can block the UI
+        // thread (macOS Keychain prompt). History is loaded from
+        // `start_storage_unlock` on a background thread after the window shows.
+        StorageEngine {
             file_path,
             meetings: Arc::new(Mutex::new(Vec::new())),
-        };
-
-        let _ = engine.load_from_disk();
-        engine
+        }
     }
 
     pub fn load_from_disk(&self) -> Result<Vec<MeetingRecord>, String> {
@@ -546,6 +546,99 @@ pub fn get_global_storage() -> &'static StorageEngine {
     STORAGE.get_or_init(StorageEngine::new)
 }
 
+/// Payload emitted on `storage-unlocked` and returned by [`get_storage_ready`].
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StorageReadyStatus {
+    pub ready: bool,
+    /// True when the data-at-rest key came from the fallback file (e.g. Keychain deny).
+    pub used_fallback: bool,
+    pub key_source: Option<String>,
+}
+
+/// Gate for history / vault commands while Keychain I/O may still be running.
+pub fn require_storage_ready() -> Result<(), String> {
+    use crate::secure_key::{is_key_unlock_in_progress, is_key_unlock_ready, STORAGE_NOT_READY};
+    if is_key_unlock_ready() {
+        return Ok(());
+    }
+    if is_key_unlock_in_progress() {
+        return Err(STORAGE_NOT_READY.to_string());
+    }
+    // Unlock never started (unit tests, or a path before setup): allow sync key resolve.
+    Ok(())
+}
+
+/// Spawns Keychain / keystore resolution + history load off the UI thread.
+/// Safe to call once from Tauri `setup` after the main window can render.
+pub fn start_storage_unlock(app: tauri::AppHandle) {
+    use crate::secure_key::{
+        begin_key_unlock, get_or_create_key_with_source, mark_keys_ready, quit_abort_requested,
+        CREDENTIAL_VAULT_ACCOUNT, CREDENTIAL_VAULT_FALLBACK, DATA_AT_REST_ACCOUNT,
+        DATA_AT_REST_FALLBACK,
+    };
+    use tauri::Emitter;
+
+    if !begin_key_unlock() {
+        // Already in progress or ready — still notify UI if ready so late listeners catch up.
+        if crate::secure_key::is_key_unlock_ready() {
+            let _ = app.emit(
+                "storage-unlocked",
+                StorageReadyStatus {
+                    ready: true,
+                    used_fallback: false,
+                    key_source: None,
+                },
+            );
+        }
+        return;
+    }
+
+    std::thread::Builder::new()
+        .name("echomind-storage-unlock".into())
+        .spawn(move || {
+            // May block on macOS Keychain Access prompt — must stay off the main thread.
+            let (_data_key, data_source) =
+                get_or_create_key_with_source(DATA_AT_REST_ACCOUNT, DATA_AT_REST_FALLBACK);
+            let (_vault_key, _vault_source) =
+                get_or_create_key_with_source(CREDENTIAL_VAULT_ACCOUNT, CREDENTIAL_VAULT_FALLBACK);
+
+            if quit_abort_requested() {
+                // Quit while the prompt was open: do not load/emit; process is exiting.
+                mark_keys_ready();
+                return;
+            }
+
+            let storage = get_global_storage();
+            match storage.load_from_disk() {
+                Ok(_) => {}
+                Err(e) => eprintln!("⚠️ Storage unlock load_from_disk: {}", e),
+            }
+
+            mark_keys_ready();
+
+            let status = StorageReadyStatus {
+                ready: true,
+                used_fallback: data_source.used_fallback(),
+                key_source: Some(data_source.as_log_label().to_string()),
+            };
+            let _ = app.emit("storage-unlocked", &status);
+            eprintln!(
+                "🔓 EchoMind secure storage ready (source: {})",
+                data_source.as_log_label()
+            );
+        })
+        .ok();
+}
+
+#[tauri::command]
+pub fn get_storage_ready() -> StorageReadyStatus {
+    StorageReadyStatus {
+        ready: crate::secure_key::is_key_unlock_ready(),
+        used_fallback: false,
+        key_source: None,
+    }
+}
+
 /// Encodes 16kHz mono float audio PCM samples into FLAC format (100% Lossless, 0 Distortion)
 pub fn compress_audio_to_flac(samples_f32: &[f32], output_path: &PathBuf) -> Result<(), String> {
     if samples_f32.is_empty() {
@@ -638,9 +731,10 @@ pub fn extract_key_decisions(segments: &[TranscriptSegment]) -> Vec<String> {
 }
 
 #[tauri::command]
-pub fn get_all_meetings() -> Vec<MeetingRecord> {
+pub fn get_all_meetings() -> Result<Vec<MeetingRecord>, String> {
+    require_storage_ready()?;
     let storage = get_global_storage();
-    storage.get_all()
+    Ok(storage.get_all())
 }
 
 /// Per-session save outcome cache. Losers wait on the Condvar until the winner
@@ -682,6 +776,7 @@ pub async fn save_current_meeting(
     title: String,
     duration_seconds: u64,
 ) -> Result<MeetingRecord, String> {
+    require_storage_ready()?;
     let result = tauri::async_runtime::spawn_blocking(move || {
         save_current_meeting_blocking(title, duration_seconds, SaveMode::Normal)
     })
@@ -739,6 +834,18 @@ pub enum QuitPersistResult {
 /// If a recording is active: stop capture, claim PCM once, write FLAC + meeting
 /// with `transcript_pending` (empty transcript). Never runs Whisper.
 pub fn persist_active_recording_on_quit() -> QuitPersistResult {
+    // Never block quit on a pending Keychain prompt — skip encrypted persist.
+    if !crate::secure_key::is_key_unlock_ready() && crate::secure_key::is_key_unlock_in_progress() {
+        let audio_engine = crate::audio::get_global_audio_engine();
+        if audio_engine.get_status().is_recording {
+            let _ = audio_engine.stop();
+        }
+        eprintln!(
+            "⚠️ Quit during storage unlock — encrypted history persist skipped (Keychain still pending)."
+        );
+        return QuitPersistResult::NothingToSave;
+    }
+
     let audio_engine = crate::audio::get_global_audio_engine();
     match decide_quit_persist(audio_engine.get_status().is_recording) {
         QuitPersistDecision::DrainInFlightOnly => QuitPersistResult::SkippedNotRecording,
@@ -791,12 +898,15 @@ pub fn prepare_for_quit() -> QuitExitMode {
     use std::sync::atomic::Ordering;
     use std::time::Instant;
 
+    crate::secure_key::request_quit_abort_unlock();
+
     let deadline = Instant::now() + QUIT_TOTAL_BUDGET;
     let transcriber = crate::transcriber::get_global_transcriber();
     transcriber.begin_shutdown();
 
     // Active listening must not discard PCM on quit. Idempotent with the
     // normal save gate — safe if a stop-save is already mid-flight.
+    // Skips encrypted persist if Keychain unlock is still pending (no hang).
     let _ = persist_active_recording_on_quit();
 
     // Drain FLAC (including a quit-save we just started) without exceeding budget.
@@ -1099,6 +1209,7 @@ pub fn delete_meeting_by_id(
     id: Option<String>,
     meeting_id: Option<String>,
 ) -> Result<Vec<MeetingRecord>, String> {
+    require_storage_ready()?;
     let target_id = id
         .or(meeting_id)
         .ok_or_else(|| "Toplantı ID belirtilmedi".to_string())?;
@@ -1112,6 +1223,7 @@ pub fn update_meeting_speaker_name(
     speaker_id: String,
     new_name: String,
 ) -> Result<MeetingRecord, String> {
+    require_storage_ready()?;
     let storage = get_global_storage();
     let mut lock = storage.meetings.lock().unwrap();
     if let Some(mtg) = lock.iter_mut().find(|m| m.id == meeting_id) {
@@ -1131,12 +1243,14 @@ pub fn update_meeting_speaker_name(
 
 #[tauri::command]
 pub fn update_meeting_title(id: String, new_title: String) -> Result<Vec<MeetingRecord>, String> {
+    require_storage_ready()?;
     let storage = get_global_storage();
     storage.update_title(&id, &new_title)
 }
 
 #[tauri::command]
 pub fn add_meeting_tag(meeting_id: String, tag: String) -> Result<MeetingRecord, String> {
+    require_storage_ready()?;
     let clean_tag = tag.trim().to_string();
     if clean_tag.is_empty() {
         return Err("Etiket adı boş olamaz".to_string());
@@ -1161,6 +1275,7 @@ pub fn add_meeting_tag(meeting_id: String, tag: String) -> Result<MeetingRecord,
 
 #[tauri::command]
 pub fn remove_meeting_tag(meeting_id: String, tag: String) -> Result<MeetingRecord, String> {
+    require_storage_ready()?;
     let clean_tag = tag.trim();
     let storage = get_global_storage();
     let mut lock = storage.meetings.lock().unwrap();
@@ -1183,6 +1298,7 @@ pub fn get_related_meetings(
     meeting_id: String,
     limit: Option<usize>,
 ) -> Result<Vec<crate::auto_tagger::RelatedMeetingItem>, String> {
+    require_storage_ready()?;
     let storage = get_global_storage();
     let all = storage.get_all();
     if let Some(target) = all.iter().find(|m| m.id == meeting_id) {
@@ -1202,6 +1318,7 @@ pub fn toggle_action_item_status(
     meeting_id: String,
     action_index: usize,
 ) -> Result<MeetingRecord, String> {
+    require_storage_ready()?;
     let storage = get_global_storage();
     let mut lock = storage.meetings.lock().unwrap();
     if let Some(mtg) = lock.iter_mut().find(|m| m.id == meeting_id) {
@@ -1220,7 +1337,8 @@ pub fn toggle_action_item_status(
 }
 
 #[tauri::command]
-pub fn get_all_tags() -> Vec<String> {
+pub fn get_all_tags() -> Result<Vec<String>, String> {
+    require_storage_ready()?;
     let storage = get_global_storage();
     let all = storage.get_all();
     let mut tags_set = std::collections::HashSet::new();
@@ -1235,7 +1353,7 @@ pub fn get_all_tags() -> Vec<String> {
     }
     let mut list: Vec<String> = tags_set.into_iter().collect();
     list.sort();
-    list
+    Ok(list)
 }
 
 #[cfg(test)]
@@ -1604,7 +1722,11 @@ mod tests {
 
     #[test]
     fn test_save_current_meeting_is_idempotent_per_session() {
+        let _unlock = crate::secure_key::key_unlock_test_lock()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         let _guard = global_save_test_lock().lock().unwrap();
+        crate::secure_key::reset_key_unlock_state_for_test();
 
         // Enough PCM to persist, short enough to skip detached Whisper (≥1s).
         let samples: Vec<f32> = (0..8000).map(|i| ((i % 40) as f32) * 0.002).collect();
@@ -1651,7 +1773,11 @@ mod tests {
 
     #[test]
     fn test_empty_pcm_claim_returns_nothing_to_save() {
+        let _unlock = crate::secure_key::key_unlock_test_lock()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         let _guard = global_save_test_lock().lock().unwrap();
+        crate::secure_key::reset_key_unlock_state_for_test();
         let engine = crate::audio::get_global_audio_engine();
         let session_id = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -1673,7 +1799,11 @@ mod tests {
 
     #[test]
     fn test_concurrent_duplicate_save_waits_for_winner_ok() {
+        let _unlock = crate::secure_key::key_unlock_test_lock()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         let _guard = global_save_test_lock().lock().unwrap();
+        crate::secure_key::reset_key_unlock_state_for_test();
         let samples: Vec<f32> = (0..8000).map(|i| ((i % 40) as f32) * 0.002).collect();
         let engine = crate::audio::get_global_audio_engine();
         let session_id = std::time::SystemTime::now()
@@ -1704,7 +1834,11 @@ mod tests {
 
     #[test]
     fn test_save_finalizes_segments_before_claim() {
+        let _unlock = crate::secure_key::key_unlock_test_lock()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         let _guard = global_save_test_lock().lock().unwrap();
+        crate::secure_key::reset_key_unlock_state_for_test();
         let engine = crate::audio::get_global_audio_engine();
         let session_id = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -1746,7 +1880,11 @@ mod tests {
 
     #[test]
     fn test_save_defers_whisper_pcm_when_segments_empty() {
+        let _unlock = crate::secure_key::key_unlock_test_lock()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         let _guard = global_save_test_lock().lock().unwrap();
+        crate::secure_key::reset_key_unlock_state_for_test();
         let samples: Vec<f32> = (0..16000).map(|i| ((i % 40) as f32) * 0.002).collect();
         let engine = crate::audio::get_global_audio_engine();
         let session_id = std::time::SystemTime::now()
@@ -1782,7 +1920,11 @@ mod tests {
 
     #[test]
     fn test_quit_save_active_recording_with_pcm_saves_once_pending() {
+        let _unlock = crate::secure_key::key_unlock_test_lock()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         let _guard = global_save_test_lock().lock().unwrap();
+        crate::secure_key::reset_key_unlock_state_for_test();
         let samples: Vec<f32> = (0..8000).map(|i| ((i % 40) as f32) * 0.002).collect();
         let engine = crate::audio::get_global_audio_engine();
         let session_id = std::time::SystemTime::now()
@@ -1839,7 +1981,11 @@ mod tests {
 
     #[test]
     fn test_quit_save_empty_pcm_saves_nothing() {
+        let _unlock = crate::secure_key::key_unlock_test_lock()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         let _guard = global_save_test_lock().lock().unwrap();
+        crate::secure_key::reset_key_unlock_state_for_test();
         let engine = crate::audio::get_global_audio_engine();
         let session_id = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -1860,7 +2006,11 @@ mod tests {
 
     #[test]
     fn test_quit_save_does_not_double_save_when_claim_already_taken() {
+        let _unlock = crate::secure_key::key_unlock_test_lock()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         let _guard = global_save_test_lock().lock().unwrap();
+        crate::secure_key::reset_key_unlock_state_for_test();
         let samples: Vec<f32> = (0..8000).map(|i| ((i % 40) as f32) * 0.002).collect();
         let engine = crate::audio::get_global_audio_engine();
         let session_id = std::time::SystemTime::now()
@@ -1902,7 +2052,11 @@ mod tests {
 
     #[test]
     fn test_quit_save_mode_never_returns_whisper_pcm() {
+        let _unlock = crate::secure_key::key_unlock_test_lock()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         let _guard = global_save_test_lock().lock().unwrap();
+        crate::secure_key::reset_key_unlock_state_for_test();
         let samples: Vec<f32> = (0..16000).map(|i| ((i % 40) as f32) * 0.002).collect();
         let engine = crate::audio::get_global_audio_engine();
         let session_id = std::time::SystemTime::now()
@@ -1950,5 +2104,77 @@ mod tests {
             quit_exit_mode_after_whisper_wait(false),
             QuitExitMode::HardExit
         );
+    }
+
+    #[test]
+    fn test_commands_return_not_ready_while_unlock_in_progress() {
+        let _unlock = crate::secure_key::key_unlock_test_lock()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let _guard = global_save_test_lock().lock().unwrap();
+        crate::secure_key::reset_key_unlock_state_for_test();
+
+        assert!(crate::secure_key::begin_key_unlock());
+        let err = get_all_meetings().unwrap_err();
+        assert_eq!(err, crate::secure_key::STORAGE_NOT_READY);
+        assert_eq!(
+            require_storage_ready().unwrap_err(),
+            crate::secure_key::STORAGE_NOT_READY
+        );
+        assert!(!get_storage_ready().ready);
+
+        // Simulate unlock thread finishing: prime keys, load history, mark ready.
+        let _ = crate::secure_key::get_or_create_key(
+            crate::secure_key::DATA_AT_REST_ACCOUNT,
+            crate::secure_key::DATA_AT_REST_FALLBACK,
+        );
+        let _ = get_global_storage().load_from_disk();
+        crate::secure_key::mark_keys_ready();
+
+        assert!(require_storage_ready().is_ok());
+        assert!(get_storage_ready().ready);
+        assert!(get_all_meetings().is_ok());
+
+        crate::secure_key::reset_key_unlock_state_for_test();
+    }
+
+    #[test]
+    fn test_quit_persist_skips_when_keychain_unlock_pending() {
+        let _unlock = crate::secure_key::key_unlock_test_lock()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let _guard = global_save_test_lock().lock().unwrap();
+        crate::secure_key::reset_key_unlock_state_for_test();
+
+        let samples: Vec<f32> = (0..4000).map(|i| ((i % 20) as f32) * 0.001).collect();
+        let engine = crate::audio::get_global_audio_engine();
+        let session_id = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos() as u64;
+        engine.inject_pcm_for_test(samples, session_id);
+        {
+            let mut state = engine.state.lock().unwrap();
+            state.is_recording = true;
+        }
+
+        assert!(crate::secure_key::begin_key_unlock());
+        let before = get_global_storage().get_all().len();
+        let result = persist_active_recording_on_quit();
+        assert_eq!(result, QuitPersistResult::NothingToSave);
+        assert_eq!(get_global_storage().get_all().len(), before);
+        assert!(
+            !engine.get_status().is_recording,
+            "capture must still stop even when persist is skipped"
+        );
+
+        crate::secure_key::reset_key_unlock_state_for_test();
+    }
+
+    #[test]
+    fn test_storage_engine_new_does_not_load_until_unlock() {
+        // Regression: constructing StorageEngine must not touch Keychain / decrypt.
+        let storage = StorageEngine::new();
+        assert!(storage.get_all().is_empty());
     }
 }
