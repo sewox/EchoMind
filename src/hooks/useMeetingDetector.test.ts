@@ -145,6 +145,29 @@ describe("useMeetingDetector Hook", () => {
     expect(onAutoStart).toHaveBeenCalledWith(mockApp);
   });
 
+  it("shows prompt instead of auto-starting when onAutoStartMeeting is absent", async () => {
+    // Mirrors storage-unlock gate: App omits the handler until secure storage is ready.
+    const { result } = renderHook(() =>
+      useMeetingDetector({
+        isRecording: false,
+      }),
+    );
+
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 10));
+    });
+
+    await act(async () => {
+      await result.current.updateSettings({ auto_start_record: true });
+    });
+
+    await act(async () => {
+      detectedCallback?.({ payload: [mockApp] });
+    });
+
+    expect(result.current.promptApp).toEqual(mockApp);
+  });
+
   it("calls onAutoStopMeeting when meeting-ended event is received while recording", async () => {
     const onAutoStop = vi.fn();
     renderHook(() =>

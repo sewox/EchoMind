@@ -47,7 +47,7 @@ use player::{
 };
 use storage::{
     add_meeting_tag, delete_meeting_by_id, get_all_meetings, get_all_tags, get_related_meetings,
-    remove_meeting_tag, save_current_meeting, toggle_action_item_status,
+    get_storage_ready, remove_meeting_tag, save_current_meeting, toggle_action_item_status,
     update_meeting_speaker_name, update_meeting_title,
 };
 use summarizer::{
@@ -86,6 +86,7 @@ pub fn run() {
             clear_transcription_history,
             get_model_status,
             get_all_meetings,
+            get_storage_ready,
             save_current_meeting,
             delete_meeting_by_id,
             import_audio_file,
@@ -154,7 +155,12 @@ pub fn run() {
             get_related_meetings,
             get_all_tags
         ])
-        .setup(|_app| Ok(()))
+        .setup(|app| {
+            // Resolve Keychain / keystore keys on a background thread so the main
+            // window can paint even while macOS shows its Keychain Access prompt.
+            storage::start_storage_unlock(app.handle().clone());
+            Ok(())
+        })
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|_app_handle, event| {
@@ -163,6 +169,7 @@ pub fn run() {
                     // Persist active/mid-save audio, abort Whisper, wait briefly
                     // for inference idle (total ≤ ~3s). If still busy, hard-exit
                     // so ggml Metal static destructors cannot abort().
+                    // Also signals storage-unlock to skip emit if Keychain is pending.
                     let exit_mode = storage::prepare_for_quit();
                     audio::get_global_audio_engine().stop().ok();
                     audio::get_global_audio_engine().stop_preview().ok();

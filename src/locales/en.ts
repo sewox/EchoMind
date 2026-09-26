@@ -24,6 +24,9 @@ export const en: TranslationKeys = {
     minutes: "min",
     seconds: "sec",
     hours: "hr",
+    storageUnlocking: "Opening secure storage…",
+    storageUnlockHint:
+      "Waiting for Keychain access. The window stays responsive; your history loads after you allow access.",
   },
   nav: {
     startListening: "Start Listening",

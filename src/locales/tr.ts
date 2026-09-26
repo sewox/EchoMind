@@ -24,6 +24,9 @@ export const tr: TranslationKeys = {
     minutes: "dk",
     seconds: "sn",
     hours: "sa",
+    storageUnlocking: "Güvenli depolama açılıyor…",
+    storageUnlockHint:
+      "Anahtarlık erişimi bekleniyor. Pencere yanıt vermeye devam eder; izin verdikten sonra geçmişiniz yüklenir.",
   },
   nav: {
     startListening: "Dinlemeyi Başlat",

@@ -1011,6 +1011,9 @@ fn should_notify_mic_only(was_already_recording: bool, status: &AudioStatus) -> 
 
 #[tauri::command]
 pub fn start_audio_capture(device_name: Option<String>) -> Result<AudioStatus, String> {
+    // Never start capture before secure storage is unlocked: quit-while-locked
+    // cannot encrypt a meeting (#59), so blocking here prevents silent data loss.
+    crate::storage::require_storage_ready()?;
     let engine = get_global_audio_engine();
     let was_already_recording = engine.get_status().is_recording;
     engine.start(device_name)?;
@@ -1028,6 +1031,7 @@ pub fn start_meeting_recording(
     meeting_title: Option<String>,
 ) -> Result<AudioStatus, String> {
     use tauri::{Emitter, Manager};
+    crate::storage::require_storage_ready()?;
     let engine = get_global_audio_engine();
     let was_already_recording = engine.get_status().is_recording;
     engine.start(device_name)?;
@@ -1482,6 +1486,46 @@ mod tests {
     #[test]
     fn test_should_notify_mic_only_never_fires_if_start_failed() {
         assert!(!should_notify_mic_only(false, &status(false, false)));
+    }
+
+    #[test]
+    fn test_start_audio_capture_refuses_while_storage_unlock_in_progress() {
+        let _unlock = crate::secure_key::key_unlock_test_lock()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        crate::secure_key::reset_key_unlock_state_for_test();
+        assert!(crate::secure_key::begin_key_unlock());
+
+        let err = start_audio_capture(None).unwrap_err();
+        assert_eq!(err, crate::secure_key::STORAGE_NOT_READY);
+        assert!(
+            !get_global_audio_engine().get_status().is_recording,
+            "capture must not start while secure storage is still unlocking"
+        );
+
+        crate::secure_key::reset_key_unlock_state_for_test();
+    }
+
+    #[test]
+    fn test_require_storage_ready_blocks_capture_paths_until_unlock() {
+        // Documents the #59 invariant: no capture (UI, island, auto-detect) can
+        // begin before encrypted storage is ready, so quit-during-unlock never
+        // has an in-flight recording to lose.
+        let _unlock = crate::secure_key::key_unlock_test_lock()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        crate::secure_key::reset_key_unlock_state_for_test();
+
+        assert!(crate::storage::require_storage_ready().is_ok()); // NotStarted → ok for tests
+        assert!(crate::secure_key::begin_key_unlock());
+        assert_eq!(
+            crate::storage::require_storage_ready().unwrap_err(),
+            crate::secure_key::STORAGE_NOT_READY
+        );
+        crate::secure_key::mark_keys_ready();
+        assert!(crate::storage::require_storage_ready().is_ok());
+
+        crate::secure_key::reset_key_unlock_state_for_test();
     }
 
     #[test]

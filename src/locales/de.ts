@@ -24,6 +24,9 @@ export const de: TranslationKeys = {
     minutes: "Min",
     seconds: "Sek",
     hours: "Std",
+    storageUnlocking: "Sicherer Speicher wird geöffnet…",
+    storageUnlockHint:
+      "Schlüsselbund-Zugriff wird erwartet. Das Fenster bleibt bedienbar; nach der Freigabe wird Ihr Verlauf geladen.",
   },
   nav: {
     startListening: "Aufnahme Starten",

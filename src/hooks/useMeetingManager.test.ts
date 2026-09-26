@@ -46,6 +46,38 @@ describe("useMeetingManager Hook", () => {
     },
   ];
 
+  it("does not auto-fetch meetings until storageReady becomes true", async () => {
+    (invoke as any).mockResolvedValue(mockMeetings);
+
+    const { result, rerender } = renderHook(
+      ({ ready }) => useMeetingManager(ready),
+      { initialProps: { ready: false } },
+    );
+
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 20));
+    });
+    expect(invoke).not.toHaveBeenCalledWith("get_all_meetings");
+
+    rerender({ ready: true });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 20));
+    });
+    expect(invoke).toHaveBeenCalledWith("get_all_meetings");
+    expect(result.current.pastMeetings.length).toBe(2);
+  });
+
+  it("silently ignores storage_not_ready errors when fetching", async () => {
+    (invoke as any).mockRejectedValue("storage_not_ready");
+    const { result } = renderHook(() => useMeetingManager(true));
+
+    await act(async () => {
+      await result.current.fetchPastMeetings();
+    });
+
+    expect(result.current.pastMeetings).toEqual([]);
+  });
+
   it("fetches past meetings on mount and filters by query across title, summary and segments", async () => {
     (invoke as any).mockResolvedValue(mockMeetings);
 

@@ -49,6 +49,7 @@ import { useMeetingDetector, MeetingAppInfo } from "./hooks/useMeetingDetector";
 import { useFirstRunModelSetup } from "./hooks/useFirstRunModelSetup";
 import { FirstRunModelSetupBanner } from "./components/FirstRunModelSetupBanner";
 import { CredentialStore } from "./services/credentialStore";
+import { useStorageReady } from "./hooks/useStorageReady";
 
 export interface HardwareInfo {
   os_name: string;
@@ -135,6 +136,7 @@ import { getTagColorClass } from "./components/transcript/MeetingTagsBar";
 export function App() {
   const { t, language, setLanguage } = useI18n();
   const { isParanoid } = usePrivacyMode();
+  const { ready: storageReady } = useStorageReady();
   const [hardware, setHardware] = useState<HardwareInfo | null>(null);
   const [modelStatus, setModelStatus] = useState<ModelStatus | null>(null);
   const [selectedLanguage, setSelectedLanguage] = useState<string>("auto");
@@ -150,7 +152,7 @@ export function App() {
   const { progress: modelSetupProgress, dismiss: dismissModelSetup } =
     useFirstRunModelSetup();
 
-  // Meeting Manager Hook
+  // Meeting Manager Hook — waits for Keychain / secure storage unlock
   const {
     pastMeetings,
     selectedMeeting,
@@ -176,7 +178,7 @@ export function App() {
     handleCancelEditMeetingTitle,
     handleAddMeetingTag,
     handleRemoveMeetingTag,
-  } = useMeetingManager();
+  } = useMeetingManager(storageReady);
 
   const [meetingTitleInput, setMeetingTitleInput] = useState<string>("");
 
@@ -221,9 +223,10 @@ export function App() {
     };
   }, []);
   useEffect(() => {
+    if (!storageReady) return;
     // Automatically migrate any legacy plaintext localStorage API keys to the native encrypted vault
     CredentialStore.migrateLegacyStorage().catch(() => {});
-  }, []);
+  }, [storageReady]);
 
   useEffect(() => {
     const autoCheck =
@@ -453,7 +456,10 @@ export function App() {
 
   useMeetingDetector({
     isRecording,
-    onAutoStartMeeting: handleAutoStartMeeting,
+    // Do not auto-start capture until secure storage is unlocked — quit during
+    // Keychain wait cannot encrypt a meeting (#59). Island/manual start is also
+    // gated in Rust via require_storage_ready on start_*_capture commands.
+    onAutoStartMeeting: storageReady ? handleAutoStartMeeting : undefined,
     onAutoStopMeeting: handleAutoStopMeeting,
   });
 
@@ -919,6 +925,24 @@ export function App() {
 
   return (
     <div className="h-screen w-screen bg-[#090d16] text-[#d8e3fb] flex flex-col font-sans overflow-hidden select-text relative">
+      {/* Secure storage unlock — window stays interactive while Keychain may prompt */}
+      {!storageReady && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/55 backdrop-blur-sm animate-in fade-in duration-200"
+          data-testid="storage-unlock-overlay"
+        >
+          <div className="flex flex-col items-center gap-2 px-7 py-5 rounded-2xl bg-slate-900/95 border border-slate-700 shadow-2xl text-white max-w-sm mx-4 text-center">
+            <Loader2 className="w-6 h-6 animate-spin text-cyan-400" />
+            <span className="text-sm font-medium">
+              {t("common.storageUnlocking")}
+            </span>
+            <span className="text-[11px] text-slate-400 leading-relaxed">
+              {t("common.storageUnlockHint")}
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Non-blocking Meeting Loader Overlay */}
       {isLoadingMeeting && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm animate-in fade-in duration-150">
