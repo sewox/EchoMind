@@ -1,15 +1,15 @@
 use crate::storage::get_storage_dir;
 use chacha20poly1305::aead::{KeyInit, OsRng};
 use chacha20poly1305::ChaCha20Poly1305;
+#[cfg(not(test))]
+use std::collections::HashSet;
 use std::fs;
 use std::path::PathBuf;
+#[cfg(not(test))]
+use std::sync::Mutex;
 
 #[cfg(not(test))]
 use keyring::Entry;
-#[cfg(not(test))]
-use std::collections::HashSet;
-#[cfg(not(test))]
-use std::sync::Mutex;
 
 #[cfg(not(test))]
 const SERVICE_NAME: &str = "com.echomind.assistant";

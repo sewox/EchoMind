@@ -765,13 +765,13 @@ pub fn get_global_transcriber() -> &'static GlobalTranscriberEngine {
 pub fn transcribe_audio_buffer(language: String) -> Result<Vec<TranscriptSegment>, String> {
     let engine = get_global_transcriber();
     let audio_engine = crate::audio::get_global_audio_engine();
-    let samples = {
-        let mut state = audio_engine.state.lock().unwrap();
-        // Require at least 1.0 second (16,000 samples) of audio for clean sentence recognition
-        if state.pcm_16k_buffer.len() < 16000 {
-            return Ok(engine.get_history());
-        }
-        std::mem::take(&mut state.pcm_16k_buffer)
+    // Live transcription advances a cursor only — never take/clear the session
+    // persist buffer (that is exclusive to claim_pcm_for_save).
+    let samples = match audio_engine
+        .take_pcm_for_live_transcribe(crate::audio::GlobalAudioEngine::LIVE_TRANSCRIBE_MIN_SAMPLES)
+    {
+        Some(s) => s,
+        None => return Ok(engine.get_history()),
     };
 
     engine.transcribe_pcm(&samples, &language)

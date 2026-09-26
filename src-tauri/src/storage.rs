@@ -648,7 +648,7 @@ pub fn get_all_meetings() -> Vec<MeetingRecord> {
 #[derive(Clone)]
 #[allow(clippy::large_enum_variant)]
 enum SessionSaveOutcome {
-    Done(MeetingRecord),
+    Done(Box<MeetingRecord>),
     Nothing,
 }
 
@@ -809,7 +809,11 @@ pub fn prepare_for_quit() -> QuitExitMode {
     // Mid-save quit: detached Whisper may still be inside ggml Metal. Abort is
     // already sticky; give it a short window to return so destructors are safe.
     let whisper_cap = QUIT_WHISPER_WAIT.min(deadline.saturating_duration_since(Instant::now()));
-    let idle = transcriber.wait_for_inference_idle(whisper_cap);
+    let idle = if !transcriber.is_inference_active() {
+        true
+    } else {
+        transcriber.wait_for_inference_idle(whisper_cap)
+    };
     let mode = quit_exit_mode_after_whisper_wait(idle);
     if mode == QuitExitMode::HardExit {
         println!(
@@ -939,7 +943,7 @@ fn save_current_meeting_blocking(
                     Some(cache) if cache.session_id == session_id => {
                         if let Some(ref outcome) = cache.outcome {
                             return match outcome {
-                                SessionSaveOutcome::Done(m) => Ok((m.clone(), None)),
+                                SessionSaveOutcome::Done(m) => Ok(((**m).clone(), None)),
                                 SessionSaveOutcome::Nothing => Err(NOTHING_TO_SAVE.to_string()),
                             };
                         }
@@ -1074,7 +1078,7 @@ fn save_current_meeting_blocking(
         Ok((saved, _)) => {
             *gate = Some(SessionSaveCache {
                 session_id,
-                outcome: Some(SessionSaveOutcome::Done(saved.clone())),
+                outcome: Some(SessionSaveOutcome::Done(Box::new(saved.clone()))),
             });
         }
         Err(_) => {
