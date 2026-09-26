@@ -48,8 +48,12 @@ import { useMeetingManager } from "./hooks/useMeetingManager";
 import { useMeetingDetector, MeetingAppInfo } from "./hooks/useMeetingDetector";
 import { useFirstRunModelSetup } from "./hooks/useFirstRunModelSetup";
 import { FirstRunModelSetupBanner } from "./components/FirstRunModelSetupBanner";
-import { CredentialStore } from "./services/credentialStore";
+import {
+  useTranscriptionJobs,
+  TranscriptionJobState,
+} from "./hooks/useTranscriptionJobs";
 import { useStorageReady } from "./hooks/useStorageReady";
+import { CredentialStore } from "./services/credentialStore";
 
 export interface HardwareInfo {
   os_name: string;
@@ -179,6 +183,28 @@ export function App() {
     handleAddMeetingTag,
     handleRemoveMeetingTag,
   } = useMeetingManager(storageReady);
+
+  const { getJob, enqueueRetranscribe } = useTranscriptionJobs(storageReady);
+
+  const jobStateLabel = useCallback(
+    (state: TranscriptionJobState | undefined, error?: string | null) => {
+      switch (state) {
+        case "queued":
+          return t("sidebar.jobQueued");
+        case "running":
+          return t("sidebar.jobRunning");
+        case "failed":
+          return error
+            ? `${t("sidebar.jobFailed")}: ${error}`
+            : t("sidebar.jobFailed");
+        case "done":
+          return t("sidebar.jobDone");
+        default:
+          return null;
+      }
+    },
+    [t],
+  );
 
   const [meetingTitleInput, setMeetingTitleInput] = useState<string>("");
 
@@ -1390,12 +1416,85 @@ export function App() {
                     </div>
 
                     {mtg.transcript_pending && (
-                      <div className="mt-2">
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/30 text-[10px] 2xl:text-xs text-amber-300 font-medium">
+                      <div className="mt-2 flex flex-col gap-1.5">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/30 text-[10px] 2xl:text-xs text-amber-300 font-medium w-fit">
                           {t("sidebar.transcriptPending")}
                         </span>
+                        {(() => {
+                          const job = getJob(mtg.id);
+                          const busy =
+                            job?.state === "queued" || job?.state === "running";
+                          const statusText = jobStateLabel(
+                            job?.state,
+                            job?.last_error,
+                          );
+                          return (
+                            <>
+                              {statusText && (
+                                <span
+                                  className={`text-[10px] 2xl:text-xs font-medium ${
+                                    job?.state === "failed"
+                                      ? "text-rose-400"
+                                      : job?.state === "running"
+                                        ? "text-cyan-300"
+                                        : "text-slate-400"
+                                  }`}
+                                  data-testid={`tx-job-status-${mtg.id}`}
+                                >
+                                  {job?.state === "running" && (
+                                    <Loader2 className="w-3 h-3 inline mr-1 animate-spin" />
+                                  )}
+                                  {statusText}
+                                </span>
+                              )}
+                              <button
+                                type="button"
+                                data-testid={`retranscribe-pending-${mtg.id}`}
+                                title={t("sidebar.retranscribePendingTooltip")}
+                                disabled={busy}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  void enqueueRetranscribe(mtg.id);
+                                }}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] 2xl:text-xs font-semibold bg-cyan-500/15 border border-cyan-500/40 text-cyan-200 hover:bg-cyan-500/25 disabled:opacity-50 disabled:cursor-not-allowed w-fit transition"
+                              >
+                                {busy ? (
+                                  <Loader2 className="w-3 h-3 animate-spin" />
+                                ) : (
+                                  <Layers className="w-3 h-3" />
+                                )}
+                                {t("sidebar.retranscribePending")}
+                              </button>
+                            </>
+                          );
+                        })()}
                       </div>
                     )}
+
+                    {!mtg.transcript_pending &&
+                      getJob(mtg.id)?.state === "failed" && (
+                        <div className="mt-2 flex flex-col gap-1.5">
+                          <span
+                            className="text-[10px] text-rose-400 font-medium"
+                            data-testid={`tx-job-status-${mtg.id}`}
+                          >
+                            {jobStateLabel("failed", getJob(mtg.id)?.last_error)}
+                          </span>
+                          <button
+                            type="button"
+                            data-testid={`retranscribe-pending-${mtg.id}`}
+                            title={t("sidebar.retranscribePendingTooltip")}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void enqueueRetranscribe(mtg.id);
+                            }}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] 2xl:text-xs font-semibold bg-cyan-500/15 border border-cyan-500/40 text-cyan-200 hover:bg-cyan-500/25 w-fit transition"
+                          >
+                            <Layers className="w-3 h-3" />
+                            {t("sidebar.retranscribePending")}
+                          </button>
+                        </div>
+                      )}
 
                     {/* Model & Summary Badge */}
                     <div className="flex items-center gap-1.5 mt-2 flex-wrap">

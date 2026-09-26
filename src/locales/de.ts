@@ -52,6 +52,13 @@ export const de: TranslationKeys = {
       "Möchten Sie dieses Meeting und alle Aufnahmen wirklich löschen?",
     segmentCount: "{count} Dialogabschnitte",
     transcriptPending: "Transkript ausstehend",
+    retranscribePending: "Neu transkribieren",
+    retranscribePendingTooltip:
+      "Aus der gespeicherten FLAC-Datei im Hintergrund transkribieren",
+    jobQueued: "In Warteschlange",
+    jobRunning: "Wird transkribiert…",
+    jobFailed: "Transkription fehlgeschlagen",
+    jobDone: "Fertig",
     liveSession: "Live-Sitzung",
     backToLive: "Zurück zur Live-Sitzung",
   },

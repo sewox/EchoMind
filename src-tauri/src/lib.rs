@@ -18,6 +18,7 @@ pub mod security;
 pub mod storage;
 pub mod summarizer;
 pub mod transcriber;
+pub mod transcription_queue;
 pub mod updater;
 
 use credentials::{delete_secure_credential, get_secure_credential, save_secure_credential};
@@ -65,6 +66,9 @@ use transcriber::{
     get_recommended_model_key, get_transcription_history, switch_transcription_model,
     transcribe_audio_buffer, unload_transcription_model,
 };
+use transcription_queue::{
+    enqueue_meeting_transcription, get_transcription_job, list_transcription_jobs,
+};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -88,6 +92,9 @@ pub fn run() {
             get_all_meetings,
             get_storage_ready,
             save_current_meeting,
+            enqueue_meeting_transcription,
+            get_transcription_job,
+            list_transcription_jobs,
             delete_meeting_by_id,
             import_audio_file,
             pick_and_import_audio_file,
