@@ -1,11 +1,11 @@
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::Sample;
 use serde::{Deserialize, Serialize};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::mpsc::{channel, Receiver, RecvTimeoutError, Sender};
 use std::sync::{Arc, Mutex, OnceLock, RwLock};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AudioStatus {
@@ -146,14 +146,64 @@ impl DeviceCatalog {
     }
 }
 
-/// How often the worker re-enumerates when idle. Fresh enough for plug/unplug
-/// and Settings, without polling CoreAudio on the UI/status path.
+/// Idle poll fallback when no device-change notification arrives.
+/// macOS primarily refreshes via `AudioObjectAddPropertyListener`; this is
+/// the safety net. Windows/Linux rely on this poll + Settings force-refresh.
 #[cfg(not(test))]
-const DEVICE_CATALOG_PERIOD: Duration = Duration::from_secs(8);
+const DEVICE_CATALOG_PERIOD: Duration = Duration::from_secs(15);
 /// Long period in unit tests so the global worker's timer does not spuriously
 /// fire mid-assertion while `TEST_ENUMERATE` is installed.
 #[cfg(test)]
 const DEVICE_CATALOG_PERIOD: Duration = Duration::from_secs(3600);
+
+/// How long to keep the catalog worker away from CoreAudio after `stop()`
+/// signals stream teardown, so `list_devices` cannot overlap
+/// `AudioDeviceDestroyIOProcID` / `StopIOProc`.
+#[cfg(not(test))]
+const POST_STOP_ENUM_DEBOUNCE: Duration = Duration::from_millis(350);
+#[cfg(test)]
+const POST_STOP_ENUM_DEBOUNCE: Duration = Duration::from_millis(0);
+
+/// True while a capture/preview stream is being built, running, or tearing
+/// down. The catalog worker must not call into CoreAudio during this window.
+static STREAM_HAL_BUSY: AtomicBool = AtomicBool::new(false);
+
+/// Earliest Instant at which the catalog worker may enumerate again (post-stop
+/// debounce). `None` / past = allowed.
+static ENUM_QUIET_UNTIL: Mutex<Option<Instant>> = Mutex::new(None);
+
+fn mark_stream_hal_busy(busy: bool) {
+    STREAM_HAL_BUSY.store(busy, Ordering::SeqCst);
+}
+
+fn schedule_post_stop_catalog_refresh() {
+    mark_stream_hal_busy(false);
+    {
+        let mut quiet = ENUM_QUIET_UNTIL.lock().unwrap();
+        *quiet = Some(Instant::now() + POST_STOP_ENUM_DEBOUNCE);
+    }
+    let delay = POST_STOP_ENUM_DEBOUNCE;
+    thread::Builder::new()
+        .name("echomind-device-catalog-debounce".into())
+        .spawn(move || {
+            if !delay.is_zero() {
+                thread::sleep(delay);
+            }
+            device_catalog().request_refresh();
+        })
+        .ok();
+}
+
+fn catalog_may_enumerate() -> bool {
+    if STREAM_HAL_BUSY.load(Ordering::SeqCst) {
+        return false;
+    }
+    let quiet = ENUM_QUIET_UNTIL.lock().unwrap();
+    match *quiet {
+        Some(until) => Instant::now() >= until,
+        None => true,
+    }
+}
 
 fn device_catalog_worker(
     catalog: Arc<DeviceCatalog>,
@@ -172,8 +222,17 @@ fn device_catalog_worker(
             Ok(()) | Err(RecvTimeoutError::Timeout) => {
                 // Coalesce a burst of refresh requests into one enumeration.
                 while rx.try_recv().is_ok() {}
+                // Never enumerate while a stream is live / tearing down, and
+                // honour the post-stop debounce window.
+                if !catalog_may_enumerate() {
+                    continue;
+                }
                 // Enumerate with NO catalog locks held, then publish.
                 let devices = enumerate();
+                // Re-check: a start() may have begun while we were in HAL.
+                if STREAM_HAL_BUSY.load(Ordering::SeqCst) {
+                    continue;
+                }
                 catalog.publish(devices);
             }
             Err(RecvTimeoutError::Disconnected) => break,
@@ -194,7 +253,10 @@ fn catalog_enumerate() -> Vec<AudioDeviceInfo> {
             return f();
         }
     }
-    GlobalAudioEngine::list_devices()
+    // Catalog path intentionally skips per-device `default_input_config()`
+    // (extra HAL round-trips). Names + loopback heuristics are enough for
+    // status / Settings picker; channels/rate stay cheap defaults.
+    GlobalAudioEngine::list_devices_light()
 }
 
 fn device_catalog() -> &'static Arc<DeviceCatalog> {
@@ -276,8 +338,10 @@ mod macos_device_listener {
         _addrs: *const AudioObjectPropertyAddress,
         _data: *mut c_void,
     ) -> OSStatus {
+        // Hot CoreAudio callback: signal only. Never enumerate, never hold a
+        // lock across any HAL call. try_lock so we never block the HAL thread.
         if let Some(cell) = REFRESH_TX.get() {
-            if let Ok(guard) = cell.lock() {
+            if let Ok(guard) = cell.try_lock() {
                 if let Some(ref tx) = *guard {
                     let _ = tx.send(());
                 }
@@ -317,11 +381,20 @@ impl GlobalAudioEngine {
         }
     }
 
-    /// Real cpal/CoreAudio (or ALSA/WASAPI) input-device enumeration.
-    /// MUST only run on the device-catalog worker (or on stream start/stop
-    /// threads that already own the HAL interaction for that stream) — never
-    /// on the Tauri command / UI / `get_status` path.
+    /// Full enumeration including per-device `default_input_config()`.
+    /// Prefer [`list_devices_light`] for the catalog worker. Never call from
+    /// `get_status` / Tauri UI poll paths.
     pub fn list_devices() -> Vec<AudioDeviceInfo> {
+        Self::enumerate_devices(true)
+    }
+
+    /// Name + loopback heuristic only — no per-device `default_input_config()`
+    /// HAL round-trips. Used exclusively by the catalog worker.
+    pub fn list_devices_light() -> Vec<AudioDeviceInfo> {
+        Self::enumerate_devices(false)
+    }
+
+    fn enumerate_devices(with_input_config: bool) -> Vec<AudioDeviceInfo> {
         let host = cpal::default_host();
         let default_device_name = host.default_input_device().and_then(|d| d.name().ok());
         let mut list = Vec::new();
@@ -335,9 +408,13 @@ impl GlobalAudioEngine {
                         .unwrap_or(false);
                     let is_loopback = device_name_is_loopback(&name);
 
-                    let (channels, sample_rate) = match dev.default_input_config() {
-                        Ok(cfg) => (cfg.channels(), cfg.sample_rate().0),
-                        Err(_) => (1, 16000),
+                    let (channels, sample_rate) = if with_input_config {
+                        match dev.default_input_config() {
+                            Ok(cfg) => (cfg.channels(), cfg.sample_rate().0),
+                            Err(_) => (1, 16000),
+                        }
+                    } else {
+                        (1, 16000)
                     };
 
                     list.push(AudioDeviceInfo {
@@ -376,8 +453,16 @@ impl GlobalAudioEngine {
             state.hp_prev_out = 0.0;
         }
 
+        // Keep the catalog worker off CoreAudio for the whole capture lifetime
+        // (build → run → teardown). Device open below still talks to HAL on
+        // this dedicated stream thread — that is unavoidable for cpal — but
+        // it must not race a concurrent catalog `list_devices`.
+        mark_stream_hal_busy(true);
+
         thread::spawn(move || {
             let host = cpal::default_host();
+            // Resolve the named device on the stream thread only. Prefer the
+            // default device when no name is set so we avoid a full walk.
             let device = if let Some(ref target_name) = target_device_for_thread {
                 let mut found = None;
                 if let Ok(devices) = host.input_devices() {
@@ -399,6 +484,7 @@ impl GlobalAudioEngine {
                 Some(dev) => dev,
                 None => {
                     eprintln!("Kayıt yapılacak ses giriş aygıtı bulunamadı");
+                    mark_stream_hal_busy(false);
                     return;
                 }
             };
@@ -407,6 +493,7 @@ impl GlobalAudioEngine {
                 Ok(cfg) => cfg,
                 Err(e) => {
                     eprintln!("Ses aygıt konfigürasyon hatası: {}", e);
+                    mark_stream_hal_busy(false);
                     return;
                 }
             };
@@ -448,6 +535,7 @@ impl GlobalAudioEngine {
                 ),
                 _ => {
                     eprintln!("Desteklenmeyen ses örnekleme formatı");
+                    mark_stream_hal_busy(false);
                     return;
                 }
             };
@@ -455,11 +543,15 @@ impl GlobalAudioEngine {
             if let Ok(stream) = stream_result {
                 if let Err(e) = stream.play() {
                     eprintln!("Ses akışı çalıştırılamadı: {}", e);
+                    mark_stream_hal_busy(false);
                     return;
                 }
 
                 // Block thread until stop signal is received
                 let _ = rx.recv();
+                // Stream Drop (teardown) happens as `stream` leaves scope here.
+            } else {
+                mark_stream_hal_busy(false);
             }
         });
 
@@ -484,10 +576,10 @@ impl GlobalAudioEngine {
             state.is_speaking = false;
         }
 
-        // Refresh the device snapshot on the catalog worker after teardown
-        // begins. The worker may briefly contend with CoreAudio; the UI/status
-        // path only reads the previous snapshot and stays responsive.
-        device_catalog().request_refresh();
+        // Do NOT enumerate here. Debounce a catalog refresh until after
+        // stream teardown is likely finished so the worker cannot overlap
+        // CoreAudio's StopIOProc / DestroyIOProcID.
+        schedule_post_stop_catalog_refresh();
 
         Ok(())
     }
@@ -503,6 +595,8 @@ impl GlobalAudioEngine {
 
         let (tx, rx) = channel::<()>();
         let state_clone = Arc::clone(&self.state);
+
+        mark_stream_hal_busy(true);
 
         thread::spawn(move || {
             let host = cpal::default_host();
@@ -525,12 +619,18 @@ impl GlobalAudioEngine {
 
             let device = match device {
                 Some(dev) => dev,
-                None => return,
+                None => {
+                    mark_stream_hal_busy(false);
+                    return;
+                }
             };
 
             let config = match device.default_input_config() {
                 Ok(cfg) => cfg,
-                Err(_) => return,
+                Err(_) => {
+                    mark_stream_hal_busy(false);
+                    return;
+                }
             };
 
             let sample_rate = config.sample_rate().0;
@@ -568,13 +668,20 @@ impl GlobalAudioEngine {
                     err_fn,
                     None,
                 ),
-                _ => return,
+                _ => {
+                    mark_stream_hal_busy(false);
+                    return;
+                }
             };
 
             if let Ok(stream) = stream_result {
                 if stream.play().is_ok() {
                     let _ = rx.recv();
+                } else {
+                    mark_stream_hal_busy(false);
                 }
+            } else {
+                mark_stream_hal_busy(false);
             }
         });
 
@@ -585,14 +692,24 @@ impl GlobalAudioEngine {
 
     pub fn stop_preview(&self) -> Result<(), String> {
         let mut preview_lock = self.preview_tx.lock().unwrap();
-        if let Some(tx) = preview_lock.take() {
+        let had_preview = if let Some(tx) = preview_lock.take() {
             let _ = tx.send(());
+            true
+        } else {
+            false
+        };
+        drop(preview_lock);
+
+        {
+            let mut state = self.state.lock().unwrap();
+            if !state.is_recording {
+                state.mic_level = 0.0;
+                state.is_speaking = false;
+            }
         }
 
-        let mut state = self.state.lock().unwrap();
-        if !state.is_recording {
-            state.mic_level = 0.0;
-            state.is_speaking = false;
+        if had_preview && !self.state.lock().unwrap().is_recording {
+            schedule_post_stop_catalog_refresh();
         }
 
         Ok(())
@@ -948,6 +1065,19 @@ mod tests {
         assert!(device_name_is_loopback("BlackHole 2ch"));
         assert!(device_name_is_loopback("VB-Audio Cable Output"));
         assert!(!device_name_is_loopback("MacBook Pro Microphone"));
+    }
+
+    #[test]
+    fn test_catalog_skips_enumerate_while_stream_hal_busy() {
+        // Grok review: never let the catalog worker race stream teardown.
+        mark_stream_hal_busy(true);
+        assert!(!catalog_may_enumerate());
+        mark_stream_hal_busy(false);
+        {
+            let mut quiet = ENUM_QUIET_UNTIL.lock().unwrap();
+            *quiet = None;
+        }
+        assert!(catalog_may_enumerate());
     }
 
     #[test]
