@@ -14,6 +14,16 @@ vi.mock("./hooks/useFirstRunModelSetup", () => ({
   useFirstRunModelSetup: () => ({ progress: null, dismiss: vi.fn() }),
 }));
 
+// Storage unlock is covered by useStorageReady.test.ts; App integration tests
+// assume secure storage is already ready so history fetch proceeds normally.
+vi.mock("./hooks/useStorageReady", () => ({
+  useStorageReady: () => ({
+    ready: true,
+    usedFallback: false,
+    keySource: "keychain",
+  }),
+}));
+
 const mockPastMeetings: MeetingRecord[] = [
   {
     id: "mtg-app-1",

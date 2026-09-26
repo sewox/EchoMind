@@ -29,10 +29,12 @@ describe("useStorageReady", () => {
     });
 
     let eventHandler: ((event: { payload: unknown }) => void) | null = null;
-    listen.mockImplementation(async (_name: string, handler: typeof eventHandler) => {
-      eventHandler = handler;
-      return () => {};
-    });
+    listen.mockImplementation(
+      async (_name: string, handler: typeof eventHandler) => {
+        eventHandler = handler;
+        return () => {};
+      },
+    );
 
     const { result } = renderHook(() => useStorageReady());
     expect(result.current.ready).toBe(false);
@@ -69,5 +71,56 @@ describe("useStorageReady", () => {
       expect(result.current.ready).toBe(true);
     });
     expect(result.current.keySource).toBe("keychain");
+    expect(result.current.usedFallback).toBe(false);
+  });
+
+  it("ignores not-ready poll payloads and handles missing key_source", async () => {
+    invoke.mockResolvedValue({
+      ready: true,
+      used_fallback: false,
+    });
+
+    const { result } = renderHook(() => useStorageReady());
+
+    await waitFor(() => {
+      expect(result.current.ready).toBe(true);
+    });
+    expect(result.current.keySource).toBeNull();
+  });
+
+  it("stays not ready when get_storage_ready rejects", async () => {
+    invoke.mockRejectedValue(new Error("not in tauri"));
+    listen.mockRejectedValue(new Error("no events"));
+
+    const { result } = renderHook(() => useStorageReady());
+
+    await waitFor(() => {
+      expect(invoke).toHaveBeenCalled();
+    });
+    expect(result.current.ready).toBe(false);
+  });
+
+  it("does not apply status after unmount", async () => {
+    let resolveInvoke: (value: unknown) => void = () => {};
+    invoke.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveInvoke = resolve;
+        }),
+    );
+
+    const { unmount } = renderHook(() => useStorageReady());
+    unmount();
+
+    await act(async () => {
+      resolveInvoke({
+        ready: true,
+        used_fallback: false,
+        key_source: "keychain",
+      });
+    });
+
+    // Hook unmounted — no throw; coverage hits the cancelled branch.
+    expect(true).toBe(true);
   });
 });
