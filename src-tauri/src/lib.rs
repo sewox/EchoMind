@@ -159,10 +159,11 @@ pub fn run() {
         .expect("error while building tauri application")
         .run(|_app_handle, event| {
             if let tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit = event {
-                // 1. Immediately cut audio streams to prevent new audio frames during shutdown
+                // Abort Whisper and briefly drain in-flight FLAC (≤2s). Never
+                // wait on transcription — bg whisper uses a detached OS thread.
+                storage::prepare_for_quit();
                 audio::get_global_audio_engine().stop().ok();
                 audio::get_global_audio_engine().stop_preview().ok();
-                // 2. Settle ongoing Whisper inference and safely drain Metal GPU pipeline before exit
                 transcriber::get_global_transcriber().cleanup_context();
             }
         });

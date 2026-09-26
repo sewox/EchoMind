@@ -31,6 +31,11 @@ pub struct AudioState {
     // High-pass filter state variables
     pub hp_prev_in: f32,
     pub hp_prev_out: f32,
+    /// Monotonic id bumped on every `start()` so a recording session can be
+    /// saved at most once even when multiple stop signals race.
+    pub recording_session_id: u64,
+    /// Set when the current session's PCM has already been claimed for save.
+    pub session_saved: bool,
 }
 
 impl Default for AudioState {
@@ -44,6 +49,8 @@ impl Default for AudioState {
             pcm_16k_buffer: Vec::new(),
             hp_prev_in: 0.0,
             hp_prev_out: 0.0,
+            recording_session_id: 0,
+            session_saved: false,
         }
     }
 }
@@ -71,6 +78,21 @@ impl Default for GlobalAudioEngine {
         Self::new()
     }
 }
+
+/// Result of atomically claiming a recording session's PCM for persistence.
+#[derive(Debug)]
+pub enum PcmClaim {
+    /// First claim with audio worth persisting.
+    Claimed { session_id: u64, pcm: Vec<f32> },
+    /// First claim but buffer empty / too short — session marked saved so
+    /// nothing retries; caller must not create a meeting or FLAC.
+    NothingToSave { session_id: u64 },
+    /// A prior claim already took this session (idempotent).
+    AlreadySaved { session_id: u64 },
+}
+
+/// Minimum PCM samples (~0.25s at 16 kHz) required to persist a meeting.
+pub const MIN_SAVE_PCM_SAMPLES: usize = 4000;
 
 /// Pure name-based loopback heuristic. Safe to call on any thread — never
 /// touches CoreAudio / cpal. Used by `get_status` for the active device so
@@ -451,6 +473,8 @@ impl GlobalAudioEngine {
             state.pcm_16k_buffer.clear();
             state.hp_prev_in = 0.0;
             state.hp_prev_out = 0.0;
+            state.recording_session_id = state.recording_session_id.wrapping_add(1).max(1);
+            state.session_saved = false;
         }
 
         // Keep the catalog worker off CoreAudio for the whole capture lifetime
@@ -755,9 +779,37 @@ impl GlobalAudioEngine {
         }
     }
 
+    /// Clone of the live PCM buffer for preview / debug / VU inspection only.
+    /// Persistence must use [`Self::claim_pcm_for_save`] so audio is taken once.
     pub fn get_pcm_buffer(&self) -> Vec<f32> {
         let state = self.state.lock().unwrap();
         state.pcm_16k_buffer.clone()
+    }
+
+    /// Atomically take the PCM buffer for the current recording session.
+    /// Empty / tiny buffers return `NothingToSave` (session still marked saved).
+    /// Subsequent callers get `AlreadySaved`.
+    pub fn claim_pcm_for_save(&self) -> PcmClaim {
+        let mut state = self.state.lock().unwrap();
+        let session_id = state.recording_session_id;
+        if state.session_saved {
+            return PcmClaim::AlreadySaved { session_id };
+        }
+        state.session_saved = true;
+        let pcm = std::mem::take(&mut state.pcm_16k_buffer);
+        if pcm.len() < MIN_SAVE_PCM_SAMPLES {
+            return PcmClaim::NothingToSave { session_id };
+        }
+        PcmClaim::Claimed { session_id, pcm }
+    }
+
+    /// Test helper: inject PCM without starting capture.
+    #[cfg(test)]
+    pub fn inject_pcm_for_test(&self, samples: Vec<f32>, session_id: u64) {
+        let mut state = self.state.lock().unwrap();
+        state.pcm_16k_buffer = samples;
+        state.recording_session_id = session_id;
+        state.session_saved = false;
     }
 }
 
@@ -1397,5 +1449,62 @@ mod tests {
     #[test]
     fn test_should_notify_mic_only_never_fires_if_start_failed() {
         assert!(!should_notify_mic_only(false, &status(false, false)));
+    }
+
+    #[test]
+    fn test_claim_pcm_for_save_takes_buffer_once_per_session() {
+        let engine = GlobalAudioEngine::new();
+        let samples: Vec<f32> = (0..8000).map(|i| ((i % 50) as f32) * 0.001).collect();
+        engine.inject_pcm_for_test(samples.clone(), 7);
+
+        match engine.claim_pcm_for_save() {
+            PcmClaim::Claimed { session_id, pcm } => {
+                assert_eq!(session_id, 7);
+                assert_eq!(pcm.len(), samples.len());
+            }
+            other => panic!("expected Claimed, got {:?}", other),
+        }
+        assert!(engine.get_pcm_buffer().is_empty());
+        assert!(matches!(
+            engine.claim_pcm_for_save(),
+            PcmClaim::AlreadySaved { session_id: 7 }
+        ));
+    }
+
+    #[test]
+    fn test_claim_empty_pcm_is_nothing_to_save() {
+        let engine = GlobalAudioEngine::new();
+        engine.inject_pcm_for_test(vec![0.01; 10], 3);
+        assert!(matches!(
+            engine.claim_pcm_for_save(),
+            PcmClaim::NothingToSave { session_id: 3 }
+        ));
+        assert!(matches!(
+            engine.claim_pcm_for_save(),
+            PcmClaim::AlreadySaved { session_id: 3 }
+        ));
+    }
+
+    #[test]
+    fn test_new_recording_session_resets_save_guard() {
+        let engine = GlobalAudioEngine::new();
+        engine.inject_pcm_for_test(vec![0.1; 5000], 1);
+        assert!(matches!(
+            engine.claim_pcm_for_save(),
+            PcmClaim::Claimed { .. }
+        ));
+        {
+            let mut state = engine.state.lock().unwrap();
+            state.recording_session_id = 2;
+            state.session_saved = false;
+            state.pcm_16k_buffer = vec![0.3; 5000];
+        }
+        match engine.claim_pcm_for_save() {
+            PcmClaim::Claimed { session_id, pcm } => {
+                assert_eq!(session_id, 2);
+                assert_eq!(pcm.len(), 5000);
+            }
+            other => panic!("expected Claimed, got {:?}", other),
+        }
     }
 }
