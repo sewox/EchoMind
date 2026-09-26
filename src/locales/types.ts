@@ -47,6 +47,12 @@ export interface TranslationKeys {
     deleteMeetingConfirm: string;
     segmentCount: string;
     transcriptPending: string;
+    retranscribePending: string;
+    retranscribePendingTooltip: string;
+    jobQueued: string;
+    jobRunning: string;
+    jobFailed: string;
+    jobDone: string;
     liveSession: string;
     backToLive: string;
   };

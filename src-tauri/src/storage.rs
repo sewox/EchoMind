@@ -457,7 +457,9 @@ impl StorageEngine {
         Ok(meeting)
     }
 
-    /// Replace transcript segments on an existing meeting (background Whisper path).
+    /// Replace transcript segments on an existing meeting (background Whisper / queue path).
+    /// Always clears `transcript_pending` — including silent (empty) results — so the
+    /// meeting does not stay stuck after a completed job.
     pub fn update_meeting_segments(
         &self,
         meeting_id: &str,
@@ -469,9 +471,7 @@ impl StorageEngine {
             .find(|m| m.id == meeting_id)
             .ok_or_else(|| format!("Toplantı bulunamadı: {}", meeting_id))?;
         mtg.segments = segments;
-        if !mtg.segments.is_empty() {
-            mtg.transcript_pending = false;
-        }
+        mtg.transcript_pending = false;
         if mtg.summary.is_empty() {
             mtg.summary = generate_summary_from_segments(&mtg.segments);
         }
@@ -615,6 +615,10 @@ pub fn start_storage_unlock(app: tauri::AppHandle) {
             }
 
             mark_keys_ready();
+
+            // Auto-enqueue transcript_pending meetings + start FLAC job worker.
+            // Must run after unlock so encrypted history is readable (#60 gate).
+            crate::transcription_queue::bootstrap_after_storage_unlock(app.clone());
 
             let status = StorageReadyStatus {
                 ready: true,
@@ -768,8 +772,8 @@ fn flac_save_in_flight() -> &'static std::sync::atomic::AtomicBool {
 pub const NOTHING_TO_SAVE: &str = "nothing_to_save";
 
 /// Persist the current in-memory recording. FLAC compression runs off the UI
-/// thread via `spawn_blocking`. Fallback Whisper is **detached** on a plain
-/// OS thread so Tokio shutdown / Quit never waits on transcription.
+/// thread via `spawn_blocking`. When segments are empty, a durable FLAC-based
+/// transcription job is enqueued (never blocks Quit on Whisper).
 #[tauri::command]
 pub async fn save_current_meeting(
     app: tauri::AppHandle,
@@ -783,18 +787,14 @@ pub async fn save_current_meeting(
     .await
     .map_err(|e| format!("Kayıt görevi tamamlanamadı: {}", e))?;
 
-    let (meeting, pending_pcm) = result?;
+    let (meeting, flac_to_enqueue) = result?;
 
-    if let Some(pcm) = pending_pcm {
-        let meeting_id = meeting.id.clone();
-        // Detached OS thread — not Tokio blocking pool — so process exit is not
-        // held open by Whisper. Abort flag stops it on Quit.
-        std::thread::Builder::new()
-            .name("echomind-bg-whisper".into())
-            .spawn(move || {
-                run_detached_fallback_transcription(app, meeting_id, pcm);
-            })
-            .ok();
+    if let Some(flac_path) = flac_to_enqueue {
+        // Durable queue — survives restart; worker reads FLAC (not in-memory PCM).
+        crate::transcription_queue::ensure_worker_started(app);
+        if let Err(e) = crate::transcription_queue::enqueue_meeting(&meeting.id, &flac_path) {
+            eprintln!("Transcription enqueue failed ({}): {}", meeting.id, e);
+        }
     }
 
     Ok(meeting)
@@ -905,6 +905,9 @@ pub fn prepare_for_quit() -> QuitExitMode {
     let deadline = Instant::now() + QUIT_TOTAL_BUDGET;
     let transcriber = crate::transcriber::get_global_transcriber();
     transcriber.begin_shutdown();
+    // Return running batch jobs to queued before the bounded Whisper wait so
+    // the next launch can resume (job file must be durable before exit).
+    crate::transcription_queue::prepare_queue_for_quit();
 
     // Active listening must not discard PCM on quit. Idempotent with the
     // normal save gate — safe if a stop-save is already mid-flight.
@@ -966,72 +969,21 @@ unsafe extern "C" {
 /// Whether quit-path save should spawn Whisper (never) vs normal stop-save.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum SaveMode {
-    /// May return PCM for detached Whisper when segments are empty.
+    /// May enqueue a FLAC transcription job when segments are empty.
     Normal,
-    /// Never Whisper; mark `transcript_pending` when segments are empty.
+    /// Never Whisper / never enqueue; mark `transcript_pending` when segments empty.
     QuitNoWhisper,
 }
 
-fn run_detached_fallback_transcription(app: tauri::AppHandle, meeting_id: String, pcm: Vec<f32>) {
-    use tauri::Emitter;
-
-    let transcriber = crate::transcriber::get_global_transcriber();
-    if transcriber.is_abort_requested() {
-        println!(
-            "🛑 Arka plan transkripsiyon atlandı (kapanış): {}",
-            meeting_id
-        );
-        return;
-    }
-
-    match transcriber.transcribe_pcm(&pcm, "auto") {
-        Ok(auto_segs) if !auto_segs.is_empty() => {
-            let mut deduped: Vec<TranscriptSegment> = Vec::new();
-            for seg in auto_segs {
-                let is_dup = deduped.iter().any(|existing| {
-                    existing.start_time_ms == seg.start_time_ms
-                        && existing.end_time_ms == seg.end_time_ms
-                        && existing.text.trim() == seg.text.trim()
-                });
-                if !is_dup {
-                    let mut s = seg;
-                    s.id = deduped.len() + 1;
-                    deduped.push(s);
-                }
-            }
-            match get_global_storage().update_meeting_segments(&meeting_id, deduped) {
-                Ok(updated) => {
-                    let _ = app.emit("meeting-transcript-ready", &updated);
-                    println!(
-                        "✅ Arka plan transkripsiyon tamamlandı: {} ({} segment)",
-                        meeting_id,
-                        updated.segments.len()
-                    );
-                }
-                Err(e) => eprintln!("Arka plan segment güncelleme hatası: {}", e),
-            }
-        }
-        Ok(_) => {
-            println!(
-                "Arka plan Whisper boş sonuç döndü (sessiz kayıt?): {}",
-                meeting_id
-            );
-        }
-        Err(e) => {
-            eprintln!("Arka plan Whisper hatası ({}): {}", meeting_id, e);
-        }
-    }
-}
-
-/// Returns `(meeting, optional_pcm_for_detached_whisper)`.
+/// Returns `(meeting, optional_flac_path_to_enqueue)`.
 /// Order: finalize transcript segments → claim PCM → persist FLAC.
-/// `SaveMode::QuitNoWhisper` never returns PCM for Whisper and marks
-/// `transcript_pending` when the meeting has no segments.
+/// `SaveMode::QuitNoWhisper` never enqueues and marks `transcript_pending`
+/// when the meeting has no segments (recovery on next launch via auto-enqueue).
 fn save_current_meeting_blocking(
     title: String,
     duration_seconds: u64,
     mode: SaveMode,
-) -> Result<(MeetingRecord, Option<Vec<f32>>), String> {
+) -> Result<(MeetingRecord, Option<String>), String> {
     use crate::audio::PcmClaim;
     use std::sync::atomic::Ordering;
 
@@ -1140,11 +1092,15 @@ fn save_current_meeting_blocking(
         }
 
         let transcript_pending = deduplicated_segments.is_empty();
-        // Quit never hands PCM to Whisper; normal save may queue detached work.
-        let pending_pcm = match mode {
+        // Quit never enqueues Whisper; normal save queues a durable FLAC job.
+        let flac_to_enqueue = match mode {
             SaveMode::QuitNoWhisper => None,
-            SaveMode::Normal if transcript_pending && raw_pcm_buffer.len() >= 16000 => {
-                Some(raw_pcm_buffer)
+            SaveMode::Normal
+                if transcript_pending
+                    && audio_file_path.is_some()
+                    && raw_pcm_buffer.len() >= 16000 =>
+            {
+                audio_file_path.clone()
             }
             SaveMode::Normal => None,
         };
@@ -1178,7 +1134,7 @@ fn save_current_meeting_blocking(
 
         let storage = get_global_storage();
         let saved = storage.add_meeting(meeting)?;
-        Ok((saved, pending_pcm))
+        Ok((saved, flac_to_enqueue))
     })();
 
     flac_save_in_flight().store(false, Ordering::SeqCst);
@@ -1881,7 +1837,7 @@ mod tests {
     }
 
     #[test]
-    fn test_save_defers_whisper_pcm_when_segments_empty() {
+    fn test_save_enqueues_flac_when_segments_empty() {
         let _unlock = crate::secure_key::key_unlock_test_lock()
             .lock()
             .unwrap_or_else(|e| e.into_inner());
@@ -1893,19 +1849,18 @@ mod tests {
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_nanos() as u64;
-        engine.inject_pcm_for_test(samples.clone(), session_id);
+        engine.inject_pcm_for_test(samples, session_id);
 
-        let (saved, pending) =
+        let (saved, flac_to_enqueue) =
             save_current_meeting_blocking("Defer Whisper".into(), 1, SaveMode::Normal).unwrap();
         assert!(saved.segments.is_empty());
-        let pending = pending.expect("PCM must be returned for detached Whisper");
-        assert_eq!(pending.len(), samples.len());
-        assert!(saved.audio_file_path.is_some());
+        assert!(saved.transcript_pending);
+        let flac = flac_to_enqueue.expect("FLAC path must be returned for queue enqueue");
+        assert_eq!(saved.audio_file_path.as_deref(), Some(flac.as_str()));
+        assert!(PathBuf::from(&flac).exists());
 
         let _ = get_global_storage().delete_meeting(&saved.id);
-        if let Some(path) = saved.audio_file_path {
-            let _ = fs::remove_file(path);
-        }
+        let _ = fs::remove_file(flac);
     }
 
     #[test]
@@ -2069,7 +2024,7 @@ mod tests {
 
         let (saved, pending) =
             save_current_meeting_blocking("QuitMode".into(), 1, SaveMode::QuitNoWhisper).unwrap();
-        assert!(pending.is_none(), "quit mode must never queue Whisper PCM");
+        assert!(pending.is_none(), "quit mode must never enqueue a FLAC job");
         assert!(saved.transcript_pending);
         assert!(saved.segments.is_empty());
 

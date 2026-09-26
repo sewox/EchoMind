@@ -51,6 +51,13 @@ export const tr: TranslationKeys = {
       "Bu toplantıyı ve tüm kayıtlarını silmek istediğinize emin misiniz?",
     segmentCount: "{count} konuşma bölümü",
     transcriptPending: "Transkript bekleniyor",
+    retranscribePending: "Yeniden yazıya dök",
+    retranscribePendingTooltip:
+      "Kayıtlı FLAC dosyasından arka planda yazıya döker",
+    jobQueued: "Kuyrukta",
+    jobRunning: "Yazıya dökülüyor…",
+    jobFailed: "Yazıya dökme başarısız",
+    jobDone: "Tamamlandı",
     liveSession: "Canlı Toplantı Akışı",
     backToLive: "Canlı Akışa Dön",
   },

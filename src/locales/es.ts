@@ -52,6 +52,13 @@ export const es: TranslationKeys = {
       "¿Está seguro de que desea eliminar esta reunión y todas sus grabaciones?",
     segmentCount: "{count} segmentos de diálogo",
     transcriptPending: "Transcripción pendiente",
+    retranscribePending: "Retranscribir",
+    retranscribePendingTooltip:
+      "Transcribir desde el FLAC guardado en segundo plano",
+    jobQueued: "En cola",
+    jobRunning: "Transcribiendo…",
+    jobFailed: "Error de transcripción",
+    jobDone: "Completado",
     liveSession: "Sesión en Vivo",
     backToLive: "Volver a la Sesión en Vivo",
   },

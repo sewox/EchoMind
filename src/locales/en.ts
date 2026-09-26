@@ -51,6 +51,13 @@ export const en: TranslationKeys = {
       "Are you sure you want to delete this meeting and all its recordings?",
     segmentCount: "{count} dialogue segments",
     transcriptPending: "Transcript pending",
+    retranscribePending: "Retranscribe",
+    retranscribePendingTooltip:
+      "Transcribe from the saved FLAC in the background",
+    jobQueued: "Queued",
+    jobRunning: "Transcribing…",
+    jobFailed: "Transcription failed",
+    jobDone: "Done",
     liveSession: "Live Meeting Stream",
     backToLive: "Back to Live Session",
   },

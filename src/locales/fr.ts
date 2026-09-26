@@ -51,6 +51,13 @@ export const fr: TranslationKeys = {
       "Êtes-vous sûr de vouloir supprimer cette réunion et ses enregistrements ?",
     segmentCount: "{count} segments de dialogue",
     transcriptPending: "Transcription en attente",
+    retranscribePending: "Retranscrire",
+    retranscribePendingTooltip:
+      "Transcrire depuis le FLAC enregistré en arrière-plan",
+    jobQueued: "En file d'attente",
+    jobRunning: "Transcription en cours…",
+    jobFailed: "Échec de la transcription",
+    jobDone: "Terminé",
     liveSession: "Session en Direct",
     backToLive: "Retour au Direct",
   },

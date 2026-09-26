@@ -153,6 +153,19 @@ describe("App Top-Level Integration", () => {
           cited_meeting_ids: [],
           provider_used: "AI",
         });
+      if (cmd === "list_transcription_jobs") return Promise.resolve([]);
+      if (cmd === "enqueue_meeting_transcription")
+        return Promise.resolve({
+          meeting_id: "mtg_pending",
+          audio_path: "/tmp/p.flac",
+          state: "queued",
+          attempts: 0,
+          max_attempts: 3,
+          last_error: null,
+          created_at_ms: 1,
+          updated_at_ms: 1,
+        });
+      if (cmd === "get_transcription_job") return Promise.resolve(null);
       return Promise.resolve();
     });
   };
@@ -3343,5 +3356,181 @@ describe("App Top-Level Integration", () => {
     });
 
     expect(screen.queryByText("Yeniden Yazıya Dök")).not.toBeInTheDocument();
+  });
+
+  it("shows Yeniden yazıya dök for transcript_pending meetings and enqueues on click", async () => {
+    const pendingMeeting: MeetingRecord = {
+      id: "mtg_pending_quit",
+      title: "Yarıda Kalan Toplantı",
+      date_formatted: "26.09.2026",
+      duration_seconds: 60,
+      duration_formatted: "01:00",
+      audio_file_path: "/data/recordings/mtg_pending_quit.flac",
+      segments: [],
+      summary: "",
+      key_decisions: [],
+      transcript_pending: true,
+      engine_used: "🔒 Cihazda (Whisper Small)",
+    };
+
+    (invoke as any).mockImplementation((cmd: string, args?: any) => {
+      if (cmd === "get_all_meetings") return Promise.resolve([pendingMeeting]);
+      if (cmd === "list_transcription_jobs") return Promise.resolve([]);
+      if (cmd === "enqueue_meeting_transcription") {
+        expect(args).toEqual({ meetingId: "mtg_pending_quit" });
+        return Promise.resolve({
+          meeting_id: "mtg_pending_quit",
+          audio_path: pendingMeeting.audio_file_path,
+          state: "queued",
+          attempts: 0,
+          max_attempts: 3,
+          last_error: null,
+          created_at_ms: 1,
+          updated_at_ms: 1,
+        });
+      }
+      if (cmd === "get_hardware_info")
+        return Promise.resolve({
+          os_name: "macOS",
+          os_version: "15.0",
+          cpu_brand: "Apple M3",
+          cpu_cores: 8,
+          total_ram_gb: 16,
+          gpu_name: "Apple M3",
+          metal_supported: true,
+          cuda_supported: false,
+          avx2_supported: true,
+        });
+      if (cmd === "get_model_status")
+        return Promise.resolve({
+          model_name: "whisper-small",
+          is_loaded: false,
+          is_downloading: false,
+          download_progress: 0,
+          hardware_acceleration: "Metal",
+        });
+      if (cmd === "get_audio_status")
+        return Promise.resolve({ is_recording: false, mic_level: 0 });
+      if (cmd === "get_privacy_mode") return Promise.resolve("balanced");
+      if (cmd === "list_audio_devices") return Promise.resolve([]);
+      if (cmd === "start_meeting_detector") return Promise.resolve();
+      return Promise.resolve();
+    });
+
+    render(
+      <I18nProvider>
+        <App />
+      </I18nProvider>,
+    );
+
+    expect(
+      await screen.findByText(/Transkript bekleniyor/i),
+    ).toBeInTheDocument();
+
+    const btn = await screen.findByTestId(
+      "retranscribe-pending-mtg_pending_quit",
+    );
+    expect(btn).toHaveTextContent(/Yeniden yazıya dök/i);
+
+    await act(async () => {
+      fireEvent.click(btn);
+    });
+
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 30));
+    });
+
+    expect(invoke).toHaveBeenCalledWith("enqueue_meeting_transcription", {
+      meetingId: "mtg_pending_quit",
+    });
+
+    expect(
+      await screen.findByTestId("tx-job-status-mtg_pending_quit"),
+    ).toHaveTextContent(/Kuyrukta/i);
+  });
+
+  it("renders failed transcription job state and allows retry", async () => {
+    const pendingMeeting: MeetingRecord = {
+      id: "mtg_failed_flac",
+      title: "Eksik FLAC",
+      date_formatted: "26.09.2026",
+      duration_seconds: 30,
+      duration_formatted: "00:30",
+      audio_file_path: "/missing.flac",
+      segments: [],
+      summary: "",
+      key_decisions: [],
+      transcript_pending: true,
+    };
+
+    (invoke as any).mockImplementation((cmd: string) => {
+      if (cmd === "get_all_meetings") return Promise.resolve([pendingMeeting]);
+      if (cmd === "list_transcription_jobs") {
+        return Promise.resolve([
+          {
+            meeting_id: "mtg_failed_flac",
+            audio_path: "/missing.flac",
+            state: "failed",
+            attempts: 1,
+            max_attempts: 3,
+            last_error: "Ses dosyası (FLAC) bulunamadı",
+            created_at_ms: 1,
+            updated_at_ms: 2,
+          },
+        ]);
+      }
+      if (cmd === "get_hardware_info")
+        return Promise.resolve({
+          os_name: "macOS",
+          os_version: "15.0",
+          cpu_brand: "Apple M3",
+          cpu_cores: 8,
+          total_ram_gb: 16,
+          gpu_name: "Apple M3",
+          metal_supported: true,
+          cuda_supported: false,
+          avx2_supported: true,
+        });
+      if (cmd === "get_model_status")
+        return Promise.resolve({
+          model_name: "whisper-small",
+          is_loaded: false,
+          is_downloading: false,
+          download_progress: 0,
+          hardware_acceleration: "Metal",
+        });
+      if (cmd === "get_audio_status")
+        return Promise.resolve({ is_recording: false, mic_level: 0 });
+      if (cmd === "get_privacy_mode") return Promise.resolve("balanced");
+      if (cmd === "list_audio_devices") return Promise.resolve([]);
+      if (cmd === "start_meeting_detector") return Promise.resolve();
+      if (cmd === "enqueue_meeting_transcription")
+        return Promise.resolve({
+          meeting_id: "mtg_failed_flac",
+          audio_path: "/missing.flac",
+          state: "queued",
+          attempts: 0,
+          max_attempts: 3,
+          last_error: null,
+          created_at_ms: 1,
+          updated_at_ms: 3,
+        });
+      return Promise.resolve();
+    });
+
+    render(
+      <I18nProvider>
+        <App />
+      </I18nProvider>,
+    );
+
+    expect(
+      await screen.findByTestId("tx-job-status-mtg_failed_flac"),
+    ).toHaveTextContent(/başarısız/i);
+
+    const btn = await screen.findByTestId(
+      "retranscribe-pending-mtg_failed_flac",
+    );
+    expect(btn).not.toBeDisabled();
   });
 });
