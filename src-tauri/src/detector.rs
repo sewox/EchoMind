@@ -116,7 +116,7 @@ fn get_dismissed_session() -> &'static Mutex<Option<String>> {
 /// open. A directly-observed active room URL is stronger, more current
 /// evidence than a phrase possibly left over in some other tab's title, so
 /// this supersedes the old whole-output phrase-based leave check.
-#[cfg(any(target_os = "macos", test))]
+#[cfg(any(test, target_os = "macos"))]
 fn extract_active_meet_code(raw_stdout: &str) -> Option<String> {
     for chunk in raw_stdout.split([',', ' ', '\n']) {
         if !chunk.contains("meet.google.com/") {
