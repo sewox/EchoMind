@@ -46,9 +46,10 @@ use player::{
     seek_native_audio, stop_native_audio,
 };
 use storage::{
-    add_meeting_tag, delete_meeting_by_id, get_all_meetings, get_all_tags, get_related_meetings,
-    get_storage_ready, remove_meeting_tag, save_current_meeting, toggle_action_item_status,
-    update_meeting_speaker_name, update_meeting_title,
+    add_meeting_tag, delete_meeting_by_id, dismiss_history_recovery_notice, get_all_meetings,
+    get_all_tags, get_related_meetings, get_storage_ready, remove_meeting_tag,
+    save_current_meeting, toggle_action_item_status, update_meeting_speaker_name,
+    update_meeting_title,
 };
 use summarizer::{
     ask_global_assistant, clean_transcript_text, enhance_meeting_transcript,
@@ -87,6 +88,7 @@ pub fn run() {
             get_model_status,
             get_all_meetings,
             get_storage_ready,
+            dismiss_history_recovery_notice,
             save_current_meeting,
             delete_meeting_by_id,
             import_audio_file,

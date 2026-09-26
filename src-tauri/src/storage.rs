@@ -553,6 +553,84 @@ pub struct StorageReadyStatus {
     /// True when the data-at-rest key came from the fallback file (e.g. Keychain deny).
     pub used_fallback: bool,
     pub key_source: Option<String>,
+    /// True when this unlock created a fresh data-at-rest key and at least one
+    /// undecryptable `.corrupt*` history backup exists — UI should explain once.
+    #[serde(default)]
+    pub show_history_recovery_notice: bool,
+}
+
+/// Durable dismiss marker for the one-time history-recovery notice.
+/// Kept as a tiny flag file in the app data dir (same place as `.corrupt*`
+/// backups) so it survives restarts without touching Keychain or localStorage.
+pub(crate) const HISTORY_RECOVERY_NOTICE_DISMISSED_FILE: &str =
+    ".history_recovery_notice_dismissed";
+
+fn history_recovery_notice_dismissed_path() -> PathBuf {
+    get_storage_dir().join(HISTORY_RECOVERY_NOTICE_DISMISSED_FILE)
+}
+
+/// Pure show condition: new key + corrupt backup present + not yet dismissed.
+pub fn should_show_history_recovery_notice(
+    key_source: crate::secure_key::KeySource,
+    has_corrupt_backup: bool,
+    dismissed: bool,
+) -> bool {
+    !dismissed && key_source == crate::secure_key::KeySource::NewKeyCreated && has_corrupt_backup
+}
+
+/// True when `{history_file_name}.corrupt-*` siblings exist next to the history file
+/// (covers both a just-rotated undecryptable file and an empty history with older backups).
+pub fn history_file_has_corrupt_backup(history_path: &Path) -> bool {
+    let Some(parent) = history_path.parent() else {
+        return false;
+    };
+    let Some(file_name) = history_path.file_name().and_then(|n| n.to_str()) else {
+        return false;
+    };
+    let prefix = format!("{}.corrupt", file_name);
+    match fs::read_dir(parent) {
+        Ok(entries) => entries.filter_map(|e| e.ok()).any(|e| {
+            let name = e.file_name();
+            let name = name.to_string_lossy();
+            name.starts_with(&prefix)
+        }),
+        Err(_) => false,
+    }
+}
+
+pub fn is_history_recovery_notice_dismissed() -> bool {
+    history_recovery_notice_dismissed_path().exists()
+}
+
+/// Persist the one-time dismiss so the notice never returns on later boots.
+pub fn mark_history_recovery_notice_dismissed() -> Result<(), String> {
+    let path = history_recovery_notice_dismissed_path();
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    fs::write(&path, b"1").map_err(|e| e.to_string())?;
+    if let Ok(mut guard) = last_storage_ready_status().lock() {
+        guard.show_history_recovery_notice = false;
+    }
+    Ok(())
+}
+
+fn last_storage_ready_status() -> &'static Mutex<StorageReadyStatus> {
+    static STATUS: OnceLock<Mutex<StorageReadyStatus>> = OnceLock::new();
+    STATUS.get_or_init(|| {
+        Mutex::new(StorageReadyStatus {
+            ready: false,
+            used_fallback: false,
+            key_source: None,
+            show_history_recovery_notice: false,
+        })
+    })
+}
+
+fn store_storage_ready_status(status: StorageReadyStatus) {
+    if let Ok(mut guard) = last_storage_ready_status().lock() {
+        *guard = status;
+    }
 }
 
 /// Gate for history / vault commands while Keychain I/O may still be running.
@@ -581,14 +659,16 @@ pub fn start_storage_unlock(app: tauri::AppHandle) {
     if !begin_key_unlock() {
         // Already in progress or ready — still notify UI if ready so late listeners catch up.
         if crate::secure_key::is_key_unlock_ready() {
-            let _ = app.emit(
-                "storage-unlocked",
-                StorageReadyStatus {
+            let status = last_storage_ready_status()
+                .lock()
+                .map(|g| g.clone())
+                .unwrap_or(StorageReadyStatus {
                     ready: true,
                     used_fallback: false,
                     key_source: None,
-                },
-            );
+                    show_history_recovery_notice: false,
+                });
+            let _ = app.emit("storage-unlocked", status);
         }
         return;
     }
@@ -614,13 +694,23 @@ pub fn start_storage_unlock(app: tauri::AppHandle) {
                 Err(e) => eprintln!("⚠️ Storage unlock load_from_disk: {}", e),
             }
 
+            // Evaluate after load_from_disk so a just-created `.corrupt-*` backup is visible.
+            let has_corrupt = history_file_has_corrupt_backup(&storage.file_path);
+            let show_notice = should_show_history_recovery_notice(
+                data_source,
+                has_corrupt,
+                is_history_recovery_notice_dismissed(),
+            );
+
             mark_keys_ready();
 
             let status = StorageReadyStatus {
                 ready: true,
                 used_fallback: data_source.used_fallback(),
                 key_source: Some(data_source.as_log_label().to_string()),
+                show_history_recovery_notice: show_notice,
             };
+            store_storage_ready_status(status.clone());
             let _ = app.emit("storage-unlocked", &status);
             eprintln!(
                 "🔓 EchoMind secure storage ready (source: {})",
@@ -632,11 +722,34 @@ pub fn start_storage_unlock(app: tauri::AppHandle) {
 
 #[tauri::command]
 pub fn get_storage_ready() -> StorageReadyStatus {
+    if crate::secure_key::is_key_unlock_ready() {
+        if let Ok(guard) = last_storage_ready_status().lock() {
+            if guard.ready {
+                return guard.clone();
+            }
+        }
+        return StorageReadyStatus {
+            ready: true,
+            used_fallback: false,
+            key_source: None,
+            show_history_recovery_notice: false,
+        };
+    }
     StorageReadyStatus {
-        ready: crate::secure_key::is_key_unlock_ready(),
+        ready: false,
         used_fallback: false,
         key_source: None,
+        show_history_recovery_notice: false,
     }
+}
+
+/// Persist dismissal of the history-recovery notice. Does not touch Keychain.
+#[tauri::command]
+pub fn dismiss_history_recovery_notice() -> Result<(), String> {
+    // Writing a flag file never blocks on Keychain; still refuse while unlock is
+    // in flight so the UI cannot race ahead of `storage-unlocked`.
+    require_storage_ready()?;
+    mark_history_recovery_notice_dismissed()
 }
 
 /// Encodes 16kHz mono float audio PCM samples into FLAC format (100% Lossless, 0 Distortion)
@@ -1637,6 +1750,89 @@ mod tests {
         );
 
         let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_history_recovery_notice_shows_for_new_key_with_corrupt_backup() {
+        use crate::secure_key::KeySource;
+
+        assert!(
+            should_show_history_recovery_notice(KeySource::NewKeyCreated, true, false),
+            "new key + corrupt backup must show the notice"
+        );
+        assert!(
+            !should_show_history_recovery_notice(KeySource::Keychain, true, false),
+            "keychain source must never show even if corrupt backups exist"
+        );
+        assert!(
+            !should_show_history_recovery_notice(KeySource::FallbackFile, true, false),
+            "fallback source must never show"
+        );
+        assert!(
+            !should_show_history_recovery_notice(KeySource::NewKeyCreated, false, false),
+            "new key alone (fresh install) must not show without a corrupt backup"
+        );
+        assert!(
+            !should_show_history_recovery_notice(KeySource::NewKeyCreated, true, true),
+            "dismissed flag must suppress the notice"
+        );
+    }
+
+    #[test]
+    fn test_history_file_has_corrupt_backup_detects_siblings() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "echomind_corrupt_detect_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let _ = fs::remove_dir_all(&temp_dir);
+        fs::create_dir_all(&temp_dir).unwrap();
+
+        let history = temp_dir.join("meetings_history.json");
+        fs::write(&history, b"[]").unwrap();
+        assert!(
+            !history_file_has_corrupt_backup(&history),
+            "empty dir must report no corrupt backup"
+        );
+
+        let backup = history.with_extension("json.corrupt-1700000000");
+        fs::write(&backup, b"undecryptable").unwrap();
+        assert!(
+            history_file_has_corrupt_backup(&history),
+            "must detect .corrupt-* sibling even when history file is empty/placeholder"
+        );
+
+        // Prefix match must not false-positive on unrelated files.
+        fs::remove_file(&backup).unwrap();
+        fs::write(temp_dir.join("meetings_history.json.bak"), b"x").unwrap();
+        assert!(!history_file_has_corrupt_backup(&history));
+
+        let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_history_recovery_notice_dismiss_flag_suppresses() {
+        // Use an isolated subdirectory by overriding via writing the known flag
+        // path under the test storage dir, then cleaning up afterward.
+        let flag = history_recovery_notice_dismissed_path();
+        let _ = fs::remove_file(&flag);
+        assert!(!is_history_recovery_notice_dismissed());
+
+        mark_history_recovery_notice_dismissed().expect("write dismiss flag");
+        assert!(is_history_recovery_notice_dismissed());
+        assert!(
+            !should_show_history_recovery_notice(
+                crate::secure_key::KeySource::NewKeyCreated,
+                true,
+                is_history_recovery_notice_dismissed()
+            ),
+            "after dismiss, notice must stay suppressed"
+        );
+
+        let _ = fs::remove_file(&flag);
     }
 
     #[test]

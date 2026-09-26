@@ -48,8 +48,10 @@ import { useMeetingManager } from "./hooks/useMeetingManager";
 import { useMeetingDetector, MeetingAppInfo } from "./hooks/useMeetingDetector";
 import { useFirstRunModelSetup } from "./hooks/useFirstRunModelSetup";
 import { FirstRunModelSetupBanner } from "./components/FirstRunModelSetupBanner";
+import { HistoryRecoveryNoticeBanner } from "./components/HistoryRecoveryNoticeBanner";
 import { CredentialStore } from "./services/credentialStore";
 import { useStorageReady } from "./hooks/useStorageReady";
+import { useHistoryRecoveryNotice } from "./hooks/useHistoryRecoveryNotice";
 
 export interface HardwareInfo {
   os_name: string;
@@ -136,7 +138,11 @@ import { getTagColorClass } from "./components/transcript/MeetingTagsBar";
 export function App() {
   const { t, language, setLanguage } = useI18n();
   const { isParanoid } = usePrivacyMode();
-  const { ready: storageReady } = useStorageReady();
+  const { ready: storageReady, showHistoryRecoveryNotice } = useStorageReady();
+  const {
+    visible: historyRecoveryVisible,
+    dismiss: dismissHistoryRecovery,
+  } = useHistoryRecoveryNotice(showHistoryRecoveryNotice);
   const [hardware, setHardware] = useState<HardwareInfo | null>(null);
   const [modelStatus, setModelStatus] = useState<ModelStatus | null>(null);
   const [selectedLanguage, setSelectedLanguage] = useState<string>("auto");
@@ -1071,6 +1077,10 @@ export function App() {
       <FirstRunModelSetupBanner
         progress={modelSetupProgress}
         onDismiss={dismissModelSetup}
+      />
+      <HistoryRecoveryNoticeBanner
+        visible={historyRecoveryVisible}
+        onDismiss={dismissHistoryRecovery}
       />
 
       {/* Floating Completion Notification Banner (Steve Jobs simplicity) */}

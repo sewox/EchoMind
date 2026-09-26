@@ -56,6 +56,7 @@ describe("useStorageReady", () => {
     expect(result.current.ready).toBe(true);
     expect(result.current.usedFallback).toBe(true);
     expect(result.current.keySource).toBe("fallback file");
+    expect(result.current.showHistoryRecoveryNotice).toBe(false);
   });
 
   it("marks ready immediately when get_storage_ready already reports ready", async () => {
@@ -63,6 +64,7 @@ describe("useStorageReady", () => {
       ready: true,
       used_fallback: false,
       key_source: "keychain",
+      show_history_recovery_notice: false,
     });
 
     const { result } = renderHook(() => useStorageReady());
@@ -72,6 +74,23 @@ describe("useStorageReady", () => {
     });
     expect(result.current.keySource).toBe("keychain");
     expect(result.current.usedFallback).toBe(false);
+    expect(result.current.showHistoryRecoveryNotice).toBe(false);
+  });
+
+  it("surfaces show_history_recovery_notice from the unlock payload", async () => {
+    invoke.mockResolvedValue({
+      ready: true,
+      used_fallback: false,
+      key_source: "new key created",
+      show_history_recovery_notice: true,
+    });
+
+    const { result } = renderHook(() => useStorageReady());
+
+    await waitFor(() => {
+      expect(result.current.showHistoryRecoveryNotice).toBe(true);
+    });
+    expect(result.current.keySource).toBe("new key created");
   });
 
   it("ignores not-ready poll payloads and handles missing key_source", async () => {

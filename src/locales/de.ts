@@ -27,6 +27,8 @@ export const de: TranslationKeys = {
     storageUnlocking: "Sicherer Speicher wird geöffnet…",
     storageUnlockHint:
       "Schlüsselbund-Zugriff wird erwartet. Das Fenster bleibt bedienbar; nach der Freigabe wird Ihr Verlauf geladen.",
+    historyRecoveryNotice:
+      "Der zuvor verschlüsselte Verlauf konnte in dieser Version nicht geöffnet werden; Sicherungen wurden behalten. Neue Aufnahmen sind jetzt über den Schlüsselbund geschützt.",
   },
   nav: {
     startListening: "Aufnahme Starten",

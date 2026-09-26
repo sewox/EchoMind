@@ -6,6 +6,7 @@ export interface StorageReadyStatus {
   ready: boolean;
   used_fallback: boolean;
   key_source?: string | null;
+  show_history_recovery_notice?: boolean;
 }
 
 /**
@@ -16,12 +17,17 @@ export function useStorageReady() {
   const [ready, setReady] = useState(false);
   const [usedFallback, setUsedFallback] = useState(false);
   const [keySource, setKeySource] = useState<string | null>(null);
+  const [showHistoryRecoveryNotice, setShowHistoryRecoveryNotice] =
+    useState(false);
 
   const applyStatus = useCallback((status: StorageReadyStatus) => {
     if (status.ready) {
       setReady(true);
       setUsedFallback(Boolean(status.used_fallback));
       setKeySource(status.key_source ?? null);
+      setShowHistoryRecoveryNotice(
+        Boolean(status.show_history_recovery_notice),
+      );
     }
   }, []);
 
@@ -51,5 +57,5 @@ export function useStorageReady() {
     };
   }, [applyStatus]);
 
-  return { ready, usedFallback, keySource };
+  return { ready, usedFallback, keySource, showHistoryRecoveryNotice };
 }
