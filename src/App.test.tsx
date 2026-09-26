@@ -1790,6 +1790,64 @@ describe("App Top-Level Integration", () => {
     );
   });
 
+  it("applies meeting-transcript-ready updates from detached Whisper", async () => {
+    setupDefaultInvoke();
+
+    render(
+      <I18nProvider>
+        <App />
+      </I18nProvider>,
+    );
+
+    const transcriptListeners = await waitForEventListeners(
+      "meeting-transcript-ready",
+    );
+    expect(transcriptListeners.length).toBeGreaterThan(0);
+
+    // Select a meeting first so the id match updates the viewer
+    await act(async () => {
+      const savedListeners = await waitForEventListeners("meeting-saved");
+      savedListeners[savedListeners.length - 1]({
+        payload: {
+          ...mockPastMeetings[0],
+          id: "mtg_bg_whisper",
+          title: "Arka Plan Whisper",
+          segments: [],
+          audio_file_path: "/tmp/bg.flac",
+        },
+      });
+      await new Promise((r) => setTimeout(r, 20));
+    });
+
+    await act(async () => {
+      transcriptListeners[transcriptListeners.length - 1]({
+        payload: {
+          ...mockPastMeetings[0],
+          id: "mtg_bg_whisper",
+          title: "Arka Plan Whisper",
+          segments: [
+            {
+              id: 1,
+              speaker_id: "spk1",
+              speaker_name: "Ahmet",
+              start_time_ms: 0,
+              end_time_ms: 2000,
+              timestamp_formatted: "00:00 -> 00:02",
+              text: "Detached transcript landed.",
+              language: "en",
+              confidence: 0.9,
+            },
+          ],
+        },
+      });
+      await new Promise((r) => setTimeout(r, 20));
+    });
+
+    expect(
+      await screen.findByText(/Detached transcript landed/i),
+    ).toBeInTheDocument();
+  });
+
   it("handles privacy modal local choice and imported meeting error alert", async () => {
     const alertSpy = vi.spyOn(window, "alert").mockImplementation(() => {});
     (invoke as any).mockImplementation((cmd: string) => {

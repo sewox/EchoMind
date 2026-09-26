@@ -159,10 +159,14 @@ pub fn run() {
         .expect("error while building tauri application")
         .run(|_app_handle, event| {
             if let tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit = event {
-                // 1. Immediately cut audio streams to prevent new audio frames during shutdown
+                // Abort Whisper first so Quit is not blocked on Metal sync /
+                // whisper_ctx lock (live sample: Quit AppleEvent timed out while
+                // save_current_meeting ran whisper_full on the main thread).
+                transcriber::get_global_transcriber().begin_shutdown();
+                // Immediately cut audio streams to prevent new audio frames during shutdown
                 audio::get_global_audio_engine().stop().ok();
                 audio::get_global_audio_engine().stop_preview().ok();
-                // 2. Settle ongoing Whisper inference and safely drain Metal GPU pipeline before exit
+                // Best-effort GPU/context teardown without blocking on inference
                 transcriber::get_global_transcriber().cleanup_context();
             }
         });

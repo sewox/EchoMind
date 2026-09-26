@@ -377,6 +377,30 @@ impl StorageEngine {
         Ok(meeting)
     }
 
+    /// Replace transcript segments on an existing meeting (background Whisper path).
+    pub fn update_meeting_segments(
+        &self,
+        meeting_id: &str,
+        segments: Vec<TranscriptSegment>,
+    ) -> Result<MeetingRecord, String> {
+        let mut lock = self.meetings.lock().unwrap();
+        let mtg = lock
+            .iter_mut()
+            .find(|m| m.id == meeting_id)
+            .ok_or_else(|| format!("Toplantı bulunamadı: {}", meeting_id))?;
+        mtg.segments = segments;
+        if mtg.summary.is_empty() {
+            mtg.summary = generate_summary_from_segments(&mtg.segments);
+        }
+        if mtg.key_decisions.is_empty() {
+            mtg.key_decisions = extract_key_decisions(&mtg.segments);
+        }
+        let updated = mtg.clone();
+        drop(lock);
+        self.save_to_disk()?;
+        Ok(updated)
+    }
+
     pub fn get_all(&self) -> Vec<MeetingRecord> {
         let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
         let lock = self.meetings.lock().unwrap();
@@ -562,22 +586,93 @@ fn cached_saved_meeting(session_id: u64) -> Option<MeetingRecord> {
         .map(|(_, m)| m.clone())
 }
 
-/// Persist the current in-memory recording. Runs FLAC compression and any
-/// fallback Whisper pass off the UI/main thread via `spawn_blocking`.
+/// Persist the current in-memory recording. FLAC compression runs off the UI
+/// thread via `spawn_blocking`. Fallback Whisper is **detached** so Quit during
+/// save is not blocked on transcription — results arrive later via
+/// `meeting-transcript-ready`.
 #[tauri::command]
 pub async fn save_current_meeting(
+    app: tauri::AppHandle,
     title: String,
     duration_seconds: u64,
 ) -> Result<MeetingRecord, String> {
-    tauri::async_runtime::spawn_blocking(move || save_current_meeting_blocking(title, duration_seconds))
-        .await
-        .map_err(|e| format!("Kayıt görevi tamamlanamadı: {}", e))?
+    let (meeting, pending_pcm) = tauri::async_runtime::spawn_blocking(move || {
+        save_current_meeting_blocking(title, duration_seconds)
+    })
+    .await
+    .map_err(|e| format!("Kayıt görevi tamamlanamadı: {}", e))??;
+
+    if let Some(pcm) = pending_pcm {
+        let meeting_id = meeting.id.clone();
+        // Fire-and-forget: do not await Whisper — Quit must not wait on Metal.
+        tauri::async_runtime::spawn_blocking(move || {
+            run_detached_fallback_transcription(app, meeting_id, pcm);
+        });
+    }
+
+    Ok(meeting)
 }
 
+fn run_detached_fallback_transcription(
+    app: tauri::AppHandle,
+    meeting_id: String,
+    pcm: Vec<f32>,
+) {
+    use tauri::Emitter;
+
+    let transcriber = crate::transcriber::get_global_transcriber();
+    if transcriber.is_abort_requested() {
+        println!(
+            "🛑 Arka plan transkripsiyon atlandı (kapanış): {}",
+            meeting_id
+        );
+        return;
+    }
+
+    match transcriber.transcribe_pcm(&pcm, "auto") {
+        Ok(auto_segs) if !auto_segs.is_empty() => {
+            let mut deduped: Vec<TranscriptSegment> = Vec::new();
+            for seg in auto_segs {
+                let is_dup = deduped.iter().any(|existing| {
+                    existing.start_time_ms == seg.start_time_ms
+                        && existing.end_time_ms == seg.end_time_ms
+                        && existing.text.trim() == seg.text.trim()
+                });
+                if !is_dup {
+                    let mut s = seg;
+                    s.id = deduped.len() + 1;
+                    deduped.push(s);
+                }
+            }
+            match get_global_storage().update_meeting_segments(&meeting_id, deduped) {
+                Ok(updated) => {
+                    let _ = app.emit("meeting-transcript-ready", &updated);
+                    println!(
+                        "✅ Arka plan transkripsiyon tamamlandı: {} ({} segment)",
+                        meeting_id,
+                        updated.segments.len()
+                    );
+                }
+                Err(e) => eprintln!("Arka plan segment güncelleme hatası: {}", e),
+            }
+        }
+        Ok(_) => {
+            println!(
+                "Arka plan Whisper boş sonuç döndü (sessiz kayıt?): {}",
+                meeting_id
+            );
+        }
+        Err(e) => {
+            eprintln!("Arka plan Whisper hatası ({}): {}", meeting_id, e);
+        }
+    }
+}
+
+/// Returns `(meeting, optional_pcm_for_detached_whisper)`.
 fn save_current_meeting_blocking(
     title: String,
     duration_seconds: u64,
-) -> Result<MeetingRecord, String> {
+) -> Result<(MeetingRecord, Option<Vec<f32>>), String> {
     use crate::audio::PcmClaim;
 
     let _save_guard = save_session_lock()
@@ -588,7 +683,7 @@ fn save_current_meeting_blocking(
     let (session_id, raw_pcm_buffer) = match audio_engine.claim_pcm_for_save() {
         PcmClaim::AlreadySaved { session_id } => {
             if let Some(existing) = cached_saved_meeting(session_id) {
-                return Ok(existing);
+                return Ok((existing, None));
             }
             return Err(
                 "Bu kayıt oturumu zaten kaydedildi (yinelenen durdurma sinyali yok sayıldı)."
@@ -652,24 +747,13 @@ fn save_current_meeting_blocking(
         }
     }
 
-    // If segments are empty but we have audio, transcribe off the main thread
-    // (this function already runs inside spawn_blocking) to guarantee zero data loss.
-    if deduplicated_segments.is_empty() && raw_pcm_buffer.len() >= 16000 {
-        if let Ok(auto_segs) = transcriber.transcribe_pcm(&raw_pcm_buffer, "auto") {
-            for seg in auto_segs {
-                let is_dup = deduplicated_segments.iter().any(|existing| {
-                    existing.start_time_ms == seg.start_time_ms
-                        && existing.end_time_ms == seg.end_time_ms
-                        && existing.text.trim() == seg.text.trim()
-                });
-                if !is_dup {
-                    let mut s = seg;
-                    s.id = deduplicated_segments.len() + 1;
-                    deduplicated_segments.push(s);
-                }
-            }
-        }
-    }
+    // Defer Whisper when live segments are empty — keep PCM for a detached
+    // background pass so the invoke returns (and Quit can proceed) immediately.
+    let pending_pcm = if deduplicated_segments.is_empty() && raw_pcm_buffer.len() >= 16000 {
+        Some(raw_pcm_buffer)
+    } else {
+        None
+    };
 
     let meeting = MeetingRecord {
         id,
@@ -702,7 +786,7 @@ fn save_current_meeting_blocking(
     let storage = get_global_storage();
     let saved = storage.add_meeting(meeting)?;
     remember_saved_meeting(session_id, saved.clone());
-    Ok(saved)
+    Ok((saved, pending_pcm))
 }
 
 #[tauri::command]
@@ -1184,13 +1268,15 @@ mod tests {
             .as_nanos() as u64;
         engine.inject_pcm_for_test(samples, session_id);
 
-        let first = save_current_meeting_blocking("Idempotent Test".into(), 3)
+        let (first, pending) = save_current_meeting_blocking("Idempotent Test".into(), 3)
             .expect("first save must succeed");
         assert_eq!(first.title, "Idempotent Test");
         assert!(
             first.audio_file_path.is_some(),
             "first save must write a FLAC"
         );
+        // Short PCM (< 1s) → no detached Whisper pending
+        assert!(pending.is_none(), "sub-second PCM must not queue Whisper");
         let flac_path = first.audio_file_path.clone().unwrap();
         assert!(
             PathBuf::from(&flac_path).exists(),
@@ -1198,8 +1284,9 @@ mod tests {
             flac_path
         );
 
-        let second = save_current_meeting_blocking("Should Be Ignored".into(), 99)
+        let (second, pending2) = save_current_meeting_blocking("Should Be Ignored".into(), 99)
             .expect("duplicate save must return cached meeting");
+        assert!(pending2.is_none());
         assert_eq!(
             second.id, first.id,
             "duplicate save must not create a new meeting id"
@@ -1220,11 +1307,36 @@ mod tests {
             let mut state = engine.state.lock().unwrap();
             state.pcm_16k_buffer = vec![0.9; 500];
         }
-        let third = save_current_meeting_blocking("Twice".into(), 1).unwrap();
+        let (third, _) = save_current_meeting_blocking("Twice".into(), 1).unwrap();
         assert_eq!(third.id, first.id);
         assert_eq!(third.title, first.title);
 
         let _ = get_global_storage().delete_meeting(&first.id);
         let _ = fs::remove_file(&flac_path);
+    }
+
+    #[test]
+    fn test_save_defers_whisper_pcm_when_segments_empty() {
+        let _guard = global_save_test_lock().lock().unwrap();
+        // >= 1s of audio so the detached Whisper path would be scheduled.
+        let samples: Vec<f32> = (0..16000).map(|i| ((i % 40) as f32) * 0.002).collect();
+        let engine = crate::audio::get_global_audio_engine();
+        let session_id = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos() as u64;
+        engine.inject_pcm_for_test(samples.clone(), session_id);
+
+        let (saved, pending) = save_current_meeting_blocking("Defer Whisper".into(), 1).unwrap();
+        assert!(saved.segments.is_empty());
+        let pending = pending.expect("PCM must be returned for detached Whisper");
+        assert_eq!(pending.len(), samples.len());
+        // Invoke path returns immediately; Whisper is not run inside blocking save.
+        assert!(saved.audio_file_path.is_some());
+
+        let _ = get_global_storage().delete_meeting(&saved.id);
+        if let Some(path) = saved.audio_file_path {
+            let _ = fs::remove_file(path);
+        }
     }
 }

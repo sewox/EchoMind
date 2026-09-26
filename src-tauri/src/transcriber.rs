@@ -63,6 +63,10 @@ pub struct GlobalTranscriberEngine {
     pub state: SharedTranscriberState,
     pub whisper_ctx: Mutex<Option<WhisperContext>>,
     pub is_transcribing: Arc<AtomicBool>,
+    /// Cooperative cancel for the current `whisper_full` pass.
+    pub abort_requested: Arc<AtomicBool>,
+    /// Sticky flag set on app Quit/Exit — never cleared; blocks new inference.
+    pub shutting_down: Arc<AtomicBool>,
 }
 
 struct TranscribeGuard<'a>(&'a AtomicBool);
@@ -70,6 +74,14 @@ impl<'a> Drop for TranscribeGuard<'a> {
     fn drop(&mut self) {
         self.0.store(false, Ordering::SeqCst);
     }
+}
+
+/// C abort trampoline for whisper.cpp — `user_data` is `*const AtomicBool`.
+unsafe extern "C" fn whisper_abort_trampoline(user_data: *mut std::ffi::c_void) -> bool {
+    if user_data.is_null() {
+        return false;
+    }
+    (*(user_data as *const AtomicBool)).load(Ordering::SeqCst)
 }
 
 impl Default for GlobalTranscriberEngine {
@@ -87,7 +99,30 @@ impl GlobalTranscriberEngine {
             state: Arc::new(Mutex::new(TranscriberState::default())),
             whisper_ctx: Mutex::new(None),
             is_transcribing: Arc::new(AtomicBool::new(false)),
+            abort_requested: Arc::new(AtomicBool::new(false)),
+            shutting_down: Arc::new(AtomicBool::new(false)),
         }
+    }
+
+    /// Signal Quit/Exit: abort any in-flight Whisper and refuse new transcription.
+    pub fn begin_shutdown(&self) {
+        self.shutting_down.store(true, Ordering::SeqCst);
+        self.abort_requested.store(true, Ordering::SeqCst);
+    }
+
+    pub fn request_abort(&self) {
+        self.abort_requested.store(true, Ordering::SeqCst);
+    }
+
+    pub fn clear_abort(&self) {
+        if !self.shutting_down.load(Ordering::SeqCst) {
+            self.abort_requested.store(false, Ordering::SeqCst);
+        }
+    }
+
+    pub fn is_abort_requested(&self) -> bool {
+        self.shutting_down.load(Ordering::SeqCst)
+            || self.abort_requested.load(Ordering::SeqCst)
     }
 
     pub fn ensure_model_loaded(&self) -> Result<(), String> {
@@ -193,26 +228,48 @@ impl GlobalTranscriberEngine {
     }
 
     pub fn cleanup_context(&self) {
-        // 1. If an active inference pass is ongoing, wait gracefully for it to settle (up to 800ms)
-        let wait_start = std::time::Instant::now();
-        while self.is_transcribing.load(Ordering::SeqCst) {
-            if wait_start.elapsed() > std::time::Duration::from_millis(800) {
-                break;
-            }
-            std::thread::sleep(std::time::Duration::from_millis(25));
+        // Cooperative abort so we don't block on whisper_ctx while inference runs.
+        // On Quit, begin_shutdown() already set sticky flags; for manual unload,
+        // only request a temporary abort.
+        let for_shutdown = self.shutting_down.load(Ordering::SeqCst);
+        if !for_shutdown {
+            self.request_abort();
         }
 
-        // 2. Safely acquire Whisper context lock and extract handle
-        let mut lock = self.whisper_ctx.lock().unwrap();
-        if let Some(ctx) = lock.take() {
-            // macOS Metal requires in-flight command buffers to drain prior to context drop
-            std::thread::sleep(std::time::Duration::from_millis(75));
-            drop(ctx);
+        let wait_start = std::time::Instant::now();
+        while self.is_transcribing.load(Ordering::SeqCst) {
+            if wait_start.elapsed() > std::time::Duration::from_millis(250) {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
         }
-        let mut state = self.state.lock().unwrap();
-        state.is_model_loaded = false;
-        state.model_display_name = "Whisper Small 244M (Bellekten Boşaltıldı)".to_string();
-        println!("Whisper GGML modeli bellekten boşaltıldı (Metal GPU ve RAM serbest bırakıldı).");
+
+        // Never block the UI/main thread on the Whisper mutex — if inference is
+        // still finishing after abort, leave the context for process teardown.
+        match self.whisper_ctx.try_lock() {
+            Ok(mut lock) => {
+                if let Some(ctx) = lock.take() {
+                    std::thread::sleep(std::time::Duration::from_millis(40));
+                    drop(ctx);
+                }
+                let mut state = self.state.lock().unwrap();
+                state.is_model_loaded = false;
+                state.model_display_name =
+                    "Whisper Small 244M (Bellekten Boşaltıldı)".to_string();
+                println!(
+                    "Whisper GGML modeli bellekten boşaltıldı (Metal GPU ve RAM serbest bırakıldı)."
+                );
+            }
+            Err(_) => {
+                println!(
+                    "Whisper temizliği atlandı: çıkarım hâlâ sürüyor (abort istendi, çıkış bloke edilmedi)."
+                );
+            }
+        }
+
+        if !for_shutdown {
+            self.clear_abort();
+        }
     }
 }
 
@@ -236,8 +293,17 @@ impl GlobalTranscriberEngine {
         self.is_transcribing.store(true, Ordering::SeqCst);
         let _transcribe_guard = TranscribeGuard(&self.is_transcribing);
 
+        if self.is_abort_requested() {
+            return Err("Transkripsiyon iptal edildi (uygulama kapanıyor).".to_string());
+        }
+        self.clear_abort();
+
         // Lazy load Whisper model on demand if not already in memory
         self.ensure_model_loaded()?;
+
+        if self.is_abort_requested() {
+            return Err("Transkripsiyon iptal edildi (uygulama kapanıyor).".to_string());
+        }
 
         let mut ctx_lock = self.whisper_ctx.lock().unwrap();
         let ctx = ctx_lock
@@ -300,6 +366,15 @@ impl GlobalTranscriberEngine {
         let total_duration_ms = ((samples.len() as f64 / 16000.0) * 1000.0) as u64;
 
         for (chunk_idx, chunk) in decode_chunks.iter().enumerate() {
+            if self.is_abort_requested() {
+                println!(
+                    "🛑 Whisper iptal edildi (chunk {}/{}).",
+                    chunk_idx + 1,
+                    decode_chunks.len()
+                );
+                break;
+            }
+
             let chunk_time_offset_ms = chunk.offset_ms;
             let chunk_samples = &chunk.samples;
             let lang_confidence_factor = chunk.lang_confidence;
@@ -327,6 +402,14 @@ impl GlobalTranscriberEngine {
             params.set_print_realtime(false);
             params.set_print_timestamps(false);
             params.set_translate(false);
+
+            // Abort callback so Quit during whisper_full returns promptly.
+            // begin_shutdown() sets abort_requested, so checking that flag is enough.
+            let abort_ptr = Arc::as_ptr(&self.abort_requested) as *mut std::ffi::c_void;
+            unsafe {
+                params.set_abort_callback(Some(whisper_abort_trampoline));
+                params.set_abort_callback_user_data(abort_ptr);
+            }
 
             if let Err(e) = state_ctx.full(params, chunk_samples) {
                 println!("Whisper chunk {} transkripsiyon hatası: {}", chunk_idx, e);
@@ -1044,5 +1127,37 @@ mod tests {
         assert_eq!(recommended_model_key(6.0), "small");
         assert_eq!(recommended_model_key(16.0), "small");
         assert_eq!(recommended_model_key(64.0), "small");
+    }
+
+    #[test]
+    fn test_begin_shutdown_makes_abort_sticky() {
+        let engine = GlobalTranscriberEngine::new();
+        assert!(!engine.is_abort_requested());
+        engine.begin_shutdown();
+        assert!(engine.is_abort_requested());
+        // clear_abort must not undo shutdown
+        engine.clear_abort();
+        assert!(engine.is_abort_requested());
+    }
+
+    #[test]
+    fn test_cleanup_context_does_not_block_when_not_transcribing() {
+        let engine = GlobalTranscriberEngine::new();
+        let start = std::time::Instant::now();
+        engine.cleanup_context();
+        assert!(
+            start.elapsed() < std::time::Duration::from_millis(500),
+            "cleanup_context must return promptly when idle"
+        );
+        // Manual unload must not sticky-shutdown the engine
+        assert!(!engine.is_abort_requested());
+    }
+
+    #[test]
+    fn test_cleanup_after_begin_shutdown_keeps_abort_sticky() {
+        let engine = GlobalTranscriberEngine::new();
+        engine.begin_shutdown();
+        engine.cleanup_context();
+        assert!(engine.is_abort_requested());
     }
 }

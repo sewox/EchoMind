@@ -457,6 +457,7 @@ export function App() {
     let unlistenStart: (() => void) | undefined;
     let unlistenStop: (() => void) | undefined;
     let unlistenSaved: (() => void) | undefined;
+    let unlistenTranscript: (() => void) | undefined;
 
     const setup = async () => {
       unlistenStart = await listen<{ title?: string }>(
@@ -517,6 +518,23 @@ export function App() {
       );
       if (cancelled) {
         unlistenSaved();
+        return;
+      }
+
+      // Detached Whisper after save — update UI when segments land without
+      // having blocked Quit on the transcription.
+      unlistenTranscript = await listen<MeetingRecord>(
+        "meeting-transcript-ready",
+        (event) => {
+          if (!event.payload) return;
+          setSelectedMeeting((prev) =>
+            prev && prev.id === event.payload.id ? event.payload : prev,
+          );
+          fetchPastMeetingsRef.current();
+        },
+      );
+      if (cancelled) {
+        unlistenTranscript();
       }
     };
 
@@ -527,6 +545,7 @@ export function App() {
       unlistenStart?.();
       unlistenStop?.();
       unlistenSaved?.();
+      unlistenTranscript?.();
     };
   }, [setSelectedMeeting, setIsRecording]);
 
