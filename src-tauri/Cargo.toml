@@ -42,7 +42,11 @@ reqwest = { version = "0.12", features = ["json", "blocking", "multipart"] }
 regex = "1.10"
 urlencoding = "2.1"
 chacha20poly1305 = "0.10"
-keyring = "3"
+# keyring 3.x has NO default features: without an explicit platform backend it
+# silently uses an in-memory mock store that dies with the process. That caused
+# every-launch key rotation and permanent data-at-rest / vault decrypt failure.
+# Enable one real backend per OS (irrelevant features are ignored on other targets).
+keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service", "crypto-rust"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc = "0.2"

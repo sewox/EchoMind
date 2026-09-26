@@ -209,6 +209,16 @@ EchoMind offers total freedom over how and where your audio and LLM intelligence
 
 Projeyi yerel ortamınızda derlemek ve geliştirmek için:
 
+**Linux (Debian/Ubuntu) sistem bağımlılıkları** — Tauri, ses ve OS Secret Service (şifreli anahtar deposu) için:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y \
+  build-essential cmake clang pkg-config \
+  libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev \
+  libasound2-dev libssl-dev libdbus-1-dev patchelf
+```
+
 ```bash
 # 1. Depoyu klonlayın
 git clone https://github.com/sewox/EchoMind.git

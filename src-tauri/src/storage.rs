@@ -280,6 +280,65 @@ impl Default for StorageEngine {
     }
 }
 
+/// Cap how many undecryptable `.corrupt-*` backups we keep per history file so
+/// a recurring key-mismatch (or other decrypt failure) cannot silently fill the
+/// user's app-data directory with dozens of copies.
+pub(crate) const MAX_CORRUPT_BACKUPS: usize = 5;
+
+/// Keep at most `max_keep` newest `{file_name}.corrupt-{unix_ts}` siblings.
+/// Older backups are deleted. Failures are logged but never panic.
+pub(crate) fn prune_corrupt_backups(file_path: &Path, max_keep: usize) {
+    let Some(parent) = file_path.parent() else {
+        return;
+    };
+    let Some(file_name) = file_path.file_name().and_then(|n| n.to_str()) else {
+        return;
+    };
+    let prefix = format!("{}.corrupt-", file_name);
+
+    let mut backups: Vec<(u64, PathBuf)> = match fs::read_dir(parent) {
+        Ok(entries) => entries
+            .filter_map(|e| e.ok())
+            .filter_map(|e| {
+                let name = e.file_name();
+                let name = name.to_string_lossy();
+                let ts_str = name.strip_prefix(&prefix)?;
+                let ts: u64 = ts_str.parse().ok()?;
+                Some((ts, e.path()))
+            })
+            .collect(),
+        Err(err) => {
+            eprintln!(
+                "⚠️ Corrupt yedek listesi okunamadı ({}): {}",
+                parent.display(),
+                err
+            );
+            return;
+        }
+    };
+
+    if backups.len() <= max_keep {
+        return;
+    }
+
+    // Newest first; drop the oldest beyond max_keep.
+    backups.sort_by_key(|a| std::cmp::Reverse(a.0));
+    for (_ts, path) in backups.into_iter().skip(max_keep) {
+        match fs::remove_file(&path) {
+            Ok(()) => eprintln!(
+                "ℹ️ Eski corrupt yedek silindi (en fazla {} tutuluyor): {}",
+                max_keep,
+                path.display()
+            ),
+            Err(err) => eprintln!(
+                "⚠️ Eski corrupt yedek silinemedi ({}): {}",
+                path.display(),
+                err
+            ),
+        }
+    }
+}
+
 impl StorageEngine {
     pub fn new() -> Self {
         let storage_dir = get_storage_dir();
@@ -316,7 +375,14 @@ impl StorageEngine {
                 Ok(records)
             }
             Err(e) => {
-                eprintln!("⚠️ Şifreli veritabanı yükleme uyarısı: {}", e);
+                eprintln!(
+                    "⚠️ Şifreli veritabanı yükleme uyarısı: {}. \
+                     Veri eski/erişilemeyen bir anahtarla şifrelenmiş olabilir; \
+                     orijinal dosya .corrupt-* olarak yedeklenip boş geçmişle devam edilecek \
+                     (çökme yok). Mock-keystore dönemi anahtarlarıyla şifrelenen veri geri \
+                     getirilemez.",
+                    e
+                );
                 // A decrypt/parse failure must never be treated as "no history": if the
                 // caller proceeds with an empty in-memory list and later calls
                 // save_to_disk(), that would silently overwrite the real (but unreadable)
@@ -331,11 +397,21 @@ impl StorageEngine {
                         let backup_path = self
                             .file_path
                             .with_extension(format!("json.corrupt-{}", timestamp));
-                        if fs::copy(&self.file_path, &backup_path).is_ok() {
-                            eprintln!(
-                                "⚠️ Okunamayan veritabanı kaybolmaması için yedeklendi: {}",
-                                backup_path.display()
-                            );
+                        match fs::copy(&self.file_path, &backup_path) {
+                            Ok(_) => {
+                                eprintln!(
+                                    "⚠️ Okunamayan veritabanı kaybolmaması için yedeklendi: {}",
+                                    backup_path.display()
+                                );
+                                prune_corrupt_backups(&self.file_path, MAX_CORRUPT_BACKUPS);
+                            }
+                            Err(copy_err) => {
+                                eprintln!(
+                                    "⚠️ Corrupt yedek kopyalanamadı ({}): {}",
+                                    backup_path.display(),
+                                    copy_err
+                                );
+                            }
                         }
                     }
                 }
@@ -1334,6 +1410,46 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn test_prune_corrupt_backups_keeps_only_n_most_recent() {
+        let temp_dir =
+            std::env::temp_dir().join(format!("echomind_corrupt_prune_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&temp_dir);
+        fs::create_dir_all(&temp_dir).unwrap();
+
+        let file_path = temp_dir.join("meetings_history.json");
+        fs::write(&file_path, b"placeholder").unwrap();
+
+        // Create 7 fake corrupt backups with increasing timestamps.
+        for ts in 100u64..107 {
+            let backup = file_path.with_extension(format!("json.corrupt-{}", ts));
+            fs::write(&backup, format!("backup-{}", ts)).unwrap();
+        }
+
+        prune_corrupt_backups(&file_path, MAX_CORRUPT_BACKUPS);
+
+        let mut remaining: Vec<u64> = fs::read_dir(&temp_dir)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .filter_map(|e| {
+                let name = e.file_name().to_string_lossy().to_string();
+                name.strip_prefix("meetings_history.json.corrupt-")?
+                    .parse()
+                    .ok()
+            })
+            .collect();
+        remaining.sort();
+
+        assert_eq!(
+            remaining,
+            vec![102, 103, 104, 105, 106],
+            "must keep only the {} newest corrupt backups",
+            MAX_CORRUPT_BACKUPS
+        );
+
+        let _ = fs::remove_dir_all(&temp_dir);
     }
 
     #[test]
