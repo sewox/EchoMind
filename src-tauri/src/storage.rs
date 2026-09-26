@@ -59,6 +59,10 @@ pub struct MeetingRecord {
     pub summary_provider: Option<String>,
     #[serde(default)]
     pub tags: Option<Vec<String>>,
+    /// True when audio was persisted but transcript is not ready yet (e.g. quit
+    /// mid-recording). Missing in older JSON → false via serde default.
+    #[serde(default)]
+    pub transcript_pending: bool,
 }
 
 pub struct StorageEngine {
@@ -389,6 +393,9 @@ impl StorageEngine {
             .find(|m| m.id == meeting_id)
             .ok_or_else(|| format!("Toplantı bulunamadı: {}", meeting_id))?;
         mtg.segments = segments;
+        if !mtg.segments.is_empty() {
+            mtg.transcript_pending = false;
+        }
         if mtg.summary.is_empty() {
             mtg.summary = generate_summary_from_segments(&mtg.segments);
         }
@@ -563,6 +570,7 @@ pub fn get_all_meetings() -> Vec<MeetingRecord> {
 /// Per-session save outcome cache. Losers wait on the Condvar until the winner
 /// publishes `Done` or `Nothing` — never surface a bare error for races.
 #[derive(Clone)]
+#[allow(clippy::large_enum_variant)]
 enum SessionSaveOutcome {
     Done(MeetingRecord),
     Nothing,
@@ -599,7 +607,7 @@ pub async fn save_current_meeting(
     duration_seconds: u64,
 ) -> Result<MeetingRecord, String> {
     let result = tauri::async_runtime::spawn_blocking(move || {
-        save_current_meeting_blocking(title, duration_seconds)
+        save_current_meeting_blocking(title, duration_seconds, SaveMode::Normal)
     })
     .await
     .map_err(|e| format!("Kayıt görevi tamamlanamadı: {}", e))?;
@@ -621,25 +629,95 @@ pub async fn save_current_meeting(
     Ok(meeting)
 }
 
-/// Called from ExitRequested: abort Whisper and briefly wait for FLAC persist
-/// (never for transcription). Returns after ≤ ~2s.
+/// Pure quit-save decision (testable without CoreAudio / disk I/O).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum QuitPersistDecision {
+    /// Capture is live — stop and run the single-save path (no Whisper).
+    PersistActiveSession,
+    /// Not recording — only drain any in-flight FLAC from a normal save.
+    DrainInFlightOnly,
+}
+
+pub fn decide_quit_persist(is_recording: bool) -> QuitPersistDecision {
+    if is_recording {
+        QuitPersistDecision::PersistActiveSession
+    } else {
+        QuitPersistDecision::DrainInFlightOnly
+    }
+}
+
+/// Outcome of [`persist_active_recording_on_quit`] (shared claim gate, no Whisper).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum QuitPersistResult {
+    SavedOnce {
+        meeting_id: String,
+    },
+    NothingToSave,
+    /// PCM already claimed by an in-flight / completed save — no second meeting.
+    AlreadyHandled {
+        meeting_id: Option<String>,
+    },
+    SkippedNotRecording,
+}
+
+/// If a recording is active: stop capture, claim PCM once, write FLAC + meeting
+/// with `transcript_pending` (empty transcript). Never runs Whisper.
+pub fn persist_active_recording_on_quit() -> QuitPersistResult {
+    let audio_engine = crate::audio::get_global_audio_engine();
+    match decide_quit_persist(audio_engine.get_status().is_recording) {
+        QuitPersistDecision::DrainInFlightOnly => QuitPersistResult::SkippedNotRecording,
+        QuitPersistDecision::PersistActiveSession => {
+            let _ = audio_engine.stop();
+            let before_count = get_global_storage().get_all().len();
+            // Re-enter the same session gate / claim_pcm_for_save path used by
+            // normal stop-save so an in-flight save cannot double-persist.
+            match save_current_meeting_blocking(String::new(), 0, SaveMode::QuitNoWhisper) {
+                Ok((meeting, _discard_pcm)) => {
+                    let after_count = get_global_storage().get_all().len();
+                    if after_count > before_count {
+                        QuitPersistResult::SavedOnce {
+                            meeting_id: meeting.id,
+                        }
+                    } else {
+                        QuitPersistResult::AlreadyHandled {
+                            meeting_id: Some(meeting.id),
+                        }
+                    }
+                }
+                Err(e) if e == NOTHING_TO_SAVE => QuitPersistResult::NothingToSave,
+                Err(_) => QuitPersistResult::NothingToSave,
+            }
+        }
+    }
+}
+
+/// Called from ExitRequested / Exit / main-window close-to-quit: abort Whisper,
+/// persist any active recording (no Whisper), briefly wait for FLAC (≤ ~2.5s).
 pub fn prepare_for_quit() {
     use std::sync::atomic::Ordering;
     crate::transcriber::get_global_transcriber().begin_shutdown();
 
+    // Active listening must not discard PCM on quit. Idempotent with the
+    // normal save gate — safe if a stop-save is already mid-flight.
+    let _ = persist_active_recording_on_quit();
+
     let start = std::time::Instant::now();
-    while flac_save_in_flight().load(Ordering::SeqCst)
-        && start.elapsed() < std::time::Duration::from_secs(2)
-    {
+    let budget = std::time::Duration::from_millis(2500);
+    while flac_save_in_flight().load(Ordering::SeqCst) && start.elapsed() < budget {
         std::thread::sleep(std::time::Duration::from_millis(25));
     }
 }
 
-fn run_detached_fallback_transcription(
-    app: tauri::AppHandle,
-    meeting_id: String,
-    pcm: Vec<f32>,
-) {
+/// Whether quit-path save should spawn Whisper (never) vs normal stop-save.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SaveMode {
+    /// May return PCM for detached Whisper when segments are empty.
+    Normal,
+    /// Never Whisper; mark `transcript_pending` when segments are empty.
+    QuitNoWhisper,
+}
+
+fn run_detached_fallback_transcription(app: tauri::AppHandle, meeting_id: String, pcm: Vec<f32>) {
     use tauri::Emitter;
 
     let transcriber = crate::transcriber::get_global_transcriber();
@@ -692,9 +770,12 @@ fn run_detached_fallback_transcription(
 
 /// Returns `(meeting, optional_pcm_for_detached_whisper)`.
 /// Order: finalize transcript segments → claim PCM → persist FLAC.
+/// `SaveMode::QuitNoWhisper` never returns PCM for Whisper and marks
+/// `transcript_pending` when the meeting has no segments.
 fn save_current_meeting_blocking(
     title: String,
     duration_seconds: u64,
+    mode: SaveMode,
 ) -> Result<(MeetingRecord, Option<Vec<f32>>), String> {
     use crate::audio::PcmClaim;
     use std::sync::atomic::Ordering;
@@ -803,12 +884,15 @@ fn save_current_meeting_blocking(
             }
         }
 
-        let pending_pcm =
-            if deduplicated_segments.is_empty() && raw_pcm_buffer.len() >= 16000 {
+        let transcript_pending = deduplicated_segments.is_empty();
+        // Quit never hands PCM to Whisper; normal save may queue detached work.
+        let pending_pcm = match mode {
+            SaveMode::QuitNoWhisper => None,
+            SaveMode::Normal if transcript_pending && raw_pcm_buffer.len() >= 16000 => {
                 Some(raw_pcm_buffer)
-            } else {
-                None
-            };
+            }
+            SaveMode::Normal => None,
+        };
 
         let meeting = MeetingRecord {
             id,
@@ -834,6 +918,7 @@ fn save_current_meeting_blocking(
             engine_used: Some("Cihazda (Whisper Small)".to_string()),
             summary_provider: Some("EchoMind Akıllı Özet".to_string()),
             tags: None,
+            transcript_pending,
         };
 
         let storage = get_global_storage();
@@ -1168,6 +1253,7 @@ mod tests {
             engine_used: Some("Cihazda (Whisper Small)".to_string()),
             summary_provider: Some("EchoMind".to_string()),
             tags: Some(vec!["Finans & Bütçe".to_string()]),
+            transcript_pending: false,
         };
 
         let added = storage.add_meeting(sample_meeting).unwrap();
@@ -1288,6 +1374,7 @@ mod tests {
             engine_used: Some("Whisper".to_string()),
             summary_provider: Some("AI".to_string()),
             tags: None,
+            transcript_pending: false,
         };
 
         // 1. Add meeting & get by id
@@ -1345,8 +1432,9 @@ mod tests {
             .as_nanos() as u64;
         engine.inject_pcm_for_test(samples, session_id);
 
-        let (first, pending) = save_current_meeting_blocking("Idempotent Test".into(), 3)
-            .expect("first save must succeed");
+        let (first, pending) =
+            save_current_meeting_blocking("Idempotent Test".into(), 3, SaveMode::Normal)
+                .expect("first save must succeed");
         assert_eq!(first.title, "Idempotent Test");
         assert!(
             first.audio_file_path.is_some(),
@@ -1357,8 +1445,9 @@ mod tests {
         assert!(PathBuf::from(&flac_path).exists());
 
         // Loser must get Ok(same record) — never a bare race Err.
-        let (second, pending2) = save_current_meeting_blocking("Should Be Ignored".into(), 99)
-            .expect("duplicate save must return cached meeting");
+        let (second, pending2) =
+            save_current_meeting_blocking("Should Be Ignored".into(), 99, SaveMode::Normal)
+                .expect("duplicate save must return cached meeting");
         assert!(pending2.is_none());
         assert_eq!(second.id, first.id);
         assert_eq!(second.title, first.title);
@@ -1369,7 +1458,8 @@ mod tests {
             let mut state = engine.state.lock().unwrap();
             state.pcm_16k_buffer = vec![0.9; 500];
         }
-        let (third, _) = save_current_meeting_blocking("Twice".into(), 1).unwrap();
+        let (third, _) =
+            save_current_meeting_blocking("Twice".into(), 1, SaveMode::Normal).unwrap();
         assert_eq!(third.id, first.id);
 
         let _ = get_global_storage().delete_meeting(&first.id);
@@ -1388,12 +1478,13 @@ mod tests {
         engine.inject_pcm_for_test(vec![0.01; 100], session_id);
 
         let before = get_global_storage().get_all().len();
-        let err = save_current_meeting_blocking("Empty".into(), 1).unwrap_err();
+        let err = save_current_meeting_blocking("Empty".into(), 1, SaveMode::Normal).unwrap_err();
         assert_eq!(err, NOTHING_TO_SAVE);
         assert_eq!(get_global_storage().get_all().len(), before);
 
         // Retry is also silent nothing (session marked saved).
-        let err2 = save_current_meeting_blocking("Empty again".into(), 1).unwrap_err();
+        let err2 =
+            save_current_meeting_blocking("Empty again".into(), 1, SaveMode::Normal).unwrap_err();
         assert_eq!(err2, NOTHING_TO_SAVE);
     }
 
@@ -1408,8 +1499,12 @@ mod tests {
             .as_nanos() as u64;
         engine.inject_pcm_for_test(samples, session_id);
 
-        let t1 = std::thread::spawn(|| save_current_meeting_blocking("Race A".into(), 2));
-        let t2 = std::thread::spawn(|| save_current_meeting_blocking("Race B".into(), 2));
+        let t1 = std::thread::spawn(|| {
+            save_current_meeting_blocking("Race A".into(), 2, SaveMode::Normal)
+        });
+        let t2 = std::thread::spawn(|| {
+            save_current_meeting_blocking("Race B".into(), 2, SaveMode::Normal)
+        });
         let r1 = t1.join().unwrap();
         let r2 = t2.join().unwrap();
 
@@ -1451,7 +1546,8 @@ mod tests {
             state.segment_counter = 1;
         }
 
-        let (saved, _) = save_current_meeting_blocking("Seg Order".into(), 1).unwrap();
+        let (saved, _) =
+            save_current_meeting_blocking("Seg Order".into(), 1, SaveMode::Normal).unwrap();
         assert_eq!(saved.segments.len(), 1);
         assert_eq!(saved.segments[0].text, "finalized before claim");
         assert!(
@@ -1476,7 +1572,8 @@ mod tests {
             .as_nanos() as u64;
         engine.inject_pcm_for_test(samples.clone(), session_id);
 
-        let (saved, pending) = save_current_meeting_blocking("Defer Whisper".into(), 1).unwrap();
+        let (saved, pending) =
+            save_current_meeting_blocking("Defer Whisper".into(), 1, SaveMode::Normal).unwrap();
         assert!(saved.segments.is_empty());
         let pending = pending.expect("PCM must be returned for detached Whisper");
         assert_eq!(pending.len(), samples.len());
@@ -1486,5 +1583,177 @@ mod tests {
         if let Some(path) = saved.audio_file_path {
             let _ = fs::remove_file(path);
         }
+    }
+
+    #[test]
+    fn test_decide_quit_persist_only_when_recording() {
+        assert_eq!(
+            decide_quit_persist(true),
+            QuitPersistDecision::PersistActiveSession
+        );
+        assert_eq!(
+            decide_quit_persist(false),
+            QuitPersistDecision::DrainInFlightOnly
+        );
+    }
+
+    #[test]
+    fn test_quit_save_active_recording_with_pcm_saves_once_pending() {
+        let _guard = global_save_test_lock().lock().unwrap();
+        let samples: Vec<f32> = (0..8000).map(|i| ((i % 40) as f32) * 0.002).collect();
+        let engine = crate::audio::get_global_audio_engine();
+        let session_id = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos() as u64;
+        engine.inject_pcm_for_test(samples, session_id);
+        {
+            let mut state = engine.state.lock().unwrap();
+            state.is_recording = true;
+        }
+
+        let before = get_global_storage().get_all().len();
+        let result = persist_active_recording_on_quit();
+        let after = get_global_storage().get_all().len();
+        assert_eq!(
+            after,
+            before + 1,
+            "active recording with PCM must create one meeting"
+        );
+
+        let meeting_id = match result {
+            QuitPersistResult::SavedOnce { meeting_id } => meeting_id,
+            other => panic!("expected SavedOnce, got {:?}", other),
+        };
+        let saved = get_global_storage()
+            .get_all()
+            .into_iter()
+            .find(|m| m.id == meeting_id)
+            .expect("meeting must be in history");
+        assert!(
+            saved.audio_file_path.is_some(),
+            "FLAC must be written on quit"
+        );
+        assert!(
+            saved.transcript_pending,
+            "quit save marks transcript pending"
+        );
+        assert!(saved.segments.is_empty());
+        assert!(
+            !engine.get_status().is_recording,
+            "quit persist must stop capture"
+        );
+
+        // Second quit persist: not recording anymore → skip, no double-save.
+        let again = persist_active_recording_on_quit();
+        assert_eq!(again, QuitPersistResult::SkippedNotRecording);
+        assert_eq!(get_global_storage().get_all().len(), after);
+
+        let flac = saved.audio_file_path.clone().unwrap();
+        let _ = get_global_storage().delete_meeting(&meeting_id);
+        let _ = fs::remove_file(flac);
+    }
+
+    #[test]
+    fn test_quit_save_empty_pcm_saves_nothing() {
+        let _guard = global_save_test_lock().lock().unwrap();
+        let engine = crate::audio::get_global_audio_engine();
+        let session_id = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos() as u64;
+        engine.inject_pcm_for_test(vec![0.01; 100], session_id);
+        {
+            let mut state = engine.state.lock().unwrap();
+            state.is_recording = true;
+        }
+
+        let before = get_global_storage().get_all().len();
+        let result = persist_active_recording_on_quit();
+        assert_eq!(result, QuitPersistResult::NothingToSave);
+        assert_eq!(get_global_storage().get_all().len(), before);
+        assert!(!engine.get_status().is_recording);
+    }
+
+    #[test]
+    fn test_quit_save_does_not_double_save_when_claim_already_taken() {
+        let _guard = global_save_test_lock().lock().unwrap();
+        let samples: Vec<f32> = (0..8000).map(|i| ((i % 40) as f32) * 0.002).collect();
+        let engine = crate::audio::get_global_audio_engine();
+        let session_id = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos() as u64;
+        engine.inject_pcm_for_test(samples, session_id);
+
+        // Normal save claims PCM first (simulates in-flight / completed stop-save).
+        let (first, pending) =
+            save_current_meeting_blocking("InFlight".into(), 2, SaveMode::Normal).unwrap();
+        assert!(pending.is_none());
+        let before = get_global_storage().get_all().len();
+
+        // Quit path still sees "recording" but claim is AlreadySaved → no new meeting.
+        {
+            let mut state = engine.state.lock().unwrap();
+            state.is_recording = true;
+            // Keep session_saved true from the claim above.
+        }
+        let result = persist_active_recording_on_quit();
+        match result {
+            QuitPersistResult::AlreadyHandled { meeting_id } => {
+                assert_eq!(meeting_id.as_deref(), Some(first.id.as_str()));
+            }
+            other => panic!("expected AlreadyHandled, got {:?}", other),
+        }
+        assert_eq!(
+            get_global_storage().get_all().len(),
+            before,
+            "in-flight / completed save must not create a second meeting on quit"
+        );
+
+        let _ = get_global_storage().delete_meeting(&first.id);
+        if let Some(p) = first.audio_file_path {
+            let _ = fs::remove_file(p);
+        }
+    }
+
+    #[test]
+    fn test_quit_save_mode_never_returns_whisper_pcm() {
+        let _guard = global_save_test_lock().lock().unwrap();
+        let samples: Vec<f32> = (0..16000).map(|i| ((i % 40) as f32) * 0.002).collect();
+        let engine = crate::audio::get_global_audio_engine();
+        let session_id = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos() as u64;
+        engine.inject_pcm_for_test(samples, session_id);
+
+        let (saved, pending) =
+            save_current_meeting_blocking("QuitMode".into(), 1, SaveMode::QuitNoWhisper).unwrap();
+        assert!(pending.is_none(), "quit mode must never queue Whisper PCM");
+        assert!(saved.transcript_pending);
+        assert!(saved.segments.is_empty());
+
+        let _ = get_global_storage().delete_meeting(&saved.id);
+        if let Some(path) = saved.audio_file_path {
+            let _ = fs::remove_file(path);
+        }
+    }
+
+    #[test]
+    fn test_transcript_pending_defaults_false_on_deserialize() {
+        let json = r#"{
+            "id": "legacy",
+            "title": "Old",
+            "date_formatted": "1 Jan",
+            "duration_seconds": 1,
+            "duration_formatted": "00:01",
+            "audio_file_path": null,
+            "segments": [],
+            "summary": "",
+            "key_decisions": []
+        }"#;
+        let m: MeetingRecord = serde_json::from_str(json).expect("legacy JSON must deserialize");
+        assert!(!m.transcript_pending);
     }
 }

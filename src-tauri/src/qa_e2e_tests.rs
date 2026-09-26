@@ -210,6 +210,7 @@ mod e2e_qa_suite {
             engine_used: Some("🔒 Yerel Whisper Small (244M)".to_string()),
             summary_provider: Some("🔒 Cihaz İçi Hızlı Özet".to_string()),
             tags: None,
+            transcript_pending: false,
         };
 
         let md =
@@ -246,6 +247,7 @@ mod e2e_qa_suite {
             engine_used: None,
             summary_provider: None,
             tags: None,
+            transcript_pending: false,
         }];
 
         let chaotic_inputs = [

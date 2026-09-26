@@ -1,7 +1,9 @@
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::Sample;
 use serde::{Deserialize, Serialize};
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+#[cfg(test)]
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{channel, Receiver, RecvTimeoutError, Sender};
 use std::sync::{Arc, Mutex, OnceLock, RwLock};
 use std::thread;
@@ -227,11 +229,7 @@ fn catalog_may_enumerate() -> bool {
     }
 }
 
-fn device_catalog_worker(
-    catalog: Arc<DeviceCatalog>,
-    rx: Receiver<()>,
-    enumerate: EnumerateFn,
-) {
+fn device_catalog_worker(catalog: Arc<DeviceCatalog>, rx: Receiver<()>, enumerate: EnumerateFn) {
     // Initial scan — may block on CoreAudio here; that is intentional and
     // confined to this worker. Callers only ever read `snapshot`.
     catalog.publish(enumerate());
@@ -239,26 +237,21 @@ fn device_catalog_worker(
     #[cfg(target_os = "macos")]
     macos_device_listener::install(catalog.request_tx.lock().unwrap().clone());
 
-    loop {
-        match rx.recv_timeout(DEVICE_CATALOG_PERIOD) {
-            Ok(()) | Err(RecvTimeoutError::Timeout) => {
-                // Coalesce a burst of refresh requests into one enumeration.
-                while rx.try_recv().is_ok() {}
-                // Never enumerate while a stream is live / tearing down, and
-                // honour the post-stop debounce window.
-                if !catalog_may_enumerate() {
-                    continue;
-                }
-                // Enumerate with NO catalog locks held, then publish.
-                let devices = enumerate();
-                // Re-check: a start() may have begun while we were in HAL.
-                if STREAM_HAL_BUSY.load(Ordering::SeqCst) {
-                    continue;
-                }
-                catalog.publish(devices);
-            }
-            Err(RecvTimeoutError::Disconnected) => break,
+    while let Ok(()) | Err(RecvTimeoutError::Timeout) = rx.recv_timeout(DEVICE_CATALOG_PERIOD) {
+        // Coalesce a burst of refresh requests into one enumeration.
+        while rx.try_recv().is_ok() {}
+        // Never enumerate while a stream is live / tearing down, and
+        // honour the post-stop debounce window.
+        if !catalog_may_enumerate() {
+            continue;
         }
+        // Enumerate with NO catalog locks held, then publish.
+        let devices = enumerate();
+        // Re-check: a start() may have begun while we were in HAL.
+        if STREAM_HAL_BUSY.load(Ordering::SeqCst) {
+            continue;
+        }
+        catalog.publish(devices);
     }
 }
 
@@ -283,9 +276,7 @@ fn catalog_enumerate() -> Vec<AudioDeviceInfo> {
 
 fn device_catalog() -> &'static Arc<DeviceCatalog> {
     static CATALOG: OnceLock<Arc<DeviceCatalog>> = OnceLock::new();
-    CATALOG.get_or_init(|| {
-        DeviceCatalog::spawn(Arc::new(catalog_enumerate) as EnumerateFn)
-    })
+    CATALOG.get_or_init(|| DeviceCatalog::spawn(Arc::new(catalog_enumerate) as EnumerateFn))
 }
 
 /// Ensure the background catalog worker is running. Safe to call repeatedly.
@@ -1228,9 +1219,8 @@ mod tests {
         // stays fast and derives active-device loopback from the name heuristic
         // alone (no enumeration on this path).
         {
-            *TEST_ENUMERATE.lock().unwrap() = Some(Arc::new(|| {
-                vec![sample_device("Status Seed", true, false)]
-            }));
+            *TEST_ENUMERATE.lock().unwrap() =
+                Some(Arc::new(|| vec![sample_device("Status Seed", true, false)]));
             device_catalog().request_refresh();
             let deadline = Instant::now() + Duration::from_secs(2);
             loop {

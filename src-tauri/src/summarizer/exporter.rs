@@ -1356,6 +1356,7 @@ mod tests {
             engine_used: None,
             summary_provider: None,
             tags: None,
+            transcript_pending: false,
         };
 
         let md = MeetingExporter::export_notes_markdown(&record, None, None);

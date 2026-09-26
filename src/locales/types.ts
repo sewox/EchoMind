@@ -44,6 +44,7 @@ export interface TranslationKeys {
     deleteMeetingTitle: string;
     deleteMeetingConfirm: string;
     segmentCount: string;
+    transcriptPending: string;
     liveSession: string;
     backToLive: string;
   };

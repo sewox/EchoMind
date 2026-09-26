@@ -47,6 +47,7 @@ export const tr: TranslationKeys = {
     deleteMeetingConfirm:
       "Bu toplantıyı ve tüm kayıtlarını silmek istediğinize emin misiniz?",
     segmentCount: "{count} konuşma bölümü",
+    transcriptPending: "Transkript bekleniyor",
     liveSession: "Canlı Toplantı Akışı",
     backToLive: "Canlı Akışa Dön",
   },

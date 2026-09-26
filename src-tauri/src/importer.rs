@@ -403,6 +403,7 @@ pub async fn import_audio_file(
             engine_used: Some(engine_label),
             summary_provider: Some(summary_res.provider_used),
             tags: None,
+            transcript_pending: false,
         };
 
         let storage = crate::storage::get_global_storage();
@@ -788,6 +789,7 @@ pub async fn retranscribe_meeting(
             }
         }
         target.segments = segments;
+        target.transcript_pending = false;
         target.summary = summary_res.summary;
         target.key_decisions = summary_res.key_decisions;
         target.meeting_goal = Some(summary_res.meeting_goal);
