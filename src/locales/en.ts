@@ -47,6 +47,7 @@ export const en: TranslationKeys = {
     deleteMeetingConfirm:
       "Are you sure you want to delete this meeting and all its recordings?",
     segmentCount: "{count} dialogue segments",
+    transcriptPending: "Transcript pending",
     liveSession: "Live Meeting Stream",
     backToLive: "Back to Live Session",
   },

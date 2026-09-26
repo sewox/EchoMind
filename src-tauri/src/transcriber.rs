@@ -3,8 +3,26 @@ use std::io::{Read, Write};
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
+use std::time::{Duration, Instant};
 use tauri::Emitter;
 use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters};
+
+/// Poll `still_busy` until it returns false or `timeout` elapses.
+/// Returns `true` when idle (not busy) before the deadline.
+pub fn wait_until_idle<F>(still_busy: F, timeout: Duration, poll: Duration) -> bool
+where
+    F: Fn() -> bool,
+{
+    let start = Instant::now();
+    while still_busy() {
+        if start.elapsed() >= timeout {
+            return false;
+        }
+        let remaining = timeout.saturating_sub(start.elapsed());
+        std::thread::sleep(poll.min(remaining).max(Duration::from_millis(1)));
+    }
+    true
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TranscriptSegment {
@@ -124,6 +142,26 @@ impl GlobalTranscriberEngine {
         self.shutting_down.load(Ordering::SeqCst) || self.abort_requested.load(Ordering::SeqCst)
     }
 
+    /// Whether a Whisper inference call is currently holding the Metal/CPU context.
+    pub fn is_inference_active(&self) -> bool {
+        self.is_transcribing.load(Ordering::SeqCst)
+    }
+
+    /// After `begin_shutdown` / abort: wait up to `timeout` for inference to
+    /// return so ggml Metal state can be torn down safely. Returns `true` if idle.
+    pub fn wait_for_inference_idle(&self, timeout: Duration) -> bool {
+        wait_until_idle(
+            || self.is_transcribing.load(Ordering::SeqCst),
+            timeout,
+            Duration::from_millis(10),
+        )
+    }
+
+    #[cfg(test)]
+    pub fn set_transcribing_for_test(&self, active: bool) {
+        self.is_transcribing.store(active, Ordering::SeqCst);
+    }
+
     pub fn ensure_model_loaded(&self) -> Result<(), String> {
         let lock = self.whisper_ctx.lock().unwrap();
         if lock.is_some() {
@@ -235,13 +273,9 @@ impl GlobalTranscriberEngine {
             self.request_abort();
         }
 
-        let wait_start = std::time::Instant::now();
-        while self.is_transcribing.load(Ordering::SeqCst) {
-            if wait_start.elapsed() > std::time::Duration::from_millis(250) {
-                break;
-            }
-            std::thread::sleep(std::time::Duration::from_millis(10));
-        }
+        // Short cooperative wait for non-quit unload paths. Quit uses a longer
+        // bounded wait in `prepare_for_quit` before deciding on hard-exit.
+        let _ = self.wait_for_inference_idle(Duration::from_millis(250));
 
         // Never block the UI/main thread on the Whisper mutex — if inference is
         // still finishing after abort, leave the context for process teardown.
@@ -1150,10 +1184,10 @@ mod tests {
     #[test]
     fn test_cleanup_context_does_not_block_when_not_transcribing() {
         let engine = GlobalTranscriberEngine::new();
-        let start = std::time::Instant::now();
+        let start = Instant::now();
         engine.cleanup_context();
         assert!(
-            start.elapsed() < std::time::Duration::from_millis(500),
+            start.elapsed() < Duration::from_millis(500),
             "cleanup_context must return promptly when idle"
         );
         // Manual unload must not sticky-shutdown the engine
@@ -1166,5 +1200,55 @@ mod tests {
         engine.begin_shutdown();
         engine.cleanup_context();
         assert!(engine.is_abort_requested());
+    }
+
+    #[test]
+    fn test_wait_until_idle_returns_true_when_already_idle() {
+        assert!(wait_until_idle(
+            || false,
+            Duration::from_millis(100),
+            Duration::from_millis(5)
+        ));
+    }
+
+    #[test]
+    fn test_wait_until_idle_times_out_when_still_busy() {
+        let start = Instant::now();
+        assert!(!wait_until_idle(
+            || true,
+            Duration::from_millis(40),
+            Duration::from_millis(5)
+        ));
+        assert!(start.elapsed() >= Duration::from_millis(35));
+        assert!(
+            start.elapsed() < Duration::from_millis(250),
+            "bounded wait must not hang"
+        );
+    }
+
+    #[test]
+    fn test_wait_until_idle_succeeds_when_flag_clears() {
+        let busy = Arc::new(AtomicBool::new(true));
+        let busy_bg = Arc::clone(&busy);
+        std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(25));
+            busy_bg.store(false, Ordering::SeqCst);
+        });
+        assert!(wait_until_idle(
+            || busy.load(Ordering::SeqCst),
+            Duration::from_millis(300),
+            Duration::from_millis(5)
+        ));
+    }
+
+    #[test]
+    fn test_wait_for_inference_idle_respects_timeout() {
+        let engine = GlobalTranscriberEngine::new();
+        engine.set_transcribing_for_test(true);
+        let start = Instant::now();
+        assert!(!engine.wait_for_inference_idle(Duration::from_millis(30)));
+        assert!(start.elapsed() >= Duration::from_millis(25));
+        engine.set_transcribing_for_test(false);
+        assert!(engine.wait_for_inference_idle(Duration::from_millis(50)));
     }
 }

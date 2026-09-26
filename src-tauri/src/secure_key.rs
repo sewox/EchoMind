@@ -36,8 +36,9 @@ fn fallback_key_path(fallback_filename: &str) -> PathBuf {
 }
 
 /// Where the encryption key for a logical account came from (never logs key material).
+#[cfg(not(test))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum KeySource {
+enum KeySource {
     /// Retrieved from the OS-native secure keystore.
     Keychain,
     /// Loaded from (or written to) the app-data fallback key file.
@@ -46,8 +47,8 @@ pub enum KeySource {
     NewKeyCreated,
 }
 
+#[cfg(not(test))]
 impl KeySource {
-    #[cfg(not(test))]
     fn as_log_label(self) -> &'static str {
         match self {
             KeySource::Keychain => "keychain",

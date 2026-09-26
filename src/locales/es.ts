@@ -48,6 +48,7 @@ export const es: TranslationKeys = {
     deleteMeetingConfirm:
       "¿Está seguro de que desea eliminar esta reunión y todas sus grabaciones?",
     segmentCount: "{count} segmentos de diálogo",
+    transcriptPending: "Transcripción pendiente",
     liveSession: "Sesión en Vivo",
     backToLive: "Volver a la Sesión en Vivo",
   },

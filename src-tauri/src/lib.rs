@@ -158,13 +158,33 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|_app_handle, event| {
-            if let tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit = event {
-                // Abort Whisper and briefly drain in-flight FLAC (≤2s). Never
-                // wait on transcription — bg whisper uses a detached OS thread.
-                storage::prepare_for_quit();
-                audio::get_global_audio_engine().stop().ok();
-                audio::get_global_audio_engine().stop_preview().ok();
-                transcriber::get_global_transcriber().cleanup_context();
+            match event {
+                tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit => {
+                    // Persist active/mid-save audio, abort Whisper, wait briefly
+                    // for inference idle (total ≤ ~3s). If still busy, hard-exit
+                    // so ggml Metal static destructors cannot abort().
+                    let exit_mode = storage::prepare_for_quit();
+                    audio::get_global_audio_engine().stop().ok();
+                    audio::get_global_audio_engine().stop_preview().ok();
+                    match exit_mode {
+                        storage::QuitExitMode::Normal => {
+                            transcriber::get_global_transcriber().cleanup_context();
+                        }
+                        storage::QuitExitMode::HardExit => {
+                            storage::hard_exit_after_quit();
+                        }
+                    }
+                }
+                tauri::RunEvent::WindowEvent {
+                    label,
+                    event: tauri::WindowEvent::CloseRequested { .. },
+                    ..
+                } if label == "main" => {
+                    // Main-window close that leads to app quit: same persist path
+                    // (idempotent with ExitRequested via claim_pcm_for_save).
+                    let _ = storage::persist_active_recording_on_quit();
+                }
+                _ => {}
             }
         });
 }

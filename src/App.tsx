@@ -116,6 +116,8 @@ export interface MeetingRecord {
   engine_used?: string;
   summary_provider?: string;
   tags?: string[];
+  /** Audio saved but transcript not ready yet (e.g. quit mid-recording). */
+  transcript_pending?: boolean;
 }
 
 export interface RelatedMeetingItem {
@@ -1362,6 +1364,14 @@ export function App() {
                         {mtg.duration_formatted}
                       </span>
                     </div>
+
+                    {mtg.transcript_pending && (
+                      <div className="mt-2">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/30 text-[10px] 2xl:text-xs text-amber-300 font-medium">
+                          {t("sidebar.transcriptPending")}
+                        </span>
+                      </div>
+                    )}
 
                     {/* Model & Summary Badge */}
                     <div className="flex items-center gap-1.5 mt-2 flex-wrap">
