@@ -1,7 +1,9 @@
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::Sample;
 use serde::{Deserialize, Serialize};
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+#[cfg(test)]
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{channel, Receiver, RecvTimeoutError, Sender};
 use std::sync::{Arc, Mutex, OnceLock, RwLock};
 use std::thread;
@@ -28,6 +30,10 @@ pub struct AudioState {
     pub is_speaking: bool,
     pub silence_counter: u32,
     pub pcm_16k_buffer: Vec<f32>,
+    /// Index into `pcm_16k_buffer` of the next sample not yet consumed by live
+    /// transcription. Live path advances this cursor; it must never clear or
+    /// take the session persist buffer (that is exclusive to `claim_pcm_for_save`).
+    pub live_transcribe_cursor: usize,
     // High-pass filter state variables
     pub hp_prev_in: f32,
     pub hp_prev_out: f32,
@@ -47,6 +53,7 @@ impl Default for AudioState {
             is_speaking: false,
             silence_counter: 999,
             pcm_16k_buffer: Vec::new(),
+            live_transcribe_cursor: 0,
             hp_prev_in: 0.0,
             hp_prev_out: 0.0,
             recording_session_id: 0,
@@ -227,11 +234,7 @@ fn catalog_may_enumerate() -> bool {
     }
 }
 
-fn device_catalog_worker(
-    catalog: Arc<DeviceCatalog>,
-    rx: Receiver<()>,
-    enumerate: EnumerateFn,
-) {
+fn device_catalog_worker(catalog: Arc<DeviceCatalog>, rx: Receiver<()>, enumerate: EnumerateFn) {
     // Initial scan — may block on CoreAudio here; that is intentional and
     // confined to this worker. Callers only ever read `snapshot`.
     catalog.publish(enumerate());
@@ -239,26 +242,21 @@ fn device_catalog_worker(
     #[cfg(target_os = "macos")]
     macos_device_listener::install(catalog.request_tx.lock().unwrap().clone());
 
-    loop {
-        match rx.recv_timeout(DEVICE_CATALOG_PERIOD) {
-            Ok(()) | Err(RecvTimeoutError::Timeout) => {
-                // Coalesce a burst of refresh requests into one enumeration.
-                while rx.try_recv().is_ok() {}
-                // Never enumerate while a stream is live / tearing down, and
-                // honour the post-stop debounce window.
-                if !catalog_may_enumerate() {
-                    continue;
-                }
-                // Enumerate with NO catalog locks held, then publish.
-                let devices = enumerate();
-                // Re-check: a start() may have begun while we were in HAL.
-                if STREAM_HAL_BUSY.load(Ordering::SeqCst) {
-                    continue;
-                }
-                catalog.publish(devices);
-            }
-            Err(RecvTimeoutError::Disconnected) => break,
+    while let Ok(()) | Err(RecvTimeoutError::Timeout) = rx.recv_timeout(DEVICE_CATALOG_PERIOD) {
+        // Coalesce a burst of refresh requests into one enumeration.
+        while rx.try_recv().is_ok() {}
+        // Never enumerate while a stream is live / tearing down, and
+        // honour the post-stop debounce window.
+        if !catalog_may_enumerate() {
+            continue;
         }
+        // Enumerate with NO catalog locks held, then publish.
+        let devices = enumerate();
+        // Re-check: a start() may have begun while we were in HAL.
+        if STREAM_HAL_BUSY.load(Ordering::SeqCst) {
+            continue;
+        }
+        catalog.publish(devices);
     }
 }
 
@@ -283,9 +281,7 @@ fn catalog_enumerate() -> Vec<AudioDeviceInfo> {
 
 fn device_catalog() -> &'static Arc<DeviceCatalog> {
     static CATALOG: OnceLock<Arc<DeviceCatalog>> = OnceLock::new();
-    CATALOG.get_or_init(|| {
-        DeviceCatalog::spawn(Arc::new(catalog_enumerate) as EnumerateFn)
-    })
+    CATALOG.get_or_init(|| DeviceCatalog::spawn(Arc::new(catalog_enumerate) as EnumerateFn))
 }
 
 /// Ensure the background catalog worker is running. Safe to call repeatedly.
@@ -471,6 +467,7 @@ impl GlobalAudioEngine {
             state.silence_counter = 999;
             state.is_speaking = false;
             state.pcm_16k_buffer.clear();
+            state.live_transcribe_cursor = 0;
             state.hp_prev_in = 0.0;
             state.hp_prev_out = 0.0;
             state.recording_session_id = state.recording_session_id.wrapping_add(1).max(1);
@@ -786,6 +783,31 @@ impl GlobalAudioEngine {
         state.pcm_16k_buffer.clone()
     }
 
+    /// Minimum unread samples required before live transcription will consume
+    /// a chunk (~1.0 s at 16 kHz for clean sentence recognition).
+    pub const LIVE_TRANSCRIBE_MIN_SAMPLES: usize = 16000;
+
+    /// Consume newly accumulated PCM for live transcription via a cursor.
+    /// Does **not** clear or take the session persist buffer — only advances
+    /// `live_transcribe_cursor`. Returns `None` when fewer than `min_samples`
+    /// unread samples are available.
+    pub fn take_pcm_for_live_transcribe(&self, min_samples: usize) -> Option<Vec<f32>> {
+        let mut state = self.state.lock().unwrap();
+        if state.live_transcribe_cursor > state.pcm_16k_buffer.len() {
+            state.live_transcribe_cursor = state.pcm_16k_buffer.len();
+        }
+        let unread = state
+            .pcm_16k_buffer
+            .len()
+            .saturating_sub(state.live_transcribe_cursor);
+        if unread < min_samples {
+            return None;
+        }
+        let samples = state.pcm_16k_buffer[state.live_transcribe_cursor..].to_vec();
+        state.live_transcribe_cursor = state.pcm_16k_buffer.len();
+        Some(samples)
+    }
+
     /// Atomically take the PCM buffer for the current recording session.
     /// Empty / tiny buffers return `NothingToSave` (session still marked saved).
     /// Subsequent callers get `AlreadySaved`.
@@ -797,6 +819,7 @@ impl GlobalAudioEngine {
         }
         state.session_saved = true;
         let pcm = std::mem::take(&mut state.pcm_16k_buffer);
+        state.live_transcribe_cursor = 0;
         if pcm.len() < MIN_SAVE_PCM_SAMPLES {
             return PcmClaim::NothingToSave { session_id };
         }
@@ -808,8 +831,16 @@ impl GlobalAudioEngine {
     pub fn inject_pcm_for_test(&self, samples: Vec<f32>, session_id: u64) {
         let mut state = self.state.lock().unwrap();
         state.pcm_16k_buffer = samples;
+        state.live_transcribe_cursor = 0;
         state.recording_session_id = session_id;
         state.session_saved = false;
+    }
+
+    /// Test helper: append samples as if the capture callback just wrote them.
+    #[cfg(test)]
+    pub fn append_pcm_for_test(&self, samples: &[f32]) {
+        let mut state = self.state.lock().unwrap();
+        state.pcm_16k_buffer.extend_from_slice(samples);
     }
 }
 
@@ -898,6 +929,9 @@ fn process_audio_data(
         if state.pcm_16k_buffer.len() > MAX_BUFFER_SAMPLES {
             let overflow = state.pcm_16k_buffer.len() - MAX_BUFFER_SAMPLES;
             state.pcm_16k_buffer.drain(0..overflow);
+            // Keep the live cursor aligned after a front-drain so it never
+            // points past the buffer or re-feeds already-dropped samples.
+            state.live_transcribe_cursor = state.live_transcribe_cursor.saturating_sub(overflow);
         }
     }
 }
@@ -1228,9 +1262,8 @@ mod tests {
         // stays fast and derives active-device loopback from the name heuristic
         // alone (no enumeration on this path).
         {
-            *TEST_ENUMERATE.lock().unwrap() = Some(Arc::new(|| {
-                vec![sample_device("Status Seed", true, false)]
-            }));
+            *TEST_ENUMERATE.lock().unwrap() =
+                Some(Arc::new(|| vec![sample_device("Status Seed", true, false)]));
             device_catalog().request_refresh();
             let deadline = Instant::now() + Duration::from_secs(2);
             loop {
@@ -1498,6 +1531,7 @@ mod tests {
             state.recording_session_id = 2;
             state.session_saved = false;
             state.pcm_16k_buffer = vec![0.3; 5000];
+            state.live_transcribe_cursor = 0;
         }
         match engine.claim_pcm_for_save() {
             PcmClaim::Claimed { session_id, pcm } => {
@@ -1506,5 +1540,110 @@ mod tests {
             }
             other => panic!("expected Claimed, got {:?}", other),
         }
+    }
+
+    #[test]
+    fn test_live_chunks_do_not_drain_persist_buffer() {
+        // After N live-transcription consumes, claim_pcm_for_save must still
+        // see the full session PCM (the bug drained it via mem::take).
+        let engine = GlobalAudioEngine::new();
+        const CHUNK: usize = 16_000;
+        const N: usize = 5;
+        engine.inject_pcm_for_test(Vec::new(), 42);
+
+        let mut total_captured = 0usize;
+        for i in 0..N {
+            engine.append_pcm_for_test(&vec![0.05; CHUNK]);
+            total_captured += CHUNK;
+            let taken = engine
+                .take_pcm_for_live_transcribe(CHUNK)
+                .unwrap_or_else(|| panic!("live chunk {} expected", i));
+            assert_eq!(taken.len(), CHUNK);
+            // Persist buffer must still hold the full session so far.
+            assert_eq!(engine.get_pcm_buffer().len(), total_captured);
+        }
+
+        match engine.claim_pcm_for_save() {
+            PcmClaim::Claimed { session_id, pcm } => {
+                assert_eq!(session_id, 42);
+                assert_eq!(
+                    pcm.len(),
+                    total_captured,
+                    "claimed PCM must equal all captured samples after {N} live chunks"
+                );
+            }
+            other => panic!("expected Claimed, got {:?}", other),
+        }
+        // Claim resets both buffer and live cursor for the next session.
+        assert!(engine.get_pcm_buffer().is_empty());
+        assert_eq!(
+            engine.state.lock().unwrap().live_transcribe_cursor,
+            0,
+            "claim_pcm_for_save must reset live_transcribe_cursor"
+        );
+    }
+
+    #[test]
+    fn test_live_chunks_over_12s_claim_full_session() {
+        // Reproduces the macOS QA failure mode: model already loaded, ~12 s of
+        // audio fed in ~1 s live chunks — claimed buffer must stay ~12 s
+        // (within 1 s), not the truncated post-last-chunk tail.
+        let engine = GlobalAudioEngine::new();
+        engine.inject_pcm_for_test(Vec::new(), 99);
+
+        const SAMPLE_RATE: usize = 16_000;
+        const SESSION_SECS: usize = 12;
+        const CHUNK_SECS: usize = 1;
+        let chunk_samples = CHUNK_SECS * SAMPLE_RATE;
+        let total_samples = SESSION_SECS * SAMPLE_RATE;
+        let n_chunks = SESSION_SECS / CHUNK_SECS;
+
+        for i in 0..n_chunks {
+            engine.append_pcm_for_test(&vec![0.02; chunk_samples]);
+            let taken = engine
+                .take_pcm_for_live_transcribe(GlobalAudioEngine::LIVE_TRANSCRIBE_MIN_SAMPLES)
+                .unwrap_or_else(|| panic!("expected live chunk after second {}", i + 1));
+            assert_eq!(taken.len(), chunk_samples);
+        }
+
+        assert_eq!(engine.get_pcm_buffer().len(), total_samples);
+
+        match engine.claim_pcm_for_save() {
+            PcmClaim::Claimed { pcm, .. } => {
+                let claimed_secs = pcm.len() as f64 / SAMPLE_RATE as f64;
+                assert!(
+                    (claimed_secs - SESSION_SECS as f64).abs() < 1.0,
+                    "claimed duration {claimed_secs:.2}s must be within 1s of {SESSION_SECS}s \
+                     (got {} samples)",
+                    pcm.len()
+                );
+            }
+            other => panic!("expected Claimed full session, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_session_start_resets_live_cursor() {
+        let engine = GlobalAudioEngine::new();
+        engine.inject_pcm_for_test(vec![0.1; 32_000], 1);
+        assert!(engine
+            .take_pcm_for_live_transcribe(GlobalAudioEngine::LIVE_TRANSCRIBE_MIN_SAMPLES)
+            .is_some());
+        assert!(engine.state.lock().unwrap().live_transcribe_cursor > 0);
+
+        // Simulate start()'s session reset without opening a CoreAudio stream.
+        {
+            let mut state = engine.state.lock().unwrap();
+            state.pcm_16k_buffer.clear();
+            state.live_transcribe_cursor = 0;
+            state.recording_session_id = state.recording_session_id.wrapping_add(1).max(1);
+            state.session_saved = false;
+        }
+
+        assert_eq!(engine.state.lock().unwrap().live_transcribe_cursor, 0);
+        assert!(engine.get_pcm_buffer().is_empty());
+        assert!(engine
+            .take_pcm_for_live_transcribe(GlobalAudioEngine::LIVE_TRANSCRIBE_MIN_SAMPLES)
+            .is_none());
     }
 }
