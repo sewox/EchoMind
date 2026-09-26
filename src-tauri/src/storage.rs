@@ -536,17 +536,77 @@ pub fn get_all_meetings() -> Vec<MeetingRecord> {
     storage.get_all()
 }
 
+/// Per-session cache so concurrent/duplicate `save_current_meeting` calls return
+/// the same `MeetingRecord` instead of creating a second FLAC + Whisper pass.
+fn last_saved_meeting_cache() -> &'static Mutex<Option<(u64, MeetingRecord)>> {
+    static CACHE: OnceLock<Mutex<Option<(u64, MeetingRecord)>>> = OnceLock::new();
+    CACHE.get_or_init(|| Mutex::new(None))
+}
+
+/// Serializes save attempts so a racing duplicate sees the cache after the
+/// winner finishes, rather than `AlreadySaved` with an empty cache.
+fn save_session_lock() -> &'static Mutex<()> {
+    static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+    LOCK.get_or_init(|| Mutex::new(()))
+}
+
+fn remember_saved_meeting(session_id: u64, meeting: MeetingRecord) {
+    *last_saved_meeting_cache().lock().unwrap() = Some((session_id, meeting));
+}
+
+fn cached_saved_meeting(session_id: u64) -> Option<MeetingRecord> {
+    let guard = last_saved_meeting_cache().lock().unwrap();
+    guard
+        .as_ref()
+        .filter(|(id, _)| *id == session_id)
+        .map(|(_, m)| m.clone())
+}
+
+/// Persist the current in-memory recording. Runs FLAC compression and any
+/// fallback Whisper pass off the UI/main thread via `spawn_blocking`.
 #[tauri::command]
-pub fn save_current_meeting(title: String, duration_seconds: u64) -> Result<MeetingRecord, String> {
+pub async fn save_current_meeting(
+    title: String,
+    duration_seconds: u64,
+) -> Result<MeetingRecord, String> {
+    tauri::async_runtime::spawn_blocking(move || save_current_meeting_blocking(title, duration_seconds))
+        .await
+        .map_err(|e| format!("Kayıt görevi tamamlanamadı: {}", e))?
+}
+
+fn save_current_meeting_blocking(
+    title: String,
+    duration_seconds: u64,
+) -> Result<MeetingRecord, String> {
+    use crate::audio::PcmClaim;
+
+    let _save_guard = save_session_lock()
+        .lock()
+        .map_err(|_| "Kayıt kilidi bozuldu".to_string())?;
+
+    let audio_engine = crate::audio::get_global_audio_engine();
+    let (session_id, raw_pcm_buffer) = match audio_engine.claim_pcm_for_save() {
+        PcmClaim::AlreadySaved { session_id } => {
+            if let Some(existing) = cached_saved_meeting(session_id) {
+                return Ok(existing);
+            }
+            return Err(
+                "Bu kayıt oturumu zaten kaydedildi (yinelenen durdurma sinyali yok sayıldı)."
+                    .to_string(),
+            );
+        }
+        PcmClaim::Claimed { session_id, pcm } => (session_id, pcm),
+    };
+
     let transcriber = crate::transcriber::get_global_transcriber();
     let segments = transcriber.get_history();
-    let audio_engine = crate::audio::get_global_audio_engine();
 
     let now = chrono::Local::now();
-    let id = format!("mtg_{}", now.format("%Y%m%d_%H%M%S"));
+    // Include session id so two rapid legitimate saves never collide on the
+    // second-resolution timestamp used historically.
+    let id = format!("mtg_{}_{}", now.format("%Y%m%d_%H%M%S"), session_id);
     let date_formatted = now.format("%d %B %Y, %H:%M").to_string();
 
-    let raw_pcm_buffer = audio_engine.get_pcm_buffer();
     let actual_duration = if duration_seconds > 0 {
         duration_seconds
     } else {
@@ -592,7 +652,8 @@ pub fn save_current_meeting(title: String, duration_seconds: u64) -> Result<Meet
         }
     }
 
-    // If segments are empty but we have audio, transcribe immediately to guarantee zero data loss
+    // If segments are empty but we have audio, transcribe off the main thread
+    // (this function already runs inside spawn_blocking) to guarantee zero data loss.
     if deduplicated_segments.is_empty() && raw_pcm_buffer.len() >= 16000 {
         if let Ok(auto_segs) = transcriber.transcribe_pcm(&raw_pcm_buffer, "auto") {
             for seg in auto_segs {
@@ -639,7 +700,9 @@ pub fn save_current_meeting(title: String, duration_seconds: u64) -> Result<Meet
     transcriber.clear_history();
 
     let storage = get_global_storage();
-    storage.add_meeting(meeting)
+    let saved = storage.add_meeting(meeting)?;
+    remember_saved_meeting(session_id, saved.clone());
+    Ok(saved)
 }
 
 #[tauri::command]
@@ -1099,5 +1162,69 @@ mod tests {
 
         // 5. Clean up
         let _ = storage.delete_meeting("mtg_edit_test");
+    }
+
+    /// Global audio/storage singletons are shared across tests — serialize the
+    /// save-path cases so inject/claim sequences cannot interleave.
+    fn global_save_test_lock() -> &'static Mutex<()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+    }
+
+    #[test]
+    fn test_save_current_meeting_is_idempotent_per_session() {
+        let _guard = global_save_test_lock().lock().unwrap();
+
+        // Short PCM (< 1s) so the fallback Whisper path is skipped.
+        let samples: Vec<f32> = (0..4000).map(|i| ((i % 40) as f32) * 0.002).collect();
+        let engine = crate::audio::get_global_audio_engine();
+        let session_id = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos() as u64;
+        engine.inject_pcm_for_test(samples, session_id);
+
+        let first = save_current_meeting_blocking("Idempotent Test".into(), 3)
+            .expect("first save must succeed");
+        assert_eq!(first.title, "Idempotent Test");
+        assert!(
+            first.audio_file_path.is_some(),
+            "first save must write a FLAC"
+        );
+        let flac_path = first.audio_file_path.clone().unwrap();
+        assert!(
+            PathBuf::from(&flac_path).exists(),
+            "FLAC file missing: {}",
+            flac_path
+        );
+
+        let second = save_current_meeting_blocking("Should Be Ignored".into(), 99)
+            .expect("duplicate save must return cached meeting");
+        assert_eq!(
+            second.id, first.id,
+            "duplicate save must not create a new meeting id"
+        );
+        assert_eq!(second.title, first.title);
+        assert_eq!(
+            second.audio_file_path, first.audio_file_path,
+            "duplicate save must not write another FLAC path"
+        );
+        assert!(
+            engine.get_pcm_buffer().is_empty(),
+            "PCM buffer must stay empty after claim"
+        );
+
+        // Stale PCM left in the buffer after a save must not create another
+        // meeting while session_saved remains true.
+        {
+            let mut state = engine.state.lock().unwrap();
+            state.pcm_16k_buffer = vec![0.9; 500];
+        }
+        let third = save_current_meeting_blocking("Twice".into(), 1).unwrap();
+        assert_eq!(third.id, first.id);
+        assert_eq!(third.title, first.title);
+
+        let _ = get_global_storage().delete_meeting(&first.id);
+        let _ = fs::remove_file(&flac_path);
     }
 }

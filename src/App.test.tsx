@@ -58,7 +58,23 @@ describe("App Top-Level Integration", () => {
     vi.clearAllMocks();
     localStorage.clear();
     CredentialStore.clearCache();
+    for (const key of Object.keys(globalTestEventListeners)) {
+      delete globalTestEventListeners[key];
+    }
   });
+
+  /** App registers Tauri listeners asynchronously; wait until at least one exists. */
+  const waitForEventListeners = async (event: string, timeoutMs = 500) => {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      const listeners = globalTestEventListeners[event] || [];
+      if (listeners.length > 0) return listeners;
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 10));
+      });
+    }
+    return globalTestEventListeners[event] || [];
+  };
 
   const setupDefaultInvoke = () => {
     (invoke as any).mockImplementation((cmd: string) => {
@@ -1343,7 +1359,7 @@ describe("App Top-Level Integration", () => {
     }
 
     // 2. Trigger meeting saved event
-    const savedListeners = globalTestEventListeners["meeting-saved"] || [];
+    const savedListeners = await waitForEventListeners("meeting-saved");
     if (savedListeners.length > 0) {
       await act(async () => {
         savedListeners[savedListeners.length - 1]({
@@ -1709,7 +1725,7 @@ describe("App Top-Level Integration", () => {
     );
 
     // Trigger meeting-saved event with empty segments
-    const savedListeners = globalTestEventListeners["meeting-saved"] || [];
+    const savedListeners = await waitForEventListeners("meeting-saved");
     if (savedListeners.length > 0) {
       await act(async () => {
         savedListeners[savedListeners.length - 1]({
@@ -1753,18 +1769,25 @@ describe("App Top-Level Integration", () => {
       </I18nProvider>,
     );
 
+    // App registers stop listeners asynchronously; wait until they exist.
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 30));
+    });
+
     const stopListeners =
       globalTestEventListeners["trigger-stop-recording"] || [];
-    if (stopListeners.length > 0) {
-      await act(async () => {
-        stopListeners[stopListeners.length - 1]({});
-        await new Promise((r) => setTimeout(r, 20));
-      });
-      expect(invoke).toHaveBeenCalledWith(
-        "save_current_meeting",
-        expect.any(Object),
-      );
-    }
+    expect(stopListeners.length).toBeGreaterThan(0);
+    await act(async () => {
+      // Fire every registered stop handler (App persists; audio hook only stops).
+      for (const listener of stopListeners) {
+        listener({});
+      }
+      await new Promise((r) => setTimeout(r, 20));
+    });
+    expect(invoke).toHaveBeenCalledWith(
+      "save_current_meeting",
+      expect.any(Object),
+    );
   });
 
   it("handles privacy modal local choice and imported meeting error alert", async () => {
@@ -2018,7 +2041,7 @@ describe("App Top-Level Integration", () => {
     );
 
     // Trigger meeting-saved with audio path but 0 segments to trigger promptMeetingTranscription
-    const savedListeners = globalTestEventListeners["meeting-saved"] || [];
+    const savedListeners = await waitForEventListeners("meeting-saved");
     if (savedListeners.length > 0) {
       await act(async () => {
         savedListeners[savedListeners.length - 1]({
@@ -2163,7 +2186,7 @@ describe("App Top-Level Integration", () => {
     );
 
     // Trigger meeting-saved with audio path but 0 segments to trigger promptMeetingTranscription
-    const savedListeners = globalTestEventListeners["meeting-saved"] || [];
+    const savedListeners = await waitForEventListeners("meeting-saved");
     if (savedListeners.length > 0) {
       await act(async () => {
         savedListeners[savedListeners.length - 1]({
@@ -2369,7 +2392,7 @@ describe("App Top-Level Integration", () => {
     });
 
     // Trigger meeting-saved event
-    const savedListeners = globalTestEventListeners["meeting-saved"] || [];
+    const savedListeners = await waitForEventListeners("meeting-saved");
     if (savedListeners.length > 0) {
       await act(async () => {
         savedListeners[savedListeners.length - 1]({
@@ -2633,6 +2656,8 @@ describe("App Top-Level Integration", () => {
           ...mockPastMeetings[0],
           id: "mtg_auto_stopped",
         });
+      if (cmd === "get_audio_status")
+        return Promise.resolve({ is_recording: false, mic_level: 0 });
       return Promise.resolve();
     });
 
@@ -2669,6 +2694,8 @@ describe("App Top-Level Integration", () => {
       deviceName: undefined,
     });
 
+    // meeting-ended alone stops capture but must NOT save — persistence is
+    // owned by trigger-stop-recording (detector emits both on auto-stop).
     const endedListeners = globalTestEventListeners["meeting-ended"] || [];
     await act(async () => {
       endedListeners[endedListeners.length - 1]({});
@@ -2676,10 +2703,196 @@ describe("App Top-Level Integration", () => {
     });
 
     expect(invoke).toHaveBeenCalledWith("stop_audio_capture");
+    expect(invoke).not.toHaveBeenCalledWith(
+      "save_current_meeting",
+      expect.any(Object),
+    );
+
+    await act(async () => {
+      const stopListeners =
+        globalTestEventListeners["trigger-stop-recording"] || [];
+      for (const listener of stopListeners) {
+        listener({});
+      }
+      await new Promise((r) => setTimeout(r, 20));
+    });
+
     expect(invoke).toHaveBeenCalledWith(
       "save_current_meeting",
       expect.any(Object),
     );
+  });
+
+  it("saves exactly once when meeting-ended and trigger-stop-recording both fire", async () => {
+    let saveCalls = 0;
+    (invoke as any).mockImplementation((cmd: string) => {
+      if (cmd === "get_all_meetings") return Promise.resolve(mockPastMeetings);
+      if (cmd === "get_detector_status") {
+        return Promise.resolve({
+          is_active: true,
+          detected_apps: [],
+          active_count: 0,
+          last_check_timestamp: "",
+          settings: {
+            enabled: true,
+            auto_start_record: true,
+            auto_stop_on_app_close: true,
+            ignored_apps: [],
+          },
+        });
+      }
+      if (cmd === "start_audio_capture") return Promise.resolve();
+      if (cmd === "stop_audio_capture") return Promise.resolve();
+      if (cmd === "get_audio_status")
+        return Promise.resolve({
+          is_recording: false,
+          mic_level: 0,
+          sys_level: 0,
+          is_speaking: false,
+          sample_rate: 16000,
+          channels: 1,
+          buffered_samples: 0,
+          is_loopback: false,
+          has_loopback_device: false,
+          active_device_name: null,
+        });
+      if (cmd === "get_current_transcript") return Promise.resolve([]);
+      if (cmd === "save_current_meeting") {
+        saveCalls += 1;
+        return Promise.resolve({
+          ...mockPastMeetings[0],
+          id: "mtg_dedup_once",
+        });
+      }
+      return Promise.resolve();
+    });
+
+    render(
+      <I18nProvider>
+        <App />
+      </I18nProvider>,
+    );
+
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 30));
+    });
+
+    // Simulate auto-started recording UI state via start event
+    await act(async () => {
+      const startListeners =
+        globalTestEventListeners["trigger-start-recording"] || [];
+      for (const listener of startListeners) {
+        listener({ payload: { title: "Meet" } });
+      }
+      await new Promise((r) => setTimeout(r, 20));
+    });
+
+    await act(async () => {
+      const endedListeners = globalTestEventListeners["meeting-ended"] || [];
+      const stopListeners =
+        globalTestEventListeners["trigger-stop-recording"] || [];
+      // Detector order: stop trigger then meeting-ended (either order must be 1 save)
+      for (const listener of stopListeners) {
+        listener({});
+      }
+      for (const listener of endedListeners) {
+        listener({});
+      }
+      await new Promise((r) => setTimeout(r, 40));
+    });
+
+    expect(saveCalls).toBe(1);
+  });
+
+  it("does not multiply trigger-stop-recording listeners across recording second ticks", async () => {
+    (invoke as any).mockImplementation((cmd: string) => {
+      if (cmd === "get_all_meetings") return Promise.resolve(mockPastMeetings);
+      if (cmd === "get_audio_status")
+        return Promise.resolve({
+          is_recording: false,
+          mic_level: 0,
+          sys_level: 0,
+          is_speaking: false,
+          sample_rate: 16000,
+          channels: 1,
+          buffered_samples: 0,
+          is_loopback: false,
+          has_loopback_device: false,
+          active_device_name: null,
+        });
+      if (cmd === "get_current_transcript") return Promise.resolve([]);
+      if (cmd === "get_transcription_history") return Promise.resolve([]);
+      if (cmd === "transcribe_audio_buffer") return Promise.resolve([]);
+      if (cmd === "start_audio_capture") return Promise.resolve();
+      if (cmd === "stop_audio_capture") return Promise.resolve();
+      if (cmd === "save_current_meeting")
+        return Promise.resolve(mockPastMeetings[0]);
+      if (cmd === "start_meeting_detector") return Promise.resolve();
+      if (cmd === "get_detector_status")
+        return Promise.resolve({
+          is_active: true,
+          detected_apps: [],
+          active_count: 0,
+          last_check_timestamp: "",
+          settings: {
+            enabled: true,
+            auto_start_record: false,
+            auto_stop_on_app_close: true,
+            ignored_apps: [],
+          },
+        });
+      if (cmd === "get_hardware_info")
+        return Promise.resolve({
+          os_name: "macOS",
+          os_version: "15.0",
+          cpu_brand: "Apple M3 Max",
+          cpu_cores: 16,
+          total_ram_gb: 36,
+          gpu_name: "Apple M3 Max (Metal)",
+          metal_supported: true,
+          cuda_supported: false,
+          avx2_supported: true,
+        });
+      if (cmd === "get_model_status")
+        return Promise.resolve({
+          model_name: "whisper-small",
+          is_loaded: true,
+          is_downloading: false,
+          download_progress: 100,
+          hardware_acceleration: "Metal (Apple Silicon)",
+        });
+      return Promise.resolve();
+    });
+
+    render(
+      <I18nProvider>
+        <App />
+      </I18nProvider>,
+    );
+
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 30));
+    });
+
+    const countAfterMount =
+      globalTestEventListeners["trigger-stop-recording"]?.length ?? 0;
+    expect(countAfterMount).toBeGreaterThan(0);
+
+    // Start recording so recordingSeconds ticks every second — previously that
+    // recreated handleSaveCurrentMeeting and re-subscribed listeners each tick.
+    const recordBtn = screen.getByRole("button", { name: /Dinlemeyi Başlat/i });
+    await act(async () => {
+      fireEvent.click(recordBtn);
+      await new Promise((r) => setTimeout(r, 20));
+    });
+
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 3200));
+    });
+
+    const countAfterTicks =
+      globalTestEventListeners["trigger-stop-recording"]?.length ?? 0;
+    expect(countAfterTicks).toBe(countAfterMount);
   });
 
   it("logs an error gracefully when hardware and model status fetches fail", async () => {
@@ -2802,7 +3015,8 @@ describe("App Top-Level Integration", () => {
       </I18nProvider>,
     );
 
-    const savedListeners = globalTestEventListeners["meeting-saved"] || [];
+    const savedListeners = await waitForEventListeners("meeting-saved");
+    expect(savedListeners.length).toBeGreaterThan(0);
     await act(async () => {
       savedListeners[savedListeners.length - 1]({
         payload: {

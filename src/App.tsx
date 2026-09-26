@@ -380,12 +380,29 @@ export function App() {
     [fetchPastMeetings, setSelectedMeeting],
   );
 
+  // Stable refs so event listeners are registered once and never leak when
+  // recordingSeconds ticks every second (that used to recreate handleSave and
+  // re-subscribe trigger-stop-recording / meeting-saved listeners).
+  const meetingTitleInputRef = useRef(meetingTitleInput);
+  const recordingSecondsRef = useRef(recordingSeconds);
+  const saveInFlightRef = useRef(false);
+  const promptMeetingTranscriptionRef = useRef(promptMeetingTranscription);
+  const fetchPastMeetingsRef = useRef(fetchPastMeetings);
+  meetingTitleInputRef.current = meetingTitleInput;
+  recordingSecondsRef.current = recordingSeconds;
+  promptMeetingTranscriptionRef.current = promptMeetingTranscription;
+  fetchPastMeetingsRef.current = fetchPastMeetings;
+
   const handleSaveCurrentMeeting = useCallback(async () => {
+    if (saveInFlightRef.current) {
+      return;
+    }
+    saveInFlightRef.current = true;
     const startTime = Date.now();
     try {
       const newMeeting = await invoke<MeetingRecord>("save_current_meeting", {
-        title: meetingTitleInput,
-        durationSeconds: recordingSeconds || 1,
+        title: meetingTitleInputRef.current,
+        durationSeconds: recordingSecondsRef.current || 1,
       });
       const elapsedSec = Math.max(
         1,
@@ -393,7 +410,7 @@ export function App() {
       );
       setMeetingTitleInput("");
       setSelectedMeeting(newMeeting);
-      fetchPastMeetings();
+      fetchPastMeetingsRef.current();
       setCompletionNotification({
         title: newMeeting.title || "Kayıt Başarıyla Tamamlandı",
         durationFormatted: newMeeting.duration_formatted,
@@ -401,29 +418,31 @@ export function App() {
       });
       // Ask user which model to transcribe with
       if (newMeeting.audio_file_path && newMeeting.segments.length === 0) {
-        promptMeetingTranscription(newMeeting);
+        promptMeetingTranscriptionRef.current(newMeeting);
       }
     } catch (err) {
       console.error("Failed to save meeting:", err);
+    } finally {
+      saveInFlightRef.current = false;
     }
-  }, [
-    meetingTitleInput,
-    recordingSeconds,
-    fetchPastMeetings,
-    promptMeetingTranscription,
-  ]);
+  }, [setSelectedMeeting]);
 
+  const handleSaveCurrentMeetingRef = useRef(handleSaveCurrentMeeting);
+  handleSaveCurrentMeetingRef.current = handleSaveCurrentMeeting;
+
+  // meeting-ended auto-stop only syncs capture state. Persistence is owned by
+  // the trigger-stop-recording path (detector emits both when auto_stop is on);
+  // saving here as well caused duplicate meetings for one session.
   const handleAutoStopMeeting = useCallback(async () => {
     if (isRecording) {
       try {
         await invoke("stop_audio_capture");
         setIsRecording(false);
-        await handleSaveCurrentMeeting();
       } catch (err) {
         console.error("Auto-stop meeting capture failed:", err);
       }
     }
-  }, [isRecording, handleSaveCurrentMeeting]);
+  }, [isRecording, setIsRecording]);
 
   useMeetingDetector({
     isRecording,
@@ -431,66 +450,85 @@ export function App() {
     onAutoStopMeeting: handleAutoStopMeeting,
   });
 
-  // Listen for recording trigger from floating island, auto-stop and meeting-saved events
+  // Listen for recording trigger from floating island, auto-stop and meeting-saved events.
+  // Subscribe once — handlers read latest values via refs above.
   useEffect(() => {
-    const unlistenStart = listen<{ title?: string }>(
-      "trigger-start-recording",
-      (event) => {
-        setSelectedMeeting(null);
-        if (event.payload?.title) {
-          setMeetingTitleInput(event.payload.title);
-        }
-        setIsRecording(true);
-      },
-    );
+    let cancelled = false;
+    let unlistenStart: (() => void) | undefined;
+    let unlistenStop: (() => void) | undefined;
+    let unlistenSaved: (() => void) | undefined;
 
-    const unlistenStop = listen("trigger-stop-recording", async () => {
-      try {
-        await invoke("stop_audio_capture");
-      } catch {
-        // Safe fallback if already stopped
+    const setup = async () => {
+      unlistenStart = await listen<{ title?: string }>(
+        "trigger-start-recording",
+        (event) => {
+          setSelectedMeeting(null);
+          if (event.payload?.title) {
+            setMeetingTitleInput(event.payload.title);
+          }
+          setIsRecording(true);
+        },
+      );
+      if (cancelled) {
+        unlistenStart();
+        return;
       }
-      setIsRecording(false);
-      await handleSaveCurrentMeeting();
-    });
 
-    const unlistenSaved = listen<MeetingRecord>("meeting-saved", async (event) => {
-      try {
-        await invoke("stop_audio_capture");
-      } catch {
-        // Safe fallback
-      }
-      setIsRecording(false);
-      setMeetingTitleInput("");
-      if (event.payload) {
-        setSelectedMeeting(event.payload);
-        fetchPastMeetings();
-        setCompletionNotification({
-          title: event.payload.title || "Toplantı Başarıyla Kaydedildi",
-          durationFormatted: event.payload.duration_formatted,
-          elapsedFormatted: "1s",
-        });
-        if (
-          event.payload.audio_file_path &&
-          event.payload.segments.length === 0
-        ) {
-          promptMeetingTranscription(event.payload);
+      unlistenStop = await listen("trigger-stop-recording", async () => {
+        try {
+          await invoke("stop_audio_capture");
+        } catch {
+          // Safe fallback if already stopped
         }
+        setIsRecording(false);
+        await handleSaveCurrentMeetingRef.current();
+      });
+      if (cancelled) {
+        unlistenStop();
+        return;
       }
-    });
+
+      unlistenSaved = await listen<MeetingRecord>(
+        "meeting-saved",
+        async (event) => {
+          try {
+            await invoke("stop_audio_capture");
+          } catch {
+            // Safe fallback
+          }
+          setIsRecording(false);
+          setMeetingTitleInput("");
+          if (event.payload) {
+            setSelectedMeeting(event.payload);
+            fetchPastMeetingsRef.current();
+            setCompletionNotification({
+              title: event.payload.title || "Toplantı Başarıyla Kaydedildi",
+              durationFormatted: event.payload.duration_formatted,
+              elapsedFormatted: "1s",
+            });
+            if (
+              event.payload.audio_file_path &&
+              event.payload.segments.length === 0
+            ) {
+              promptMeetingTranscriptionRef.current(event.payload);
+            }
+          }
+        },
+      );
+      if (cancelled) {
+        unlistenSaved();
+      }
+    };
+
+    setup();
 
     return () => {
-      unlistenStart.then((f) => f());
-      unlistenStop.then((f) => f());
-      unlistenSaved.then((f) => f());
+      cancelled = true;
+      unlistenStart?.();
+      unlistenStop?.();
+      unlistenSaved?.();
     };
-  }, [
-    setSelectedMeeting,
-    setIsRecording,
-    handleSaveCurrentMeeting,
-    fetchPastMeetings,
-    promptMeetingTranscription,
-  ]);
+  }, [setSelectedMeeting, setIsRecording]);
 
   // Fetch initial data
   useEffect(() => {
