@@ -544,6 +544,15 @@ impl GlobalTranscriberEngine {
         state.segments.clone()
     }
 
+    /// Take (and clear) live transcript segments — call after stop and before
+    /// claiming PCM so save sees a finalized segment snapshot.
+    pub fn take_history(&self) -> Vec<TranscriptSegment> {
+        let mut state = self.state.lock().unwrap();
+        let segs = std::mem::take(&mut state.segments);
+        state.segment_counter = 0;
+        segs
+    }
+
     pub fn clear_history(&self) {
         let mut state = self.state.lock().unwrap();
         state.segments.clear();

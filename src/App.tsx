@@ -421,6 +421,11 @@ export function App() {
         promptMeetingTranscriptionRef.current(newMeeting);
       }
     } catch (err) {
+      const msg = String(err ?? "");
+      // Empty / too-short session: silent idempotent no-op (Rust sentinel).
+      if (msg.includes("nothing_to_save")) {
+        return;
+      }
       console.error("Failed to save meeting:", err);
     } finally {
       saveInFlightRef.current = false;

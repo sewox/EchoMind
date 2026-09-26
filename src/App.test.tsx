@@ -2862,6 +2862,48 @@ describe("App Top-Level Integration", () => {
     expect(saveCalls).toBe(1);
   });
 
+  it("silently ignores nothing_to_save from empty session claims", async () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    (invoke as any).mockImplementation((cmd: string) => {
+      if (cmd === "get_all_meetings") return Promise.resolve(mockPastMeetings);
+      if (cmd === "stop_audio_capture") return Promise.resolve();
+      if (cmd === "save_current_meeting") {
+        return Promise.reject("nothing_to_save");
+      }
+      return Promise.resolve();
+    });
+
+    render(
+      <I18nProvider>
+        <App />
+      </I18nProvider>,
+    );
+
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 30));
+    });
+
+    const stopListeners =
+      globalTestEventListeners["trigger-stop-recording"] || [];
+    expect(stopListeners.length).toBeGreaterThan(0);
+    await act(async () => {
+      for (const listener of stopListeners) {
+        listener({});
+      }
+      await new Promise((r) => setTimeout(r, 30));
+    });
+
+    expect(invoke).toHaveBeenCalledWith(
+      "save_current_meeting",
+      expect.any(Object),
+    );
+    expect(consoleSpy).not.toHaveBeenCalledWith(
+      "Failed to save meeting:",
+      expect.anything(),
+    );
+    consoleSpy.mockRestore();
+  });
+
   it("does not multiply trigger-stop-recording listeners across recording second ticks", async () => {
     (invoke as any).mockImplementation((cmd: string) => {
       if (cmd === "get_all_meetings") return Promise.resolve(mockPastMeetings);
