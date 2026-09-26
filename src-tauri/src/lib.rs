@@ -160,12 +160,20 @@ pub fn run() {
         .run(|_app_handle, event| {
             match event {
                 tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit => {
-                    // Abort Whisper, persist active recording (no Whisper), drain
-                    // in-flight FLAC (≤ ~2.5s). Never wait on transcription.
-                    storage::prepare_for_quit();
+                    // Persist active/mid-save audio, abort Whisper, wait briefly
+                    // for inference idle (total ≤ ~3s). If still busy, hard-exit
+                    // so ggml Metal static destructors cannot abort().
+                    let exit_mode = storage::prepare_for_quit();
                     audio::get_global_audio_engine().stop().ok();
                     audio::get_global_audio_engine().stop_preview().ok();
-                    transcriber::get_global_transcriber().cleanup_context();
+                    match exit_mode {
+                        storage::QuitExitMode::Normal => {
+                            transcriber::get_global_transcriber().cleanup_context();
+                        }
+                        storage::QuitExitMode::HardExit => {
+                            storage::hard_exit_after_quit();
+                        }
+                    }
                 }
                 tauri::RunEvent::WindowEvent {
                     label,

@@ -767,21 +767,84 @@ pub fn persist_active_recording_on_quit() -> QuitPersistResult {
     }
 }
 
-/// Called from ExitRequested / Exit / main-window close-to-quit: abort Whisper,
-/// persist any active recording (no Whisper), briefly wait for FLAC (≤ ~2.5s).
-pub fn prepare_for_quit() {
+/// How the process should leave after [`prepare_for_quit`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum QuitExitMode {
+    /// Whisper is idle — safe to drop the ggml context via normal teardown.
+    Normal,
+    /// Detached inference is still holding Metal/CPU state after abort+wait.
+    /// Skip C++ static destructors (`_exit`) to avoid ggml Metal abort-on-exit.
+    HardExit,
+}
+
+/// Total quit budget for FLAC drain + Whisper idle wait (never block forever).
+const QUIT_TOTAL_BUDGET: std::time::Duration = std::time::Duration::from_millis(3000);
+/// Cap for waiting on an in-flight FLAC persist.
+const QUIT_FLAC_WAIT: std::time::Duration = std::time::Duration::from_millis(2000);
+/// Cap for waiting on aborting Whisper so Metal can tear down cleanly.
+const QUIT_WHISPER_WAIT: std::time::Duration = std::time::Duration::from_millis(1000);
+
+/// Called from ExitRequested / Exit / main-window close-to-quit:
+/// abort Whisper, persist any active recording (no Whisper), drain in-flight
+/// FLAC, then briefly wait for inference to return. Total ≤ ~3s.
+pub fn prepare_for_quit() -> QuitExitMode {
     use std::sync::atomic::Ordering;
-    crate::transcriber::get_global_transcriber().begin_shutdown();
+    use std::time::Instant;
+
+    let deadline = Instant::now() + QUIT_TOTAL_BUDGET;
+    let transcriber = crate::transcriber::get_global_transcriber();
+    transcriber.begin_shutdown();
 
     // Active listening must not discard PCM on quit. Idempotent with the
     // normal save gate — safe if a stop-save is already mid-flight.
     let _ = persist_active_recording_on_quit();
 
-    let start = std::time::Instant::now();
-    let budget = std::time::Duration::from_millis(2500);
-    while flac_save_in_flight().load(Ordering::SeqCst) && start.elapsed() < budget {
+    // Drain FLAC (including a quit-save we just started) without exceeding budget.
+    let flac_cap = QUIT_FLAC_WAIT.min(deadline.saturating_duration_since(Instant::now()));
+    let flac_start = Instant::now();
+    while flac_save_in_flight().load(Ordering::SeqCst) && flac_start.elapsed() < flac_cap {
         std::thread::sleep(std::time::Duration::from_millis(25));
     }
+
+    // Mid-save quit: detached Whisper may still be inside ggml Metal. Abort is
+    // already sticky; give it a short window to return so destructors are safe.
+    let whisper_cap = QUIT_WHISPER_WAIT.min(deadline.saturating_duration_since(Instant::now()));
+    let idle = transcriber.wait_for_inference_idle(whisper_cap);
+    let mode = quit_exit_mode_after_whisper_wait(idle);
+    if mode == QuitExitMode::HardExit {
+        println!(
+            "🛑 Whisper çıkarımı quit bütçesi içinde bitmedi — Metal teardown atlanarak çıkılacak."
+        );
+    }
+    mode
+}
+
+/// Pure quit-exit decision after the bounded Whisper idle wait (unit-tested).
+pub fn quit_exit_mode_after_whisper_wait(inference_idle: bool) -> QuitExitMode {
+    if inference_idle {
+        QuitExitMode::Normal
+    } else {
+        QuitExitMode::HardExit
+    }
+}
+
+/// Flush stdio and terminate without running C/C++ `atexit` / static destructors.
+/// Used when ggml Metal would otherwise abort in `ggml_metal_device_free` while
+/// a detached Whisper thread is still alive. Call only after FLAC + meeting
+/// persistence has completed.
+pub fn hard_exit_after_quit() -> ! {
+    use std::io::Write;
+    let _ = std::io::stdout().flush();
+    let _ = std::io::stderr().flush();
+    // POSIX / CRT `_exit` — does not run C++ static destructors.
+    unsafe {
+        libc_exit(0);
+    }
+}
+
+unsafe extern "C" {
+    #[link_name = "_exit"]
+    fn libc_exit(code: std::os::raw::c_int) -> !;
 }
 
 /// Whether quit-path save should spawn Whisper (never) vs normal stop-save.
@@ -1871,5 +1934,17 @@ mod tests {
         }"#;
         let m: MeetingRecord = serde_json::from_str(json).expect("legacy JSON must deserialize");
         assert!(!m.transcript_pending);
+    }
+
+    #[test]
+    fn test_quit_exit_mode_after_whisper_wait() {
+        assert_eq!(
+            quit_exit_mode_after_whisper_wait(true),
+            QuitExitMode::Normal
+        );
+        assert_eq!(
+            quit_exit_mode_after_whisper_wait(false),
+            QuitExitMode::HardExit
+        );
     }
 }

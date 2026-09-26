@@ -1,13 +1,15 @@
 use crate::storage::get_storage_dir;
 use chacha20poly1305::aead::{KeyInit, OsRng};
 use chacha20poly1305::ChaCha20Poly1305;
-use std::collections::HashSet;
 use std::fs;
 use std::path::PathBuf;
-use std::sync::Mutex;
 
 #[cfg(not(test))]
 use keyring::Entry;
+#[cfg(not(test))]
+use std::collections::HashSet;
+#[cfg(not(test))]
+use std::sync::Mutex;
 
 #[cfg(not(test))]
 const SERVICE_NAME: &str = "com.echomind.assistant";
@@ -34,8 +36,9 @@ fn fallback_key_path(fallback_filename: &str) -> PathBuf {
 }
 
 /// Where the encryption key for a logical account came from (never logs key material).
+#[cfg(not(test))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum KeySource {
+enum KeySource {
     /// Retrieved from the OS-native secure keystore.
     Keychain,
     /// Loaded from (or written to) the app-data fallback key file.
@@ -44,6 +47,7 @@ pub enum KeySource {
     NewKeyCreated,
 }
 
+#[cfg(not(test))]
 impl KeySource {
     fn as_log_label(self) -> &'static str {
         match self {
@@ -155,6 +159,7 @@ fn get_or_create_fallback_key(fallback_filename: &str) -> [u8; 32] {
     new_key
 }
 
+#[cfg(not(test))]
 fn log_key_source_once(account: &str, source: KeySource) {
     static LOGGED: Mutex<Option<HashSet<String>>> = Mutex::new(None);
     let mut guard = LOGGED.lock().unwrap_or_else(|e| e.into_inner());
