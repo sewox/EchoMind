@@ -12,8 +12,8 @@ body:
         > ⚠️ **Gizlilik / Privacy:** API anahtarlarını, gerçek toplantı metinlerini, isim/e-posta/TCKN gibi kişisel verileri **paylaşmayın**. Ekran görüntülerinde bu alanları kapatın.
         > Do **not** paste API keys, real meeting transcripts or personal data. Redact them in screenshots.
         >
-        > Bir **güvenlik açığı** bulduysanız lütfen burada herkese açık issue açmayın; depo sahibiyle doğrudan iletişime geçin.
-        > If you found a **security vulnerability**, please don't open a public issue — contact the maintainer directly.
+        > Bir **güvenlik açığı** bulduysanız herkese açık issue açmayın; [gizli olarak bildirin](https://github.com/sewox/EchoMind/security/advisories/new).
+        > Found a **security vulnerability**? Don't open a public issue — [report it privately](https://github.com/sewox/EchoMind/security/advisories/new).
 
   - type: checkboxes
     id: preflight
