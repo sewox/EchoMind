@@ -580,6 +580,8 @@ export const es: TranslationKeys = {
         "* Tus claves y preferencias se guardan de forma segura en este dispositivo.",
       languageDesc:
         "Elige el idioma de la interfaz de EchoMind. Los menús, botones y plantillas de informe se mostrarán en este idioma.",
+      recommended: "Recomendado",
+      highSpeed: "Alta velocidad",
     },
     app: {
       micOnlyBanner:

@@ -856,7 +856,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         </span>
                       </div>
                       <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                        Önerilen
+                        {t("ui.settings.recommended")}
                       </span>
                     </div>
                     <p className="text-[10px] text-slate-400 leading-relaxed">
@@ -895,7 +895,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         </span>
                       </div>
                       <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
-                        Yüksek Hız
+                        {t("ui.settings.highSpeed")}
                       </span>
                     </div>
                     <p className="text-[10px] text-slate-400 leading-relaxed">

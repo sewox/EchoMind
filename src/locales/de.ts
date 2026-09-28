@@ -573,6 +573,8 @@ export const de: TranslationKeys = {
         "* Ihre Schlüssel und Einstellungen werden sicher auf diesem Gerät gespeichert.",
       languageDesc:
         "Wählen Sie die Sprache der EchoMind-Oberfläche. Menüs, Schaltflächen und Berichtsvorlagen werden in dieser Sprache angezeigt.",
+      recommended: "Empfohlen",
+      highSpeed: "Hohes Tempo",
     },
     app: {
       micOnlyBanner:

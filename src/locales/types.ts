@@ -516,6 +516,8 @@ export interface TranslationKeys {
       customModelPlaceholder: string;
       keysFootnote: string;
       languageDesc: string;
+      recommended: string;
+      highSpeed: string;
     };
     app: {
       micOnlyBanner: string;

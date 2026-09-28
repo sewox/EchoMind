@@ -576,6 +576,8 @@ export const fr: TranslationKeys = {
         "* Vos clés et préférences sont stockées en toute sécurité sur cet appareil.",
       languageDesc:
         "Choisissez la langue de l'interface EchoMind. Les menus, boutons et modèles de rapport s'afficheront dans cette langue.",
+      recommended: "Recommandé",
+      highSpeed: "Haute vitesse",
     },
     app: {
       micOnlyBanner:

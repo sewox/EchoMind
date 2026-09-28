@@ -582,6 +582,8 @@ export const tr: TranslationKeys = {
         "* Anahtarlarınız ve tercihleriniz cihazınızda anında güvenle saklanır.",
       languageDesc:
         "EchoMind arayüzünde kullanmak istediğiniz dili seçin. Tüm menüler, butonlar ve rapor şablonları bu dilde görüntülenecektir.",
+      recommended: "Önerilen",
+      highSpeed: "Yüksek Hız",
     },
     app: {
       micOnlyBanner:

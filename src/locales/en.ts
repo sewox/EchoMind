@@ -576,6 +576,8 @@ export const en: TranslationKeys = {
         "* Your keys and preferences are stored securely on this device.",
       languageDesc:
         "Choose the language for the EchoMind interface. Menus, buttons and report templates will be shown in this language.",
+      recommended: "Recommended",
+      highSpeed: "High Speed",
     },
     app: {
       micOnlyBanner: "Mic Only — System Audio (Zoom/Meet/Teams) Not Captured",
