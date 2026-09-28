@@ -21,6 +21,14 @@ vi.mock("./hooks/useStorageReady", () => ({
     ready: true,
     usedFallback: false,
     keySource: "keychain",
+    showHistoryRecoveryNotice: false,
+  }),
+}));
+
+vi.mock("./hooks/useHistoryRecoveryNotice", () => ({
+  useHistoryRecoveryNotice: () => ({
+    visible: false,
+    dismiss: vi.fn(),
   }),
 }));
 
