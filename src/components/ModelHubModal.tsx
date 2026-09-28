@@ -21,6 +21,7 @@ import {
   GROQ_MODELS,
   GEMINI_MODELS,
   OPENAI_MODELS,
+  modelLabel,
 } from "./ModelHubModalConstants";
 import { useI18n } from "../locales/i18nContext";
 import { CredentialStore } from "../services/credentialStore";
@@ -612,7 +613,7 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
                       >
                         {GROQ_MODELS.map((m) => (
                           <option key={m.id} value={m.id}>
-                            {m.name}
+                            {modelLabel(m, t)}
                           </option>
                         ))}
                       </select>
@@ -753,7 +754,7 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
                       >
                         {GEMINI_MODELS.map((m) => (
                           <option key={m.id} value={m.id}>
-                            {m.name}
+                            {modelLabel(m, t)}
                           </option>
                         ))}
                       </select>
@@ -891,7 +892,7 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
                       >
                         {OPENAI_MODELS.map((m) => (
                           <option key={m.id} value={m.id}>
-                            {m.name}
+                            {modelLabel(m, t)}
                           </option>
                         ))}
                       </select>

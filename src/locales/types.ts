@@ -594,6 +594,20 @@ export interface TranslationKeys {
       footnote: string;
       done: string;
     };
+    models: {
+      recommendedFast: string;
+      maxAccuracy: string;
+      englishOnly: string;
+      recommendedSmart: string;
+      ultraLight: string;
+      deepReasoning: string;
+      nextGenSpeed: string;
+      fastEconomic: string;
+      highestIntel: string;
+      globalStandardAsr: string;
+      multimodalAudio: string;
+      customModel: string;
+    };
   };
 }
 

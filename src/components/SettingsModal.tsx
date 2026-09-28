@@ -33,6 +33,7 @@ import {
   GROQ_MODELS,
   GEMINI_MODELS,
   OPENAI_MODELS,
+  modelLabel,
 } from "./ModelHubModalConstants";
 import { useI18n, SUPPORTED_LANGUAGES } from "../locales/i18nContext";
 
@@ -1362,7 +1363,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   >
                     {GROQ_MODELS.map((m) => (
                       <option key={m.id} value={m.id}>
-                        {m.name}
+                        {modelLabel(m, t)}
                       </option>
                     ))}
                   </select>
@@ -1447,7 +1448,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   >
                     {GEMINI_MODELS.map((m) => (
                       <option key={m.id} value={m.id}>
-                        {m.name}
+                        {modelLabel(m, t)}
                       </option>
                     ))}
                   </select>
@@ -1532,7 +1533,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   >
                     {OPENAI_MODELS.map((m) => (
                       <option key={m.id} value={m.id}>
-                        {m.name}
+                        {modelLabel(m, t)}
                       </option>
                     ))}
                   </select>
