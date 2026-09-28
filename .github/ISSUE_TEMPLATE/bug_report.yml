@@ -1,0 +1,158 @@
+name: "🐞 Hata Bildirimi / Bug Report"
+description: "Uygulamada beklenmeyen bir davranış bildirin. / Report something that doesn't work as expected."
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Hatayı bildirdiğiniz için teşekkürler! Lütfen alanları olabildiğince doldurun; ne kadar detay, o kadar hızlı çözüm.
+        Thanks for reporting! Please fill in as much as you can — more detail means a faster fix.
+
+        > ⚠️ **Gizlilik / Privacy:** API anahtarlarını, gerçek toplantı metinlerini, isim/e-posta/TCKN gibi kişisel verileri **paylaşmayın**. Ekran görüntülerinde bu alanları kapatın.
+        > Do **not** paste API keys, real meeting transcripts or personal data. Redact them in screenshots.
+        >
+        > Bir **güvenlik açığı** bulduysanız lütfen burada herkese açık issue açmayın; depo sahibiyle doğrudan iletişime geçin.
+        > If you found a **security vulnerability**, please don't open a public issue — contact the maintainer directly.
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: "Ön kontrol / Pre-flight"
+      options:
+        - label: "En güncel sürümü kullanıyorum ([Releases](https://github.com/sewox/EchoMind/releases/latest)). / I'm on the latest release."
+          required: true
+        - label: "Aynı hata için açık issue'ları aradım, bulamadım. / I searched existing issues and found no duplicate."
+          required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: "EchoMind sürümü / Version"
+      description: "Uygulamanın sol üstündeki sürüm etiketi (ör. v0.2.12). / The version badge at the top-left of the app."
+      placeholder: "v0.2.12"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: "İşletim sistemi / Operating system"
+      options:
+        - "macOS (Apple Silicon)"
+        - "macOS (Intel)"
+        - "Windows 11"
+        - "Windows 10"
+        - "Linux (.deb)"
+        - "Linux (.AppImage)"
+        - "Linux (.rpm)"
+        - "Diğer / Other"
+    validations:
+      required: true
+
+  - type: input
+    id: os-version
+    attributes:
+      label: "OS sürümü ve donanım / OS version & hardware"
+      placeholder: "macOS 15.3, M1 Pro 16 GB  /  Windows 11 23H2, RTX 3060"
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: "Etkilenen alan / Affected area"
+      multiple: true
+      options:
+        - "Kurulum / açılış — Install / startup"
+        - "Güvenli depolama / Anahtarlık — Secure storage / Keychain"
+        - "Canlı dinleme / kayıt — Live listening / recording"
+        - "Transkripsiyon kalitesi — Transcription quality"
+        - "Ses dosyası içe aktarma — Audio import"
+        - "Toplantı raporu / özet — Meeting report / summary"
+        - "Toplantı geçmişi — Meeting history"
+        - "Floating Island / toplantı algılama — Meeting detection"
+        - "Akıllı Asistan — Smart Advisor"
+        - "Model Merkezi / model indirme — Model Hub / downloads"
+        - "Bulut servisleri (Groq/Gemini/OpenAI) — Cloud services"
+        - "Gizlilik modları / DLP — Privacy modes / DLP"
+        - "Dışa aktarma — Export"
+        - "Arayüz / çeviri — UI / translation"
+        - "Diğer / Other"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: privacy-mode
+    attributes:
+      label: "Gizlilik modu / Privacy mode"
+      options:
+        - "Paranoid"
+        - "Dengeli / Balanced"
+        - "Maksimum Zeka / Max Intelligence"
+        - "Bilmiyorum / Not sure"
+
+  - type: input
+    id: engine
+    attributes:
+      label: "Transkripsiyon motoru / Transcription engine"
+      description: "Model Merkezi'nde seçili motor. / The engine selected in Model Hub."
+      placeholder: "Whisper Small / SenseVoice / Apple Dictation / Groq whisper-large-v3-turbo ..."
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: "Ne oldu? / What happened?"
+      description: "Gördüğünüz davranışı ve varsa hata mesajını yazın. / Describe the behavior and any error message."
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: "Tekrar üretme adımları / Steps to reproduce"
+      placeholder: |
+        1. Uygulamayı aç / Open the app
+        2. "Dinlemeyi Başlat"a bas / Click "Start Listening"
+        3. ...
+        4. Hata görünüyor / See the error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: "Beklenen davranış / Expected behavior"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: frequency
+    attributes:
+      label: "Ne sıklıkla? / How often?"
+      options:
+        - "Her seferinde / Every time"
+        - "Bazen / Sometimes"
+        - "Bir kez / Only once"
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: "Loglar / Logs"
+      description: |
+        Log almak için uygulamayı terminalden başlatıp hatayı tekrarlayın ve çıktıyı yapıştırın (kişisel veri ve anahtarları silin).
+        To capture logs, launch the app from a terminal, reproduce the issue and paste the output (redact personal data and keys).
+        - macOS: `/Applications/EchoMind.app/Contents/MacOS/echomind`
+        - Linux: `echomind` (veya / or `./EchoMind_*.AppImage`)
+        - Windows: log yerine hata anının ekran görüntüsünü ekleyin. / Please attach a screenshot of the error instead.
+      render: shell
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: "Ekran görüntüsü / video — Screenshots / video"
+      description: "Sürükleyip bırakabilirsiniz. Hassas bilgileri kapatın. / Drag and drop. Redact sensitive info."
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: "Ek bilgi / Additional context"
+      description: "Mikrofon/kulaklık, Loopback/BlackHole kullanımı, toplantı uygulaması (Meet/Zoom/Teams) vb. / Mic/headphones, loopback device, meeting app, etc."
