@@ -500,4 +500,172 @@ export const en: TranslationKeys = {
       "No other meetings with matching tags, topics, or attendees yet.",
     jumpToMeeting: "Jump to Meeting",
   },
+  ui: {
+    settings: {
+      vuMeter: "Live Input Level (VU Meter):",
+      speechDetected: "🟢 Speech Detected",
+      silentWaiting: "⚪ Silent / Waiting",
+      sampling: "Sampling: 16,000 Hz Mono (Whisper-optimized)",
+      filter: "Filter: 80 Hz High-Pass + Noise Gate",
+      defaultMic: "🎙️ Default Microphone (Automatic {os} Selection)",
+      loopbackPrefix: "🔊 [System Audio / Loopback] ",
+      defaultSuffix: "({os} Default)",
+      rescanDevices: "Rescan audio devices",
+      dualCaptureTitle: "System Audio + Microphone (Two-Way Capture Active)",
+      micCaptureTitle: "Microphone Capture",
+      dualCaptureDesc:
+        "Virtual loopback is active; remote participants are captured clearly.",
+      micCaptureDesc: "Currently listening to your microphone input only.",
+      loopbackActive: "Loopback Active",
+      micOnly: "Microphone Only",
+      remoteTipTitle: "Tip: Capturing remote participants in a meeting",
+      remoteTipBefore:
+        "When you use headphones, other participants' audio playing from your computer doesn't reach the standard microphone. To transcribe the remote side too, select the ",
+      remoteTipOr: ", or ",
+      remoteTipAfter: " virtual device.",
+      loopbackFound:
+        "✓ A virtual audio device was found on your system! Select the loopback device from the list above.",
+      yourVoice: "Your Voice: Active Input",
+      systemAudioLoopback: "System Audio: Loopback Active",
+      systemAudioSpeaker: "System Audio: Speaker/Room",
+      testingAudio: "Testing Audio (Listening to VU)...",
+      testInput: "Test Input (5 s)",
+      openSoundPanelTitle:
+        "Open the OS sound control panel or Audio MIDI Setup",
+      openSoundPanel: "Open System Sound Panel",
+      hideGuide: "Hide Setup Guide",
+      showGuide: "Loopback / BlackHole Setup Guide",
+      cpu: "Processor:",
+      gpu: "Graphics & Acceleration:",
+      ram: "System Memory (RAM):",
+      detecting: "Detecting...",
+      appleAccel: "Apple Silicon Acceleration Active",
+      standardGpu: "Standard",
+      offlineMode: "Offline Privacy Mode:",
+      privateOnDevice: "100% Private On-Device",
+      dataSecurity: "Data Security:",
+      dataSecurityParanoid: "Paranoid Mode: 100% on-device, zero cloud egress.",
+      dataSecurityDefault:
+        "100% private with local models; cloud use requires explicit consent.",
+      aiStatus: "AI Status:",
+      aiReady: "Ready",
+      aiOnDemand: "Loads On Demand",
+      cloudWarnToggle: "Show Privacy Warning for Cloud Processing",
+      cloudWarnToggleDesc:
+        "Before a fast cloud option runs, reminds you that your recording will be sent over the internet to an AI server.",
+      localLlmTitle: "Custom Local LLM Server (Ollama / vLLM / LM Studio)",
+      localOffline: "100% Local & Offline",
+      localLlmDesc:
+        "Connect an Ollama or OpenAI-compatible LLM server hosted on your computer or local network.",
+      endpointUrl: "Server API Endpoint URL:",
+      modelName: "Model Name:",
+      testingServer: "Testing Server...",
+      testServer: "Test Server Connection",
+      paranoidActiveTitle: "Air-Gapped / Paranoid Mode Active",
+      paranoidActiveDesc:
+        "While this mode is on, external cloud API calls (Groq, Gemini, OpenAI) are fully blocked at the Rust backend level. The keys below only take effect in Balanced or Max Intelligence mode.",
+      locked: "Locked",
+      groqTitle: "Groq (Lightning Fast - ~10 Seconds)",
+      groqBadge: "Free & Ultra Fast",
+      geminiTitle: "Google Gemini (Flash & Pro Family)",
+      geminiBadge: "Top-Tier Intelligence",
+      openaiBadge: "Global Standard",
+      preferredModel: "Preferred Model:",
+      customModelPlaceholder: "Enter a model name (e.g. {example})",
+      keysFootnote:
+        "* Your keys and preferences are stored securely on this device.",
+      languageDesc:
+        "Choose the language for the EchoMind interface. Menus, buttons and report templates will be shown in this language.",
+    },
+    app: {
+      micOnlyBanner: "Mic Only — System Audio (Zoom/Meet/Teams) Not Captured",
+      micOnlyTooltip:
+        "Only the microphone is being captured. System audio (Zoom / Meet / Teams) is not included. To record remote participants too, choose a loopback device in audio settings.",
+      micActive: "Microphone Active",
+      loopbackHint:
+        "Choose Loopback / BlackHole to capture remote audio (Meet/Zoom)",
+      footerTagline:
+        "Privacy First • 100% On-Device • Supports All Audio & Video Formats",
+      aiOptions: "AI Options",
+      aiOptionsTitle: "Change AI Mode",
+    },
+    transcript: {
+      speaking: "Speaking",
+      transcribing: "Transcribing...",
+      transcribe: "Transcribe",
+      pastRecording: "Past Recording: {date}",
+      exportReport: "Export Report",
+    },
+    island: {
+      active: "Active",
+      standby: "Standby",
+      prompt: "Do you want to record this meeting?",
+      ended: "Meeting ended (Standby)",
+    },
+    assistant: {
+      welcome:
+        "Hi! I'm the EchoMind Enterprise Meeting Assistant.\n\nI can answer your questions by searching your entire meeting archive: decisions, action items and transcripts. Pick one of the topics below or ask anything you like.",
+      examples: "Examples:",
+      copyReply: "Copy Reply",
+      q1Label: "Open Tasks & Owners",
+      q1Prompt:
+        "List all open action items, tasks and owners across all meetings.",
+      q2Label: "All Key Decisions",
+      q2Prompt:
+        "Summarize the agreements reached and firm decisions made in all past meetings.",
+      q3Label: "Meeting Goals & Progress",
+      q3Prompt:
+        "Compare the main goals of the meetings and which topics were deferred to later phases.",
+      q4Label: "Budget & Financial Topics",
+      q4Prompt:
+        "What was discussed about budget, taxes, payments and costs in the meetings?",
+    },
+    modelHub: {
+      inUse: "In Use",
+      select: "Select",
+      activeModel: "Active Model",
+      useThis: "Use This",
+      downloading: "Downloading...",
+      downloadSize: "Download ({size} MB)",
+      speedValue: "Speed: {value}%",
+      accuracyValue: "Accuracy: {value}%",
+      zeroDownload: "0 MB Download",
+      preparing: "Preparing options...",
+      appleTitle:
+        "🍎 macOS On-Device Speech Recognition (Apple Dictation / ANE)",
+      appleDesc:
+        "Your operating system's built-in speech recognition engine. 0 MB RAM, zero latency, accelerated by the Apple Neural Engine.",
+      appleSelectAria: "Select macOS speech recognition",
+      senseDesc:
+        "Next-generation local speech engine that doesn't hallucinate words and runs up to 15x faster than Whisper.",
+      senseSelectAria: "Select SenseVoice",
+      activeMode: "Active",
+      groqTitle: "Lightning Fast (Groq Cloud Whisper)",
+      groqBadge: "Fastest (~10 s)",
+      groqDesc:
+        "Transcribes a 1-hour recording in about 10 seconds, with no load on your computer or battery.",
+      cpuLoad: "Computer Load:",
+      zeroLoad: "None",
+      speedLabel: "Speed:",
+      inSeconds: "⚡ Seconds",
+      qualityLabel: "Accuracy:",
+      crystalClear: "Crystal Clear",
+      topTier: "Top-Tier",
+      veryHigh: "Very High",
+      geminiTitle: "Google Gemini (Multimodal Audio & Reasoning)",
+      geminiBadge: "Rich Model Family",
+      geminiDesc:
+        "Google's advanced multimodal audio AI. High accuracy and smart speaker analysis across all Gemini versions.",
+      openaiTitle: "Global Standard (OpenAI Whisper & GPT-4o Audio)",
+      openaiDesc:
+        "World-renowned AI infrastructure with excellent results for multilingual meetings.",
+      modelVersion: "Model Version:",
+      examplePlaceholder: "e.g. {example}",
+      pasteKey: "Paste your {provider} API key ({prefix})",
+      saveAndSelect: "Save & Select",
+      footnote:
+        "* You can switch anytime with one click based on your privacy and speed preferences.",
+      done: "Done",
+    },
+  },
 };

@@ -505,4 +505,173 @@ export const tr: TranslationKeys = {
       "Benzer etiket, anahtar kelime veya katılımcıya sahip başka bir toplantı henüz yok.",
     jumpToMeeting: "Toplantıya Git",
   },
+  ui: {
+    settings: {
+      vuMeter: "Canlı Ses Seviyesi (VU Metre):",
+      speechDetected: "🟢 Konuşma Algılandı",
+      silentWaiting: "⚪ Sessiz / Bekleniyor",
+      sampling: "Örnekleme: 16.000 Hz Mono (Whisper Optimize)",
+      filter: "Filtre: 80Hz High-Pass + Gürültü Kapısı",
+      defaultMic: "🎙️ Varsayılan Mikrofon (Otomatik {os} Seçimi)",
+      loopbackPrefix: "🔊 [Sistem Sesi / Loopback] ",
+      defaultSuffix: "(Varsayılan {os})",
+      rescanDevices: "Ses aygıtlarını yeniden tara",
+      dualCaptureTitle: "Sistem Sesi + Mikrofon (Çift Yönlü Kayıt Aktif)",
+      micCaptureTitle: "Mikrofon Ses Kaydı",
+      dualCaptureDesc:
+        "Sanal ses döngüsü (Loopback) devrede; karşı tarafın konuşmaları net kaydediliyor.",
+      micCaptureDesc: "Şu an doğrudan mikrofon girişiniz dinleniyor.",
+      loopbackActive: "Loopback Aktif",
+      micOnly: "Sadece Mikrofon",
+      remoteTipTitle: "Toplantıda Karşı Tarafın Sesini Kaydetme İpucu:",
+      remoteTipBefore:
+        "Kulaklık kullandığınızda bilgisayarınızdan çalan diğer katılımcıların sesi standart mikrofona ulaşmaz. Karşı tarafın sesini de doğrudan yazıya dökmek için ",
+      remoteTipOr: " veya ",
+      remoteTipAfter: " sanal aygıtını seçebilirsiniz.",
+      loopbackFound:
+        "✓ Sisteminizde sanal ses aygıtı bulundu! Yukarıdaki listeden Loopback aygıtını seçebilirsiniz.",
+      yourVoice: "Sizin Sesiniz: Aktif Giriş",
+      systemAudioLoopback: "Sistem Sesi: Loopback Devrede",
+      systemAudioSpeaker: "Sistem Sesi: Hoparlör/Ortam",
+      testingAudio: "Ses Test Ediliyor (VU Dinleniyor)...",
+      testInput: "Giriş Sesini Test Et (5 sn)",
+      openSoundPanelTitle:
+        "İşletim sistemi ses denetim masasını veya Audio MIDI Setup'ı aç",
+      openSoundPanel: "Sistem Ses Panelini Aç",
+      hideGuide: "Kurulum Yönergesini Gizle",
+      showGuide: "Loopback / BlackHole Kurulum Yönergesi",
+      cpu: "Bilgisayar İşlemcisi:",
+      gpu: "Grafik & Hızlandırma:",
+      ram: "Sistem Belleği (RAM):",
+      detecting: "Tespit Ediliyor...",
+      appleAccel: "Apple Silicon Hızlandırması Aktif",
+      standardGpu: "Standart",
+      offlineMode: "Çevrimdışı Gizlilik Modu:",
+      privateOnDevice: "%100 Cihazınızda Gizli",
+      dataSecurity: "Veri Güvenliği:",
+      dataSecurityParanoid:
+        "Paranoid Mod: %100 Cihazınızda Gizli, sıfır bulut çıkışı.",
+      dataSecurityDefault:
+        "Yerel modellerde %100 gizli; bulut kullanımında açık onay istenir.",
+      aiStatus: "Yapay Zeka Durumu:",
+      aiReady: "Kullanıma Hazır",
+      aiOnDemand: "İhtiyaç Anında Açılır",
+      cloudWarnToggle: "Bulut İşlemlerinde Gizlilik Uyarısı Göster",
+      cloudWarnToggleDesc:
+        "Hızlı bulut seçeneği kullanıldığında, ses kaydınızın internet üzerinden yapay zeka sunucusuna gideceğini işlem öncesinde hatırlatır.",
+      localLlmTitle: "Özel Yerel LLM Sunucusu (Ollama / vLLM / LM Studio)",
+      localOffline: "%100 Yerel & Çevrimdışı",
+      localLlmDesc:
+        "Kendi bilgisayarınızda veya yerel ağınızda barındırdığınız Ollama veya OpenAI uyumlu yerel LLM sunucu adresini bağlayabilirsiniz.",
+      endpointUrl: "Sunucu API Endpoint URL:",
+      modelName: "Model Adı:",
+      testingServer: "Sunucu Test Ediliyor...",
+      testServer: "Sunucu Bağlantısını Test Et",
+      paranoidActiveTitle: "Air-Gapped / Paranoid Mod Aktif",
+      paranoidActiveDesc:
+        "Bu mod devredeyken harici bulut API çağrıları (Groq, Gemini, OpenAI) Rust backend seviyesinde tamamen engellenmiştir. Aşağıdaki anahtarlar yalnızca Dengeli veya Maksimum Zeka moduna geçtiğinizde etkinleşir.",
+      locked: "Kilitli",
+      groqTitle: "Groq (Yıldırım Hızı - 10 Saniyede)",
+      groqBadge: "Ücretsiz & Ultra Hızlı",
+      geminiTitle: "Google Gemini (Flash & Pro Ailesi)",
+      geminiBadge: "Üst Düzey Zeka",
+      openaiBadge: "Küresel Standart",
+      preferredModel: "Tercih Edilen Model:",
+      customModelPlaceholder: "Model adı yazın (örn: {example})",
+      keysFootnote:
+        "* Anahtarlarınız ve tercihleriniz cihazınızda anında güvenle saklanır.",
+      languageDesc:
+        "EchoMind arayüzünde kullanmak istediğiniz dili seçin. Tüm menüler, butonlar ve rapor şablonları bu dilde görüntülenecektir.",
+    },
+    app: {
+      micOnlyBanner:
+        "Sadece Mikrofon — Sistem Sesi (Zoom/Meet/Teams) Desteklenmiyor",
+      micOnlyTooltip:
+        "Şu an yalnızca mikrofon yakalanıyor. Sistem sesi (Zoom / Meet / Teams) desteklenmiyor. Karşı tarafın sesini de kaydetmek için ses ayarlarından Loopback seçebilirsiniz.",
+      micActive: "Mikrofon Aktif",
+      loopbackHint:
+        "Karşı tarafın sesi (Meet/Zoom) için Loopback / BlackHole seçin",
+      footerTagline:
+        "Gizlilik Öncelikli • %100 Cihazınızda Güvende • Tüm Ses & Video Formatlarını Destekler",
+      aiOptions: "Yapay Zeka Seçenekleri",
+      aiOptionsTitle: "Yapay Zeka Modunu Değiştir",
+    },
+    transcript: {
+      speaking: "Konuşuluyor",
+      transcribing: "Yazıya Dönüştürülüyor...",
+      transcribe: "Yazıya Dönüştür",
+      pastRecording: "Geçmiş Kayıt: {date}",
+      exportReport: "Raporu Dışa Aktar",
+    },
+    island: {
+      active: "Aktif",
+      standby: "Beklemede",
+      prompt: "Toplantıyı kaydetmek istiyor musunuz?",
+      ended: "Toplantı sona erdi (Beklemede)",
+    },
+    assistant: {
+      welcome:
+        "Merhaba! Ben EchoMind Kurumsal Toplantı Asistanı.\n\nTüm toplantı arşivinizi, alınan kararları, eylem maddelerini ve konuşma dökümlerini tarayarak sorularınızı yanıtlayabilirim. Aşağıdaki hazır başlıklardan birini seçebilir veya dilediğiniz soruyu sorabilirsiniz.",
+      examples: "Örnekler:",
+      copyReply: "Yanıtı Kopyala",
+      q1Label: "Açık Görevler ve Sorumlular",
+      q1Prompt:
+        "Tüm toplantılardaki açık eylem maddelerini, görevleri ve sorumluları listele.",
+      q2Label: "Alınan Tüm Kritik Kararlar",
+      q2Prompt:
+        "Geçmiş tüm toplantılarda varılan mutabakatları ve alınan kesin kararları özetle.",
+      q3Label: "Toplantı Hedefleri ve Süreç",
+      q3Prompt:
+        "Toplantıların temel amaçlarını ve hangi konuların sonraki fazlara ertelendiğini karşılaştır.",
+      q4Label: "Bütçe & Finansal Konular",
+      q4Prompt:
+        "Toplantılarda bütçe, KDV, ödeme ve maliyetler hakkında ne konuşuldu?",
+    },
+    modelHub: {
+      inUse: "Kullanımda",
+      select: "Bunu Seç",
+      activeModel: "Aktif Model",
+      useThis: "Bunu Kullan",
+      downloading: "İndiriliyor...",
+      downloadSize: "İndir ({size} MB)",
+      speedValue: "Hız: %{value}",
+      accuracyValue: "Doğruluk: %{value}",
+      zeroDownload: "0 MB İndirme",
+      preparing: "Seçenekler hazırlanıyor...",
+      appleTitle: "🍎 macOS Yerel Ses Tanıma (Apple Dikte / ANE)",
+      appleDesc:
+        "İşletim sisteminizin yerleşik Türkçe konuşma tanıma motoru. 0 MB RAM, sıfır gecikme ve Apple Neural Engine hızlandırmasıyla çalışır.",
+      appleSelectAria: "macOS Yerel Ses Tanıma Seç",
+      senseDesc:
+        "Halüsinasyonsuz, kelime uydurmayan ve Whisper'dan 15 kat daha hızlı çalışan yeni nesil yerel konuşma tanıma motoru.",
+      senseSelectAria: "SenseVoice Seç",
+      activeMode: "Aktif Mod",
+      groqTitle: "Yıldırım Hızı (Groq Cloud Whisper)",
+      groqBadge: "En Hızlı (10 Saniye)",
+      groqDesc:
+        "1 saatlik ses kaydını 10 saniye gibi kısa bir sürede eksiksiz yazıya döker. Bilgisayarınızı hiç yormaz ve pilinizi tüketmez.",
+      cpuLoad: "Bilgisayar Yükü:",
+      zeroLoad: "Sıfır Yük",
+      speedLabel: "Hız:",
+      inSeconds: "⚡ Saniyeler İçinde",
+      qualityLabel: "Anlama Kalitesi:",
+      crystalClear: "Kristal Netliğinde",
+      topTier: "Üst Düzey Zeka",
+      veryHigh: "Çok Yüksek",
+      geminiTitle: "Google Gemini (Multimodal Ses & Akıl Yürütme)",
+      geminiBadge: "Zengin Model Ailesi",
+      geminiDesc:
+        "Google'ın gelişmiş multimodal ses yapay zekası. Tüm Gemini sürümleri ile yüksek doğruluk ve akıllı konuşmacı analizi.",
+      openaiTitle: "Küresel Standart (OpenAI Whisper & GPT-4o Audio)",
+      openaiDesc:
+        "Dünya çapında bilinen yapay zeka altyapısıyla çok dilli toplantılar için üstün başarı.",
+      modelVersion: "Model Versiyonu:",
+      examplePlaceholder: "Örn: {example}",
+      pasteKey: "{provider} API Anahtarını Yapıştırın ({prefix})",
+      saveAndSelect: "Kaydet & Seç",
+      footnote:
+        "* İstediğiniz zaman gizlilik ve hız tercihlerinize göre tek tıkla değiştirebilirsiniz.",
+      done: "Tamam",
+    },
+  },
 };

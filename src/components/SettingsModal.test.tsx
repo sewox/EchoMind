@@ -672,7 +672,8 @@ describe("SettingsModal Component", () => {
       name: /AI Services|Yapay Zeka Servisleri/i,
     });
     fireEvent.click(apiTab);
-    expect(screen.getByText(/Özel Yerel LLM/i)).toBeInTheDocument();
+    expect(screen.getByText(/Custom Local LLM Server/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Özel Yerel LLM/i)).not.toBeInTheDocument();
   });
 
   it("handles clicking privacy mode profiles in Device & Privacy tab", () => {
