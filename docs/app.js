@@ -266,6 +266,9 @@ function setLanguage(lang) {
     }
   });
 
+  // Translations carry the fallback version/sizes; overwrite with the live release.
+  applyLatestRelease();
+
   const langBtn = document.getElementById("langToggleBtn");
   if (langBtn) {
     langBtn.innerHTML = lang === "tr" ? "🌐 English" : "🌐 Türkçe";
@@ -429,6 +432,9 @@ document.addEventListener("DOMContentLoaded", () => {
   // Init Language (check localStorage or default 'tr')
   const savedLang = localStorage.getItem("echomind_lang") || "tr";
   setLanguage(savedLang);
+
+  // Point download buttons at the newest GitHub release
+  loadLatestRelease();
 
   // Init DLP Sandbox Input & Output Elements
   const dlpInput = document.getElementById("dlpInput");
@@ -731,4 +737,69 @@ function initShowcaseSlider() {
   });
 
   renderShowcaseSlide(showcaseIndex);
+}
+
+// ---------------------------------------------------------------------------
+// Latest release: the HTML ships working links to a known release as a
+// fallback; on load we ask the GitHub API for the newest release and swap in
+// its asset URLs, sizes and version so the site never points at a stale build.
+// ---------------------------------------------------------------------------
+const RELEASES_API =
+  "https://api.github.com/repos/sewox/EchoMind/releases/latest";
+let latestRelease = null;
+
+async function loadLatestRelease() {
+  try {
+    const res = await fetch(RELEASES_API, {
+      headers: { Accept: "application/vnd.github+json" },
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    const assets = {};
+    (data.assets || []).forEach((a) => {
+      // EchoMind_0.2.12_x64-setup.exe -> key "x64-setup.exe"
+      const m = a.name.match(/^EchoMind_[\d.]+_(.+)$/);
+      if (m) {
+        assets[m[1]] = {
+          url: a.browser_download_url,
+          mb: (a.size / (1024 * 1024)).toFixed(1),
+        };
+      }
+    });
+    if (!data.tag_name || Object.keys(assets).length === 0) return;
+    latestRelease = { version: data.tag_name, assets };
+    applyLatestRelease();
+  } catch {
+    // Offline or rate-limited: keep the fallback links from the HTML.
+  }
+}
+
+function applyLatestRelease() {
+  if (!latestRelease) return;
+  document
+    .querySelectorAll('a[href*="/releases/download/"], a[data-release-asset]')
+    .forEach((a) => {
+      // Remember which asset a button is for, so re-applying (e.g. after a
+      // language switch) doesn't depend on the current href shape.
+      if (!a.dataset.releaseAsset) {
+        const m = a.getAttribute("href").match(/EchoMind_[\d.]+_([^/]+)$/);
+        if (m) a.dataset.releaseAsset = m[1];
+      }
+      const asset = latestRelease.assets[a.dataset.releaseAsset];
+      if (!asset) return;
+      a.href = asset.url;
+      a.querySelectorAll("span").forEach((span) => {
+        span.textContent = span.textContent.replace(
+          /\([\d.,]+\s*MB\)/,
+          `(${asset.mb} MB)`,
+        );
+      });
+    });
+  const badge = document.querySelector('[data-i18n="badgeRelease"]');
+  if (badge) {
+    badge.textContent = badge.textContent.replace(
+      /v\d+\.\d+\.\d+/,
+      latestRelease.version,
+    );
+  }
 }

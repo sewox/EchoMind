@@ -1095,3 +1095,32 @@ footer.site-footer {
   padding-top: 24px;
   font-size: 0.8rem;
 }
+
+/* Small screens: the section links don't fit next to the logo and actions
+   (they pushed the page wider than the viewport). Sections stay reachable by
+   scrolling, and the hero already has the download buttons. */
+@media (max-width: 900px) {
+  .nav-links {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .nav-actions .btn span {
+    display: none;
+  }
+
+  .island-preview-wrapper {
+    padding: 18px;
+  }
+
+  .mockup-header {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  /* The engine pill doesn't fit inside the floating HUD on phones */
+  .island-hud > .island-badge {
+    display: none;
+  }
+}
