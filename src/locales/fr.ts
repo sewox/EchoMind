@@ -27,6 +27,8 @@ export const fr: TranslationKeys = {
     storageUnlocking: "Ouverture du stockage sécurisé…",
     storageUnlockHint:
       "En attente de l'accès au trousseau. La fenêtre reste réactive ; votre historique se charge après autorisation.",
+    historyRecoveryNotice:
+      "L'historique chiffré précédent n'a pas pu être ouvert dans cette version ; des sauvegardes ont été conservées. Les nouveaux enregistrements sont désormais protégés par le trousseau.",
   },
   nav: {
     startListening: "Démarrer l'écoute",

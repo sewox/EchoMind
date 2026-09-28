@@ -27,6 +27,8 @@ export const es: TranslationKeys = {
     storageUnlocking: "Abriendo almacenamiento seguro…",
     storageUnlockHint:
       "Esperando acceso al llavero. La ventana sigue respondiendo; el historial se carga tras permitir el acceso.",
+    historyRecoveryNotice:
+      "No se pudo abrir el historial cifrado anterior en esta versión; se conservaron copias de seguridad. Las nuevas grabaciones ahora están protegidas con el llavero.",
   },
   nav: {
     startListening: "Iniciar Escucha",

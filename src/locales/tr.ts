@@ -27,6 +27,8 @@ export const tr: TranslationKeys = {
     storageUnlocking: "Güvenli depolama açılıyor…",
     storageUnlockHint:
       "Anahtarlık erişimi bekleniyor. Pencere yanıt vermeye devam eder; izin verdikten sonra geçmişiniz yüklenir.",
+    historyRecoveryNotice:
+      "Önceki şifreli geçmiş bu sürümde açılamadı; yedekler saklandı. Yeni kayıtlar artık Keychain ile korunuyor.",
   },
   nav: {
     startListening: "Dinlemeyi Başlat",
