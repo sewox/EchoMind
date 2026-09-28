@@ -31,7 +31,7 @@
     />
     <meta
       property="og:image"
-      content="https://sewox.github.io/EchoMind/assets/og-preview.png"
+      content="https://sewox.github.io/EchoMind/assets/screenshots/en/en-03-live-transcript.png"
     />
 
     <!-- Twitter Card -->
@@ -102,7 +102,7 @@
     <!-- Hero Section -->
     <section class="hero">
       <div class="container">
-        <!-- Product Hunt / Release Badge -->
+        <!-- Release Badge -->
         <div
           style="
             display: flex;
@@ -111,26 +111,10 @@
             flex-wrap: wrap;
           "
         >
-          <a
-            href="https://www.producthunt.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="ph-badge-pill"
-          >
-            <svg viewBox="0 0 24 24" fill="currentColor">
-              <path
-                d="M13.6 8.4h-3.2v3.6h3.2c1 0 1.8-.8 1.8-1.8s-.8-1.8-1.8-1.8zm0-3.6H6.8v14.4h3.6v-3.6h3.2c3 0 5.4-2.4 5.4-5.4S16.6 4.8 13.6 4.8z"
-              />
-            </svg>
-            <span data-i18n="badgeProductHunt"
-              >🚀 Product Hunt'ta Keşfedin</span
-            >
-          </a>
-
           <div class="badge-pill">
             <span class="badge-pulse"></span>
             <span data-i18n="badgeRelease"
-              >EchoMind v0.2.3 Yayında • Sıfır-Güven Mimarisi</span
+              >EchoMind v0.2.12 Yayında • Sıfır-Güven Mimarisi</span
             >
           </div>
         </div>
@@ -148,7 +132,7 @@
         <div class="hero-actions">
           <a
             id="heroDownloadWin"
-            href="https://github.com/sewox/EchoMind/releases/download/v0.2.3/EchoMind_0.2.3_x64-setup.exe"
+            href="https://github.com/sewox/EchoMind/releases/download/v0.2.12/EchoMind_0.2.12_x64-setup.exe"
             class="btn btn-primary btn-lg"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
@@ -160,7 +144,7 @@
           </a>
           <a
             id="heroDownloadMac"
-            href="https://github.com/sewox/EchoMind/releases/download/v0.2.3/EchoMind_0.2.3_aarch64.dmg"
+            href="https://github.com/sewox/EchoMind/releases/download/v0.2.12/EchoMind_0.2.12_aarch64.dmg"
             class="btn btn-secondary btn-lg"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
@@ -604,32 +588,19 @@
             <span data-i18n="tabShowcaseMemory">🧠 Semantik Hafıza</span>
           </button>
           <button class="showcase-tab-btn" data-showcase="hardware">
-            <span data-i18n="tabShowcaseHw">⚡ Donanım Ayarları</span>
+            <span data-i18n="tabShowcaseHw">⚡ Model Merkezi</span>
+          </button>
+          <button class="showcase-tab-btn" data-showcase="privacy">
+            <span data-i18n="tabShowcasePrivacy">🛡️ Gizlilik Modları</span>
           </button>
         </div>
 
-        <!-- Showcase Window Mockup -->
+        <!-- Real app screenshots (macOS). Language-specific set is picked in app.js. -->
         <div class="showcase-window-wrapper">
-          <div class="showcase-window-header">
-            <div class="showcase-dots">
-              <span></span><span></span><span></span>
-            </div>
-            <div class="showcase-window-title" id="showcaseWinTitle">
-              EchoMind AI Assistant • Live Meeting Room
-            </div>
-            <div
-              class="showcase-window-badge"
-              id="showcaseWinBadge"
-              data-i18n="showcaseBadgeLocal"
-            >
-              %100 Yerel Motor
-            </div>
-          </div>
-
           <div class="showcase-img-container">
             <img
-              src="assets/screenshots/showcase-live-transcription.png"
-              alt="EchoMind Masaüstü Arayüzü - Canlı Transkripsiyon"
+              src="assets/screenshots/macos-03-live-transcript.png"
+              alt="EchoMind masaüstü uygulaması - canlı transkripsiyon ekran görüntüsü"
               class="showcase-img"
               id="showcaseMainImg"
             />
@@ -641,11 +612,11 @@
               id="showcaseCaptionText"
               data-i18n="captionTrans"
             >
-              Toplantı sırasında konuşmacıları anlık tanır, Whisper Metal/CUDA
-              ile yerel çözümler ve hassas DLP verilerini maskeler.
+              Toplantı sırasında konuşmalar cihazınızdaki Whisper modeliyle
+              anlık olarak yazıya dökülür; ses bilgisayarınızdan çıkmaz.
             </div>
             <div class="showcase-caption-tag" id="showcaseCaptionTag">
-              Apple Metal & NVIDIA CUDA
+              macOS • v0.2.12
             </div>
           </div>
         </div>
@@ -677,7 +648,7 @@
             </div>
             <div class="download-action-wrap">
               <a
-                href="https://github.com/sewox/EchoMind/releases/download/v0.2.3/EchoMind_0.2.3_x64-setup.exe"
+                href="https://github.com/sewox/EchoMind/releases/download/v0.2.12/EchoMind_0.2.12_x64-setup.exe"
                 class="btn btn-primary"
                 style="width: 100%"
               >
@@ -699,11 +670,11 @@
             </div>
             <div class="download-action-wrap">
               <a
-                href="https://github.com/sewox/EchoMind/releases/download/v0.2.3/EchoMind_0.2.3_x64_en-US.msi"
+                href="https://github.com/sewox/EchoMind/releases/download/v0.2.12/EchoMind_0.2.12_x64_en-US.msi"
                 class="btn btn-secondary"
                 style="width: 100%"
               >
-                <span data-i18n="btnDownloadWinMsi">İndir .msi (7.0 MB)</span>
+                <span data-i18n="btnDownloadWinMsi">İndir .msi (6.9 MB)</span>
               </a>
             </div>
           </div>
@@ -721,11 +692,11 @@
             </div>
             <div class="download-action-wrap">
               <a
-                href="https://github.com/sewox/EchoMind/releases/download/v0.2.3/EchoMind_0.2.3_aarch64.dmg"
+                href="https://github.com/sewox/EchoMind/releases/download/v0.2.12/EchoMind_0.2.12_aarch64.dmg"
                 class="btn btn-secondary"
                 style="width: 100%"
               >
-                <span data-i18n="btnDownloadMacDmg">İndir .dmg (8.4 MB)</span>
+                <span data-i18n="btnDownloadMacDmg">İndir .dmg (8.2 MB)</span>
               </a>
             </div>
           </div>
@@ -745,7 +716,7 @@
             </div>
             <div class="download-action-wrap" style="display: flex; gap: 8px">
               <a
-                href="https://github.com/sewox/EchoMind/releases/download/v0.2.3/EchoMind_0.2.3_amd64.deb"
+                href="https://github.com/sewox/EchoMind/releases/download/v0.2.12/EchoMind_0.2.12_amd64.deb"
                 class="btn btn-primary"
                 style="
                   flex: 1;
@@ -757,7 +728,7 @@
                 <span>.deb</span>
               </a>
               <a
-                href="https://github.com/sewox/EchoMind/releases/download/v0.2.3/EchoMind_0.2.3_amd64.AppImage"
+                href="https://github.com/sewox/EchoMind/releases/download/v0.2.12/EchoMind_0.2.12_amd64.AppImage"
                 class="btn btn-secondary"
                 style="
                   flex: 1;

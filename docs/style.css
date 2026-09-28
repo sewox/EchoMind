@@ -1,4 +1,4 @@
-/* EchoMind AI Assistant - Modern Aesthetic Landing Style (Product Hunt Ready) */
+/* EchoMind AI Assistant - Modern Aesthetic Landing Style */
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap");
 
 :root {
@@ -244,35 +244,6 @@ nav.navbar {
   padding: 14px 28px;
   font-size: 1.05rem;
   border-radius: var(--radius-md);
-}
-
-/* Product Hunt Badge & Pill */
-.ph-badge-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 16px;
-  background: rgba(218, 85, 47, 0.12);
-  border: 1px solid rgba(218, 85, 47, 0.3);
-  border-radius: var(--radius-full);
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #ff8a65;
-  margin-bottom: 24px;
-  text-decoration: none;
-  transition: all 0.2s ease;
-}
-
-.ph-badge-pill:hover {
-  background: rgba(218, 85, 47, 0.2);
-  border-color: rgba(218, 85, 47, 0.5);
-  transform: translateY(-1px);
-}
-
-.ph-badge-pill svg {
-  width: 16px;
-  height: 16px;
-  color: #da552f;
 }
 
 /* Hero Section */
@@ -950,51 +921,6 @@ section.download-section {
   transition: all 0.3s ease;
 }
 
-.showcase-window-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 20px;
-  background: rgba(15, 23, 42, 0.9);
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-.showcase-dots {
-  display: flex;
-  gap: 8px;
-}
-
-.showcase-dots span {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-}
-
-.showcase-dots span:nth-child(1) {
-  background: #ef4444;
-}
-.showcase-dots span:nth-child(2) {
-  background: #f59e0b;
-}
-.showcase-dots span:nth-child(3) {
-  background: #10b981;
-}
-
-.showcase-window-title {
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-  font-family: var(--font-mono);
-}
-
-.showcase-window-badge {
-  font-size: 0.72rem;
-  background: rgba(16, 185, 129, 0.15);
-  color: var(--accent-emerald);
-  padding: 3px 8px;
-  border-radius: 999px;
-  font-weight: 600;
-}
-
 .showcase-img-container {
   position: relative;
   width: 100%;
@@ -1041,9 +967,6 @@ section.download-section {
   .showcase-tab-btn {
     font-size: 0.8rem;
     padding: 8px 14px;
-  }
-  .showcase-window-title {
-    display: none;
   }
   .showcase-caption-bar {
     padding: 12px 16px;

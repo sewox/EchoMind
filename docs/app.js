@@ -12,8 +12,7 @@ const translations = {
     navSecurity: "Güvenlik & DLP",
     navHardware: "Donanım",
     navDownload: "İndir",
-    badgeRelease: "EchoMind v0.2.3 Yayında • Sıfır-Güven Mimarisi",
-    badgeProductHunt: "🚀 Product Hunt'ta Keşfedin",
+    badgeRelease: "EchoMind v0.2.12 Yayında • Sıfır-Güven Mimarisi",
     heroTitle: "Toplantılarınızı Donanım Gücüyle Dinleyen Hibrit Yapay Zekâ",
     heroSubtitle:
       "Apple Metal ve NVIDIA CUDA ile %100 yerel ve gizli çalışabilen, kurumsal DLP ve toplantılar arası semantik hafıza sunan yeni nesil masaüstü toplantı asistanı.",
@@ -29,19 +28,20 @@ const translations = {
     tabShowcaseTrans: "🎙️ Canlı Transkripsiyon",
     tabShowcaseSummary: "📊 Akıllı Özet & Analitik",
     tabShowcaseMemory: "🧠 Semantik Hafıza",
-    tabShowcaseHw: "⚡ Donanım Ayarları",
+    tabShowcaseHw: "⚡ Model Merkezi",
+    tabShowcasePrivacy: "🛡️ Gizlilik Modları",
     showcaseBadgeLocal: "%100 Yerel Motor",
     showcaseBadgeSummary: "Otomatik Yapay Zekâ Analitiği",
     showcaseBadgeMemory: "Vektörel Semantik Arama",
     showcaseBadgeHw: "Apple Metal & NVIDIA CUDA",
     captionTrans:
-      "Toplantı sırasında konuşmacıları anlık tanır, Whisper Metal/CUDA ile yerel çözümler ve hassas DLP verilerini maskeler.",
+      "Toplantı sırasında konuşmalar cihazınızdaki Whisper modeliyle anlık olarak yazıya dökülür; ses bilgisayarınızdan çıkmaz.",
     captionSummary:
-      "Toplantı bittiğinde kararları, aksiyon maddelerini ve konuşmacı dengesini otomatik olarak özetler ve grafiğe döker.",
+      "Toplantı bittiğinde amaç, öne çıkan başlıklar, kararlar ve görevler otomatik bir rapora dönüşür.",
     captionMemory:
-      "Tüm geçmiş toplantılarınızda doğal dille semantik arama yapın ve ilgili ses kesitine doğrudan zıplayın.",
+      "Akıllı Asistan tüm toplantı arşivinizi tarayarak kararlar, görevler ve konuşmalar hakkındaki sorularınızı yanıtlar.",
     captionHw:
-      "Cihazınızın GPU (Metal, CUDA) ve CPU kaynaklarına göre Whisper modellerini tek tıkla yapılandırın.",
+      "Tamamen yerel (Apple Dikte, SenseVoice, Whisper) veya kendi anahtarınızla bulut modelleri arasında tek tıkla geçiş yapın.",
     secFeaturesTitle: "Neden EchoMind?",
     secFeaturesSubtitle:
       "Tüm toplantı iş akışınızı gizlilikten ödün vermeden otomatikleştirin.",
@@ -102,8 +102,8 @@ const translations = {
     linuxDistroTitle: "Linux Dağıtımları (.deb / .AppImage)",
     linuxDistroDesc: "Ubuntu, Debian, Fedora ve Arch x64 için yerel paketler.",
     btnDownloadWinExe: "İndir .exe (4.9 MB)",
-    btnDownloadWinMsi: "İndir .msi (7.0 MB)",
-    btnDownloadMacDmg: "İndir .dmg (8.4 MB)",
+    btnDownloadWinMsi: "İndir .msi (6.9 MB)",
+    btnDownloadMacDmg: "İndir .dmg (8.2 MB)",
     footerText:
       "EchoMind © 2026. Açık Kaynaklı ve Sıfır-Güven Toplantı Zekâsı Platformu.",
   },
@@ -113,8 +113,7 @@ const translations = {
     navSecurity: "Security & DLP",
     navHardware: "Hardware",
     navDownload: "Download",
-    badgeRelease: "EchoMind v0.2.3 Released • Zero-Trust Architecture",
-    badgeProductHunt: "🚀 Discover on Product Hunt",
+    badgeRelease: "EchoMind v0.2.12 Released • Zero-Trust Architecture",
     heroTitle: "Hardware-Aware Hybrid AI Meeting Intelligence",
     heroSubtitle:
       "A next-generation desktop meeting assistant that runs 100% locally with Apple Metal & NVIDIA CUDA, featuring enterprise DLP and cross-meeting semantic memory.",
@@ -130,19 +129,20 @@ const translations = {
     tabShowcaseTrans: "🎙️ Live Transcription",
     tabShowcaseSummary: "📊 Smart Summary & Analytics",
     tabShowcaseMemory: "🧠 Semantic Memory",
-    tabShowcaseHw: "⚡ Hardware Settings",
+    tabShowcaseHw: "⚡ Model Hub",
+    tabShowcasePrivacy: "🛡️ Privacy Modes",
     showcaseBadgeLocal: "100% On-Device Engine",
     showcaseBadgeSummary: "Automated AI Analytics",
     showcaseBadgeMemory: "Vector Semantic Search",
     showcaseBadgeHw: "Apple Metal & NVIDIA CUDA",
     captionTrans:
-      "Separates speakers in real time, transcribes locally via Whisper Metal/CUDA, and masks sensitive DLP credentials.",
+      "Speech is transcribed live by the Whisper model on your device; the audio never leaves your computer.",
     captionSummary:
-      "Automatically extracts decisions, action items, and speaker participation balance immediately after the meeting.",
+      "When the meeting ends, its purpose, highlights, decisions and tasks turn into an automatic report.",
     captionMemory:
-      "Search seamlessly across all previous meetings using natural language queries with instant audio timestamp links.",
+      "The Smart Advisor searches your whole meeting archive to answer questions about decisions, tasks and discussions.",
     captionHw:
-      "Easily configure Whisper model sizes and hardware acceleration targets tailored to your system's GPU and CPU cores.",
+      "Switch with one click between fully local engines (Apple Dictation, SenseVoice, Whisper) and bring-your-own-key cloud models.",
     secFeaturesTitle: "Why Choose EchoMind?",
     secFeaturesSubtitle:
       "Automate your entire meeting intelligence workflow without compromising data privacy.",
@@ -204,8 +204,8 @@ const translations = {
     linuxDistroDesc:
       "Native packages for Ubuntu, Debian, Fedora, and Arch x64.",
     btnDownloadWinExe: "Download .exe (4.9 MB)",
-    btnDownloadWinMsi: "Download .msi (7.0 MB)",
-    btnDownloadMacDmg: "Download .dmg (8.4 MB)",
+    btnDownloadWinMsi: "Download .msi (6.9 MB)",
+    btnDownloadMacDmg: "Download .dmg (8.2 MB)",
     footerText:
       "EchoMind © 2026. Open-Source Zero-Trust Meeting Intelligence Platform.",
   },
@@ -517,82 +517,53 @@ document.addEventListener("DOMContentLoaded", () => {
 
 let currentShowcaseKey = "transcription";
 
+const SHOT = {
+  tr: (name) => `assets/screenshots/macos-${name}.png`,
+  en: (name) => `assets/screenshots/en/en-${name}.png`,
+};
+
+// Real screenshots of the running app (macOS, v0.2.12). Each tab picks the
+// Turkish or English capture of the same screen based on the site language.
 const showcaseData = {
   transcription: {
-    img: "assets/screenshots/showcase-live-transcription.png",
-    title: {
-      tr: "EchoMind AI Assistant • Canlı Toplantı & Transkripsiyon Odası",
-      en: "EchoMind AI Assistant • Live Meeting Room & Transcription",
-    },
-    badge: {
-      tr: "%100 Yerel Motor",
-      en: "100% On-Device Engine",
-    },
+    shot: "03-live-transcript",
     caption: {
-      tr: "Toplantı sırasında konuşmacıları anlık tanır, Whisper Metal/CUDA ile yerel çözümler ve hassas DLP verilerini maskeler.",
-      en: "Separates speakers in real time, transcribes locally via Whisper Metal/CUDA, and masks sensitive DLP credentials.",
+      tr: "Toplantı sırasında konuşmalar cihazınızdaki Whisper modeliyle anlık olarak yazıya dökülür; ses bilgisayarınızdan çıkmaz.",
+      en: "Speech is transcribed live by the Whisper model on your device; the audio never leaves your computer.",
     },
-    tag: {
-      tr: "Apple Metal & NVIDIA CUDA",
-      en: "Apple Metal & NVIDIA CUDA",
-    },
+    tag: { tr: "Canlı Dinleme", en: "Live Listening" },
   },
   summary: {
-    img: "assets/screenshots/showcase-meeting-summary.png",
-    title: {
-      tr: "EchoMind AI Assistant • Yönetici Özeti & Aksiyon Maddeleri",
-      en: "EchoMind AI Assistant • Executive Summary & Action Items",
-    },
-    badge: {
-      tr: "Otomatik Yapay Zekâ Analitiği",
-      en: "Automated AI Analytics",
-    },
+    shot: "13-meeting-report",
     caption: {
-      tr: "Toplantı bittiğinde kararları, aksiyon maddelerini ve konuşmacı dengesini otomatik olarak özetler ve grafiğe döker.",
-      en: "Automatically extracts decisions, action items, and speaker participation balance immediately after the meeting.",
+      tr: "Toplantı bittiğinde amaç, öne çıkan başlıklar, kararlar ve görevler otomatik bir rapora dönüşür.",
+      en: "When the meeting ends, its purpose, highlights, decisions and tasks turn into an automatic report.",
     },
-    tag: {
-      tr: "Konuşmacı Ayrıştırma & Kararlar",
-      en: "Speaker Diarization & Decisions",
-    },
+    tag: { tr: "Toplantı Raporu", en: "Meeting Report" },
   },
   memory: {
-    img: "assets/screenshots/showcase-semantic-memory.png",
-    title: {
-      tr: "EchoMind AI Assistant • Toplantılar Arası Semantik Arama",
-      en: "EchoMind AI Assistant • Cross-Meeting Semantic Memory",
-    },
-    badge: {
-      tr: "Vektörel Semantik Arama",
-      en: "Vector Semantic Search",
-    },
+    shot: "14-smart-assistant",
     caption: {
-      tr: "Tüm geçmiş toplantılarınızda doğal dille semantik arama yapın ve ilgili ses kesitine doğrudan zıplayın.",
-      en: "Search seamlessly across all previous meetings using natural language queries with instant audio timestamp links.",
+      tr: "Akıllı Asistan tüm toplantı arşivinizi tarayarak kararlar, görevler ve konuşmalar hakkındaki sorularınızı yanıtlar.",
+      en: "The Smart Advisor searches your whole meeting archive to answer questions about decisions, tasks and discussions.",
     },
-    tag: {
-      tr: "Semantik Hafıza & Ses Kesiti",
-      en: "Semantic Memory & Soundbites",
-    },
+    tag: { tr: "Akıllı Asistan • ⌘K", en: "Smart Advisor • ⌘K" },
   },
   hardware: {
-    img: "assets/screenshots/showcase-hardware-settings.png",
-    title: {
-      tr: "EchoMind AI Assistant • Donanım Hızlandırma & Model Seçici",
-      en: "EchoMind AI Assistant • Hardware Acceleration & Model Selector",
-    },
-    badge: {
-      tr: "Donanım Farkındalıklı",
-      en: "Hardware-Aware",
-    },
+    shot: "07-model-hub",
     caption: {
-      tr: "Cihazınızın GPU (Metal, CUDA) ve CPU kaynaklarına göre Whisper modellerini tek tıkla yapılandırın.",
-      en: "Easily configure Whisper model sizes and hardware acceleration targets tailored to your system's GPU and CPU cores.",
+      tr: "Tamamen yerel (Apple Dikte, SenseVoice, Whisper) veya kendi anahtarınızla bulut modelleri arasında tek tıkla geçiş yapın.",
+      en: "Switch with one click between fully local engines (Apple Dictation, SenseVoice, Whisper) and bring-your-own-key cloud models.",
     },
-    tag: {
-      tr: "Metal • CUDA • AVX2",
-      en: "Metal • CUDA • AVX2",
+    tag: { tr: "Model Merkezi", en: "Model Hub" },
+  },
+  privacy: {
+    shot: "06-privacy-mode",
+    caption: {
+      tr: "Paranoid, Dengeli ve Maksimum Zeka profilleriyle verinin cihazdan çıkıp çıkmayacağına siz karar verin.",
+      en: "Paranoid, Balanced and Max Intelligence profiles let you decide whether any data may leave the device.",
     },
+    tag: { tr: "Gizlilik Profilleri", en: "Privacy Profiles" },
   },
 };
 
@@ -605,21 +576,22 @@ function selectShowcaseTab(key) {
   });
 
   const data = showcaseData[key];
+  const lang = currentLang === "en" ? "en" : "tr";
   const imgEl = document.getElementById("showcaseMainImg");
-  const titleEl = document.getElementById("showcaseWinTitle");
-  const badgeEl = document.getElementById("showcaseWinBadge");
   const captionEl = document.getElementById("showcaseCaptionText");
   const tagEl = document.getElementById("showcaseCaptionTag");
 
   if (imgEl) {
-    imgEl.style.opacity = "0.4";
-    setTimeout(() => {
-      imgEl.src = data.img;
-      imgEl.style.opacity = "1";
-    }, 150);
+    const nextSrc = SHOT[lang](data.shot);
+    if (!imgEl.src.endsWith(nextSrc)) {
+      imgEl.style.opacity = "0.4";
+      setTimeout(() => {
+        imgEl.src = nextSrc;
+        imgEl.alt = data.tag[lang];
+        imgEl.style.opacity = "1";
+      }, 150);
+    }
   }
-  if (titleEl) titleEl.textContent = data.title[currentLang];
-  if (badgeEl) badgeEl.textContent = data.badge[currentLang];
-  if (captionEl) captionEl.textContent = data.caption[currentLang];
-  if (tagEl) tagEl.textContent = data.tag[currentLang];
+  if (captionEl) captionEl.textContent = data.caption[lang];
+  if (tagEl) tagEl.textContent = data.tag[lang];
 }
