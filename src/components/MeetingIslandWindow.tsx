@@ -140,7 +140,9 @@ const IslandContent: FC = () => {
                     : "text-slate-400 bg-slate-900/60 border-slate-700/40"
                 }`}
               >
-                {appInfo.is_running ? "Aktif" : "Beklemede"}
+                {appInfo.is_running
+                  ? t("ui.island.active")
+                  : t("ui.island.standby")}
               </span>
               <span
                 data-testid="island-privacy-badge"
@@ -157,8 +159,8 @@ const IslandContent: FC = () => {
             </div>
             <span className="text-[11px] text-slate-400 truncate">
               {appInfo.is_running
-                ? "Toplantıyı kaydetmek istiyor musunuz?"
-                : "Toplantı sona erdi (Beklemede)"}
+                ? t("ui.island.prompt")
+                : t("ui.island.ended")}
             </span>
           </div>
         </div>

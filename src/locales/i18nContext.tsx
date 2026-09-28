@@ -3,6 +3,7 @@ import React, {
   useContext,
   useState,
   useMemo,
+  useEffect,
   ReactNode,
 } from "react";
 import { TranslationKeys, SupportedLanguage, LanguageOption } from "./types";
@@ -81,6 +82,19 @@ export const I18nProvider: React.FC<{ children: ReactNode }> = ({
       // Ignore localStorage errors
     }
   };
+
+  // Other windows (e.g. the floating island) share this origin's localStorage
+  // but only read it on mount; follow language changes made in the main window.
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== STORAGE_KEY || !e.newValue) return;
+      if (e.newValue in dictionaries) {
+        setLanguageState(e.newValue as SupportedLanguage);
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
 
   const currentDict = useMemo(() => {
     return dictionaries[language] || tr;
