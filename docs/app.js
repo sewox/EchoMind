@@ -12,8 +12,7 @@ const translations = {
     navSecurity: "Güvenlik & DLP",
     navHardware: "Donanım",
     navDownload: "İndir",
-    badgeRelease: "EchoMind v0.2.3 Yayında • Sıfır-Güven Mimarisi",
-    badgeProductHunt: "🚀 Product Hunt'ta Keşfedin",
+    badgeRelease: "EchoMind v0.2.12 Yayında • Sıfır-Güven Mimarisi",
     heroTitle: "Toplantılarınızı Donanım Gücüyle Dinleyen Hibrit Yapay Zekâ",
     heroSubtitle:
       "Apple Metal ve NVIDIA CUDA ile %100 yerel ve gizli çalışabilen, kurumsal DLP ve toplantılar arası semantik hafıza sunan yeni nesil masaüstü toplantı asistanı.",
@@ -26,22 +25,6 @@ const translations = {
     secShowcaseTitle: "✨ EchoMind Masaüstü Arayüzü",
     secShowcaseSubtitle:
       "Gizlilik odaklı, sıfır gecikmeli ve donanım hızlandırmalı modern toplantı arayüzünü inceleyin.",
-    tabShowcaseTrans: "🎙️ Canlı Transkripsiyon",
-    tabShowcaseSummary: "📊 Akıllı Özet & Analitik",
-    tabShowcaseMemory: "🧠 Semantik Hafıza",
-    tabShowcaseHw: "⚡ Donanım Ayarları",
-    showcaseBadgeLocal: "%100 Yerel Motor",
-    showcaseBadgeSummary: "Otomatik Yapay Zekâ Analitiği",
-    showcaseBadgeMemory: "Vektörel Semantik Arama",
-    showcaseBadgeHw: "Apple Metal & NVIDIA CUDA",
-    captionTrans:
-      "Toplantı sırasında konuşmacıları anlık tanır, Whisper Metal/CUDA ile yerel çözümler ve hassas DLP verilerini maskeler.",
-    captionSummary:
-      "Toplantı bittiğinde kararları, aksiyon maddelerini ve konuşmacı dengesini otomatik olarak özetler ve grafiğe döker.",
-    captionMemory:
-      "Tüm geçmiş toplantılarınızda doğal dille semantik arama yapın ve ilgili ses kesitine doğrudan zıplayın.",
-    captionHw:
-      "Cihazınızın GPU (Metal, CUDA) ve CPU kaynaklarına göre Whisper modellerini tek tıkla yapılandırın.",
     secFeaturesTitle: "Neden EchoMind?",
     secFeaturesSubtitle:
       "Tüm toplantı iş akışınızı gizlilikten ödün vermeden otomatikleştirin.",
@@ -102,8 +85,8 @@ const translations = {
     linuxDistroTitle: "Linux Dağıtımları (.deb / .AppImage)",
     linuxDistroDesc: "Ubuntu, Debian, Fedora ve Arch x64 için yerel paketler.",
     btnDownloadWinExe: "İndir .exe (4.9 MB)",
-    btnDownloadWinMsi: "İndir .msi (7.0 MB)",
-    btnDownloadMacDmg: "İndir .dmg (8.4 MB)",
+    btnDownloadWinMsi: "İndir .msi (6.9 MB)",
+    btnDownloadMacDmg: "İndir .dmg (8.2 MB)",
     footerText:
       "EchoMind © 2026. Açık Kaynaklı ve Sıfır-Güven Toplantı Zekâsı Platformu.",
   },
@@ -113,8 +96,7 @@ const translations = {
     navSecurity: "Security & DLP",
     navHardware: "Hardware",
     navDownload: "Download",
-    badgeRelease: "EchoMind v0.2.3 Released • Zero-Trust Architecture",
-    badgeProductHunt: "🚀 Discover on Product Hunt",
+    badgeRelease: "EchoMind v0.2.12 Released • Zero-Trust Architecture",
     heroTitle: "Hardware-Aware Hybrid AI Meeting Intelligence",
     heroSubtitle:
       "A next-generation desktop meeting assistant that runs 100% locally with Apple Metal & NVIDIA CUDA, featuring enterprise DLP and cross-meeting semantic memory.",
@@ -127,22 +109,6 @@ const translations = {
     secShowcaseTitle: "✨ EchoMind Desktop Experience",
     secShowcaseSubtitle:
       "Explore the privacy-first, zero-latency, and hardware-accelerated modern meeting interface.",
-    tabShowcaseTrans: "🎙️ Live Transcription",
-    tabShowcaseSummary: "📊 Smart Summary & Analytics",
-    tabShowcaseMemory: "🧠 Semantic Memory",
-    tabShowcaseHw: "⚡ Hardware Settings",
-    showcaseBadgeLocal: "100% On-Device Engine",
-    showcaseBadgeSummary: "Automated AI Analytics",
-    showcaseBadgeMemory: "Vector Semantic Search",
-    showcaseBadgeHw: "Apple Metal & NVIDIA CUDA",
-    captionTrans:
-      "Separates speakers in real time, transcribes locally via Whisper Metal/CUDA, and masks sensitive DLP credentials.",
-    captionSummary:
-      "Automatically extracts decisions, action items, and speaker participation balance immediately after the meeting.",
-    captionMemory:
-      "Search seamlessly across all previous meetings using natural language queries with instant audio timestamp links.",
-    captionHw:
-      "Easily configure Whisper model sizes and hardware acceleration targets tailored to your system's GPU and CPU cores.",
     secFeaturesTitle: "Why Choose EchoMind?",
     secFeaturesSubtitle:
       "Automate your entire meeting intelligence workflow without compromising data privacy.",
@@ -204,8 +170,8 @@ const translations = {
     linuxDistroDesc:
       "Native packages for Ubuntu, Debian, Fedora, and Arch x64.",
     btnDownloadWinExe: "Download .exe (4.9 MB)",
-    btnDownloadWinMsi: "Download .msi (7.0 MB)",
-    btnDownloadMacDmg: "Download .dmg (8.4 MB)",
+    btnDownloadWinMsi: "Download .msi (6.9 MB)",
+    btnDownloadMacDmg: "Download .dmg (8.2 MB)",
     footerText:
       "EchoMind © 2026. Open-Source Zero-Trust Meeting Intelligence Platform.",
   },
@@ -300,6 +266,9 @@ function setLanguage(lang) {
     }
   });
 
+  // Translations carry the fallback version/sizes; overwrite with the live release.
+  applyLatestRelease();
+
   const langBtn = document.getElementById("langToggleBtn");
   if (langBtn) {
     langBtn.innerHTML = lang === "tr" ? "🌐 English" : "🌐 Türkçe";
@@ -330,9 +299,9 @@ function setLanguage(lang) {
     transcriptEl.textContent = list[0];
   }
 
-  // Update Showcase Gallery texts on lang switch
-  if (typeof selectShowcaseTab === "function") {
-    selectShowcaseTab(currentShowcaseKey);
+  // Re-render the screenshot slider in the new language
+  if (typeof renderShowcaseSlide === "function") {
+    renderShowcaseSlide(showcaseIndex);
   }
 
   localStorage.setItem("echomind_lang", lang);
@@ -464,6 +433,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const savedLang = localStorage.getItem("echomind_lang") || "tr";
   setLanguage(savedLang);
 
+  // Point download buttons at the newest GitHub release
+  loadLatestRelease();
+
   // Init DLP Sandbox Input & Output Elements
   const dlpInput = document.getElementById("dlpInput");
   const dlpOutput = document.getElementById("dlpOutput");
@@ -507,119 +479,327 @@ document.addEventListener("DOMContentLoaded", () => {
     }, 4000);
   }
 
-  // Init Showcase Gallery Tabs
-  document.querySelectorAll(".showcase-tab-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      selectShowcaseTab(btn.getAttribute("data-showcase"));
-    });
-  });
+  // Init screenshot slider
+  initShowcaseSlider();
 });
 
-let currentShowcaseKey = "transcription";
+// ---------------------------------------------------------------------------
+// Screenshot slider. Real captures of the running app (macOS, v0.2.12);
+// web-optimized copies live in assets/screenshots/web/{tr,en}/ and the
+// full-resolution PNGs next to them.
+// ---------------------------------------------------------------------------
+const SHOWCASE_SLIDES = [
+  {
+    shot: "01-main-empty",
+    title: { tr: "Ana Ekran", en: "Main Window" },
+    caption: {
+      tr: "Tek tıkla dinlemeye başlayın veya bir ses dosyası yükleyin; geçmiş toplantılar solda listelenir.",
+      en: "Start listening with one click or import an audio file; past meetings are listed on the left.",
+    },
+  },
+  {
+    shot: "02-recording",
+    title: { tr: "Kayıt Başladı", en: "Recording Started" },
+    caption: {
+      tr: "Canlı dinleme sırasında mikrofon durumu ve sistem sesi yakalanıp yakalanmadığı açıkça gösterilir.",
+      en: "While listening, the app clearly shows the microphone state and whether system audio is captured.",
+    },
+  },
+  {
+    shot: "03-live-transcript",
+    title: { tr: "Canlı Transkripsiyon", en: "Live Transcription" },
+    caption: {
+      tr: "Toplantı sırasında konuşmalar cihazınızdaki Whisper modeliyle anlık olarak yazıya dökülür; ses bilgisayarınızdan çıkmaz.",
+      en: "Speech is transcribed live by the Whisper model on your device; the audio never leaves your computer.",
+    },
+  },
+  {
+    shot: "04-meeting-detail",
+    title: { tr: "Toplantı Detayı", en: "Meeting Detail" },
+    caption: {
+      tr: "Geçmiş bir toplantıyı açın, sesi dinleyin ve zaman damgalı konuşma akışında gezinin.",
+      en: "Open a past meeting, play back the audio and browse the timestamped dialogue stream.",
+    },
+  },
+  {
+    shot: "13-meeting-report",
+    title: { tr: "Toplantı Raporu", en: "Meeting Report" },
+    caption: {
+      tr: "Toplantı bittiğinde amaç, öne çıkan başlıklar, kararlar ve görevler otomatik bir rapora dönüşür.",
+      en: "When the meeting ends, its purpose, highlights, decisions and tasks turn into an automatic report.",
+    },
+  },
+  {
+    shot: "14-smart-assistant",
+    title: { tr: "Akıllı Asistan • ⌘K", en: "Smart Advisor • ⌘K" },
+    caption: {
+      tr: "Tüm toplantı arşivinizi tarayarak kararlar, görevler ve konuşmalar hakkındaki sorularınızı yanıtlar.",
+      en: "Searches your whole meeting archive to answer questions about decisions, tasks and discussions.",
+    },
+  },
+  {
+    shot: "12-floating-island",
+    title: { tr: "Floating Island", en: "Floating Island" },
+    caption: {
+      tr: "Meet, Zoom veya Teams toplantısı algılandığında ekranın üstünde kayıt başlatma önerisi belirir.",
+      en: "When a Meet, Zoom or Teams call is detected, a prompt to start recording appears at the top of the screen.",
+    },
+  },
+  {
+    shot: "15-privacy-mode-menu",
+    title: { tr: "Gizlilik Profili", en: "Privacy Profile" },
+    caption: {
+      tr: "Paranoid, Dengeli ve Maksimum Zeka profilleri arasında üst menüden anında geçiş yapın.",
+      en: "Switch instantly between Paranoid, Balanced and Max Intelligence from the header menu.",
+    },
+  },
+  {
+    shot: "06-privacy-mode",
+    title: { tr: "Cihaz & Gizlilik", en: "Device & Privacy" },
+    caption: {
+      tr: "Verinin cihazdan çıkıp çıkmayacağına siz karar verin; donanım bilgileri de burada görünür.",
+      en: "Decide whether any data may leave the device; your hardware details are shown here too.",
+    },
+  },
+  {
+    shot: "05-settings-audio",
+    title: { tr: "Mikrofon & Sistem Sesi", en: "Microphone & System Audio" },
+    caption: {
+      tr: "Mikrofon seçimi, canlı ses seviyesi ve karşı tarafı kaydetmek için Loopback / BlackHole rehberi.",
+      en: "Microphone selection, a live input meter and a Loopback / BlackHole guide for capturing remote audio.",
+    },
+  },
+  {
+    shot: "07-model-hub",
+    title: { tr: "Model Merkezi • Yerel", en: "Model Hub • Local" },
+    caption: {
+      tr: "Apple Dikte, SenseVoice ve Whisper gibi tamamen çevrimdışı çalışan motorlar arasından seçim yapın.",
+      en: "Choose between fully offline engines such as Apple Dictation, SenseVoice and Whisper.",
+    },
+  },
+  {
+    shot: "11-model-hub-cloud",
+    title: { tr: "Model Merkezi • Bulut", en: "Model Hub • Cloud" },
+    caption: {
+      tr: "İsterseniz kendi anahtarınızla Groq, Gemini veya OpenAI ile saniyeler içinde yazıya dökün.",
+      en: "Optionally transcribe in seconds with Groq, Gemini or OpenAI using your own key.",
+    },
+  },
+  {
+    shot: "08-settings-ai-services",
+    title: { tr: "Yapay Zeka Servisleri", en: "AI Services" },
+    caption: {
+      tr: "Yerel LLM sunucusu (Ollama / LM Studio) ve bulut anahtarları; anahtarlar cihazınızda saklanır.",
+      en: "Local LLM server (Ollama / LM Studio) and cloud keys; keys are stored on your device.",
+    },
+  },
+  {
+    shot: "10-settings-language",
+    title: { tr: "Arayüz Dili", en: "App Language" },
+    caption: {
+      tr: "Türkçe, İngilizce, Almanca, Fransızca ve İspanyolca arayüz desteği.",
+      en: "Interface available in Turkish, English, German, French and Spanish.",
+    },
+  },
+  {
+    shot: "16-secure-storage-unlocking",
+    title: { tr: "Güvenli Depolama", en: "Secure Storage" },
+    caption: {
+      tr: "Toplantı geçmişi şifreli saklanır; açılışta anahtar sistem Anahtarlığı'ndan alınır.",
+      en: "Meeting history is stored encrypted; on launch the key is fetched from the system Keychain.",
+    },
+  },
+];
 
-const showcaseData = {
-  transcription: {
-    img: "assets/screenshots/showcase-live-transcription.png",
-    title: {
-      tr: "EchoMind AI Assistant • Canlı Toplantı & Transkripsiyon Odası",
-      en: "EchoMind AI Assistant • Live Meeting Room & Transcription",
-    },
-    badge: {
-      tr: "%100 Yerel Motor",
-      en: "100% On-Device Engine",
-    },
-    caption: {
-      tr: "Toplantı sırasında konuşmacıları anlık tanır, Whisper Metal/CUDA ile yerel çözümler ve hassas DLP verilerini maskeler.",
-      en: "Separates speakers in real time, transcribes locally via Whisper Metal/CUDA, and masks sensitive DLP credentials.",
-    },
-    tag: {
-      tr: "Apple Metal & NVIDIA CUDA",
-      en: "Apple Metal & NVIDIA CUDA",
-    },
+const SLIDER_UI = {
+  tr: {
+    prev: "Önceki ekran",
+    next: "Sonraki ekran",
+    region: "EchoMind ekran görüntüleri",
+    goto: "Ekran",
   },
-  summary: {
-    img: "assets/screenshots/showcase-meeting-summary.png",
-    title: {
-      tr: "EchoMind AI Assistant • Yönetici Özeti & Aksiyon Maddeleri",
-      en: "EchoMind AI Assistant • Executive Summary & Action Items",
-    },
-    badge: {
-      tr: "Otomatik Yapay Zekâ Analitiği",
-      en: "Automated AI Analytics",
-    },
-    caption: {
-      tr: "Toplantı bittiğinde kararları, aksiyon maddelerini ve konuşmacı dengesini otomatik olarak özetler ve grafiğe döker.",
-      en: "Automatically extracts decisions, action items, and speaker participation balance immediately after the meeting.",
-    },
-    tag: {
-      tr: "Konuşmacı Ayrıştırma & Kararlar",
-      en: "Speaker Diarization & Decisions",
-    },
-  },
-  memory: {
-    img: "assets/screenshots/showcase-semantic-memory.png",
-    title: {
-      tr: "EchoMind AI Assistant • Toplantılar Arası Semantik Arama",
-      en: "EchoMind AI Assistant • Cross-Meeting Semantic Memory",
-    },
-    badge: {
-      tr: "Vektörel Semantik Arama",
-      en: "Vector Semantic Search",
-    },
-    caption: {
-      tr: "Tüm geçmiş toplantılarınızda doğal dille semantik arama yapın ve ilgili ses kesitine doğrudan zıplayın.",
-      en: "Search seamlessly across all previous meetings using natural language queries with instant audio timestamp links.",
-    },
-    tag: {
-      tr: "Semantik Hafıza & Ses Kesiti",
-      en: "Semantic Memory & Soundbites",
-    },
-  },
-  hardware: {
-    img: "assets/screenshots/showcase-hardware-settings.png",
-    title: {
-      tr: "EchoMind AI Assistant • Donanım Hızlandırma & Model Seçici",
-      en: "EchoMind AI Assistant • Hardware Acceleration & Model Selector",
-    },
-    badge: {
-      tr: "Donanım Farkındalıklı",
-      en: "Hardware-Aware",
-    },
-    caption: {
-      tr: "Cihazınızın GPU (Metal, CUDA) ve CPU kaynaklarına göre Whisper modellerini tek tıkla yapılandırın.",
-      en: "Easily configure Whisper model sizes and hardware acceleration targets tailored to your system's GPU and CPU cores.",
-    },
-    tag: {
-      tr: "Metal • CUDA • AVX2",
-      en: "Metal • CUDA • AVX2",
-    },
+  en: {
+    prev: "Previous screen",
+    next: "Next screen",
+    region: "EchoMind screenshots",
+    goto: "Screen",
   },
 };
 
-function selectShowcaseTab(key) {
-  if (!showcaseData[key]) return;
-  currentShowcaseKey = key;
+let showcaseIndex = 2;
 
-  document.querySelectorAll(".showcase-tab-btn").forEach((btn) => {
-    btn.classList.toggle("active", btn.getAttribute("data-showcase") === key);
+function showcaseLang() {
+  return currentLang === "en" ? "en" : "tr";
+}
+
+function showcaseSrc(i, lang) {
+  return `assets/screenshots/web/${lang}/${SHOWCASE_SLIDES[i].shot}.webp`;
+}
+
+function renderShowcaseSlide(index) {
+  const n = SHOWCASE_SLIDES.length;
+  showcaseIndex = ((index % n) + n) % n;
+  const lang = showcaseLang();
+  const slide = SHOWCASE_SLIDES[showcaseIndex];
+  const ui = SLIDER_UI[lang];
+
+  const imgEl = document.getElementById("showcaseMainImg");
+  const titleEl = document.getElementById("sliderTitle");
+  const captionEl = document.getElementById("showcaseCaptionText");
+  const counterEl = document.getElementById("sliderCounter");
+  const sliderEl = document.getElementById("shotSlider");
+  if (!imgEl) return;
+
+  const nextSrc = showcaseSrc(showcaseIndex, lang);
+  if (imgEl.getAttribute("src") !== nextSrc) {
+    imgEl.style.opacity = "0.35";
+    const loader = new Image();
+    loader.onload = loader.onerror = () => {
+      imgEl.src = nextSrc;
+      imgEl.style.opacity = "1";
+    };
+    loader.src = nextSrc;
+  }
+  imgEl.alt = slide.title[lang];
+  if (titleEl) titleEl.textContent = slide.title[lang];
+  if (captionEl) captionEl.textContent = slide.caption[lang];
+  if (counterEl) counterEl.textContent = `${showcaseIndex + 1} / ${n}`;
+  if (sliderEl) sliderEl.setAttribute("aria-label", ui.region);
+
+  const prevBtn = document.getElementById("sliderPrev");
+  const nextBtn = document.getElementById("sliderNext");
+  if (prevBtn) prevBtn.setAttribute("aria-label", ui.prev);
+  if (nextBtn) nextBtn.setAttribute("aria-label", ui.next);
+
+  document.querySelectorAll("#sliderDots .slider-dot").forEach((dot, i) => {
+    const active = i === showcaseIndex;
+    dot.classList.toggle("active", active);
+    dot.setAttribute("aria-selected", active ? "true" : "false");
+    dot.setAttribute(
+      "aria-label",
+      `${ui.goto} ${i + 1}: ${SHOWCASE_SLIDES[i].title[lang]}`,
+    );
   });
 
-  const data = showcaseData[key];
-  const imgEl = document.getElementById("showcaseMainImg");
-  const titleEl = document.getElementById("showcaseWinTitle");
-  const badgeEl = document.getElementById("showcaseWinBadge");
-  const captionEl = document.getElementById("showcaseCaptionText");
-  const tagEl = document.getElementById("showcaseCaptionTag");
+  // Warm the cache for the neighbours so arrow clicks feel instant.
+  [showcaseIndex - 1, showcaseIndex + 1].forEach((j) => {
+    const k = ((j % n) + n) % n;
+    new Image().src = showcaseSrc(k, lang);
+  });
+}
 
-  if (imgEl) {
-    imgEl.style.opacity = "0.4";
-    setTimeout(() => {
-      imgEl.src = data.img;
-      imgEl.style.opacity = "1";
-    }, 150);
+function initShowcaseSlider() {
+  const sliderEl = document.getElementById("shotSlider");
+  const dotsEl = document.getElementById("sliderDots");
+  if (!sliderEl || !dotsEl) return;
+
+  dotsEl.innerHTML = "";
+  SHOWCASE_SLIDES.forEach((_, i) => {
+    const dot = document.createElement("button");
+    dot.type = "button";
+    dot.className = "slider-dot";
+    dot.setAttribute("role", "tab");
+    dot.addEventListener("click", () => renderShowcaseSlide(i));
+    dotsEl.appendChild(dot);
+  });
+
+  document
+    .getElementById("sliderPrev")
+    .addEventListener("click", () => renderShowcaseSlide(showcaseIndex - 1));
+  document
+    .getElementById("sliderNext")
+    .addEventListener("click", () => renderShowcaseSlide(showcaseIndex + 1));
+
+  sliderEl.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowLeft") {
+      e.preventDefault();
+      renderShowcaseSlide(showcaseIndex - 1);
+    } else if (e.key === "ArrowRight") {
+      e.preventDefault();
+      renderShowcaseSlide(showcaseIndex + 1);
+    }
+  });
+
+  let touchX = null;
+  sliderEl.addEventListener(
+    "touchstart",
+    (e) => {
+      touchX = e.touches[0].clientX;
+    },
+    { passive: true },
+  );
+  sliderEl.addEventListener("touchend", (e) => {
+    if (touchX === null) return;
+    const dx = e.changedTouches[0].clientX - touchX;
+    touchX = null;
+    if (Math.abs(dx) > 40)
+      renderShowcaseSlide(showcaseIndex + (dx < 0 ? 1 : -1));
+  });
+
+  renderShowcaseSlide(showcaseIndex);
+}
+
+// ---------------------------------------------------------------------------
+// Latest release: the HTML ships working links to a known release as a
+// fallback; on load we ask the GitHub API for the newest release and swap in
+// its asset URLs, sizes and version so the site never points at a stale build.
+// ---------------------------------------------------------------------------
+const RELEASES_API =
+  "https://api.github.com/repos/sewox/EchoMind/releases/latest";
+let latestRelease = null;
+
+async function loadLatestRelease() {
+  try {
+    const res = await fetch(RELEASES_API, {
+      headers: { Accept: "application/vnd.github+json" },
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    const assets = {};
+    (data.assets || []).forEach((a) => {
+      // EchoMind_0.2.12_x64-setup.exe -> key "x64-setup.exe"
+      const m = a.name.match(/^EchoMind_[\d.]+_(.+)$/);
+      if (m) {
+        assets[m[1]] = {
+          url: a.browser_download_url,
+          mb: (a.size / (1024 * 1024)).toFixed(1),
+        };
+      }
+    });
+    if (!data.tag_name || Object.keys(assets).length === 0) return;
+    latestRelease = { version: data.tag_name, assets };
+    applyLatestRelease();
+  } catch {
+    // Offline or rate-limited: keep the fallback links from the HTML.
   }
-  if (titleEl) titleEl.textContent = data.title[currentLang];
-  if (badgeEl) badgeEl.textContent = data.badge[currentLang];
-  if (captionEl) captionEl.textContent = data.caption[currentLang];
-  if (tagEl) tagEl.textContent = data.tag[currentLang];
+}
+
+function applyLatestRelease() {
+  if (!latestRelease) return;
+  document
+    .querySelectorAll('a[href*="/releases/download/"], a[data-release-asset]')
+    .forEach((a) => {
+      // Remember which asset a button is for, so re-applying (e.g. after a
+      // language switch) doesn't depend on the current href shape.
+      if (!a.dataset.releaseAsset) {
+        const m = a.getAttribute("href").match(/EchoMind_[\d.]+_([^/]+)$/);
+        if (m) a.dataset.releaseAsset = m[1];
+      }
+      const asset = latestRelease.assets[a.dataset.releaseAsset];
+      if (!asset) return;
+      a.href = asset.url;
+      a.querySelectorAll("span").forEach((span) => {
+        span.textContent = span.textContent.replace(
+          /\([\d.,]+\s*MB\)/,
+          `(${asset.mb} MB)`,
+        );
+      });
+    });
+  const badge = document.querySelector('[data-i18n="badgeRelease"]');
+  if (badge) {
+    badge.textContent = badge.textContent.replace(
+      /v\d+\.\d+\.\d+/,
+      latestRelease.version,
+    );
+  }
 }

@@ -21,6 +21,7 @@ import {
   GROQ_MODELS,
   GEMINI_MODELS,
   OPENAI_MODELS,
+  modelLabel,
 } from "./ModelHubModalConstants";
 import { useI18n } from "../locales/i18nContext";
 import { CredentialStore } from "../services/credentialStore";
@@ -326,23 +327,21 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
                 <div className="flex-1 space-y-2">
                   <div className="flex items-center gap-2">
                     <h3 className="font-semibold text-white text-sm flex items-center gap-2">
-                      🍎 macOS Yerel Ses Tanıma (Apple Dikte / ANE)
+                      {t("ui.modelHub.appleTitle")}
                     </h3>
                     {activeEngine === "apple_speech" && (
                       <span className="text-[11px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full font-semibold">
-                        Kullanımda
+                        {t("ui.modelHub.inUse")}
                       </span>
                     )}
                   </div>
                   <p className="text-xs text-slate-400">
-                    İşletim sisteminizin yerleşik Türkçe konuşma tanıma motoru.
-                    0 MB RAM, sıfır gecikme ve Apple Neural Engine
-                    hızlandırmasıyla çalışır.
+                    {t("ui.modelHub.appleDesc")}
                   </p>
                   <div className="flex items-center gap-4 text-xs text-slate-400 pt-1">
                     <span className="flex items-center gap-1">
-                      <HardDrive className="w-3.5 h-3.5 text-slate-500" />0 MB
-                      İndirme
+                      <HardDrive className="w-3.5 h-3.5 text-slate-500" />
+                      {t("ui.modelHub.zeroDownload")}
                     </span>
                     <span className="flex items-center gap-1">
                       <Cpu className="w-3.5 h-3.5 text-slate-500" />
@@ -350,11 +349,11 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
                     </span>
                     <span className="flex items-center gap-1">
                       <Zap className="w-3.5 h-3.5 text-amber-400" />
-                      Hız: %100
+                      {t("ui.modelHub.speedValue", { value: 100 })}
                     </span>
                     <span className="flex items-center gap-1">
                       <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                      Doğruluk: %95
+                      {t("ui.modelHub.accuracyValue", { value: 95 })}
                     </span>
                   </div>
                 </div>
@@ -362,7 +361,7 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
                   <button
                     onClick={() => handleSelectOfflineEngine("apple_speech")}
                     disabled={activeEngine === "apple_speech"}
-                    aria-label="macOS Yerel Ses Tanıma Seç"
+                    aria-label={t("ui.modelHub.appleSelectAria")}
                     className={`px-4 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 ${
                       activeEngine === "apple_speech"
                         ? "bg-slate-800 text-slate-500 cursor-default"
@@ -370,8 +369,8 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
                     }`}
                   >
                     {activeEngine === "apple_speech"
-                      ? "Kullanımda"
-                      : "Bunu Seç"}
+                      ? t("ui.modelHub.inUse")
+                      : t("ui.modelHub.select")}
                   </button>
                 </div>
               </div>
@@ -393,13 +392,12 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
                     </h3>
                     {activeEngine === "sensevoice" && (
                       <span className="text-[11px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 px-2 py-0.5 rounded-full font-semibold">
-                        Kullanımda
+                        {t("ui.modelHub.inUse")}
                       </span>
                     )}
                   </div>
                   <p className="text-xs text-slate-400">
-                    Halüsinasyonsuz, kelime uydurmayan ve Whisper'dan 15 kat
-                    daha hızlı çalışan yeni nesil yerel konuşma tanıma motoru.
+                    {t("ui.modelHub.senseDesc")}
                   </p>
                   <div className="flex items-center gap-4 text-xs text-slate-400 pt-1">
                     <span className="flex items-center gap-1">
@@ -412,11 +410,11 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
                     </span>
                     <span className="flex items-center gap-1">
                       <Zap className="w-3.5 h-3.5 text-amber-400" />
-                      Hız: %98
+                      {t("ui.modelHub.speedValue", { value: 98 })}
                     </span>
                     <span className="flex items-center gap-1">
                       <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                      Doğruluk: %92
+                      {t("ui.modelHub.accuracyValue", { value: 92 })}
                     </span>
                   </div>
                 </div>
@@ -424,14 +422,16 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
                   <button
                     onClick={() => handleSelectOfflineEngine("sensevoice")}
                     disabled={activeEngine === "sensevoice"}
-                    aria-label="SenseVoice Seç"
+                    aria-label={t("ui.modelHub.senseSelectAria")}
                     className={`px-4 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 ${
                       activeEngine === "sensevoice"
                         ? "bg-slate-800 text-slate-500 cursor-default"
                         : "bg-cyan-600 hover:bg-cyan-500 text-white shadow-lg shadow-cyan-600/20"
                     }`}
                   >
-                    {activeEngine === "sensevoice" ? "Kullanımda" : "Bunu Seç"}
+                    {activeEngine === "sensevoice"
+                      ? t("ui.modelHub.inUse")
+                      : t("ui.modelHub.select")}
                   </button>
                 </div>
               </div>
@@ -440,7 +440,7 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
             {loading && (!models || models.length === 0) ? (
               <div className="flex flex-col items-center justify-center py-12 text-slate-400">
                 <Loader2 className="w-8 h-8 animate-spin text-cyan-400 mb-2" />
-                <p className="text-sm">Seçenekler hazırlanıyor...</p>
+                <p className="text-sm">{t("ui.modelHub.preparing")}</p>
               </div>
             ) : (
               (models || []).map((model) => {
@@ -464,7 +464,7 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
                           </h3>
                           {isActiveThis && (
                             <span className="text-[11px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 px-2 py-0.5 rounded-full font-semibold">
-                              Kullanımda
+                              {t("ui.modelHub.inUse")}
                             </span>
                           )}
                         </div>
@@ -482,11 +482,15 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
                           </span>
                           <span className="flex items-center gap-1">
                             <Zap className="w-3.5 h-3.5 text-amber-400" />
-                            Hız: %{model.speed_score}
+                            {t("ui.modelHub.speedValue", {
+                              value: model.speed_score,
+                            })}
                           </span>
                           <span className="flex items-center gap-1">
                             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                            Doğruluk: %{model.accuracy_score}
+                            {t("ui.modelHub.accuracyValue", {
+                              value: model.accuracy_score,
+                            })}
                           </span>
                         </div>
                       </div>
@@ -502,7 +506,9 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
                                 : "bg-cyan-600 hover:bg-cyan-500 text-white shadow-lg shadow-cyan-600/20"
                             }`}
                           >
-                            {isActiveThis ? "Aktif Model" : "Bunu Kullan"}
+                            {isActiveThis
+                              ? t("ui.modelHub.activeModel")
+                              : t("ui.modelHub.useThis")}
                           </button>
                         ) : (
                           <button
@@ -513,12 +519,14 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
                             {downloadingKey === model.key ? (
                               <>
                                 <Loader2 className="w-3.5 h-3.5 animate-spin text-cyan-400" />
-                                İndiriliyor...
+                                {t("ui.modelHub.downloading")}
                               </>
                             ) : (
                               <>
                                 <Download className="w-3.5 h-3.5 text-cyan-400" />
-                                İndir ({model.size_mb} MB)
+                                {t("ui.modelHub.downloadSize", {
+                                  size: model.size_mb,
+                                })}
                               </>
                             )}
                           </button>
@@ -548,40 +556,37 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
                   <div className="flex items-center gap-2">
                     <h3 className="font-semibold text-white text-sm flex items-center gap-2">
                       <Zap className="w-4 h-4 text-amber-400" />
-                      Yıldırım Hızı (Groq Cloud Whisper)
+                      {t("ui.modelHub.groqTitle")}
                     </h3>
                     {activeEngine === "cloud_groq" && (
                       <span className="text-[11px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full font-semibold">
-                        Aktif Mod
+                        {t("ui.modelHub.activeMode")}
                       </span>
                     )}
                     <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded font-medium">
-                      En Hızlı (10 Saniye)
+                      {t("ui.modelHub.groqBadge")}
                     </span>
                   </div>
-                  <p className="text-slate-400">
-                    1 saatlik ses kaydını{" "}
-                    <strong>10 saniye gibi kısa bir sürede</strong> eksiksiz
-                    yazıya döker. Bilgisayarınızı hiç yormaz ve pilinizi
-                    tüketmez.
-                  </p>
+                  <p className="text-slate-400">{t("ui.modelHub.groqDesc")}</p>
 
                   {/* Standardized Metrics: Sadece "Sıfır Yük" */}
                   <div className="flex items-center gap-4 text-slate-300 pt-1">
                     <span>
-                      Bilgisayar Yükü:{" "}
-                      <strong className="text-emerald-400">Sıfır Yük</strong>
-                    </span>
-                    <span>
-                      Hız:{" "}
-                      <strong className="text-amber-400">
-                        ⚡ Saniyeler İçinde
+                      {t("ui.modelHub.cpuLoad")}{" "}
+                      <strong className="text-emerald-400">
+                        {t("ui.modelHub.zeroLoad")}
                       </strong>
                     </span>
                     <span>
-                      Anlama Kalitesi:{" "}
+                      {t("ui.modelHub.speedLabel")}{" "}
+                      <strong className="text-amber-400">
+                        {t("ui.modelHub.inSeconds")}
+                      </strong>
+                    </span>
+                    <span>
+                      {t("ui.modelHub.qualityLabel")}{" "}
                       <strong className="text-cyan-400">
-                        Kristal Netliğinde
+                        {t("ui.modelHub.crystalClear")}
                       </strong>
                     </span>
                   </div>
@@ -590,7 +595,7 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
                   <div className="pt-2 flex flex-col gap-2">
                     <div className="flex items-center gap-2">
                       <span className="text-[11px] text-slate-400 font-medium">
-                        Model Versiyonu:
+                        {t("ui.modelHub.modelVersion")}
                       </span>
                       <select
                         value={groqModelVersion}
@@ -608,7 +613,7 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
                       >
                         {GROQ_MODELS.map((m) => (
                           <option key={m.id} value={m.id}>
-                            {m.name}
+                            {modelLabel(m, t)}
                           </option>
                         ))}
                       </select>
@@ -627,7 +632,9 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
                               e.target.value.trim(),
                             );
                           }}
-                          placeholder="Örn: whisper-large-v3-turbo"
+                          placeholder={t("ui.modelHub.examplePlaceholder", {
+                            example: "whisper-large-v3-turbo",
+                          })}
                           className="flex-1 px-2.5 py-1 bg-slate-950 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-amber-500 font-mono"
                         />
                       </div>
@@ -643,7 +650,9 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
                       : "bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white shadow-lg shadow-amber-600/20"
                   }`}
                 >
-                  {activeEngine === "cloud_groq" ? "Kullanımda" : "Bunu Seç"}
+                  {activeEngine === "cloud_groq"
+                    ? t("ui.modelHub.inUse")
+                    : t("ui.modelHub.select")}
                 </button>
               </div>
 
@@ -655,7 +664,10 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
                     type="password"
                     value={inlineKeyValue}
                     onChange={(e) => setInlineKeyValue(e.target.value)}
-                    placeholder="Groq API Anahtarını Yapıştırın (gsk_...)"
+                    placeholder={t("ui.modelHub.pasteKey", {
+                      provider: "Groq",
+                      prefix: "gsk_...",
+                    })}
                     className="flex-1 px-3 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs text-white font-mono focus:outline-none focus:border-amber-500"
                   />
                   <button
@@ -663,7 +675,8 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
                     disabled={!inlineKeyValue.trim()}
                     className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 disabled:opacity-40 text-white text-xs font-semibold rounded-lg flex items-center gap-1 shrink-0"
                   >
-                    <Check className="w-3.5 h-3.5" /> Kaydet & Seç
+                    <Check className="w-3.5 h-3.5" />{" "}
+                    {t("ui.modelHub.saveAndSelect")}
                   </button>
                 </div>
               )}
@@ -682,37 +695,40 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
                   <div className="flex items-center gap-2">
                     <h3 className="font-semibold text-white text-sm flex items-center gap-2">
                       <Sparkles className="w-4 h-4 text-cyan-400" />
-                      Google Gemini (Multimodal Ses & Akıl Yürütme)
+                      {t("ui.modelHub.geminiTitle")}
                     </h3>
                     {activeEngine === "cloud_gemini" && (
                       <span className="text-[11px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full font-semibold">
-                        Aktif Mod
+                        {t("ui.modelHub.activeMode")}
                       </span>
                     )}
                     <span className="text-[10px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 px-1.5 py-0.5 rounded font-medium">
-                      Zengin Model Ailesi
+                      {t("ui.modelHub.geminiBadge")}
                     </span>
                   </div>
                   <p className="text-slate-400">
-                    Google'ın gelişmiş multimodal ses yapay zekası. Tüm Gemini
-                    sürümleri ile yüksek doğruluk ve akıllı konuşmacı analizi.
+                    {t("ui.modelHub.geminiDesc")}
                   </p>
 
                   {/* Standardized Metrics: Sadece "Sıfır Yük" */}
                   <div className="flex items-center gap-4 text-slate-300 pt-1">
                     <span>
-                      Bilgisayar Yükü:{" "}
-                      <strong className="text-emerald-400">Sıfır Yük</strong>
-                    </span>
-                    <span>
-                      Hız:{" "}
-                      <strong className="text-amber-400">
-                        ⚡ Saniyeler İçinde
+                      {t("ui.modelHub.cpuLoad")}{" "}
+                      <strong className="text-emerald-400">
+                        {t("ui.modelHub.zeroLoad")}
                       </strong>
                     </span>
                     <span>
-                      Anlama Kalitesi:{" "}
-                      <strong className="text-cyan-400">Üst Düzey Zeka</strong>
+                      {t("ui.modelHub.speedLabel")}{" "}
+                      <strong className="text-amber-400">
+                        {t("ui.modelHub.inSeconds")}
+                      </strong>
+                    </span>
+                    <span>
+                      {t("ui.modelHub.qualityLabel")}{" "}
+                      <strong className="text-cyan-400">
+                        {t("ui.modelHub.topTier")}
+                      </strong>
                     </span>
                   </div>
 
@@ -720,7 +736,7 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
                   <div className="pt-2 flex flex-col gap-2">
                     <div className="flex items-center gap-2">
                       <span className="text-[11px] text-slate-400 font-medium">
-                        Model Versiyonu:
+                        {t("ui.modelHub.modelVersion")}
                       </span>
                       <select
                         value={geminiModelVersion}
@@ -738,7 +754,7 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
                       >
                         {GEMINI_MODELS.map((m) => (
                           <option key={m.id} value={m.id}>
-                            {m.name}
+                            {modelLabel(m, t)}
                           </option>
                         ))}
                       </select>
@@ -757,7 +773,9 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
                               e.target.value.trim(),
                             );
                           }}
-                          placeholder="Örn: gemini-2.0-flash veya gemini-1.5-pro"
+                          placeholder={t("ui.modelHub.examplePlaceholder", {
+                            example: "gemini-2.0-flash / gemini-1.5-pro",
+                          })}
                           className="flex-1 px-2.5 py-1 bg-slate-950 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-cyan-500 font-mono"
                         />
                       </div>
@@ -773,7 +791,9 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
                       : "bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white shadow-lg shadow-cyan-600/20"
                   }`}
                 >
-                  {activeEngine === "cloud_gemini" ? "Kullanımda" : "Bunu Seç"}
+                  {activeEngine === "cloud_gemini"
+                    ? t("ui.modelHub.inUse")
+                    : t("ui.modelHub.select")}
                 </button>
               </div>
 
@@ -785,7 +805,10 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
                     type="password"
                     value={inlineKeyValue}
                     onChange={(e) => setInlineKeyValue(e.target.value)}
-                    placeholder="Google Gemini API Anahtarını Yapıştırın (AIzaSy...)"
+                    placeholder={t("ui.modelHub.pasteKey", {
+                      provider: "Google Gemini",
+                      prefix: "AIzaSy...",
+                    })}
                     className="flex-1 px-3 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs text-white font-mono focus:outline-none focus:border-cyan-500"
                   />
                   <button
@@ -793,7 +816,8 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
                     disabled={!inlineKeyValue.trim()}
                     className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-40 text-white text-xs font-semibold rounded-lg flex items-center gap-1 shrink-0"
                   >
-                    <Check className="w-3.5 h-3.5" /> Kaydet & Seç
+                    <Check className="w-3.5 h-3.5" />{" "}
+                    {t("ui.modelHub.saveAndSelect")}
                   </button>
                 </div>
               )}
@@ -812,34 +836,37 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
                   <div className="flex items-center gap-2">
                     <h3 className="font-semibold text-white text-sm flex items-center gap-2">
                       <Globe className="w-4 h-4 text-emerald-400" />
-                      Küresel Standart (OpenAI Whisper & GPT-4o Audio)
+                      {t("ui.modelHub.openaiTitle")}
                     </h3>
                     {activeEngine === "cloud_openai" && (
                       <span className="text-[11px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full font-semibold">
-                        Aktif Mod
+                        {t("ui.modelHub.activeMode")}
                       </span>
                     )}
                   </div>
                   <p className="text-slate-400">
-                    Dünya çapında bilinen yapay zeka altyapısıyla çok dilli
-                    toplantılar için üstün başarı.
+                    {t("ui.modelHub.openaiDesc")}
                   </p>
 
                   {/* Standardized Metrics: Sadece "Sıfır Yük" */}
                   <div className="flex items-center gap-4 text-slate-300 pt-1">
                     <span>
-                      Bilgisayar Yükü:{" "}
-                      <strong className="text-emerald-400">Sıfır Yük</strong>
-                    </span>
-                    <span>
-                      Hız:{" "}
-                      <strong className="text-amber-400">
-                        ⚡ Saniyeler İçinde
+                      {t("ui.modelHub.cpuLoad")}{" "}
+                      <strong className="text-emerald-400">
+                        {t("ui.modelHub.zeroLoad")}
                       </strong>
                     </span>
                     <span>
-                      Anlama Kalitesi:{" "}
-                      <strong className="text-cyan-400">Çok Yüksek</strong>
+                      {t("ui.modelHub.speedLabel")}{" "}
+                      <strong className="text-amber-400">
+                        {t("ui.modelHub.inSeconds")}
+                      </strong>
+                    </span>
+                    <span>
+                      {t("ui.modelHub.qualityLabel")}{" "}
+                      <strong className="text-cyan-400">
+                        {t("ui.modelHub.veryHigh")}
+                      </strong>
                     </span>
                   </div>
 
@@ -847,7 +874,7 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
                   <div className="pt-2 flex flex-col gap-2">
                     <div className="flex items-center gap-2">
                       <span className="text-[11px] text-slate-400 font-medium">
-                        Model Versiyonu:
+                        {t("ui.modelHub.modelVersion")}
                       </span>
                       <select
                         value={openaiModelVersion}
@@ -865,7 +892,7 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
                       >
                         {OPENAI_MODELS.map((m) => (
                           <option key={m.id} value={m.id}>
-                            {m.name}
+                            {modelLabel(m, t)}
                           </option>
                         ))}
                       </select>
@@ -884,7 +911,9 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
                               e.target.value.trim(),
                             );
                           }}
-                          placeholder="Örn: whisper-1 veya gpt-4o-audio-preview"
+                          placeholder={t("ui.modelHub.examplePlaceholder", {
+                            example: "whisper-1 / gpt-4o-audio-preview",
+                          })}
                           className="flex-1 px-2.5 py-1 bg-slate-950 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
                         />
                       </div>
@@ -900,7 +929,9 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
                       : "bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/20"
                   }`}
                 >
-                  {activeEngine === "cloud_openai" ? "Kullanımda" : "Bunu Seç"}
+                  {activeEngine === "cloud_openai"
+                    ? t("ui.modelHub.inUse")
+                    : t("ui.modelHub.select")}
                 </button>
               </div>
 
@@ -912,7 +943,10 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
                     type="password"
                     value={inlineKeyValue}
                     onChange={(e) => setInlineKeyValue(e.target.value)}
-                    placeholder="OpenAI API Anahtarını Yapıştırın (sk-proj-...)"
+                    placeholder={t("ui.modelHub.pasteKey", {
+                      provider: "OpenAI",
+                      prefix: "sk-proj-...",
+                    })}
                     className="flex-1 px-3 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs text-white font-mono focus:outline-none focus:border-emerald-500"
                   />
                   <button
@@ -920,7 +954,8 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
                     disabled={!inlineKeyValue.trim()}
                     className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-xs font-semibold rounded-lg flex items-center gap-1 shrink-0"
                   >
-                    <Check className="w-3.5 h-3.5" /> Kaydet & Seç
+                    <Check className="w-3.5 h-3.5" />{" "}
+                    {t("ui.modelHub.saveAndSelect")}
                   </button>
                 </div>
               )}
@@ -930,15 +965,12 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
 
         {/* Footer */}
         <div className="px-6 py-4 border-t border-slate-800 bg-slate-900/90 flex items-center justify-between text-xs text-slate-400">
-          <span>
-            * İstediğiniz zaman gizlilik ve hız tercihlerinize göre tek tıkla
-            değiştirebilirsiniz.
-          </span>
+          <span>{t("ui.modelHub.footnote")}</span>
           <button
             onClick={onClose}
             className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-medium transition"
           >
-            Tamam
+            {t("ui.modelHub.done")}
           </button>
         </div>
       </div>

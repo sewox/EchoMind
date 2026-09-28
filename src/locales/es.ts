@@ -502,4 +502,193 @@ export const es: TranslationKeys = {
       "Aún no hay otras reuniones con etiquetas o participantes coincidentes.",
     jumpToMeeting: "Ir a la reunión",
   },
+  ui: {
+    settings: {
+      vuMeter: "Nivel de entrada en vivo (VU):",
+      speechDetected: "🟢 Voz detectada",
+      silentWaiting: "⚪ Silencio / En espera",
+      sampling: "Muestreo: 16.000 Hz mono (optimizado para Whisper)",
+      filter: "Filtro: paso alto 80 Hz + puerta de ruido",
+      defaultMic: "🎙️ Micrófono predeterminado (selección automática de {os})",
+      loopbackPrefix: "🔊 [Audio del sistema / Loopback] ",
+      defaultSuffix: "(predeterminado de {os})",
+      rescanDevices: "Volver a buscar dispositivos de audio",
+      dualCaptureTitle:
+        "Audio del sistema + micrófono (captura bidireccional activa)",
+      micCaptureTitle: "Captura de micrófono",
+      dualCaptureDesc:
+        "El loopback virtual está activo; los participantes remotos se capturan con claridad.",
+      micCaptureDesc: "Actualmente solo se escucha la entrada de tu micrófono.",
+      loopbackActive: "Loopback activo",
+      micOnly: "Solo micrófono",
+      remoteTipTitle: "Consejo: capturar a los participantes remotos",
+      remoteTipBefore:
+        "Con auriculares, el audio de los demás participantes que suena en tu equipo no llega al micrófono estándar. Para transcribir también al otro lado, selecciona el dispositivo virtual ",
+      remoteTipOr: " o ",
+      remoteTipAfter: ".",
+      loopbackFound:
+        "✓ ¡Se encontró un dispositivo de audio virtual! Selecciona el dispositivo loopback en la lista de arriba.",
+      yourVoice: "Tu voz: entrada activa",
+      systemAudioLoopback: "Audio del sistema: loopback activo",
+      systemAudioSpeaker: "Audio del sistema: altavoz/ambiente",
+      testingAudio: "Probando audio (escuchando VU)...",
+      testInput: "Probar entrada (5 s)",
+      openSoundPanelTitle:
+        "Abrir el panel de sonido del sistema o Configuración de Audio MIDI",
+      openSoundPanel: "Abrir panel de sonido",
+      hideGuide: "Ocultar guía",
+      showGuide: "Guía de configuración Loopback / BlackHole",
+      cpu: "Procesador:",
+      gpu: "Gráficos y aceleración:",
+      ram: "Memoria del sistema (RAM):",
+      detecting: "Detectando...",
+      appleAccel: "Aceleración Apple Silicon activa",
+      standardGpu: "Estándar",
+      offlineMode: "Modo de privacidad sin conexión:",
+      privateOnDevice: "100 % privado en el dispositivo",
+      dataSecurity: "Seguridad de datos:",
+      dataSecurityParanoid:
+        "Modo paranoico: 100 % en el dispositivo, sin salida a la nube.",
+      dataSecurityDefault:
+        "100 % privado con modelos locales; el uso de la nube requiere consentimiento explícito.",
+      aiStatus: "Estado de la IA:",
+      aiReady: "Listo",
+      aiOnDemand: "Se carga bajo demanda",
+      cloudWarnToggle:
+        "Mostrar aviso de privacidad para procesamiento en la nube",
+      cloudWarnToggleDesc:
+        "Antes de usar una opción rápida en la nube, recuerda que tu grabación se enviará por internet a un servidor de IA.",
+      localLlmTitle:
+        "Servidor LLM local personalizado (Ollama / vLLM / LM Studio)",
+      localOffline: "100 % local y sin conexión",
+      localLlmDesc:
+        "Conecta un servidor LLM de Ollama o compatible con OpenAI alojado en tu equipo o red local.",
+      endpointUrl: "URL del endpoint de la API:",
+      modelName: "Nombre del modelo:",
+      testingServer: "Probando servidor...",
+      testServer: "Probar conexión con el servidor",
+      paranoidActiveTitle: "Modo Air-Gapped / Paranoico activo",
+      paranoidActiveDesc:
+        "Mientras este modo esté activo, las llamadas a API en la nube (Groq, Gemini, OpenAI) se bloquean por completo en el backend de Rust. Las claves de abajo solo se aplican en los modos Equilibrado o Inteligencia máxima.",
+      locked: "Bloqueado",
+      groqTitle: "Groq (Ultrarrápido – ~10 segundos)",
+      groqBadge: "Gratis y ultrarrápido",
+      geminiTitle: "Google Gemini (familia Flash y Pro)",
+      geminiBadge: "Inteligencia de primer nivel",
+      openaiBadge: "Estándar global",
+      preferredModel: "Modelo preferido:",
+      customModelPlaceholder: "Escribe un nombre de modelo (p. ej.: {example})",
+      keysFootnote:
+        "* Tus claves y preferencias se guardan de forma segura en este dispositivo.",
+      languageDesc:
+        "Elige el idioma de la interfaz de EchoMind. Los menús, botones y plantillas de informe se mostrarán en este idioma.",
+      recommended: "Recomendado",
+      highSpeed: "Alta velocidad",
+    },
+    app: {
+      micOnlyBanner:
+        "Solo micrófono: audio del sistema (Zoom/Meet/Teams) no capturado",
+      micOnlyTooltip:
+        "Solo se captura el micrófono. El audio del sistema (Zoom / Meet / Teams) no se incluye. Para grabar también a los participantes remotos, elige un dispositivo loopback en los ajustes de audio.",
+      micActive: "Micrófono activo",
+      loopbackHint:
+        "Elige Loopback / BlackHole para capturar el audio remoto (Meet/Zoom)",
+      footerTagline:
+        "Privacidad primero • 100 % en el dispositivo • Todos los formatos de audio y vídeo",
+      aiOptions: "Opciones de IA",
+      aiOptionsTitle: "Cambiar modo de IA",
+    },
+    transcript: {
+      speaking: "Hablando",
+      transcribing: "Transcribiendo...",
+      transcribe: "Transcribir",
+      pastRecording: "Grabación anterior: {date}",
+      exportReport: "Exportar informe",
+    },
+    island: {
+      active: "Activo",
+      standby: "En espera",
+      prompt: "¿Quieres grabar esta reunión?",
+      ended: "Reunión finalizada (en espera)",
+    },
+    assistant: {
+      welcome:
+        "¡Hola! Soy el asistente de reuniones empresariales de EchoMind.\n\nPuedo responder tus preguntas buscando en todo tu archivo de reuniones: decisiones, tareas y transcripciones. Elige uno de los temas de abajo o pregunta lo que quieras.",
+      examples: "Ejemplos:",
+      copyReply: "Copiar respuesta",
+      q1Label: "Tareas abiertas y responsables",
+      q1Prompt:
+        "Enumera todas las acciones abiertas, tareas y responsables de todas las reuniones.",
+      q2Label: "Todas las decisiones clave",
+      q2Prompt:
+        "Resume los acuerdos alcanzados y las decisiones firmes de todas las reuniones anteriores.",
+      q3Label: "Objetivos y avance",
+      q3Prompt:
+        "Compara los objetivos principales de las reuniones y qué temas se aplazaron a fases posteriores.",
+      q4Label: "Presupuesto y temas financieros",
+      q4Prompt:
+        "¿Qué se habló sobre presupuesto, impuestos, pagos y costes en las reuniones?",
+    },
+    modelHub: {
+      inUse: "En uso",
+      select: "Seleccionar",
+      activeModel: "Modelo activo",
+      useThis: "Usar",
+      downloading: "Descargando...",
+      downloadSize: "Descargar ({size} MB)",
+      speedValue: "Velocidad: {value} %",
+      accuracyValue: "Precisión: {value} %",
+      zeroDownload: "0 MB de descarga",
+      preparing: "Preparando opciones...",
+      appleTitle:
+        "🍎 Reconocimiento de voz de macOS en el dispositivo (Dictado de Apple / ANE)",
+      appleDesc:
+        "El motor de reconocimiento de voz integrado en tu sistema. 0 MB de RAM, latencia cero y aceleración con Apple Neural Engine.",
+      appleSelectAria: "Seleccionar reconocimiento de voz de macOS",
+      senseDesc:
+        "Motor de voz local de nueva generación que no alucina palabras y es hasta 15 veces más rápido que Whisper.",
+      senseSelectAria: "Seleccionar SenseVoice",
+      activeMode: "Activo",
+      groqTitle: "Ultrarrápido (Groq Cloud Whisper)",
+      groqBadge: "El más rápido (~10 s)",
+      groqDesc:
+        "Transcribe una grabación de 1 hora en unos 10 segundos, sin cargar tu equipo ni tu batería.",
+      cpuLoad: "Carga del equipo:",
+      zeroLoad: "Ninguna",
+      speedLabel: "Velocidad:",
+      inSeconds: "⚡ Segundos",
+      qualityLabel: "Calidad:",
+      crystalClear: "Excelente",
+      topTier: "De primer nivel",
+      veryHigh: "Muy alta",
+      geminiTitle: "Google Gemini (audio multimodal y razonamiento)",
+      geminiBadge: "Amplia familia de modelos",
+      geminiDesc:
+        "La IA de audio multimodal avanzada de Google. Alta precisión y análisis inteligente de hablantes con todas las versiones de Gemini.",
+      openaiTitle: "Estándar global (OpenAI Whisper y GPT-4o Audio)",
+      openaiDesc:
+        "Infraestructura de IA reconocida mundialmente, excelente para reuniones multilingües.",
+      modelVersion: "Versión del modelo:",
+      examplePlaceholder: "p. ej.: {example}",
+      pasteKey: "Pega tu clave API de {provider} ({prefix})",
+      saveAndSelect: "Guardar y seleccionar",
+      footnote:
+        "* Puedes cambiar en cualquier momento con un clic según tus preferencias de privacidad y velocidad.",
+      done: "Listo",
+    },
+    models: {
+      recommendedFast: "Recomendado – ~10 s",
+      maxAccuracy: "Máxima precisión",
+      englishOnly: "Inglés",
+      recommendedSmart: "Recomendado – rápido e inteligente",
+      ultraLight: "Ultraligero y rápido",
+      deepReasoning: "Razonamiento profundo",
+      nextGenSpeed: "Velocidad de nueva generación",
+      fastEconomic: "Rápido y económico",
+      highestIntel: "Máxima inteligencia",
+      globalStandardAsr: "ASR estándar global",
+      multimodalAudio: "Audio multimodal",
+      customModel: "➕ Introducir nombre de modelo personalizado...",
+    },
+  },
 };

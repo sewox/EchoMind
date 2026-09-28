@@ -147,7 +147,7 @@ export const PrivacyModeBadge: React.FC<PrivacyModeBadgeProps> = ({
                     {t("privacyModes.balanced.name")}
                   </span>
                   <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono">
-                    Önerilen
+                    {t("ui.settings.recommended")}
                   </span>
                 </div>
                 <p className="text-[10px] text-slate-400 mt-0.5 leading-tight">
@@ -179,7 +179,7 @@ export const PrivacyModeBadge: React.FC<PrivacyModeBadgeProps> = ({
                     {t("privacyModes.maxIntelligence.name")}
                   </span>
                   <span className="text-[9px] px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-mono">
-                    Yüksek Hız
+                    {t("ui.settings.highSpeed")}
                   </span>
                 </div>
                 <p className="text-[10px] text-slate-400 mt-0.5 leading-tight">

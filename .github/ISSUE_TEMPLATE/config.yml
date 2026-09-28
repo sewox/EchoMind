@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: "🔒 Güvenlik açığı bildir / Report a security vulnerability"
+    url: https://github.com/sewox/EchoMind/security/advisories/new
+    about: "Güvenlik açıklarını herkese açık issue yerine gizli olarak bildirin. / Report vulnerabilities privately, not as public issues."
+  - name: "📦 En güncel sürümü indir / Download the latest release"
+    url: https://github.com/sewox/EchoMind/releases/latest
+    about: "Hata bildirmeden önce son sürümde tekrar deneyin. / Please retry on the latest release before reporting."
+  - name: "🌐 Web sitesi ve kurulum rehberi / Website & install guide"
+    url: https://sewox.github.io/EchoMind/
+    about: "Kurulum, indirme bağlantıları ve özellik tanıtımı. / Installation, downloads and feature overview."

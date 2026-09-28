@@ -71,30 +71,10 @@ interface GlobalAssistantModalProps {
 }
 
 const QUICK_PROMPTS = [
-  {
-    icon: "✅",
-    label: "Açık Görevler ve Sorumlular",
-    prompt:
-      "Tüm toplantılardaki açık eylem maddelerini, görevleri ve sorumluları listele.",
-  },
-  {
-    icon: "⚡",
-    label: "Alınan Tüm Kritik Kararlar",
-    prompt:
-      "Geçmiş tüm toplantılarda varılan mutabakatları ve alınan kesin kararları özetle.",
-  },
-  {
-    icon: "🎯",
-    label: "Toplantı Hedefleri ve Süreç",
-    prompt:
-      "Toplantıların temel amaçlarını ve hangi konuların sonraki fazlara ertelendiğini karşılaştır.",
-  },
-  {
-    icon: "💰",
-    label: "Bütçe & Finansal Konular",
-    prompt:
-      "Toplantılarda bütçe, KDV, ödeme ve maliyetler hakkında ne konuşuldu?",
-  },
+  { icon: "✅", key: "q1" },
+  { icon: "⚡", key: "q2" },
+  { icon: "🎯", key: "q3" },
+  { icon: "💰", key: "q4" },
 ];
 
 export const GlobalAssistantModal: React.FC<GlobalAssistantModalProps> = ({
@@ -129,8 +109,8 @@ export const GlobalAssistantModal: React.FC<GlobalAssistantModalProps> = ({
     {
       id: "welcome",
       role: "assistant",
-      content:
-        "Merhaba! Ben **EchoMind Kurumsal Toplantı Asistanı**.\n\nTüm toplantı arşivinizi, alınan kararları, eylem maddelerini ve konuşma dökümlerini tarayarak sorularınızı yanıtlayabilirim. Aşağıdaki hazır başlıklardan birini seçebilir veya dilediğiniz soruyu sorabilirsiniz.",
+      // Rendered via t("ui.assistant.welcome") so it follows the UI language.
+      content: "",
       provider: "EchoMind Knowledge Core",
       timestamp: new Date().toLocaleTimeString([], {
         hour: "2-digit",
@@ -403,9 +383,16 @@ export const GlobalAssistantModal: React.FC<GlobalAssistantModalProps> = ({
                         <span>{msg.timestamp}</span>
                         {msg.role === "assistant" && (
                           <button
-                            onClick={() => handleCopy(msg.content, msg.id)}
+                            onClick={() =>
+                              handleCopy(
+                                msg.id === "welcome"
+                                  ? t("ui.assistant.welcome")
+                                  : msg.content,
+                                msg.id,
+                              )
+                            }
                             className="p-1 rounded hover:bg-white/10 transition"
-                            title="Yanıtı Kopyala"
+                            title={t("ui.assistant.copyReply")}
                           >
                             {copiedMessageId === msg.id ? (
                               <Check className="w-3 h-3 text-emerald-400" />
@@ -419,7 +406,9 @@ export const GlobalAssistantModal: React.FC<GlobalAssistantModalProps> = ({
 
                     {/* Markdown / Text Content */}
                     <div className="whitespace-pre-wrap font-sans space-y-2 select-text cursor-text">
-                      {msg.content}
+                      {msg.id === "welcome"
+                        ? t("ui.assistant.welcome")
+                        : msg.content}
                     </div>
 
                     {/* Clickable Citations Footer */}
@@ -470,17 +459,19 @@ export const GlobalAssistantModal: React.FC<GlobalAssistantModalProps> = ({
             <div className="px-6 py-2 border-t border-white/5 bg-slate-950/40 flex items-center gap-2 overflow-x-auto shrink-0">
               <span className="text-[11px] text-slate-500 shrink-0 font-medium flex items-center gap-1">
                 <HelpCircle className="w-3 h-3" />
-                <span>Örnekler:</span>
+                <span>{t("ui.assistant.examples")}</span>
               </span>
               {QUICK_PROMPTS.map((qp, idx) => (
                 <button
                   key={idx}
-                  onClick={() => handleSendMessage(qp.prompt)}
+                  onClick={() =>
+                    handleSendMessage(t(`ui.assistant.${qp.key}Prompt`))
+                  }
                   disabled={isLoading}
                   className="px-2.5 py-1 rounded-full bg-slate-900 hover:bg-slate-800 border border-white/10 hover:border-cyan-500/40 text-slate-300 text-xs font-medium transition flex items-center gap-1.5 shrink-0 disabled:opacity-50"
                 >
                   <span>{qp.icon}</span>
-                  <span>{qp.label}</span>
+                  <span>{t(`ui.assistant.${qp.key}Label`)}</span>
                 </button>
               ))}
             </div>
