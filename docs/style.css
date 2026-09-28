@@ -872,41 +872,6 @@ section.download-section {
   position: relative;
 }
 
-.showcase-tabs {
-  display: flex;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-bottom: 28px;
-}
-
-.showcase-tab-btn {
-  background: rgba(15, 23, 42, 0.6);
-  border: 1px solid var(--border-subtle);
-  color: var(--text-secondary);
-  padding: 10px 18px;
-  border-radius: 999px;
-  font-size: 0.9rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.25s ease;
-  backdrop-filter: blur(8px);
-}
-
-.showcase-tab-btn:hover {
-  background: rgba(30, 41, 59, 0.8);
-  color: var(--text-primary);
-  border-color: rgba(99, 102, 241, 0.3);
-  transform: translateY(-1px);
-}
-
-.showcase-tab-btn.active {
-  background: rgba(99, 102, 241, 0.2);
-  color: #c7d2fe;
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 20px rgba(99, 102, 241, 0.25);
-}
-
 .showcase-window-wrapper {
   max-width: 1020px;
   margin: 0 auto;
@@ -934,6 +899,125 @@ section.download-section {
   display: block;
   object-fit: cover;
   transition: opacity 0.25s ease;
+}
+
+/* Screenshot slider */
+.shot-slider {
+  position: relative;
+  outline: none;
+}
+
+.shot-slider:focus-visible {
+  box-shadow:
+    0 0 0 2px rgba(129, 140, 248, 0.8),
+    0 24px 60px rgba(0, 0, 0, 0.7);
+}
+
+.shot-slider .showcase-img-container {
+  aspect-ratio: 2200 / 1442;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.shot-slider .showcase-img {
+  /* never upscale: small captures (e.g. the floating island) keep their size */
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.slider-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(10, 15, 30, 0.72);
+  color: #fff;
+  font-size: 28px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-bottom: 4px;
+  backdrop-filter: blur(8px);
+  transition:
+    background 0.2s ease,
+    transform 0.2s ease;
+}
+
+.slider-nav:hover {
+  background: rgba(99, 102, 241, 0.85);
+  transform: translateY(-50%) scale(1.06);
+}
+
+.slider-prev {
+  left: 14px;
+}
+
+.slider-next {
+  right: 14px;
+}
+
+.slider-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.slider-title {
+  font-weight: 600;
+  color: #fff;
+  font-size: 0.95rem;
+}
+
+.slider-dots {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.slider-dot {
+  width: 9px;
+  height: 9px;
+  padding: 0;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.25);
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    width 0.2s ease;
+}
+
+.slider-dot.active {
+  width: 24px;
+  border-radius: 999px;
+  background: #818cf8;
+}
+
+@media (max-width: 640px) {
+  .slider-nav {
+    width: 36px;
+    height: 36px;
+    font-size: 22px;
+  }
+
+  .slider-prev {
+    left: 8px;
+  }
+
+  .slider-next {
+    right: 8px;
+  }
 }
 
 .showcase-caption-bar {
@@ -964,10 +1048,6 @@ section.download-section {
 }
 
 @media (max-width: 600px) {
-  .showcase-tab-btn {
-    font-size: 0.8rem;
-    padding: 8px 14px;
-  }
   .showcase-caption-bar {
     padding: 12px 16px;
   }

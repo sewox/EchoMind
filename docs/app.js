@@ -25,23 +25,6 @@ const translations = {
     secShowcaseTitle: "✨ EchoMind Masaüstü Arayüzü",
     secShowcaseSubtitle:
       "Gizlilik odaklı, sıfır gecikmeli ve donanım hızlandırmalı modern toplantı arayüzünü inceleyin.",
-    tabShowcaseTrans: "🎙️ Canlı Transkripsiyon",
-    tabShowcaseSummary: "📊 Akıllı Özet & Analitik",
-    tabShowcaseMemory: "🧠 Semantik Hafıza",
-    tabShowcaseHw: "⚡ Model Merkezi",
-    tabShowcasePrivacy: "🛡️ Gizlilik Modları",
-    showcaseBadgeLocal: "%100 Yerel Motor",
-    showcaseBadgeSummary: "Otomatik Yapay Zekâ Analitiği",
-    showcaseBadgeMemory: "Vektörel Semantik Arama",
-    showcaseBadgeHw: "Apple Metal & NVIDIA CUDA",
-    captionTrans:
-      "Toplantı sırasında konuşmalar cihazınızdaki Whisper modeliyle anlık olarak yazıya dökülür; ses bilgisayarınızdan çıkmaz.",
-    captionSummary:
-      "Toplantı bittiğinde amaç, öne çıkan başlıklar, kararlar ve görevler otomatik bir rapora dönüşür.",
-    captionMemory:
-      "Akıllı Asistan tüm toplantı arşivinizi tarayarak kararlar, görevler ve konuşmalar hakkındaki sorularınızı yanıtlar.",
-    captionHw:
-      "Tamamen yerel (Apple Dikte, SenseVoice, Whisper) veya kendi anahtarınızla bulut modelleri arasında tek tıkla geçiş yapın.",
     secFeaturesTitle: "Neden EchoMind?",
     secFeaturesSubtitle:
       "Tüm toplantı iş akışınızı gizlilikten ödün vermeden otomatikleştirin.",
@@ -126,23 +109,6 @@ const translations = {
     secShowcaseTitle: "✨ EchoMind Desktop Experience",
     secShowcaseSubtitle:
       "Explore the privacy-first, zero-latency, and hardware-accelerated modern meeting interface.",
-    tabShowcaseTrans: "🎙️ Live Transcription",
-    tabShowcaseSummary: "📊 Smart Summary & Analytics",
-    tabShowcaseMemory: "🧠 Semantic Memory",
-    tabShowcaseHw: "⚡ Model Hub",
-    tabShowcasePrivacy: "🛡️ Privacy Modes",
-    showcaseBadgeLocal: "100% On-Device Engine",
-    showcaseBadgeSummary: "Automated AI Analytics",
-    showcaseBadgeMemory: "Vector Semantic Search",
-    showcaseBadgeHw: "Apple Metal & NVIDIA CUDA",
-    captionTrans:
-      "Speech is transcribed live by the Whisper model on your device; the audio never leaves your computer.",
-    captionSummary:
-      "When the meeting ends, its purpose, highlights, decisions and tasks turn into an automatic report.",
-    captionMemory:
-      "The Smart Advisor searches your whole meeting archive to answer questions about decisions, tasks and discussions.",
-    captionHw:
-      "Switch with one click between fully local engines (Apple Dictation, SenseVoice, Whisper) and bring-your-own-key cloud models.",
     secFeaturesTitle: "Why Choose EchoMind?",
     secFeaturesSubtitle:
       "Automate your entire meeting intelligence workflow without compromising data privacy.",
@@ -330,9 +296,9 @@ function setLanguage(lang) {
     transcriptEl.textContent = list[0];
   }
 
-  // Update Showcase Gallery texts on lang switch
-  if (typeof selectShowcaseTab === "function") {
-    selectShowcaseTab(currentShowcaseKey);
+  // Re-render the screenshot slider in the new language
+  if (typeof renderShowcaseSlide === "function") {
+    renderShowcaseSlide(showcaseIndex);
   }
 
   localStorage.setItem("echomind_lang", lang);
@@ -507,91 +473,262 @@ document.addEventListener("DOMContentLoaded", () => {
     }, 4000);
   }
 
-  // Init Showcase Gallery Tabs
-  document.querySelectorAll(".showcase-tab-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      selectShowcaseTab(btn.getAttribute("data-showcase"));
-    });
-  });
+  // Init screenshot slider
+  initShowcaseSlider();
 });
 
-let currentShowcaseKey = "transcription";
-
-const SHOT = {
-  tr: (name) => `assets/screenshots/macos-${name}.png`,
-  en: (name) => `assets/screenshots/en/en-${name}.png`,
-};
-
-// Real screenshots of the running app (macOS, v0.2.12). Each tab picks the
-// Turkish or English capture of the same screen based on the site language.
-const showcaseData = {
-  transcription: {
+// ---------------------------------------------------------------------------
+// Screenshot slider. Real captures of the running app (macOS, v0.2.12);
+// web-optimized copies live in assets/screenshots/web/{tr,en}/ and the
+// full-resolution PNGs next to them.
+// ---------------------------------------------------------------------------
+const SHOWCASE_SLIDES = [
+  {
+    shot: "01-main-empty",
+    title: { tr: "Ana Ekran", en: "Main Window" },
+    caption: {
+      tr: "Tek tıkla dinlemeye başlayın veya bir ses dosyası yükleyin; geçmiş toplantılar solda listelenir.",
+      en: "Start listening with one click or import an audio file; past meetings are listed on the left.",
+    },
+  },
+  {
+    shot: "02-recording",
+    title: { tr: "Kayıt Başladı", en: "Recording Started" },
+    caption: {
+      tr: "Canlı dinleme sırasında mikrofon durumu ve sistem sesi yakalanıp yakalanmadığı açıkça gösterilir.",
+      en: "While listening, the app clearly shows the microphone state and whether system audio is captured.",
+    },
+  },
+  {
     shot: "03-live-transcript",
+    title: { tr: "Canlı Transkripsiyon", en: "Live Transcription" },
     caption: {
       tr: "Toplantı sırasında konuşmalar cihazınızdaki Whisper modeliyle anlık olarak yazıya dökülür; ses bilgisayarınızdan çıkmaz.",
       en: "Speech is transcribed live by the Whisper model on your device; the audio never leaves your computer.",
     },
-    tag: { tr: "Canlı Dinleme", en: "Live Listening" },
   },
-  summary: {
+  {
+    shot: "04-meeting-detail",
+    title: { tr: "Toplantı Detayı", en: "Meeting Detail" },
+    caption: {
+      tr: "Geçmiş bir toplantıyı açın, sesi dinleyin ve zaman damgalı konuşma akışında gezinin.",
+      en: "Open a past meeting, play back the audio and browse the timestamped dialogue stream.",
+    },
+  },
+  {
     shot: "13-meeting-report",
+    title: { tr: "Toplantı Raporu", en: "Meeting Report" },
     caption: {
       tr: "Toplantı bittiğinde amaç, öne çıkan başlıklar, kararlar ve görevler otomatik bir rapora dönüşür.",
       en: "When the meeting ends, its purpose, highlights, decisions and tasks turn into an automatic report.",
     },
-    tag: { tr: "Toplantı Raporu", en: "Meeting Report" },
   },
-  memory: {
+  {
     shot: "14-smart-assistant",
+    title: { tr: "Akıllı Asistan • ⌘K", en: "Smart Advisor • ⌘K" },
     caption: {
-      tr: "Akıllı Asistan tüm toplantı arşivinizi tarayarak kararlar, görevler ve konuşmalar hakkındaki sorularınızı yanıtlar.",
-      en: "The Smart Advisor searches your whole meeting archive to answer questions about decisions, tasks and discussions.",
+      tr: "Tüm toplantı arşivinizi tarayarak kararlar, görevler ve konuşmalar hakkındaki sorularınızı yanıtlar.",
+      en: "Searches your whole meeting archive to answer questions about decisions, tasks and discussions.",
     },
-    tag: { tr: "Akıllı Asistan • ⌘K", en: "Smart Advisor • ⌘K" },
   },
-  hardware: {
-    shot: "07-model-hub",
+  {
+    shot: "12-floating-island",
+    title: { tr: "Floating Island", en: "Floating Island" },
     caption: {
-      tr: "Tamamen yerel (Apple Dikte, SenseVoice, Whisper) veya kendi anahtarınızla bulut modelleri arasında tek tıkla geçiş yapın.",
-      en: "Switch with one click between fully local engines (Apple Dictation, SenseVoice, Whisper) and bring-your-own-key cloud models.",
+      tr: "Meet, Zoom veya Teams toplantısı algılandığında ekranın üstünde kayıt başlatma önerisi belirir.",
+      en: "When a Meet, Zoom or Teams call is detected, a prompt to start recording appears at the top of the screen.",
     },
-    tag: { tr: "Model Merkezi", en: "Model Hub" },
   },
-  privacy: {
+  {
+    shot: "15-privacy-mode-menu",
+    title: { tr: "Gizlilik Profili", en: "Privacy Profile" },
+    caption: {
+      tr: "Paranoid, Dengeli ve Maksimum Zeka profilleri arasında üst menüden anında geçiş yapın.",
+      en: "Switch instantly between Paranoid, Balanced and Max Intelligence from the header menu.",
+    },
+  },
+  {
     shot: "06-privacy-mode",
+    title: { tr: "Cihaz & Gizlilik", en: "Device & Privacy" },
     caption: {
-      tr: "Paranoid, Dengeli ve Maksimum Zeka profilleriyle verinin cihazdan çıkıp çıkmayacağına siz karar verin.",
-      en: "Paranoid, Balanced and Max Intelligence profiles let you decide whether any data may leave the device.",
+      tr: "Verinin cihazdan çıkıp çıkmayacağına siz karar verin; donanım bilgileri de burada görünür.",
+      en: "Decide whether any data may leave the device; your hardware details are shown here too.",
     },
-    tag: { tr: "Gizlilik Profilleri", en: "Privacy Profiles" },
+  },
+  {
+    shot: "05-settings-audio",
+    title: { tr: "Mikrofon & Sistem Sesi", en: "Microphone & System Audio" },
+    caption: {
+      tr: "Mikrofon seçimi, canlı ses seviyesi ve karşı tarafı kaydetmek için Loopback / BlackHole rehberi.",
+      en: "Microphone selection, a live input meter and a Loopback / BlackHole guide for capturing remote audio.",
+    },
+  },
+  {
+    shot: "07-model-hub",
+    title: { tr: "Model Merkezi • Yerel", en: "Model Hub • Local" },
+    caption: {
+      tr: "Apple Dikte, SenseVoice ve Whisper gibi tamamen çevrimdışı çalışan motorlar arasından seçim yapın.",
+      en: "Choose between fully offline engines such as Apple Dictation, SenseVoice and Whisper.",
+    },
+  },
+  {
+    shot: "11-model-hub-cloud",
+    title: { tr: "Model Merkezi • Bulut", en: "Model Hub • Cloud" },
+    caption: {
+      tr: "İsterseniz kendi anahtarınızla Groq, Gemini veya OpenAI ile saniyeler içinde yazıya dökün.",
+      en: "Optionally transcribe in seconds with Groq, Gemini or OpenAI using your own key.",
+    },
+  },
+  {
+    shot: "08-settings-ai-services",
+    title: { tr: "Yapay Zeka Servisleri", en: "AI Services" },
+    caption: {
+      tr: "Yerel LLM sunucusu (Ollama / LM Studio) ve bulut anahtarları; anahtarlar cihazınızda saklanır.",
+      en: "Local LLM server (Ollama / LM Studio) and cloud keys; keys are stored on your device.",
+    },
+  },
+  {
+    shot: "10-settings-language",
+    title: { tr: "Arayüz Dili", en: "App Language" },
+    caption: {
+      tr: "Türkçe, İngilizce, Almanca, Fransızca ve İspanyolca arayüz desteği.",
+      en: "Interface available in Turkish, English, German, French and Spanish.",
+    },
+  },
+  {
+    shot: "16-secure-storage-unlocking",
+    title: { tr: "Güvenli Depolama", en: "Secure Storage" },
+    caption: {
+      tr: "Toplantı geçmişi şifreli saklanır; açılışta anahtar sistem Anahtarlığı'ndan alınır.",
+      en: "Meeting history is stored encrypted; on launch the key is fetched from the system Keychain.",
+    },
+  },
+];
+
+const SLIDER_UI = {
+  tr: {
+    prev: "Önceki ekran",
+    next: "Sonraki ekran",
+    region: "EchoMind ekran görüntüleri",
+    goto: "Ekran",
+  },
+  en: {
+    prev: "Previous screen",
+    next: "Next screen",
+    region: "EchoMind screenshots",
+    goto: "Screen",
   },
 };
 
-function selectShowcaseTab(key) {
-  if (!showcaseData[key]) return;
-  currentShowcaseKey = key;
+let showcaseIndex = 2;
 
-  document.querySelectorAll(".showcase-tab-btn").forEach((btn) => {
-    btn.classList.toggle("active", btn.getAttribute("data-showcase") === key);
+function showcaseLang() {
+  return currentLang === "en" ? "en" : "tr";
+}
+
+function showcaseSrc(i, lang) {
+  return `assets/screenshots/web/${lang}/${SHOWCASE_SLIDES[i].shot}.webp`;
+}
+
+function renderShowcaseSlide(index) {
+  const n = SHOWCASE_SLIDES.length;
+  showcaseIndex = ((index % n) + n) % n;
+  const lang = showcaseLang();
+  const slide = SHOWCASE_SLIDES[showcaseIndex];
+  const ui = SLIDER_UI[lang];
+
+  const imgEl = document.getElementById("showcaseMainImg");
+  const titleEl = document.getElementById("sliderTitle");
+  const captionEl = document.getElementById("showcaseCaptionText");
+  const counterEl = document.getElementById("sliderCounter");
+  const sliderEl = document.getElementById("shotSlider");
+  if (!imgEl) return;
+
+  const nextSrc = showcaseSrc(showcaseIndex, lang);
+  if (imgEl.getAttribute("src") !== nextSrc) {
+    imgEl.style.opacity = "0.35";
+    const loader = new Image();
+    loader.onload = loader.onerror = () => {
+      imgEl.src = nextSrc;
+      imgEl.style.opacity = "1";
+    };
+    loader.src = nextSrc;
+  }
+  imgEl.alt = slide.title[lang];
+  if (titleEl) titleEl.textContent = slide.title[lang];
+  if (captionEl) captionEl.textContent = slide.caption[lang];
+  if (counterEl) counterEl.textContent = `${showcaseIndex + 1} / ${n}`;
+  if (sliderEl) sliderEl.setAttribute("aria-label", ui.region);
+
+  const prevBtn = document.getElementById("sliderPrev");
+  const nextBtn = document.getElementById("sliderNext");
+  if (prevBtn) prevBtn.setAttribute("aria-label", ui.prev);
+  if (nextBtn) nextBtn.setAttribute("aria-label", ui.next);
+
+  document.querySelectorAll("#sliderDots .slider-dot").forEach((dot, i) => {
+    const active = i === showcaseIndex;
+    dot.classList.toggle("active", active);
+    dot.setAttribute("aria-selected", active ? "true" : "false");
+    dot.setAttribute(
+      "aria-label",
+      `${ui.goto} ${i + 1}: ${SHOWCASE_SLIDES[i].title[lang]}`,
+    );
   });
 
-  const data = showcaseData[key];
-  const lang = currentLang === "en" ? "en" : "tr";
-  const imgEl = document.getElementById("showcaseMainImg");
-  const captionEl = document.getElementById("showcaseCaptionText");
-  const tagEl = document.getElementById("showcaseCaptionTag");
+  // Warm the cache for the neighbours so arrow clicks feel instant.
+  [showcaseIndex - 1, showcaseIndex + 1].forEach((j) => {
+    const k = ((j % n) + n) % n;
+    new Image().src = showcaseSrc(k, lang);
+  });
+}
 
-  if (imgEl) {
-    const nextSrc = SHOT[lang](data.shot);
-    if (!imgEl.src.endsWith(nextSrc)) {
-      imgEl.style.opacity = "0.4";
-      setTimeout(() => {
-        imgEl.src = nextSrc;
-        imgEl.alt = data.tag[lang];
-        imgEl.style.opacity = "1";
-      }, 150);
+function initShowcaseSlider() {
+  const sliderEl = document.getElementById("shotSlider");
+  const dotsEl = document.getElementById("sliderDots");
+  if (!sliderEl || !dotsEl) return;
+
+  dotsEl.innerHTML = "";
+  SHOWCASE_SLIDES.forEach((_, i) => {
+    const dot = document.createElement("button");
+    dot.type = "button";
+    dot.className = "slider-dot";
+    dot.setAttribute("role", "tab");
+    dot.addEventListener("click", () => renderShowcaseSlide(i));
+    dotsEl.appendChild(dot);
+  });
+
+  document
+    .getElementById("sliderPrev")
+    .addEventListener("click", () => renderShowcaseSlide(showcaseIndex - 1));
+  document
+    .getElementById("sliderNext")
+    .addEventListener("click", () => renderShowcaseSlide(showcaseIndex + 1));
+
+  sliderEl.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowLeft") {
+      e.preventDefault();
+      renderShowcaseSlide(showcaseIndex - 1);
+    } else if (e.key === "ArrowRight") {
+      e.preventDefault();
+      renderShowcaseSlide(showcaseIndex + 1);
     }
-  }
-  if (captionEl) captionEl.textContent = data.caption[lang];
-  if (tagEl) tagEl.textContent = data.tag[lang];
+  });
+
+  let touchX = null;
+  sliderEl.addEventListener(
+    "touchstart",
+    (e) => {
+      touchX = e.touches[0].clientX;
+    },
+    { passive: true },
+  );
+  sliderEl.addEventListener("touchend", (e) => {
+    if (touchX === null) return;
+    const dx = e.changedTouches[0].clientX - touchX;
+    touchX = null;
+    if (Math.abs(dx) > 40)
+      renderShowcaseSlide(showcaseIndex + (dx < 0 ? 1 : -1));
+  });
+
+  renderShowcaseSlide(showcaseIndex);
 }

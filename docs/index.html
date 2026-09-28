@@ -574,52 +574,63 @@
           </p>
         </div>
 
-        <!-- Showcase Tabs -->
-        <div class="showcase-tabs">
-          <button class="showcase-tab-btn active" data-showcase="transcription">
-            <span data-i18n="tabShowcaseTrans">🎙️ Canlı Transkripsiyon</span>
-          </button>
-          <button class="showcase-tab-btn" data-showcase="summary">
-            <span data-i18n="tabShowcaseSummary"
-              >📊 Akıllı Özet & Analitik</span
-            >
-          </button>
-          <button class="showcase-tab-btn" data-showcase="memory">
-            <span data-i18n="tabShowcaseMemory">🧠 Semantik Hafıza</span>
-          </button>
-          <button class="showcase-tab-btn" data-showcase="hardware">
-            <span data-i18n="tabShowcaseHw">⚡ Model Merkezi</span>
-          </button>
-          <button class="showcase-tab-btn" data-showcase="privacy">
-            <span data-i18n="tabShowcasePrivacy">🛡️ Gizlilik Modları</span>
-          </button>
-        </div>
-
-        <!-- Real app screenshots (macOS). Language-specific set is picked in app.js. -->
-        <div class="showcase-window-wrapper">
+        <!-- Screenshot slider: real captures of the running app (macOS, v0.2.12).
+             Slides and TR/EN captions live in app.js (SHOWCASE_SLIDES). -->
+        <div
+          class="showcase-window-wrapper shot-slider"
+          id="shotSlider"
+          tabindex="0"
+          role="region"
+          aria-roledescription="carousel"
+          aria-label="EchoMind ekran görüntüleri"
+        >
           <div class="showcase-img-container">
             <img
-              src="assets/screenshots/macos-03-live-transcript.png"
-              alt="EchoMind masaüstü uygulaması - canlı transkripsiyon ekran görüntüsü"
+              src="assets/screenshots/web/tr/03-live-transcript.webp"
+              alt="Canlı transkripsiyon"
               class="showcase-img"
               id="showcaseMainImg"
+              width="1600"
+              height="1049"
             />
+            <button
+              type="button"
+              class="slider-nav slider-prev"
+              id="sliderPrev"
+              aria-label="Önceki ekran"
+            >
+              ‹
+            </button>
+            <button
+              type="button"
+              class="slider-nav slider-next"
+              id="sliderNext"
+              aria-label="Sonraki ekran"
+            >
+              ›
+            </button>
           </div>
 
           <div class="showcase-caption-bar">
-            <div
-              class="showcase-caption-text"
-              id="showcaseCaptionText"
-              data-i18n="captionTrans"
-            >
-              Toplantı sırasında konuşmalar cihazınızdaki Whisper modeliyle
-              anlık olarak yazıya dökülür; ses bilgisayarınızdan çıkmaz.
+            <div class="slider-text">
+              <div class="slider-title" id="sliderTitle">
+                Canlı Transkripsiyon
+              </div>
+              <div class="showcase-caption-text" id="showcaseCaptionText">
+                Toplantı sırasında konuşmalar cihazınızdaki Whisper modeliyle
+                anlık olarak yazıya dökülür; ses bilgisayarınızdan çıkmaz.
+              </div>
             </div>
-            <div class="showcase-caption-tag" id="showcaseCaptionTag">
-              macOS • v0.2.12
+            <div
+              class="showcase-caption-tag"
+              id="sliderCounter"
+              aria-live="polite"
+            >
+              3 / 15
             </div>
           </div>
         </div>
+        <div class="slider-dots" id="sliderDots" role="tablist"></div>
       </div>
     </section>
 
