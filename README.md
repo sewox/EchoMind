@@ -6,7 +6,7 @@
 
 ---
 
-[![Release](https://img.shields.io/github/v/release/sewox/EchoMind?style=for-the-badge&logo=github&color=7c3aed)](https://github.com/sewox/EchoMind/releases/tag/v0.2.0)
+[![Release](https://img.shields.io/github/v/release/sewox/EchoMind?style=for-the-badge&logo=github&color=7c3aed)](https://github.com/sewox/EchoMind/releases/latest)
 [![CI Pipeline](https://img.shields.io/github/actions/workflow/status/sewox/EchoMind/ci.yml?branch=main&style=for-the-badge&logo=githubactions&logoColor=white&label=CI%20Gate&color=10b981)](https://github.com/sewox/EchoMind/actions)
 [![Test Coverage](https://img.shields.io/badge/Coverage-92.3%25-brightgreen?style=for-the-badge&logo=vitest&logoColor=white)](https://github.com/sewox/EchoMind)
 [![Tauri v2](https://img.shields.io/badge/Tauri-v2.2-blue?style=for-the-badge&logo=tauri&logoColor=white)](https://tauri.app)
@@ -23,15 +23,28 @@
 
 ---
 
+## 🖼️ Ekran Görüntüleri / Screenshots
+
+<p align="center">
+  <img src="docs/assets/screenshots/en/en-03-live-transcript.png" alt="Live transcription" width="49%" />
+  <img src="docs/assets/screenshots/en/en-13-meeting-report.png" alt="Meeting report" width="49%" />
+  <img src="docs/assets/screenshots/en/en-06-privacy-mode.png" alt="Privacy profiles" width="49%" />
+  <img src="docs/assets/screenshots/en/en-07-model-hub.png" alt="Model Hub" width="49%" />
+</p>
+
+<p align="center"><sub>Gerçek uygulama ekran görüntüleri (macOS, v0.2.12). Türkçe set: <code>docs/assets/screenshots/macos-*.png</code> • English set: <code>docs/assets/screenshots/en/</code></sub></p>
+
+---
+
 ## 📦 Hızlı İndirme / Downloads
 
 | Platform | Format | Açıklama / Description | İndirme / Download |
 | :--- | :--- | :--- | :--- |
-| **Windows (x64)** | `.exe` | Standart Windows Kurulum Paketi (NSIS) | [⬇️ **EchoMind_0.2.2_x64-setup.exe**](https://github.com/sewox/EchoMind/releases/download/v0.2.2/EchoMind_0.2.2_x64-setup.exe) |
-| **Windows (x64)** | `.msi` | Kurumsal Windows Installer | [⬇️ **EchoMind_0.2.2_x64_en-US.msi**](https://github.com/sewox/EchoMind/releases/download/v0.2.2/EchoMind_0.2.2_x64_en-US.msi) |
-| **macOS (Apple Silicon)** | `.dmg` | Apple Silicon (M1/M2/M3/M4) Disk İmajı | [⬇️ **EchoMind_0.2.2_aarch64.dmg**](https://github.com/sewox/EchoMind/releases/download/v0.2.2/EchoMind_0.2.2_aarch64.dmg) |
-| **Linux (Debian / Ubuntu)** | `.deb` | Debian, Ubuntu x64 Kurulum Paketi | [⬇️ **EchoMind_0.2.2_amd64.deb**](https://github.com/sewox/EchoMind/releases/download/v0.2.2/EchoMind_0.2.2_amd64.deb) |
-| **Linux (Taşınabilir / All)** | `.AppImage` | Bağımsız Çalıştırılabilir Linux Paketi | [⬇️ **EchoMind_0.2.2_amd64.AppImage**](https://github.com/sewox/EchoMind/releases/download/v0.2.2/EchoMind_0.2.2_amd64.AppImage) |
+| **Windows (x64)** | `.exe` | Standart Windows Kurulum Paketi (NSIS) | [⬇️ **EchoMind_0.2.12_x64-setup.exe**](https://github.com/sewox/EchoMind/releases/download/v0.2.12/EchoMind_0.2.12_x64-setup.exe) |
+| **Windows (x64)** | `.msi` | Kurumsal Windows Installer | [⬇️ **EchoMind_0.2.12_x64_en-US.msi**](https://github.com/sewox/EchoMind/releases/download/v0.2.12/EchoMind_0.2.12_x64_en-US.msi) |
+| **macOS (Apple Silicon)** | `.dmg` | Apple Silicon (M1/M2/M3/M4) Disk İmajı | [⬇️ **EchoMind_0.2.12_aarch64.dmg**](https://github.com/sewox/EchoMind/releases/download/v0.2.12/EchoMind_0.2.12_aarch64.dmg) |
+| **Linux (Debian / Ubuntu)** | `.deb` | Debian, Ubuntu x64 Kurulum Paketi | [⬇️ **EchoMind_0.2.12_amd64.deb**](https://github.com/sewox/EchoMind/releases/download/v0.2.12/EchoMind_0.2.12_amd64.deb) |
+| **Linux (Taşınabilir / All)** | `.AppImage` | Bağımsız Çalıştırılabilir Linux Paketi | [⬇️ **EchoMind_0.2.12_amd64.AppImage**](https://github.com/sewox/EchoMind/releases/download/v0.2.12/EchoMind_0.2.12_amd64.AppImage) |
 
 ---
 
@@ -179,8 +192,8 @@ EchoMind offers total freedom over how and where your audio and LLM intelligence
 ## 🛠️ Quick Start Guide
 
 ### 1. Installation
-- **Windows:** Download and run [`EchoMind_0.2.2_x64-setup.exe`](https://github.com/sewox/EchoMind/releases/download/v0.2.2/EchoMind_0.2.2_x64-setup.exe).
-- **macOS:** Download [`EchoMind_0.2.2_aarch64.dmg`](https://github.com/sewox/EchoMind/releases/download/v0.2.2/EchoMind_0.2.2_aarch64.dmg) and drag `EchoMind` to your `Applications` folder.
+- **Windows:** Download and run [`EchoMind_0.2.12_x64-setup.exe`](https://github.com/sewox/EchoMind/releases/download/v0.2.12/EchoMind_0.2.12_x64-setup.exe).
+- **macOS:** Download [`EchoMind_0.2.12_aarch64.dmg`](https://github.com/sewox/EchoMind/releases/download/v0.2.12/EchoMind_0.2.12_aarch64.dmg) and drag `EchoMind` to your `Applications` folder.
 
 ### 2. Getting Started
 1. Launch the app and allow the **Smart Advisor** to detect your hardware.
