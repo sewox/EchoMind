@@ -33,6 +33,7 @@ import {
   GROQ_MODELS,
   GEMINI_MODELS,
   OPENAI_MODELS,
+  modelLabel,
 } from "./ModelHubModalConstants";
 import { useI18n, SUPPORTED_LANGUAGES } from "../locales/i18nContext";
 
@@ -458,11 +459,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
             <div>
               <h3 className="font-semibold text-white text-base">
-                Ayarlar ve Tercihler
+                {t("settings.title")}
               </h3>
-              <p className="text-xs text-slate-400">
-                Mikrofon, cihaz performansı ve yapay zeka seçenekleri
-              </p>
+              <p className="text-xs text-slate-400">{t("settings.subtitle")}</p>
             </div>
           </div>
           <button
@@ -535,18 +534,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <div className="flex items-center justify-between">
                 <label className="text-slate-200 font-semibold flex items-center gap-2">
                   <Mic className="w-4 h-4 text-cyan-400" />
-                  <span>Kullanılacak Mikrofon</span>
+                  <span>{t("settings.micLabel")}</span>
                 </label>
                 <button
                   onClick={fetchAudioDevices}
                   disabled={isLoadingDevices}
                   className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-medium flex items-center gap-1.5 transition"
-                  title="Ses aygıtlarını yeniden tara"
+                  title={t("ui.settings.rescanDevices")}
                 >
                   <RefreshCw
                     className={`w-3 h-3 ${isLoadingDevices ? "animate-spin" : ""}`}
                   />
-                  <span>Yenile</span>
+                  <span>{t("settings.refreshMics")}</span>
                 </button>
               </div>
 
@@ -556,12 +555,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 className="w-full bg-slate-900 border border-slate-700 text-slate-100 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:border-cyan-500 font-medium"
               >
                 <option value="default">
-                  🎙️ Varsayılan Mikrofon (Otomatik {osLabel} Seçimi)
+                  {t("ui.settings.defaultMic", { os: osLabel })}
                 </option>
                 {(audioDevices || []).map((dev) => (
                   <option key={dev.name} value={dev.name}>
-                    {dev.is_loopback ? "🔊 [Sistem Sesi / Loopback] " : "🎙️ "}
-                    {dev.name} {dev.is_default ? `(Varsayılan ${osLabel})` : ""}
+                    {dev.is_loopback ? t("ui.settings.loopbackPrefix") : "🎙️ "}
+                    {dev.name}{" "}
+                    {dev.is_default
+                      ? t("ui.settings.defaultSuffix", { os: osLabel })
+                      : ""}
                   </option>
                 ))}
               </select>
@@ -571,14 +573,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <div className="flex items-center justify-between text-[11px]">
                   <span className="text-slate-400 flex items-center gap-1.5">
                     <Radio className="w-3.5 h-3.5 text-cyan-400" />
-                    <span>Canlı Ses Seviyesi (VU Metre):</span>
+                    <span>{t("ui.settings.vuMeter")}</span>
                   </span>
                   <span
                     className={`font-semibold ${isSpeaking ? "text-emerald-400" : "text-slate-400"}`}
                   >
                     {isSpeaking
-                      ? "🟢 Konuşma Algılandı"
-                      : "⚪ Sessiz / Bekleniyor"}
+                      ? t("ui.settings.speechDetected")
+                      : t("ui.settings.silentWaiting")}
                   </span>
                 </div>
                 <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden p-0.5 border border-slate-700">
@@ -590,8 +592,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   />
                 </div>
                 <div className="flex items-center justify-between text-[10px] text-slate-400">
-                  <span>Örnekleme: 16.000 Hz Mono (Whisper Optimize)</span>
-                  <span>Filtre: 80Hz High-Pass + Gürültü Kapısı</span>
+                  <span>{t("ui.settings.sampling")}</span>
+                  <span>{t("ui.settings.filter")}</span>
                 </div>
               </div>
             </div>
@@ -626,13 +628,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       <div>
                         <h4 className="font-semibold text-white text-xs">
                           {isLoopbackActive
-                            ? "Sistem Sesi + Mikrofon (Çift Yönlü Kayıt Aktif)"
-                            : "Mikrofon Ses Kaydı"}
+                            ? t("ui.settings.dualCaptureTitle")
+                            : t("ui.settings.micCaptureTitle")}
                         </h4>
                         <p className="text-[10px] text-slate-400">
                           {isLoopbackActive
-                            ? "Sanal ses döngüsü (Loopback) devrede; karşı tarafın konuşmaları net kaydediliyor."
-                            : "Şu an doğrudan mikrofon girişiniz dinleniyor."}
+                            ? t("ui.settings.dualCaptureDesc")
+                            : t("ui.settings.micCaptureDesc")}
                         </p>
                       </div>
                     </div>
@@ -648,29 +650,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           isLoopbackActive ? "bg-emerald-400" : "bg-amber-400"
                         }`}
                       />
-                      {isLoopbackActive ? "Loopback Aktif" : "Sadece Mikrofon"}
+                      {isLoopbackActive
+                        ? t("ui.settings.loopbackActive")
+                        : t("ui.settings.micOnly")}
                     </span>
                   </div>
 
                   {!isLoopbackActive && (
                     <div className="p-3 rounded-lg bg-amber-950/20 border border-amber-500/20 text-amber-300 text-[11px] space-y-1.5 leading-relaxed">
                       <p className="font-medium text-amber-200 flex items-center gap-1.5">
-                        <span>💡</span> Toplantıda Karşı Tarafın Sesini Kaydetme
-                        İpucu:
+                        <span>💡</span> {t("ui.settings.remoteTipTitle")}
                       </p>
                       <p className="text-[10.5px] text-amber-300/90">
-                        Kulaklık kullandığınızda bilgisayarınızdan çalan diğer
-                        katılımcıların sesi standart mikrofona ulaşmaz. Karşı
-                        tarafın sesini de doğrudan yazıya dökmek için{" "}
+                        {t("ui.settings.remoteTipBefore")}
                         <strong>BlackHole (macOS)</strong>,{" "}
-                        <strong>VB-Cable</strong> veya{" "}
-                        <strong>Stereo Mix</strong> sanal aygıtını
-                        seçebilirsiniz.
+                        <strong>VB-Cable</strong>
+                        {t("ui.settings.remoteTipOr")}
+                        <strong>Stereo Mix</strong>
+                        {t("ui.settings.remoteTipAfter")}
                       </p>
                       {hasAnyLoopback && (
                         <p className="text-[10px] text-emerald-300 font-semibold pt-0.5">
-                          ✓ Sisteminizde sanal ses aygıtı bulundu! Yukarıdaki
-                          listeden Loopback aygıtını seçebilirsiniz.
+                          {t("ui.settings.loopbackFound")}
                         </p>
                       )}
                     </div>
@@ -679,14 +680,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-400 pt-1">
                     <div className="p-2 rounded-lg bg-slate-900/60 border border-slate-800 flex items-center gap-2">
                       <Mic className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                      <span>Sizin Sesiniz: Aktif Giriş</span>
+                      <span>{t("ui.settings.yourVoice")}</span>
                     </div>
                     <div className="p-2 rounded-lg bg-slate-900/60 border border-slate-800 flex items-center gap-2">
                       <Volume2 className="w-3.5 h-3.5 text-blue-400 shrink-0" />
                       <span>
                         {isLoopbackActive
-                          ? "Sistem Sesi: Loopback Devrede"
-                          : "Sistem Sesi: Hoparlör/Ortam"}
+                          ? t("ui.settings.systemAudioLoopback")
+                          : t("ui.settings.systemAudioSpeaker")}
                       </span>
                     </div>
                   </div>
@@ -710,8 +711,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         />
                         <span>
                           {isAudioTesting
-                            ? "Ses Test Ediliyor (VU Dinleniyor)..."
-                            : "Giriş Sesini Test Et (5 sn)"}
+                            ? t("ui.settings.testingAudio")
+                            : t("ui.settings.testInput")}
                         </span>
                       </button>
 
@@ -719,10 +720,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         type="button"
                         onClick={handleOpenAudioMidiSetup}
                         className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-medium flex items-center gap-1.5 transition"
-                        title="İşletim sistemi ses denetim masasını veya Audio MIDI Setup'ı aç"
+                        title={t("ui.settings.openSoundPanelTitle")}
                       >
                         <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
-                        <span>Sistem Ses Panelini Aç</span>
+                        <span>{t("ui.settings.openSoundPanel")}</span>
                       </button>
                     </div>
 
@@ -732,8 +733,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       className="text-[11px] text-cyan-400 hover:text-cyan-300 underline underline-offset-2 transition"
                     >
                       {showLoopbackGuide
-                        ? "Kurulum Yönergesini Gizle"
-                        : "Loopback / BlackHole Kurulum Yönergesi"}
+                        ? t("ui.settings.hideGuide")
+                        : t("ui.settings.showGuide")}
                     </button>
                   </div>
 
@@ -856,7 +857,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         </span>
                       </div>
                       <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                        Önerilen
+                        {t("ui.settings.recommended")}
                       </span>
                     </div>
                     <p className="text-[10px] text-slate-400 leading-relaxed">
@@ -895,7 +896,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         </span>
                       </div>
                       <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
-                        Yüksek Hız
+                        {t("ui.settings.highSpeed")}
                       </span>
                     </div>
                     <p className="text-[10px] text-slate-400 leading-relaxed">
@@ -920,28 +921,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-slate-400 flex items-center gap-1.5 font-medium">
-                  <Cpu className="w-4 h-4 text-cyan-400" /> Bilgisayar
-                  İşlemcisi:
+                  <Cpu className="w-4 h-4 text-cyan-400" />{" "}
+                  {t("ui.settings.cpu")}
                 </span>
                 <span className="text-slate-200 font-semibold">
-                  {hardware ? hardware.cpu_brand : "Tespit Ediliyor..."}
+                  {hardware ? hardware.cpu_brand : t("ui.settings.detecting")}
                 </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-slate-400 flex items-center gap-1.5 font-medium">
-                  <Zap className="w-4 h-4 text-amber-400" /> Grafik &
-                  Hızlandırma:
+                  <Zap className="w-4 h-4 text-amber-400" />{" "}
+                  {t("ui.settings.gpu")}
                 </span>
                 <span className="text-emerald-400 font-medium">
                   {hardware?.metal_supported
-                    ? "Apple Silicon Hızlandırması Aktif"
-                    : hardware?.gpu_name || "Standart"}
+                    ? t("ui.settings.appleAccel")
+                    : hardware?.gpu_name || t("ui.settings.standardGpu")}
                 </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-slate-400 flex items-center gap-1.5 font-medium">
-                  <HardDrive className="w-4 h-4 text-indigo-400" /> Sistem
-                  Belleği (RAM):
+                  <HardDrive className="w-4 h-4 text-indigo-400" />{" "}
+                  {t("ui.settings.ram")}
                 </span>
                 <span className="text-slate-200 font-semibold">
                   {hardware ? `${hardware.total_ram_gb} GB` : "-"}
@@ -954,27 +955,27 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <div className="flex items-center justify-between">
                 <span className="text-slate-400 flex items-center gap-1.5 font-medium">
                   <ShieldCheck className="w-4 h-4 text-emerald-400" />{" "}
-                  Çevrimdışı Gizlilik Modu:
+                  {t("ui.settings.offlineMode")}
                 </span>
                 <span className="text-emerald-400 font-medium">
-                  %100 Cihazınızda Gizli
+                  {t("ui.settings.privateOnDevice")}
                 </span>
               </div>
               <div className="flex items-center justify-between text-slate-400">
-                <span>Veri Güvenliği:</span>
+                <span>{t("ui.settings.dataSecurity")}</span>
                 <span className="text-slate-200">
                   {isParanoid
-                    ? "Paranoid Mod: %100 Cihazınızda Gizli, sıfır bulut çıkışı."
-                    : "Yerel modellerde %100 gizli; bulut kullanımında açık onay istenir."}
+                    ? t("ui.settings.dataSecurityParanoid")
+                    : t("ui.settings.dataSecurityDefault")}
                 </span>
               </div>
               {modelStatus && (
                 <div className="flex items-center justify-between text-slate-400">
-                  <span>Yapay Zeka Durumu:</span>
+                  <span>{t("ui.settings.aiStatus")}</span>
                   <span className="text-slate-200">
                     {modelStatus.is_loaded
-                      ? "Kullanıma Hazır"
-                      : "İhtiyaç Anında Açılır"}
+                      ? t("ui.settings.aiReady")
+                      : t("ui.settings.aiOnDemand")}
                   </span>
                 </div>
               )}
@@ -984,13 +985,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/80 flex items-center justify-between">
               <div>
                 <label className="text-slate-200 font-medium flex items-center gap-1.5">
-                  <ShieldCheck className="w-4 h-4 text-amber-400" /> Bulut
-                  İşlemlerinde Gizlilik Uyarısı Göster
+                  <ShieldCheck className="w-4 h-4 text-amber-400" />{" "}
+                  {t("ui.settings.cloudWarnToggle")}
                 </label>
                 <p className="text-slate-400 text-[11px] mt-0.5">
-                  Hızlı bulut seçeneği kullanıldığında, ses kaydınızın internet
-                  üzerinden yapay zeka sunucusuna gideceğini işlem öncesinde
-                  hatırlatır.
+                  {t("ui.settings.cloudWarnToggleDesc")}
                 </p>
               </div>
               <input
@@ -1198,23 +1197,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <div className="p-3.5 rounded-xl bg-slate-950/60 border border-purple-500/30 space-y-2.5">
               <div className="flex items-center justify-between">
                 <label className="font-semibold text-white flex items-center gap-1.5">
-                  <Server className="w-4 h-4 text-purple-400" /> Özel Yerel LLM
-                  Sunucusu (Ollama / vLLM / LM Studio)
+                  <Server className="w-4 h-4 text-purple-400" />{" "}
+                  {t("ui.settings.localLlmTitle")}
                 </label>
                 <span className="text-[10px] bg-purple-500/20 text-purple-300 border border-purple-500/30 px-1.5 py-0.5 rounded font-medium">
-                  %100 Yerel & Çevrimdışı
+                  {t("ui.settings.localOffline")}
                 </span>
               </div>
               <p className="text-[11px] text-slate-400">
-                Kendi bilgisayarınızda veya yerel ağınızda barındırdığınız
-                Ollama veya OpenAI uyumlu yerel LLM sunucu adresini
-                bağlayabilirsiniz.
+                {t("ui.settings.localLlmDesc")}
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <div className="space-y-1">
                   <span className="text-[10px] text-slate-400 font-medium">
-                    Sunucu API Endpoint URL:
+                    {t("ui.settings.endpointUrl")}
                   </span>
                   <input
                     type="text"
@@ -1233,7 +1230,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
                 <div className="space-y-1">
                   <span className="text-[10px] text-slate-400 font-medium">
-                    Model Adı:
+                    {t("ui.settings.modelName")}
                   </span>
                   <input
                     type="text"
@@ -1260,12 +1257,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   {ollamaTestStatus.state === "testing" ? (
                     <>
                       <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-300" />
-                      Sunucu Test Ediliyor...
+                      {t("ui.settings.testingServer")}
                     </>
                   ) : (
                     <>
                       <Activity className="w-3.5 h-3.5 text-purple-400" />
-                      Sunucu Bağlantısını Test Et
+                      {t("ui.settings.testServer")}
                     </>
                   )}
                 </button>
@@ -1294,13 +1291,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <ShieldAlert className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
                 <div>
                   <div className="font-semibold text-purple-300">
-                    Air-Gapped / Paranoid Mod Aktif
+                    {t("ui.settings.paranoidActiveTitle")}
                   </div>
                   <div className="text-[11px] text-purple-300/80 mt-0.5">
-                    Bu mod devredeyken harici bulut API çağrıları (Groq, Gemini,
-                    OpenAI) Rust backend seviyesinde tamamen engellenmiştir.
-                    Aşağıdaki anahtarlar yalnızca Dengeli veya Maksimum Zeka
-                    moduna geçtiğinizde etkinleşir.
+                    {t("ui.settings.paranoidActiveDesc")}
                   </div>
                 </div>
               </div>
@@ -1316,17 +1310,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             >
               <div className="flex items-center justify-between">
                 <label className="font-semibold text-white flex items-center gap-1.5">
-                  <Zap className="w-4 h-4 text-amber-400" /> Groq (Yıldırım Hızı
-                  - 10 Saniyede)
+                  <Zap className="w-4 h-4 text-amber-400" />{" "}
+                  {t("ui.settings.groqTitle")}
                 </label>
                 <div className="flex items-center gap-1.5">
                   {isParanoid && (
                     <span className="text-[10px] bg-purple-950/80 text-purple-300 border border-purple-500/40 px-1.5 py-0.5 rounded font-mono flex items-center gap-1">
-                      <Lock className="w-2.5 h-2.5" /> Kilitli
+                      <Lock className="w-2.5 h-2.5" /> {t("ui.settings.locked")}
                     </span>
                   )}
                   <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded">
-                    Ücretsiz & Ultra Hızlı
+                    {t("ui.settings.groqBadge")}
                   </span>
                 </div>
               </div>
@@ -1360,7 +1354,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <div className="space-y-2 pt-1">
                 <div className="flex items-center justify-between">
                   <span className="text-slate-400 text-[11px]">
-                    Tercih Edilen Model:
+                    {t("ui.settings.preferredModel")}
                   </span>
                   <select
                     value={groqModel}
@@ -1369,7 +1363,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   >
                     {GROQ_MODELS.map((m) => (
                       <option key={m.id} value={m.id}>
-                        {m.name}
+                        {modelLabel(m, t)}
                       </option>
                     ))}
                   </select>
@@ -1381,7 +1375,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       type="text"
                       value={customGroq}
                       onChange={(e) => setCustomGroq(e.target.value)}
-                      placeholder="Model adı yazın (örn: whisper-large-v3-turbo)"
+                      placeholder={t("ui.settings.customModelPlaceholder", {
+                        example: "whisper-large-v3-turbo",
+                      })}
                       className="flex-1 px-2.5 py-1 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white focus:outline-none font-mono"
                     />
                   </div>
@@ -1399,17 +1395,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             >
               <div className="flex items-center justify-between">
                 <label className="font-semibold text-white flex items-center gap-1.5">
-                  <Sparkles className="w-4 h-4 text-cyan-400" /> Google Gemini
-                  (Flash & Pro Ailesi)
+                  <Sparkles className="w-4 h-4 text-cyan-400" />{" "}
+                  {t("ui.settings.geminiTitle")}
                 </label>
                 <div className="flex items-center gap-1.5">
                   {isParanoid && (
                     <span className="text-[10px] bg-purple-950/80 text-purple-300 border border-purple-500/40 px-1.5 py-0.5 rounded font-mono flex items-center gap-1">
-                      <Lock className="w-2.5 h-2.5" /> Kilitli
+                      <Lock className="w-2.5 h-2.5" /> {t("ui.settings.locked")}
                     </span>
                   )}
                   <span className="text-[10px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 px-1.5 py-0.5 rounded">
-                    Üst Düzey Zeka
+                    {t("ui.settings.geminiBadge")}
                   </span>
                 </div>
               </div>
@@ -1443,7 +1439,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <div className="space-y-2 pt-1">
                 <div className="flex items-center justify-between">
                   <span className="text-slate-400 text-[11px]">
-                    Tercih Edilen Model:
+                    {t("ui.settings.preferredModel")}
                   </span>
                   <select
                     value={geminiModel}
@@ -1452,7 +1448,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   >
                     {GEMINI_MODELS.map((m) => (
                       <option key={m.id} value={m.id}>
-                        {m.name}
+                        {modelLabel(m, t)}
                       </option>
                     ))}
                   </select>
@@ -1464,7 +1460,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       type="text"
                       value={customGemini}
                       onChange={(e) => setCustomGemini(e.target.value)}
-                      placeholder="Model adı yazın (örn: gemini-2.0-flash)"
+                      placeholder={t("ui.settings.customModelPlaceholder", {
+                        example: "gemini-2.0-flash",
+                      })}
                       className="flex-1 px-2.5 py-1 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white focus:outline-none font-mono"
                     />
                   </div>
@@ -1488,11 +1486,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <div className="flex items-center gap-1.5">
                   {isParanoid && (
                     <span className="text-[10px] bg-purple-950/80 text-purple-300 border border-purple-500/40 px-1.5 py-0.5 rounded font-mono flex items-center gap-1">
-                      <Lock className="w-2.5 h-2.5" /> Kilitli
+                      <Lock className="w-2.5 h-2.5" /> {t("ui.settings.locked")}
                     </span>
                   )}
                   <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-1.5 py-0.5 rounded">
-                    Küresel Standart
+                    {t("ui.settings.openaiBadge")}
                   </span>
                 </div>
               </div>
@@ -1526,7 +1524,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <div className="space-y-2 pt-1">
                 <div className="flex items-center justify-between">
                   <span className="text-slate-400 text-[11px]">
-                    Tercih Edilen Model:
+                    {t("ui.settings.preferredModel")}
                   </span>
                   <select
                     value={openaiModel}
@@ -1535,7 +1533,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   >
                     {OPENAI_MODELS.map((m) => (
                       <option key={m.id} value={m.id}>
-                        {m.name}
+                        {modelLabel(m, t)}
                       </option>
                     ))}
                   </select>
@@ -1547,7 +1545,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       type="text"
                       value={customOpenai}
                       onChange={(e) => setCustomOpenai(e.target.value)}
-                      placeholder="Model adı yazın (örn: whisper-1)"
+                      placeholder={t("ui.settings.customModelPlaceholder", {
+                        example: "whisper-1",
+                      })}
                       className="flex-1 px-2.5 py-1 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white focus:outline-none font-mono"
                     />
                   </div>
@@ -1558,8 +1558,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             {/* Save Buttons */}
             <div className="flex items-center justify-between pt-2">
               <span className="text-[11px] text-slate-400">
-                * Anahtarlarınız ve tercihleriniz cihazınızda anında güvenle
-                saklanır.
+                {t("ui.settings.keysFootnote")}
               </span>
               <button
                 onClick={handleSaveKeys}
@@ -1587,9 +1586,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <span>{t("settings.tabLanguage")}</span>
               </label>
               <p className="text-slate-400 text-xs leading-relaxed">
-                EchoMind arayüzünde kullanmak istediğiniz dili seçin. Tüm
-                menüler, butonlar ve rapor şablonları bu dilde
-                görüntülenecektir.
+                {t("ui.settings.languageDesc")}
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">

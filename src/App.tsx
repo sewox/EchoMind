@@ -52,8 +52,10 @@ import {
   useTranscriptionJobs,
   TranscriptionJobState,
 } from "./hooks/useTranscriptionJobs";
-import { useStorageReady } from "./hooks/useStorageReady";
+import { HistoryRecoveryNoticeBanner } from "./components/HistoryRecoveryNoticeBanner";
 import { CredentialStore } from "./services/credentialStore";
+import { useStorageReady } from "./hooks/useStorageReady";
+import { useHistoryRecoveryNotice } from "./hooks/useHistoryRecoveryNotice";
 
 export interface HardwareInfo {
   os_name: string;
@@ -140,7 +142,11 @@ import { getTagColorClass } from "./components/transcript/MeetingTagsBar";
 export function App() {
   const { t, language, setLanguage } = useI18n();
   const { isParanoid } = usePrivacyMode();
-  const { ready: storageReady } = useStorageReady();
+  const { ready: storageReady, showHistoryRecoveryNotice } = useStorageReady();
+  const {
+    visible: historyRecoveryVisible,
+    dismiss: dismissHistoryRecovery,
+  } = useHistoryRecoveryNotice(showHistoryRecoveryNotice);
   const [hardware, setHardware] = useState<HardwareInfo | null>(null);
   const [modelStatus, setModelStatus] = useState<ModelStatus | null>(null);
   const [selectedLanguage, setSelectedLanguage] = useState<string>("auto");
@@ -1017,12 +1023,10 @@ export function App() {
               type="button"
               onClick={() => setIsSettingsOpen(true)}
               className="px-2.5 py-1 rounded-full bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-[11px] text-amber-300 flex items-center gap-1.5 transition"
-              title="Şu an yalnızca mikrofon yakalanıyor. Sistem sesi (Zoom / Meet / Teams) desteklenmiyor. Karşı tarafın sesini de kaydetmek için ses ayarlarından Loopback seçebilirsiniz."
+              title={t("ui.app.micOnlyTooltip")}
             >
               <Volume2 className="w-3 h-3 text-amber-400" />
-              <span>
-                Sadece Mikrofon — Sistem Sesi (Zoom/Meet/Teams) Desteklenmiyor
-              </span>
+              <span>{t("ui.app.micOnlyBanner")}</span>
             </button>
           )}
 
@@ -1097,6 +1101,10 @@ export function App() {
       <FirstRunModelSetupBanner
         progress={modelSetupProgress}
         onDismiss={dismissModelSetup}
+      />
+      <HistoryRecoveryNoticeBanner
+        visible={historyRecoveryVisible}
+        onDismiss={dismissHistoryRecovery}
       />
 
       {/* Floating Completion Notification Banner (Steve Jobs simplicity) */}
@@ -1218,14 +1226,14 @@ export function App() {
                 className="flex items-center justify-center gap-1.5 text-[11px] text-slate-400"
               >
                 <Mic className="w-3 h-3 text-emerald-400" />
-                <span>Mikrofon Aktif</span>
+                <span>{t("ui.app.micActive")}</span>
                 <span className="text-slate-600">•</span>
                 <button
                   type="button"
                   onClick={() => setIsSettingsOpen(true)}
                   className="text-cyan-400 hover:text-cyan-300 underline underline-offset-2 transition cursor-pointer"
                 >
-                  Karşı tarafın sesi (Meet/Zoom) için Loopback / BlackHole seçin
+                  {t("ui.app.loopbackHint")}
                 </button>
               </div>
             )}
@@ -1575,18 +1583,15 @@ export function App() {
       <footer className="shrink-0 border-t border-white/10 px-8 py-3 text-center text-xs text-slate-400 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <ShieldCheck className="w-4 h-4 text-emerald-400" />
-          <span>
-            Gizlilik Öncelikli • %100 Cihazınızda Güvende • Tüm Ses & Video
-            Formatlarını Destekler
-          </span>
+          <span>{t("ui.app.footerTagline")}</span>
         </div>
         <button
           onClick={() => setIsModelHubOpen(true)}
           className="text-[11px] text-slate-400 hover:text-cyan-300 flex items-center gap-1.5 transition px-2.5 py-1 rounded-lg hover:bg-slate-800"
-          title="Yapay Zeka Modunu Değiştir"
+          title={t("ui.app.aiOptionsTitle")}
         >
           <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-          <span>Yapay Zeka Seçenekleri</span>
+          <span>{t("ui.app.aiOptions")}</span>
         </button>
       </footer>
 

@@ -1019,7 +1019,7 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
               {isRecording && isSpeaking && (
                 <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-medium flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                  Konuşuluyor
+                  {t("ui.transcript.speaking")}
                 </span>
               )}
               <div className="flex items-center gap-1 bg-slate-900/80 border border-slate-800 p-0.5 rounded-lg text-[11px] text-slate-400">
@@ -1155,18 +1155,20 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
             {isProcessing ? (
               <>
                 <Wand2 className="w-3.5 h-3.5 animate-spin" />
-                <span>Yazıya Dönüştürülüyor...</span>
+                <span>{t("ui.transcript.transcribing")}</span>
               </>
             ) : (
               <>
                 <Play className="w-3.5 h-3.5 fill-slate-900" />
-                <span>Yazıya Dönüştür</span>
+                <span>{t("ui.transcript.transcribe")}</span>
               </>
             )}
           </button>
         ) : (
           <span className="text-xs text-slate-400 font-mono">
-            Geçmiş Kayıt: {selectedPastMeeting.date_formatted}
+            {t("ui.transcript.pastRecording", {
+              date: selectedPastMeeting.date_formatted,
+            })}
           </span>
         )}
 
@@ -1181,7 +1183,7 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
             ) : (
               <Copy className="w-3.5 h-3.5" />
             )}
-            <span>Kopyala</span>
+            <span>{t("common.copy")}</span>
           </button>
 
           {selectedPastMeeting && (
@@ -1202,7 +1204,7 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
             className="px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-medium text-xs shadow-md shadow-cyan-900/30 transition flex items-center gap-1.5 disabled:opacity-30"
           >
             <Download className="w-3.5 h-3.5" />
-            <span>Raporu Dışa Aktar</span>
+            <span>{t("ui.transcript.exportReport")}</span>
           </button>
 
           {!selectedPastMeeting && (

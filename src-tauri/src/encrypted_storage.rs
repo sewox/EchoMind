@@ -126,6 +126,11 @@ mod tests {
 
     #[test]
     fn test_encrypted_storage_roundtrip() {
+        // Encryption reads the global key-unlock phase; hold the shared test lock so
+        // unlock-gate tests running in parallel can't flip it to InProgress mid-test.
+        let _unlock = crate::secure_key::key_unlock_test_lock()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         let temp_dir = std::env::temp_dir();
         let file_path = temp_dir.join(format!("echomind_test_enc_{}.dat", std::process::id()));
 
@@ -153,6 +158,11 @@ mod tests {
 
     #[test]
     fn test_tamper_detection_rejects_modified_ciphertext() {
+        // Encryption reads the global key-unlock phase; hold the shared test lock so
+        // unlock-gate tests running in parallel can't flip it to InProgress mid-test.
+        let _unlock = crate::secure_key::key_unlock_test_lock()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         let temp_dir = std::env::temp_dir();
         let file_path = temp_dir.join(format!("echomind_test_tamper_{}.dat", std::process::id()));
 
@@ -178,6 +188,11 @@ mod tests {
 
     #[test]
     fn test_two_files_do_not_share_ciphertext_prefix() {
+        // Encryption reads the global key-unlock phase; hold the shared test lock so
+        // unlock-gate tests running in parallel can't flip it to InProgress mid-test.
+        let _unlock = crate::secure_key::key_unlock_test_lock()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         // Regression guard for the old scheme, where a deterministic per-user keystream
         // meant two files with the same plaintext prefix leaked correlated ciphertext.
         let temp_dir = std::env::temp_dir();
@@ -204,6 +219,11 @@ mod tests {
 
     #[test]
     fn test_legacy_plaintext_migration() {
+        // Encryption reads the global key-unlock phase; hold the shared test lock so
+        // unlock-gate tests running in parallel can't flip it to InProgress mid-test.
+        let _unlock = crate::secure_key::key_unlock_test_lock()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         let temp_dir = std::env::temp_dir();
         let file_path = temp_dir.join(format!("echomind_test_legacy_{}.dat", std::process::id()));
 
@@ -220,6 +240,11 @@ mod tests {
 
     #[test]
     fn test_legacy_v1_xor_migration() {
+        // Encryption reads the global key-unlock phase; hold the shared test lock so
+        // unlock-gate tests running in parallel can't flip it to InProgress mid-test.
+        let _unlock = crate::secure_key::key_unlock_test_lock()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         let temp_dir = std::env::temp_dir();
         let file_path = temp_dir.join(format!(
             "echomind_test_legacy_v1_{}.dat",

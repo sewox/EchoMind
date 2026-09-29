@@ -1,4 +1,4 @@
-/* EchoMind AI Assistant - Modern Aesthetic Landing Style (Product Hunt Ready) */
+/* EchoMind AI Assistant - Modern Aesthetic Landing Style */
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap");
 
 :root {
@@ -244,35 +244,6 @@ nav.navbar {
   padding: 14px 28px;
   font-size: 1.05rem;
   border-radius: var(--radius-md);
-}
-
-/* Product Hunt Badge & Pill */
-.ph-badge-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 16px;
-  background: rgba(218, 85, 47, 0.12);
-  border: 1px solid rgba(218, 85, 47, 0.3);
-  border-radius: var(--radius-full);
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #ff8a65;
-  margin-bottom: 24px;
-  text-decoration: none;
-  transition: all 0.2s ease;
-}
-
-.ph-badge-pill:hover {
-  background: rgba(218, 85, 47, 0.2);
-  border-color: rgba(218, 85, 47, 0.5);
-  transform: translateY(-1px);
-}
-
-.ph-badge-pill svg {
-  width: 16px;
-  height: 16px;
-  color: #da552f;
 }
 
 /* Hero Section */
@@ -901,41 +872,6 @@ section.download-section {
   position: relative;
 }
 
-.showcase-tabs {
-  display: flex;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-bottom: 28px;
-}
-
-.showcase-tab-btn {
-  background: rgba(15, 23, 42, 0.6);
-  border: 1px solid var(--border-subtle);
-  color: var(--text-secondary);
-  padding: 10px 18px;
-  border-radius: 999px;
-  font-size: 0.9rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.25s ease;
-  backdrop-filter: blur(8px);
-}
-
-.showcase-tab-btn:hover {
-  background: rgba(30, 41, 59, 0.8);
-  color: var(--text-primary);
-  border-color: rgba(99, 102, 241, 0.3);
-  transform: translateY(-1px);
-}
-
-.showcase-tab-btn.active {
-  background: rgba(99, 102, 241, 0.2);
-  color: #c7d2fe;
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 20px rgba(99, 102, 241, 0.25);
-}
-
 .showcase-window-wrapper {
   max-width: 1020px;
   margin: 0 auto;
@@ -948,51 +884,6 @@ section.download-section {
   overflow: hidden;
   backdrop-filter: blur(16px);
   transition: all 0.3s ease;
-}
-
-.showcase-window-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 20px;
-  background: rgba(15, 23, 42, 0.9);
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-.showcase-dots {
-  display: flex;
-  gap: 8px;
-}
-
-.showcase-dots span {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-}
-
-.showcase-dots span:nth-child(1) {
-  background: #ef4444;
-}
-.showcase-dots span:nth-child(2) {
-  background: #f59e0b;
-}
-.showcase-dots span:nth-child(3) {
-  background: #10b981;
-}
-
-.showcase-window-title {
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-  font-family: var(--font-mono);
-}
-
-.showcase-window-badge {
-  font-size: 0.72rem;
-  background: rgba(16, 185, 129, 0.15);
-  color: var(--accent-emerald);
-  padding: 3px 8px;
-  border-radius: 999px;
-  font-weight: 600;
 }
 
 .showcase-img-container {
@@ -1008,6 +899,125 @@ section.download-section {
   display: block;
   object-fit: cover;
   transition: opacity 0.25s ease;
+}
+
+/* Screenshot slider */
+.shot-slider {
+  position: relative;
+  outline: none;
+}
+
+.shot-slider:focus-visible {
+  box-shadow:
+    0 0 0 2px rgba(129, 140, 248, 0.8),
+    0 24px 60px rgba(0, 0, 0, 0.7);
+}
+
+.shot-slider .showcase-img-container {
+  aspect-ratio: 2200 / 1442;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.shot-slider .showcase-img {
+  /* never upscale: small captures (e.g. the floating island) keep their size */
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.slider-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(10, 15, 30, 0.72);
+  color: #fff;
+  font-size: 28px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-bottom: 4px;
+  backdrop-filter: blur(8px);
+  transition:
+    background 0.2s ease,
+    transform 0.2s ease;
+}
+
+.slider-nav:hover {
+  background: rgba(99, 102, 241, 0.85);
+  transform: translateY(-50%) scale(1.06);
+}
+
+.slider-prev {
+  left: 14px;
+}
+
+.slider-next {
+  right: 14px;
+}
+
+.slider-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.slider-title {
+  font-weight: 600;
+  color: #fff;
+  font-size: 0.95rem;
+}
+
+.slider-dots {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.slider-dot {
+  width: 9px;
+  height: 9px;
+  padding: 0;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.25);
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    width 0.2s ease;
+}
+
+.slider-dot.active {
+  width: 24px;
+  border-radius: 999px;
+  background: #818cf8;
+}
+
+@media (max-width: 640px) {
+  .slider-nav {
+    width: 36px;
+    height: 36px;
+    font-size: 22px;
+  }
+
+  .slider-prev {
+    left: 8px;
+  }
+
+  .slider-next {
+    right: 8px;
+  }
 }
 
 .showcase-caption-bar {
@@ -1038,13 +1048,6 @@ section.download-section {
 }
 
 @media (max-width: 600px) {
-  .showcase-tab-btn {
-    font-size: 0.8rem;
-    padding: 8px 14px;
-  }
-  .showcase-window-title {
-    display: none;
-  }
   .showcase-caption-bar {
     padding: 12px 16px;
   }
@@ -1091,4 +1094,33 @@ footer.site-footer {
   border-top: 1px solid rgba(255, 255, 255, 0.05);
   padding-top: 24px;
   font-size: 0.8rem;
+}
+
+/* Small screens: the section links don't fit next to the logo and actions
+   (they pushed the page wider than the viewport). Sections stay reachable by
+   scrolling, and the hero already has the download buttons. */
+@media (max-width: 900px) {
+  .nav-links {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .nav-actions .btn span {
+    display: none;
+  }
+
+  .island-preview-wrapper {
+    padding: 18px;
+  }
+
+  .mockup-header {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  /* The engine pill doesn't fit inside the floating HUD on phones */
+  .island-hud > .island-badge {
+    display: none;
+  }
 }

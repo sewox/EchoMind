@@ -27,6 +27,8 @@ export const fr: TranslationKeys = {
     storageUnlocking: "Ouverture du stockage sécurisé…",
     storageUnlockHint:
       "En attente de l'accès au trousseau. La fenêtre reste réactive ; votre historique se charge après autorisation.",
+    historyRecoveryNotice:
+      "L'historique chiffré précédent n'a pas pu être ouvert dans cette version ; des sauvegardes ont été conservées. Les nouveaux enregistrements sont désormais protégés par le trousseau.",
   },
   nav: {
     startListening: "Démarrer l'écoute",
@@ -502,5 +504,194 @@ export const fr: TranslationKeys = {
     noRelatedMeetingsDesc:
       "Aucune autre réunion ne partage actuellement d'étiquettes ou de participants communs.",
     jumpToMeeting: "Accéder à la réunion",
+  },
+  ui: {
+    settings: {
+      vuMeter: "Niveau d'entrée en direct (VU-mètre) :",
+      speechDetected: "🟢 Parole détectée",
+      silentWaiting: "⚪ Silence / En attente",
+      sampling: "Échantillonnage : 16 000 Hz mono (optimisé Whisper)",
+      filter: "Filtre : passe-haut 80 Hz + noise gate",
+      defaultMic: "🎙️ Microphone par défaut (sélection {os} automatique)",
+      loopbackPrefix: "🔊 [Audio système / Loopback] ",
+      defaultSuffix: "(par défaut {os})",
+      rescanDevices: "Rechercher à nouveau les périphériques audio",
+      dualCaptureTitle:
+        "Audio système + micro (capture bidirectionnelle active)",
+      micCaptureTitle: "Capture micro",
+      dualCaptureDesc:
+        "Le loopback virtuel est actif ; les participants distants sont capturés clairement.",
+      micCaptureDesc: "Seule l'entrée de votre micro est actuellement écoutée.",
+      loopbackActive: "Loopback actif",
+      micOnly: "Micro uniquement",
+      remoteTipTitle: "Astuce : capturer les participants distants",
+      remoteTipBefore:
+        "Avec un casque, l'audio des autres participants joué par votre ordinateur n'atteint pas le micro standard. Pour transcrire aussi l'autre côté, sélectionnez le périphérique virtuel ",
+      remoteTipOr: " ou ",
+      remoteTipAfter: ".",
+      loopbackFound:
+        "✓ Un périphérique audio virtuel a été trouvé ! Sélectionnez le périphérique loopback dans la liste ci-dessus.",
+      yourVoice: "Votre voix : entrée active",
+      systemAudioLoopback: "Audio système : loopback actif",
+      systemAudioSpeaker: "Audio système : haut-parleur/pièce",
+      testingAudio: "Test audio en cours (écoute VU)...",
+      testInput: "Tester l'entrée (5 s)",
+      openSoundPanelTitle:
+        "Ouvrir le panneau son du système ou Configuration audio et MIDI",
+      openSoundPanel: "Ouvrir le panneau son",
+      hideGuide: "Masquer le guide",
+      showGuide: "Guide de configuration Loopback / BlackHole",
+      cpu: "Processeur :",
+      gpu: "Graphisme et accélération :",
+      ram: "Mémoire système (RAM) :",
+      detecting: "Détection...",
+      appleAccel: "Accélération Apple Silicon active",
+      standardGpu: "Standard",
+      offlineMode: "Mode confidentialité hors ligne :",
+      privateOnDevice: "100 % privé sur l'appareil",
+      dataSecurity: "Sécurité des données :",
+      dataSecurityParanoid:
+        "Mode paranoïaque : 100 % sur l'appareil, aucune sortie cloud.",
+      dataSecurityDefault:
+        "100 % privé avec les modèles locaux ; l'usage du cloud requiert un consentement explicite.",
+      aiStatus: "Statut de l'IA :",
+      aiReady: "Prêt",
+      aiOnDemand: "Chargé à la demande",
+      cloudWarnToggle:
+        "Afficher un avertissement de confidentialité pour le cloud",
+      cloudWarnToggleDesc:
+        "Avant d'utiliser une option cloud rapide, rappelle que votre enregistrement sera envoyé via Internet à un serveur d'IA.",
+      localLlmTitle:
+        "Serveur LLM local personnalisé (Ollama / vLLM / LM Studio)",
+      localOffline: "100 % local et hors ligne",
+      localLlmDesc:
+        "Connectez un serveur LLM Ollama ou compatible OpenAI hébergé sur votre ordinateur ou réseau local.",
+      endpointUrl: "URL du point de terminaison API :",
+      modelName: "Nom du modèle :",
+      testingServer: "Test du serveur...",
+      testServer: "Tester la connexion au serveur",
+      paranoidActiveTitle: "Mode Air-Gapped / Paranoïaque actif",
+      paranoidActiveDesc:
+        "Tant que ce mode est actif, les appels aux API cloud externes (Groq, Gemini, OpenAI) sont entièrement bloqués au niveau du backend Rust. Les clés ci-dessous ne s'appliquent qu'en mode Équilibré ou Intelligence maximale.",
+      locked: "Verrouillé",
+      groqTitle: "Groq (Ultra-rapide – ~10 secondes)",
+      groqBadge: "Gratuit et ultra-rapide",
+      geminiTitle: "Google Gemini (famille Flash et Pro)",
+      geminiBadge: "Intelligence de pointe",
+      openaiBadge: "Standard mondial",
+      preferredModel: "Modèle préféré :",
+      customModelPlaceholder: "Saisissez un nom de modèle (ex. : {example})",
+      keysFootnote:
+        "* Vos clés et préférences sont stockées en toute sécurité sur cet appareil.",
+      languageDesc:
+        "Choisissez la langue de l'interface EchoMind. Les menus, boutons et modèles de rapport s'afficheront dans cette langue.",
+      recommended: "Recommandé",
+      highSpeed: "Haute vitesse",
+    },
+    app: {
+      micOnlyBanner:
+        "Micro uniquement – audio système (Zoom/Meet/Teams) non capté",
+      micOnlyTooltip:
+        "Seul le micro est capté. L'audio système (Zoom / Meet / Teams) n'est pas inclus. Pour enregistrer aussi les participants distants, choisissez un périphérique loopback dans les réglages audio.",
+      micActive: "Micro actif",
+      loopbackHint:
+        "Choisissez Loopback / BlackHole pour capter l'audio distant (Meet/Zoom)",
+      footerTagline:
+        "Confidentialité d'abord • 100 % sur l'appareil • Tous formats audio et vidéo",
+      aiOptions: "Options d'IA",
+      aiOptionsTitle: "Changer de mode IA",
+    },
+    transcript: {
+      speaking: "Parole",
+      transcribing: "Transcription...",
+      transcribe: "Transcrire",
+      pastRecording: "Enregistrement passé : {date}",
+      exportReport: "Exporter le rapport",
+    },
+    island: {
+      active: "Actif",
+      standby: "En veille",
+      prompt: "Voulez-vous enregistrer cette réunion ?",
+      ended: "Réunion terminée (en veille)",
+    },
+    assistant: {
+      welcome:
+        "Bonjour ! Je suis l'assistant de réunion d'entreprise EchoMind.\n\nJe réponds à vos questions en parcourant toute votre archive de réunions : décisions, actions et transcriptions. Choisissez un sujet ci-dessous ou posez la question de votre choix.",
+      examples: "Exemples :",
+      copyReply: "Copier la réponse",
+      q1Label: "Tâches ouvertes et responsables",
+      q1Prompt:
+        "Liste toutes les actions ouvertes, tâches et responsables de toutes les réunions.",
+      q2Label: "Toutes les décisions clés",
+      q2Prompt:
+        "Résume les accords conclus et les décisions fermes prises lors de toutes les réunions passées.",
+      q3Label: "Objectifs et avancement",
+      q3Prompt:
+        "Compare les objectifs principaux des réunions et les sujets reportés à des phases ultérieures.",
+      q4Label: "Budget et sujets financiers",
+      q4Prompt:
+        "Qu'a-t-on dit du budget, des taxes, des paiements et des coûts lors des réunions ?",
+    },
+    modelHub: {
+      inUse: "Utilisé",
+      select: "Sélectionner",
+      activeModel: "Modèle actif",
+      useThis: "Utiliser",
+      downloading: "Téléchargement...",
+      downloadSize: "Télécharger ({size} Mo)",
+      speedValue: "Vitesse : {value} %",
+      accuracyValue: "Précision : {value} %",
+      zeroDownload: "0 Mo à télécharger",
+      preparing: "Préparation des options...",
+      appleTitle:
+        "🍎 Reconnaissance vocale macOS sur l'appareil (Dictée Apple / ANE)",
+      appleDesc:
+        "Le moteur de reconnaissance vocale intégré à votre système. 0 Mo de RAM, latence nulle, accéléré par l'Apple Neural Engine.",
+      appleSelectAria: "Sélectionner la reconnaissance vocale macOS",
+      senseDesc:
+        "Moteur vocal local nouvelle génération, sans hallucinations, jusqu'à 15 fois plus rapide que Whisper.",
+      senseSelectAria: "Sélectionner SenseVoice",
+      activeMode: "Actif",
+      groqTitle: "Ultra-rapide (Groq Cloud Whisper)",
+      groqBadge: "Le plus rapide (~10 s)",
+      groqDesc:
+        "Transcrit un enregistrement d'une heure en 10 secondes environ, sans solliciter votre ordinateur ni votre batterie.",
+      cpuLoad: "Charge machine :",
+      zeroLoad: "Nulle",
+      speedLabel: "Vitesse :",
+      inSeconds: "⚡ Quelques secondes",
+      qualityLabel: "Qualité :",
+      crystalClear: "Excellente",
+      topTier: "Haut de gamme",
+      veryHigh: "Très élevée",
+      geminiTitle: "Google Gemini (audio multimodal et raisonnement)",
+      geminiBadge: "Large famille de modèles",
+      geminiDesc:
+        "L'IA audio multimodale avancée de Google. Grande précision et analyse intelligente des intervenants avec toutes les versions de Gemini.",
+      openaiTitle: "Standard mondial (OpenAI Whisper & GPT-4o Audio)",
+      openaiDesc:
+        "Une infrastructure d'IA reconnue mondialement, excellente pour les réunions multilingues.",
+      modelVersion: "Version du modèle :",
+      examplePlaceholder: "ex. : {example}",
+      pasteKey: "Collez votre clé API {provider} ({prefix})",
+      saveAndSelect: "Enregistrer et sélectionner",
+      footnote:
+        "* Vous pouvez changer à tout moment en un clic selon vos préférences de confidentialité et de vitesse.",
+      done: "Terminé",
+    },
+    models: {
+      recommendedFast: "Recommandé – ~10 s",
+      maxAccuracy: "Précision maximale",
+      englishOnly: "Anglais",
+      recommendedSmart: "Recommandé – rapide et intelligent",
+      ultraLight: "Ultra-léger et rapide",
+      deepReasoning: "Raisonnement approfondi",
+      nextGenSpeed: "Vitesse nouvelle génération",
+      fastEconomic: "Rapide et économique",
+      highestIntel: "Intelligence maximale",
+      globalStandardAsr: "ASR standard mondial",
+      multimodalAudio: "Audio multimodal",
+      customModel: "➕ Saisir un nom de modèle personnalisé...",
+    },
   },
 };
