@@ -35,6 +35,17 @@ body:
     validations:
       required: true
 
+  - type: dropdown
+    id: platform
+    attributes:
+      label: "Platform (isteğe bağlı / optional)"
+      multiple: true
+      options:
+        - "macOS"
+        - "Windows"
+        - "Linux"
+        - "Tümü / All"
+
   - type: textarea
     id: problem
     attributes:
