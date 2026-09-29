@@ -1600,6 +1600,11 @@ mod tests {
 
     #[test]
     fn test_storage_add_and_delete() {
+        // Encryption reads the global key-unlock phase; hold the shared test lock so
+        // unlock-gate tests running in parallel can't flip it to InProgress mid-test.
+        let _unlock = crate::secure_key::key_unlock_test_lock()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         let storage = StorageEngine::new();
         let sample_meeting = MeetingRecord {
             id: "test_123".to_string(),
@@ -1664,6 +1669,11 @@ mod tests {
 
     #[test]
     fn test_load_from_disk_backs_up_undecryptable_file_instead_of_losing_it() {
+        // Encryption reads the global key-unlock phase; hold the shared test lock so
+        // unlock-gate tests running in parallel can't flip it to InProgress mid-test.
+        let _unlock = crate::secure_key::key_unlock_test_lock()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         let temp_dir = std::env::temp_dir();
         let file_path = temp_dir.join(format!("echomind_test_corrupt_{}.json", std::process::id()));
 
@@ -1837,6 +1847,11 @@ mod tests {
 
     #[test]
     fn test_storage_update_title_and_extraction() {
+        // Encryption reads the global key-unlock phase; hold the shared test lock so
+        // unlock-gate tests running in parallel can't flip it to InProgress mid-test.
+        let _unlock = crate::secure_key::key_unlock_test_lock()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         let storage = StorageEngine::new();
         let sample_meeting = MeetingRecord {
             id: "mtg_edit_test".to_string(),
