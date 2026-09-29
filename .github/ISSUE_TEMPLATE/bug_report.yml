@@ -29,8 +29,8 @@ body:
     id: version
     attributes:
       label: "EchoMind sürümü / Version"
-      description: "Uygulamanın sol üstündeki sürüm etiketi (ör. v0.2.12). / The version badge at the top-left of the app."
-      placeholder: "v0.2.12"
+      description: "Uygulamanın sol üstündeki sürüm etiketi. / The version badge at the top-left of the app."
+      placeholder: "v0.2.x"
     validations:
       required: true
 
@@ -63,8 +63,10 @@ body:
       multiple: true
       options:
         - "Kurulum / açılış — Install / startup"
+        - "Uygulamayı kapatma — Quit / exit"
         - "Güvenli depolama / Anahtarlık — Secure storage / Keychain"
         - "Canlı dinleme / kayıt — Live listening / recording"
+        - "Sistem sesi / loopback — System audio / loopback"
         - "Transkripsiyon kalitesi — Transcription quality"
         - "Ses dosyası içe aktarma — Audio import"
         - "Toplantı raporu / özet — Meeting report / summary"
@@ -142,7 +144,8 @@ body:
         To capture logs, launch the app from a terminal, reproduce the issue and paste the output (redact personal data and keys).
         - macOS: `/Applications/EchoMind.app/Contents/MacOS/echomind`
         - Linux: `echomind` (veya / or `./EchoMind_*.AppImage`)
-        - Windows: log yerine hata anının ekran görüntüsünü ekleyin. / Please attach a screenshot of the error instead.
+        - Windows: Uygulama konsol çıktısı veya log dosyası üretmez. Çökme olduysa **Olay Görüntüleyicisi → Windows Günlükleri → Uygulama**'daki `echomind.exe` hata kaydını, yoksa hata anının ekran görüntüsünü ekleyin.
+          The app writes no console output or log file on Windows. For crashes, copy the `echomind.exe` entry from **Event Viewer → Windows Logs → Application**; otherwise attach a screenshot of the error.
       render: shell
 
   - type: textarea
