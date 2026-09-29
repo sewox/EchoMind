@@ -41,9 +41,10 @@ npm run tauri dev
 
 ## Sürüm çıkarma / Releases
 
-1. `package.json`, `src-tauri/tauri.conf.json` ve `src-tauri/Cargo.toml` içindeki sürüm aynı PR'da yükseltilir. / Bump the version in all three files in one PR.
+1. `package.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml` (ve `Cargo.lock`) içindeki sürüm ile `README.md`'deki indirme linkleri aynı PR'da yükseltilir. / Bump the version in those files and the README download links in one PR.
 2. PR merge edildikten sonra `vX.Y.Z` etiketi push edilir; `Release & Build App` iş akışı macOS, Windows ve Linux paketlerini üretir. / After merge, push a `vX.Y.Z` tag; the release workflow builds the installers.
 3. Web sitesindeki indirme butonları en son release'i otomatik olarak gösterir. / The website's download buttons pick up the latest release automatically.
+4. Release sayfasına TR/EN sürüm notlarını ekleyin (yeni özellikler, düzeltmeler, bilinen sorunlar). / Add TR/EN release notes to the GitHub release (features, fixes, known issues).
 
 ## Hata ve öneriler / Bugs and ideas
 
