@@ -39,12 +39,18 @@
 ## 📦 Hızlı İndirme / Downloads
 
 | Platform | Format | Açıklama / Description | İndirme / Download |
-| :--- | :--- | :--- | :--- |
-| **Windows (x64)** | `.exe` | Standart Windows Kurulum Paketi (NSIS) | [⬇️ **EchoMind_0.2.12_x64-setup.exe**](https://github.com/sewox/EchoMind/releases/download/v0.2.12/EchoMind_0.2.12_x64-setup.exe) |
-| **Windows (x64)** | `.msi` | Kurumsal Windows Installer | [⬇️ **EchoMind_0.2.12_x64_en-US.msi**](https://github.com/sewox/EchoMind/releases/download/v0.2.12/EchoMind_0.2.12_x64_en-US.msi) |
-| **macOS (Apple Silicon)** | `.dmg` | Apple Silicon (M1/M2/M3/M4) Disk İmajı | [⬇️ **EchoMind_0.2.12_aarch64.dmg**](https://github.com/sewox/EchoMind/releases/download/v0.2.12/EchoMind_0.2.12_aarch64.dmg) |
-| **Linux (Debian / Ubuntu)** | `.deb` | Debian, Ubuntu x64 Kurulum Paketi | [⬇️ **EchoMind_0.2.12_amd64.deb**](https://github.com/sewox/EchoMind/releases/download/v0.2.12/EchoMind_0.2.12_amd64.deb) |
-| **Linux (Taşınabilir / All)** | `.AppImage` | Bağımsız Çalıştırılabilir Linux Paketi | [⬇️ **EchoMind_0.2.12_amd64.AppImage**](https://github.com/sewox/EchoMind/releases/download/v0.2.12/EchoMind_0.2.12_amd64.AppImage) |
+|---|---|---|---|
+| **Windows (x64)** | `.exe` | Standart Windows Kurulum Paketi (NSIS) / Standard installer | [⬇️ **EchoMind_0.2.13_x64-setup.exe**](https://github.com/sewox/EchoMind/releases/download/v0.2.13/EchoMind_0.2.13_x64-setup.exe) |
+| **Windows (x64)** | `.msi` | Kurumsal Windows Installer / Enterprise installer | [⬇️ **EchoMind_0.2.13_x64_en-US.msi**](https://github.com/sewox/EchoMind/releases/download/v0.2.13/EchoMind_0.2.13_x64_en-US.msi) |
+| **macOS (Apple Silicon)** | `.dmg` | Apple Silicon (M1/M2/M3/M4) Disk İmajı / Disk image | [⬇️ **EchoMind_0.2.13_aarch64.dmg**](https://github.com/sewox/EchoMind/releases/download/v0.2.13/EchoMind_0.2.13_aarch64.dmg) |
+| **Linux (Debian / Ubuntu)** | `.deb` | Debian, Ubuntu x64 Kurulum Paketi / Package | [⬇️ **EchoMind_0.2.13_amd64.deb**](https://github.com/sewox/EchoMind/releases/download/v0.2.13/EchoMind_0.2.13_amd64.deb) |
+| **Linux (Fedora / RHEL)** | `.rpm` | Fedora, RHEL, openSUSE x64 Paketi / Package | [⬇️ **EchoMind-0.2.13-1.x86_64.rpm**](https://github.com/sewox/EchoMind/releases/download/v0.2.13/EchoMind-0.2.13-1.x86_64.rpm) |
+| **Linux (Taşınabilir / All)** | `.AppImage` | Bağımsız Çalıştırılabilir Linux Paketi / Portable | [⬇️ **EchoMind_0.2.13_amd64.AppImage**](https://github.com/sewox/EchoMind/releases/download/v0.2.13/EchoMind_0.2.13_amd64.AppImage) |
+
+Tüm sürümler ve sürüm notları / All versions and release notes: **[Releases](https://github.com/sewox/EchoMind/releases)** • Intel Mac için henüz paket yok / No Intel Mac build yet.
+
+> ⚠️ **İlk açılış / First launch:** Paketler henüz Apple/Microsoft tarafından imzalanmadığı için işletim sistemi uyarı verebilir; aşağıdaki [Kurulum](#1-kurulum) / [Installation](#1-installation) adımlarına bakın.
+> The installers are not yet code-signed, so your OS may warn on first launch — see the installation steps below.
 
 ---
 
@@ -107,10 +113,17 @@ EchoMind, kullanıcılarına tam model özgürlüğü ve sıfır bağımlılık 
 ## 🚀 Son Kullanıcı Başlangıç Kılavuzu
 
 ### 1. Kurulum
-- **Windows:** İndirdiğiniz `EchoMind_0.2.0_x64-setup.exe` dosyasını çalıştırın ve kurulum sihirbazını takip edin.
-- **macOS:** İndirdiğiniz `EchoMind_0.2.0_aarch64.dmg` dosyasını açın ve `EchoMind` uygulamasını `Applications` klasörüne sürükleyin.
-- **Linux (Debian/Ubuntu):** `sudo dpkg -i EchoMind_0.2.0_amd64.deb` veya `sudo apt install ./EchoMind_0.2.0_amd64.deb`
-- **Linux (AppImage):** `chmod +x EchoMind_0.2.0_amd64.AppImage && ./EchoMind_0.2.0_amd64.AppImage`
+Kurulum dosyalarını [son sürüm sayfasından](https://github.com/sewox/EchoMind/releases/latest) veya yukarıdaki tablodan indirin.
+
+- **Windows:** `EchoMind_0.2.13_x64-setup.exe` dosyasını çalıştırın. *"Windows bilgisayarınızı korudu"* (SmartScreen) uyarısı çıkarsa **Ek bilgi → Yine de çalıştır**'a tıklayın.
+- **macOS (Apple Silicon):** `EchoMind_0.2.13_aarch64.dmg` dosyasını açıp `EchoMind`'ı `Applications` klasörüne sürükleyin. Uygulama henüz Apple tarafından imzalanmadığı için ilk açılışta *"EchoMind hasarlı ve açılamıyor"* uyarısı görebilirsiniz. Terminal'de bir kez şunu çalıştırın:
+  ```bash
+  xattr -dr com.apple.quarantine /Applications/EchoMind.app
+  ```
+  İlk açılışta mikrofon ve Anahtarlık (Keychain) erişimine izin verin; toplantı geçmişiniz Anahtarlık'ta saklanan anahtarla şifrelenir.
+- **Linux (Debian/Ubuntu):** `sudo apt install ./EchoMind_0.2.13_amd64.deb`
+- **Linux (Fedora/RHEL):** `sudo dnf install ./EchoMind-0.2.13-1.x86_64.rpm`
+- **Linux (AppImage):** `chmod +x EchoMind_0.2.13_amd64.AppImage && ./EchoMind_0.2.13_amd64.AppImage`
 
 ### 2. İlk Çalıştırma & Ayarlar
 1. Uygulamayı açtığınızda **Donanım Algılayıcı (Smart Advisor)** donanımınızı tarayarak en uygun çalışma modunu önerir.
@@ -192,8 +205,17 @@ EchoMind offers total freedom over how and where your audio and LLM intelligence
 ## 🛠️ Quick Start Guide
 
 ### 1. Installation
-- **Windows:** Download and run [`EchoMind_0.2.12_x64-setup.exe`](https://github.com/sewox/EchoMind/releases/download/v0.2.12/EchoMind_0.2.12_x64-setup.exe).
-- **macOS:** Download [`EchoMind_0.2.12_aarch64.dmg`](https://github.com/sewox/EchoMind/releases/download/v0.2.12/EchoMind_0.2.12_aarch64.dmg) and drag `EchoMind` to your `Applications` folder.
+Download the installer from the [latest release](https://github.com/sewox/EchoMind/releases/latest) or the table above.
+
+- **Windows:** Run `EchoMind_0.2.13_x64-setup.exe`. If SmartScreen shows *"Windows protected your PC"*, click **More info → Run anyway**.
+- **macOS (Apple Silicon):** Open `EchoMind_0.2.13_aarch64.dmg` and drag `EchoMind` to `Applications`. The app is not notarized by Apple yet, so macOS may say *"EchoMind is damaged and can't be opened"* on first launch. Run this once in Terminal:
+  ```bash
+  xattr -dr com.apple.quarantine /Applications/EchoMind.app
+  ```
+  Allow microphone and Keychain access on first launch; your meeting history is encrypted with a key stored in the Keychain.
+- **Linux (Debian/Ubuntu):** `sudo apt install ./EchoMind_0.2.13_amd64.deb`
+- **Linux (Fedora/RHEL):** `sudo dnf install ./EchoMind-0.2.13-1.x86_64.rpm`
+- **Linux (AppImage):** `chmod +x EchoMind_0.2.13_amd64.AppImage && ./EchoMind_0.2.13_amd64.AppImage`
 
 ### 2. Getting Started
 1. Launch the app and allow the **Smart Advisor** to detect your hardware.
