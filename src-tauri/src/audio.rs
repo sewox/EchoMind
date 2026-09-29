@@ -1150,6 +1150,24 @@ mod tests {
         }
     }
 
+    /// Seed the process-global catalog through the current `TEST_ENUMERATE`
+    /// hook. The worker's first scan may still be a slow real enumeration on a
+    /// cold process, and a refresh that lands while another test marks the HAL
+    /// busy is skipped, so keep re-requesting instead of relying on one send.
+    fn wait_for_global_snapshot(pred: impl Fn(&[AudioDeviceInfo]) -> bool) -> bool {
+        let deadline = Instant::now() + Duration::from_secs(10);
+        loop {
+            if pred(&device_snapshot()) {
+                return true;
+            }
+            if Instant::now() >= deadline {
+                return false;
+            }
+            device_catalog().request_refresh();
+            thread::sleep(Duration::from_millis(20));
+        }
+    }
+
     #[test]
     fn test_device_name_is_loopback_heuristics() {
         assert!(device_name_is_loopback("BlackHole 2ch"));
@@ -1159,6 +1177,9 @@ mod tests {
 
     #[test]
     fn test_catalog_skips_enumerate_while_stream_hal_busy() {
+        // Flips process-global HAL-busy state that makes the shared catalog
+        // worker drop refreshes; serialize with the other catalog tests.
+        let _guard = test_enumerate_lock();
         // Grok review: never let the catalog worker race stream teardown.
         mark_stream_hal_busy(true);
         assert!(!catalog_may_enumerate());
@@ -1268,16 +1289,10 @@ mod tests {
         {
             *TEST_ENUMERATE.lock().unwrap() =
                 Some(Arc::new(|| vec![sample_device("Status Seed", true, false)]));
-            device_catalog().request_refresh();
-            let deadline = Instant::now() + Duration::from_secs(2);
-            loop {
-                let snap = device_snapshot();
-                if snap.iter().any(|d| d.name == "Status Seed") {
-                    break;
-                }
-                assert!(Instant::now() < deadline, "timed out seeding catalog");
-                thread::sleep(Duration::from_millis(5));
-            }
+            assert!(
+                wait_for_global_snapshot(|snap| snap.iter().any(|d| d.name == "Status Seed")),
+                "timed out seeding catalog"
+            );
         }
 
         let engine = GlobalAudioEngine::new();
@@ -1340,13 +1355,10 @@ mod tests {
                     sample_device("BlackHole 2ch", false, true),
                 ]
             }));
-            device_catalog().request_refresh();
-            let deadline = Instant::now() + Duration::from_secs(2);
-            while !device_snapshot().iter().any(|d| d.name == "Built-in Mic")
-                && Instant::now() < deadline
-            {
-                thread::sleep(Duration::from_millis(5));
-            }
+            assert!(
+                wait_for_global_snapshot(|snap| snap.iter().any(|d| d.name == "Built-in Mic")),
+                "timed out seeding catalog"
+            );
             assert!(device_snapshot().iter().any(|d| d.is_loopback));
         }
 
@@ -1408,11 +1420,10 @@ mod tests {
         {
             *TEST_ENUMERATE.lock().unwrap() =
                 Some(Arc::new(|| vec![sample_device("Mic", true, false)]));
-            device_catalog().request_refresh();
-            let deadline = Instant::now() + Duration::from_secs(2);
-            while device_snapshot().is_empty() && Instant::now() < deadline {
-                thread::sleep(Duration::from_millis(5));
-            }
+            assert!(
+                wait_for_global_snapshot(|snap| snap.iter().any(|d| d.name == "Mic")),
+                "timed out seeding catalog"
+            );
         }
 
         let gate_w = Arc::clone(&gate);

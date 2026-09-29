@@ -325,6 +325,11 @@ mod tests {
 
     #[test]
     fn test_attack_vector_encrypted_storage_tamper_resistance() {
+        // Encryption reads the global key-unlock phase; hold the shared test lock so
+        // unlock-gate tests running in parallel can't flip it to InProgress mid-test.
+        let _unlock = crate::secure_key::key_unlock_test_lock()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         let temp_dir = std::env::temp_dir();
         let file_path = temp_dir.join(format!("echomind_tamper_test_{}.dat", std::process::id()));
 
