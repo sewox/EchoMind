@@ -14,7 +14,7 @@ use std::sync::{Condvar, Mutex, OnceLock};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::storage::{get_global_storage, get_storage_dir, MeetingRecord};
-use crate::transcriber::TranscriptSegment;
+use crate::transcriber::{TranscriptSegment, BATCH_CANCELLED};
 
 /// Default retry budget for transient Whisper / decode failures.
 pub const DEFAULT_MAX_ATTEMPTS: u32 = 3;
@@ -175,6 +175,13 @@ impl JobQueueState {
         false
     }
 
+    /// Drop a job entirely (its meeting was deleted). Returns true if one existed.
+    pub fn remove(&mut self, meeting_id: &str) -> bool {
+        let before = self.jobs.len();
+        self.jobs.retain(|j| j.meeting_id != meeting_id);
+        self.jobs.len() != before
+    }
+
     /// Permanent failure (missing FLAC, exhausted retries).
     pub fn mark_failed(&mut self, meeting_id: &str, error: &str, now_ms: u64) -> bool {
         if let Some(job) = self.get_mut(meeting_id) {
@@ -294,7 +301,10 @@ fn save_queue_to_disk(path: &Path, state: &JobQueueState) -> Result<(), String> 
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
     let json = serde_json::to_string_pretty(&state.to_file()).map_err(|e| e.to_string())?;
-    fs::write(path, json).map_err(|e| e.to_string())
+    // Write-then-rename so a crash mid-write never leaves a truncated queue file.
+    let tmp = path.with_extension("json.tmp");
+    fs::write(&tmp, json).map_err(|e| e.to_string())?;
+    fs::rename(&tmp, path).map_err(|e| e.to_string())
 }
 
 struct QueueInner {
@@ -318,6 +328,10 @@ struct QueueRuntime {
     yield_for_live: AtomicBool,
     /// App is quitting — worker should exit after requeue.
     shutting_down: AtomicBool,
+    /// Cancels the batch job currently in Whisper. Passed to
+    /// `transcribe_pcm_batch`; never touches the engine-wide abort flag, so
+    /// live transcription keeps working while a batch job is being cancelled.
+    cancel_current: AtomicBool,
 }
 
 fn global_queue() -> &'static QueueRuntime {
@@ -331,6 +345,7 @@ fn global_queue() -> &'static QueueRuntime {
         worker_started: AtomicBool::new(false),
         yield_for_live: AtomicBool::new(false),
         shutting_down: AtomicBool::new(false),
+        cancel_current: AtomicBool::new(false),
     })
 }
 
@@ -414,6 +429,30 @@ pub fn enqueue_meeting(meeting_id: &str, audio_path: &str) -> Result<Transcripti
     Ok(job)
 }
 
+/// The meeting was deleted: drop its job and stop Whisper if it is running,
+/// so a deleted meeting never burns retries re-transcribing its audio.
+pub fn forget_meeting(meeting_id: &str) {
+    let q = global_queue();
+    let mut guard = q.inner.lock().unwrap();
+    let was_running = guard
+        .state
+        .get(meeting_id)
+        .is_some_and(|j| j.state == TranscriptionJobState::Running);
+    if guard.state.remove(meeting_id) {
+        if was_running {
+            q.cancel_current.store(true, Ordering::SeqCst);
+        }
+        guard.persist();
+    }
+}
+
+fn meeting_exists(meeting_id: &str) -> bool {
+    get_global_storage()
+        .get_all()
+        .iter()
+        .any(|m| m.id == meeting_id)
+}
+
 /// Look up job status for a meeting (if any).
 pub fn get_job(meeting_id: &str) -> Option<TranscriptionJob> {
     let q = global_queue();
@@ -430,12 +469,11 @@ pub fn list_jobs() -> Vec<TranscriptionJob> {
 /// Live capture is starting — abort any batch Whisper and free the model.
 pub fn pause_for_live_capture() {
     let q = global_queue();
+    // Order matters: the worker clears `cancel_current` on claim and only then
+    // re-checks `yield_for_live`, so setting yield first and cancel second can't
+    // be missed — a job that slips past the re-check still sees the cancel.
     q.yield_for_live.store(true, Ordering::SeqCst);
-    let transcriber = crate::transcriber::get_global_transcriber();
-    if transcriber.is_inference_active() {
-        // Cooperative abort only — not sticky shutdown — so live can clear it.
-        transcriber.request_abort();
-    }
+    q.cancel_current.store(true, Ordering::SeqCst);
     q.wake.notify_all();
 }
 
@@ -443,7 +481,6 @@ pub fn pause_for_live_capture() {
 pub fn resume_after_live_capture() {
     let q = global_queue();
     q.yield_for_live.store(false, Ordering::SeqCst);
-    crate::transcriber::get_global_transcriber().clear_abort();
     q.wake.notify_all();
 }
 
@@ -453,6 +490,7 @@ pub fn prepare_queue_for_quit() {
     let q = global_queue();
     q.shutting_down.store(true, Ordering::SeqCst);
     q.yield_for_live.store(false, Ordering::SeqCst);
+    q.cancel_current.store(true, Ordering::SeqCst);
     let mut guard = q.inner.lock().unwrap();
     let n = guard.state.recover_running_to_queued(now_ms());
     if n > 0 {
@@ -530,6 +568,9 @@ fn worker_loop(app: tauri::AppHandle) {
             }
             match guard.state.claim_next(now_ms()) {
                 Some(j) => {
+                    // Fresh job: clear any earlier cancel *before* the
+                    // yield re-check below (see pause_for_live_capture).
+                    q.cancel_current.store(false, Ordering::SeqCst);
                     guard.persist();
                     j
                 }
@@ -541,6 +582,12 @@ fn worker_loop(app: tauri::AppHandle) {
         };
 
         emit_job_update(&app, &job);
+
+        // Meeting deleted while queued: drop the job instead of transcribing.
+        if !meeting_exists(&job.meeting_id) {
+            forget_meeting(&job.meeting_id);
+            continue;
+        }
 
         // Missing FLAC → permanent fail, never crash.
         let Some(path) = resolve_audio_path(&job.audio_path) else {
@@ -596,10 +643,9 @@ fn worker_loop(app: tauri::AppHandle) {
         }
 
         let transcriber = crate::transcriber::get_global_transcriber();
-        // Clear a previous live-yield abort so batch can run (no-op if quitting).
-        transcriber.clear_abort();
-
-        let result = transcriber.transcribe_pcm(&pcm, "auto");
+        // Batch mode: own segments only (never the live history), and a cancel
+        // yields BATCH_CANCELLED instead of a partial transcript.
+        let result = transcriber.transcribe_pcm_batch(&pcm, "auto", &q.cancel_current);
         drop(pcm);
 
         match result {
@@ -635,6 +681,10 @@ fn worker_loop(app: tauri::AppHandle) {
                             updated_meeting.segments.len()
                         );
                     }
+                    Err(_) if !meeting_exists(&job.meeting_id) => {
+                        // Deleted while Whisper ran — nothing to retry.
+                        forget_meeting(&job.meeting_id);
+                    }
                     Err(e) => {
                         let mut guard = q.inner.lock().unwrap();
                         let _ = guard
@@ -663,6 +713,10 @@ fn worker_loop(app: tauri::AppHandle) {
                         }
                         let _ = app.emit("meeting-transcript-ready", &updated_meeting);
                     }
+                    Err(_) if !meeting_exists(&job.meeting_id) => {
+                        // Deleted while Whisper ran — nothing to retry.
+                        forget_meeting(&job.meeting_id);
+                    }
                     Err(e) => {
                         let mut guard = q.inner.lock().unwrap();
                         let _ = guard
@@ -677,7 +731,9 @@ fn worker_loop(app: tauri::AppHandle) {
                 }
             }
             Err(e) => {
-                let is_abort = e.contains("iptal")
+                let is_abort = e == BATCH_CANCELLED
+                    || q.cancel_current.load(Ordering::SeqCst)
+                    || e.contains("iptal")
                     || e.contains("abort")
                     || e.contains("kapanıyor")
                     || transcriber.is_abort_requested()
@@ -758,6 +814,7 @@ pub fn reset_queue_for_test(path: PathBuf) {
     guard.persist();
     q.yield_for_live.store(false, Ordering::SeqCst);
     q.shutting_down.store(false, Ordering::SeqCst);
+    q.cancel_current.store(false, Ordering::SeqCst);
 }
 
 #[cfg(test)]
@@ -917,6 +974,90 @@ mod tests {
             TranscriptionJobState::Queued
         );
 
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_remove_drops_job() {
+        let mut q = JobQueueState::default();
+        q.enqueue("mtg_a", "/tmp/a.flac", 1);
+        q.enqueue("mtg_b", "/tmp/b.flac", 2);
+        assert!(q.remove("mtg_a"));
+        assert!(!q.remove("mtg_a"));
+        assert!(q.get("mtg_a").is_none());
+        assert_eq!(q.jobs().len(), 1);
+    }
+
+    #[test]
+    fn test_persist_is_atomic_and_leaves_no_temp_file() {
+        let _guard = test_lock().lock().unwrap();
+        let dir = std::env::temp_dir().join(format!("echomind_q_atomic_{}", now_ms()));
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("transcription_jobs.json");
+
+        let mut q = JobQueueState::default();
+        q.enqueue("mtg_1", "/tmp/1.flac", 1);
+        save_queue_to_disk(&path, &q).unwrap();
+        q.enqueue("mtg_2", "/tmp/2.flac", 2);
+        save_queue_to_disk(&path, &q).unwrap();
+
+        assert!(!path.with_extension("json.tmp").exists());
+        assert_eq!(load_queue_from_disk(&path).jobs().len(), 2);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_live_capture_always_signals_batch_cancel() {
+        // Regression: the cancel used to be sent only if Whisper was already
+        // running, so a job starting a moment later ran alongside live capture.
+        let _guard = test_lock().lock().unwrap();
+        let dir = std::env::temp_dir().join(format!("echomind_q_live_{}", now_ms()));
+        fs::create_dir_all(&dir).unwrap();
+        reset_queue_for_test(dir.join("transcription_jobs.json"));
+        let q = global_queue();
+
+        pause_for_live_capture();
+        assert!(q.yield_for_live.load(Ordering::SeqCst));
+        assert!(q.cancel_current.load(Ordering::SeqCst));
+        // Never raised on the engine-wide flag — that would fail live chunks.
+        assert!(!crate::transcriber::get_global_transcriber().is_abort_requested());
+
+        resume_after_live_capture();
+        assert!(!q.yield_for_live.load(Ordering::SeqCst));
+
+        reset_queue_for_test(dir.join("transcription_jobs.json"));
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_forget_meeting_drops_job_and_cancels_only_if_running() {
+        let _guard = test_lock().lock().unwrap();
+        let dir = std::env::temp_dir().join(format!("echomind_q_forget_{}", now_ms()));
+        fs::create_dir_all(&dir).unwrap();
+        reset_queue_for_test(dir.join("transcription_jobs.json"));
+        let q = global_queue();
+
+        {
+            let mut g = q.inner.lock().unwrap();
+            g.state.enqueue("mtg_queued", "/tmp/q.flac", 1);
+        }
+        forget_meeting("mtg_queued");
+        assert!(get_job("mtg_queued").is_none());
+        assert!(!q.cancel_current.load(Ordering::SeqCst));
+
+        {
+            let mut g = q.inner.lock().unwrap();
+            g.state.enqueue("mtg_running", "/tmp/r.flac", 2);
+            g.state.claim_next(3).unwrap();
+        }
+        forget_meeting("mtg_running");
+        assert!(get_job("mtg_running").is_none());
+        assert!(
+            q.cancel_current.load(Ordering::SeqCst),
+            "deleting a meeting mid-transcription must stop Whisper"
+        );
+
+        reset_queue_for_test(dir.join("transcription_jobs.json"));
         let _ = fs::remove_dir_all(&dir);
     }
 

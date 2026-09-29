@@ -94,12 +94,21 @@ impl<'a> Drop for TranscribeGuard<'a> {
     }
 }
 
-/// C abort trampoline for whisper.cpp — `user_data` is `*const AtomicBool`.
+/// Flags whisper.cpp polls during `full()`: the engine-wide abort (Quit) and an
+/// optional per-call cancel (batch jobs yielding to live capture).
+struct WhisperAbortFlags {
+    global: *const AtomicBool,
+    extra: *const AtomicBool,
+}
+
+/// C abort trampoline for whisper.cpp — `user_data` is `*const WhisperAbortFlags`.
 unsafe extern "C" fn whisper_abort_trampoline(user_data: *mut std::ffi::c_void) -> bool {
     if user_data.is_null() {
         return false;
     }
-    (*(user_data as *const AtomicBool)).load(Ordering::SeqCst)
+    let flags = &*(user_data as *const WhisperAbortFlags);
+    (!flags.global.is_null() && (*flags.global).load(Ordering::SeqCst))
+        || (!flags.extra.is_null() && (*flags.extra).load(Ordering::SeqCst))
 }
 
 impl Default for GlobalTranscriberEngine {
@@ -311,13 +320,48 @@ impl Drop for GlobalTranscriberEngine {
     }
 }
 
+/// Returned when a batch transcription is cancelled (live capture started or Quit).
+pub const BATCH_CANCELLED: &str = "batch_transcription_cancelled";
+
 impl GlobalTranscriberEngine {
+    /// Live / import path: appends to the shared live transcript history and
+    /// returns the whole history.
     pub fn transcribe_pcm(
         &self,
         samples: &[f32],
         language: &str,
     ) -> Result<Vec<TranscriptSegment>, String> {
+        self.transcribe_pcm_impl(samples, language, None)
+    }
+
+    /// Background (queue) path: never touches the live transcript history,
+    /// returns only this recording's segments (ids from 1), and fails with
+    /// `BATCH_CANCELLED` instead of returning a partial transcript when `cancel`
+    /// or the engine-wide abort is raised. Callers own `cancel`; this never
+    /// sets the engine-wide abort flag, so live transcription is unaffected.
+    pub fn transcribe_pcm_batch(
+        &self,
+        samples: &[f32],
+        language: &str,
+        cancel: &AtomicBool,
+    ) -> Result<Vec<TranscriptSegment>, String> {
+        self.transcribe_pcm_impl(samples, language, Some(cancel))
+    }
+
+    fn transcribe_pcm_impl(
+        &self,
+        samples: &[f32],
+        language: &str,
+        batch_cancel: Option<&AtomicBool>,
+    ) -> Result<Vec<TranscriptSegment>, String> {
+        let is_batch = batch_cancel.is_some();
+        let cancelled =
+            || self.is_abort_requested() || batch_cancel.is_some_and(|c| c.load(Ordering::SeqCst));
+
         if samples.is_empty() {
+            if is_batch {
+                return Ok(Vec::new());
+            }
             let state = self.state.lock().unwrap();
             return Ok(state.segments.clone());
         }
@@ -329,12 +373,18 @@ impl GlobalTranscriberEngine {
             return Err("Transkripsiyon iptal edildi (uygulama kapanıyor).".to_string());
         }
         self.clear_abort();
+        if cancelled() {
+            return Err(BATCH_CANCELLED.to_string());
+        }
 
         // Lazy load Whisper model on demand if not already in memory
         self.ensure_model_loaded()?;
 
         if self.is_abort_requested() {
             return Err("Transkripsiyon iptal edildi (uygulama kapanıyor).".to_string());
+        }
+        if cancelled() {
+            return Err(BATCH_CANCELLED.to_string());
         }
 
         let mut ctx_lock = self.whisper_ctx.lock().unwrap();
@@ -390,7 +440,9 @@ impl GlobalTranscriberEngine {
         };
 
         let mut new_segments = Vec::new();
-        let mut segment_counter = {
+        let mut segment_counter = if is_batch {
+            0
+        } else {
             let state = self.state.lock().unwrap();
             state.segment_counter
         };
@@ -398,12 +450,16 @@ impl GlobalTranscriberEngine {
         let total_duration_ms = ((samples.len() as f64 / 16000.0) * 1000.0) as u64;
 
         for (chunk_idx, chunk) in decode_chunks.iter().enumerate() {
-            if self.is_abort_requested() {
+            if cancelled() {
                 println!(
                     "🛑 Whisper iptal edildi (chunk {}/{}).",
                     chunk_idx + 1,
                     decode_chunks.len()
                 );
+                if is_batch {
+                    // Never hand a partial transcript to the queue as "done".
+                    return Err(BATCH_CANCELLED.to_string());
+                }
                 break;
             }
 
@@ -435,9 +491,13 @@ impl GlobalTranscriberEngine {
             params.set_print_timestamps(false);
             params.set_translate(false);
 
-            // Abort callback so Quit during whisper_full returns promptly.
-            // begin_shutdown() sets abort_requested, so checking that flag is enough.
-            let abort_ptr = Arc::as_ptr(&self.abort_requested) as *mut std::ffi::c_void;
+            // Abort callback so Quit (engine-wide flag) or a batch cancel
+            // returns promptly from whisper_full. `abort_flags` outlives `full()`.
+            let abort_flags = WhisperAbortFlags {
+                global: Arc::as_ptr(&self.abort_requested),
+                extra: batch_cancel.map_or(std::ptr::null(), |c| c as *const AtomicBool),
+            };
+            let abort_ptr = &abort_flags as *const WhisperAbortFlags as *mut std::ffi::c_void;
             unsafe {
                 params.set_abort_callback(Some(whisper_abort_trampoline));
                 params.set_abort_callback_user_data(abort_ptr);
@@ -563,6 +623,14 @@ impl GlobalTranscriberEngine {
 
         // 2. Automatically resolve speaker names from Turkish vocative addressing and introductions
         crate::diarization::resolve_speaker_names(&mut new_segments);
+
+        if is_batch {
+            // An abort during the last chunk's full() only shows up here.
+            if cancelled() {
+                return Err(BATCH_CANCELLED.to_string());
+            }
+            return Ok(new_segments);
+        }
 
         let mut state = self.state.lock().unwrap();
         state.segment_counter = segment_counter;
@@ -1168,6 +1236,75 @@ mod tests {
         assert_eq!(recommended_model_key(6.0), "small");
         assert_eq!(recommended_model_key(16.0), "small");
         assert_eq!(recommended_model_key(64.0), "small");
+    }
+
+    fn seg(id: usize, text: &str) -> TranscriptSegment {
+        TranscriptSegment {
+            id,
+            speaker_id: "Konuşmacı 1".into(),
+            speaker_name: "Konuşmacı 1".into(),
+            start_time_ms: 0,
+            end_time_ms: 1000,
+            timestamp_formatted: "00:00".into(),
+            text: text.into(),
+            language: "auto".into(),
+            confidence: 1.0,
+        }
+    }
+
+    #[test]
+    fn test_batch_never_returns_or_touches_live_history() {
+        let engine = GlobalTranscriberEngine::new();
+        engine
+            .state
+            .lock()
+            .unwrap()
+            .segments
+            .push(seg(1, "previous live meeting"));
+        let cancel = AtomicBool::new(false);
+
+        // Empty input: the live path returns the whole history, batch must not.
+        assert_eq!(engine.transcribe_pcm(&[], "auto").unwrap().len(), 1);
+        assert!(engine
+            .transcribe_pcm_batch(&[], "auto", &cancel)
+            .unwrap()
+            .is_empty());
+        assert_eq!(engine.get_history().len(), 1, "live history untouched");
+    }
+
+    #[test]
+    fn test_batch_cancel_fails_without_touching_engine_abort() {
+        let engine = GlobalTranscriberEngine::new();
+        let cancel = AtomicBool::new(true);
+        let err = engine
+            .transcribe_pcm_batch(&[0.1; 16000], "auto", &cancel)
+            .unwrap_err();
+        assert_eq!(err, BATCH_CANCELLED);
+        // Live transcription must stay usable while a batch job is cancelled.
+        assert!(!engine.is_abort_requested());
+        assert!(!engine.is_inference_active());
+    }
+
+    #[test]
+    fn test_abort_trampoline_checks_engine_and_batch_flags() {
+        let global = AtomicBool::new(false);
+        let extra = AtomicBool::new(false);
+        let mut flags = WhisperAbortFlags {
+            global: &global,
+            extra: &extra,
+        };
+        let call = |f: &WhisperAbortFlags| unsafe {
+            whisper_abort_trampoline(f as *const WhisperAbortFlags as *mut std::ffi::c_void)
+        };
+        assert!(!call(&flags));
+        extra.store(true, Ordering::SeqCst);
+        assert!(call(&flags), "batch cancel must stop whisper_full");
+        extra.store(false, Ordering::SeqCst);
+        global.store(true, Ordering::SeqCst);
+        assert!(call(&flags), "Quit must stop whisper_full");
+        flags.extra = std::ptr::null();
+        assert!(call(&flags), "live path (no batch flag) still honours Quit");
+        assert!(!unsafe { whisper_abort_trampoline(std::ptr::null_mut()) });
     }
 
     #[test]

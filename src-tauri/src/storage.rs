@@ -1285,7 +1285,9 @@ pub fn delete_meeting_by_id(
         .or(meeting_id)
         .ok_or_else(|| "Toplantı ID belirtilmedi".to_string())?;
     let storage = get_global_storage();
-    storage.delete_meeting(&target_id)
+    let remaining = storage.delete_meeting(&target_id)?;
+    crate::transcription_queue::forget_meeting(&target_id);
+    Ok(remaining)
 }
 
 #[tauri::command]
