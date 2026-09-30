@@ -1014,6 +1014,8 @@ pub fn start_audio_capture(device_name: Option<String>) -> Result<AudioStatus, S
     // Never start capture before secure storage is unlocked: quit-while-locked
     // cannot encrypt a meeting (#59), so blocking here prevents silent data loss.
     crate::storage::require_storage_ready()?;
+    // Batch Whisper must yield so live capture/transcription is never blocked.
+    crate::transcription_queue::pause_for_live_capture();
     let engine = get_global_audio_engine();
     let was_already_recording = engine.get_status().is_recording;
     engine.start(device_name)?;
@@ -1032,6 +1034,7 @@ pub fn start_meeting_recording(
 ) -> Result<AudioStatus, String> {
     use tauri::{Emitter, Manager};
     crate::storage::require_storage_ready()?;
+    crate::transcription_queue::pause_for_live_capture();
     let engine = get_global_audio_engine();
     let was_already_recording = engine.get_status().is_recording;
     engine.start(device_name)?;
@@ -1057,6 +1060,7 @@ pub fn start_meeting_recording(
 pub fn stop_audio_capture() -> Result<AudioStatus, String> {
     let engine = get_global_audio_engine();
     engine.stop()?;
+    crate::transcription_queue::resume_after_live_capture();
     Ok(engine.get_status())
 }
 
@@ -1068,6 +1072,7 @@ pub fn stop_audio_capture() -> Result<AudioStatus, String> {
 pub fn cancel_audio_capture() -> Result<AudioStatus, String> {
     let engine = get_global_audio_engine();
     engine.stop()?;
+    crate::transcription_queue::resume_after_live_capture();
     Ok(engine.get_status())
 }
 
