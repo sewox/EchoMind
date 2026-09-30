@@ -27,13 +27,32 @@ pub fn write_encrypted_file<P: AsRef<Path>>(path: P, plaintext: &[u8]) -> Result
     output.extend_from_slice(&nonce);
     output.extend_from_slice(&ciphertext);
 
-    fs::write(path.as_ref(), output).map_err(|e| {
-        format!(
-            "Şifreli dosya yazma hatası ({}): {}",
-            path.as_ref().display(),
-            e
-        )
-    })
+    // Write-then-rename so a crash mid-write can't leave a truncated file, and
+    // keep it owner-only (the parent dir is user-private, but be explicit).
+    let path = path.as_ref();
+    let tmp = path.with_extension("enc-tmp");
+    let write_err =
+        |e: std::io::Error| format!("Şifreli dosya yazma hatası ({}): {}", path.display(), e);
+    fs::write(&tmp, output).map_err(write_err)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = fs::set_permissions(&tmp, fs::Permissions::from_mode(0o600));
+    }
+    fs::rename(&tmp, path).map_err(write_err)
+}
+
+/// True when `path` is already in the current authenticated format. Plaintext
+/// or legacy-V1 files are readable for migration but must be rewritten.
+pub fn is_current_format<P: AsRef<Path>>(path: P) -> bool {
+    let mut header = [0u8; 16];
+    match fs::File::open(path.as_ref()) {
+        Ok(mut f) => {
+            use std::io::Read;
+            f.read_exact(&mut header).is_ok() && header == *MAGIC_HEADER_V2
+        }
+        Err(_) => false,
+    }
 }
 
 /// Decrypts the legacy V1 format: a naive reversible stream cipher. Kept only so
@@ -215,6 +234,39 @@ mod tests {
 
         let _ = fs::remove_file(path_a);
         let _ = fs::remove_file(path_b);
+    }
+
+    #[test]
+    fn test_write_is_owner_only_atomic_and_detectable() {
+        let _unlock = crate::secure_key::key_unlock_test_lock()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let dir = std::env::temp_dir();
+        let path = dir.join(format!("echomind_test_perm_{}.dat", std::process::id()));
+        let plain = dir.join(format!("echomind_test_plain_{}.dat", std::process::id()));
+
+        write_encrypted_file(&path, b"gizli toplanti").unwrap();
+        assert!(is_current_format(&path));
+        assert!(
+            !path.with_extension("enc-tmp").exists(),
+            "temp file must be renamed away"
+        );
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mode = fs::metadata(&path).unwrap().permissions().mode() & 0o777;
+            assert_eq!(mode, 0o600, "encrypted history must be owner-only");
+        }
+
+        fs::write(&plain, b"[{\"id\":\"x\"}]").unwrap();
+        assert!(
+            !is_current_format(&plain),
+            "plaintext JSON is not the current format"
+        );
+        assert!(!is_current_format(dir.join("echomind_missing_file.dat")));
+
+        let _ = fs::remove_file(path);
+        let _ = fs::remove_file(plain);
     }
 
     #[test]

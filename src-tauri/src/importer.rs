@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::path::{Path, PathBuf};
+
+use crate::transcriber::TranscriptSegment;
 use symphonia::core::audio::{AudioBufferRef, Signal};
 use symphonia::core::codecs::DecoderOptions;
 use symphonia::core::errors::Error;
@@ -23,6 +25,131 @@ fn with_model_fallback_warning(label: String) -> String {
     } else {
         label
     }
+}
+
+fn local_model_label(model_version: Option<&str>) -> &'static str {
+    match model_version {
+        Some("medium") => "Gelişmiş Mod",
+        Some("large-v3-turbo") => "Zirve Netlik",
+        Some("base") => "Hızlı Mod",
+        _ => "Standart Mod",
+    }
+}
+
+/// Runs the ASR engine the user picked for an import / re-transcription.
+/// When that engine fails it falls back to local Whisper and says so in the
+/// returned label — the label must never claim a cloud engine that didn't run.
+/// Local Whisper runs in batch mode, so the result never leaks into (or picks
+/// up) the live-recording transcript history.
+fn run_asr_engine(
+    audio_path: &Path,
+    pcm_16k: &[f32],
+    lang: &str,
+    cloud_provider: Option<&str>,
+    api_key: Option<&str>,
+    model_version: Option<&str>,
+) -> Result<(Vec<TranscriptSegment>, String), String> {
+    let mut failed_engine: Option<&'static str> = None;
+
+    if let Some(prov) = cloud_provider {
+        let clean_prov = prov.trim().to_lowercase();
+        match clean_prov.as_str() {
+            "apple_speech" | "apple_native" | "apple" => {
+                match crate::offline_engines::transcribe_apple_speech(audio_path, lang) {
+                    Ok(segs) => return Ok((segs, "🍎 macOS Yerel Ses Tanıma".to_string())),
+                    Err(e) => {
+                        eprintln!("⚠️ Apple Speech başarısız: {}", e);
+                        failed_engine = Some("Apple Speech");
+                    }
+                }
+            }
+            "sensevoice" => match crate::offline_engines::transcribe_sensevoice(audio_path, lang) {
+                Ok(segs) => return Ok((segs, "⚡ SenseVoice (Yerel)".to_string())),
+                Err(e) => {
+                    eprintln!("⚠️ SenseVoice başarısız: {}", e);
+                    failed_engine = Some("SenseVoice");
+                }
+            },
+            "groq" | "openai" | "gemini" => {
+                if let Some(key) = api_key.map(str::trim).filter(|k| !k.is_empty()) {
+                    // HARD REJECT in Paranoid / Air-Gapped Mode
+                    crate::security::check_cloud_access_allowed()?;
+                    match crate::cloud_transcriber::transcribe_audio_cloud(
+                        audio_path,
+                        &clean_prov,
+                        key,
+                        lang,
+                        model_version,
+                    ) {
+                        Ok(mut segs) => {
+                            // Keep the provider's own speaker separation when it
+                            // produced one; only cluster acoustically otherwise.
+                            let distinct: std::collections::HashSet<&str> =
+                                segs.iter().map(|s| s.speaker_id.as_str()).collect();
+                            if distinct.len() <= 1 {
+                                crate::diarization::cluster_speakers(&mut segs, pcm_16k, 16000, 6);
+                            }
+                            crate::diarization::resolve_speaker_names(&mut segs);
+                            return Ok((
+                                segs,
+                                format!("⚡ Bulut Zekası ({})", clean_prov.to_uppercase()),
+                            ));
+                        }
+                        Err(e) => {
+                            // Errors can embed the request URL (incl. the API key):
+                            // log a redacted form, never surface it in the label.
+                            eprintln!(
+                                "⚠️ Bulut ASR başarısız ({}): {}",
+                                clean_prov,
+                                e.replace(key, "***")
+                            );
+                            failed_engine = Some(match clean_prov.as_str() {
+                                "groq" => "Groq",
+                                "openai" => "OpenAI",
+                                _ => "Gemini",
+                            });
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    if let Some(local_model_key) = model_version {
+        if ["tiny", "base", "small", "medium", "large-v3-turbo"].contains(&local_model_key) {
+            let _ = crate::transcriber::switch_transcription_model(local_model_key.to_string());
+        }
+    }
+    let transcriber = crate::transcriber::get_global_transcriber();
+    let not_cancelled = std::sync::atomic::AtomicBool::new(false);
+    let segs = transcriber.transcribe_pcm_batch(pcm_16k, lang, &not_cancelled)?;
+    // Auto-cleanup local context memory after heavy batch transcription
+    transcriber.cleanup_context();
+
+    let mut label = with_model_fallback_warning(format!(
+        "🔒 Bilgisayarınızda ({})",
+        local_model_label(model_version)
+    ));
+    if let Some(engine) = failed_engine {
+        label = format!(
+            "{} ⚠️ ({} başarısız oldu, yerel modele geçildi)",
+            label, engine
+        );
+    }
+    Ok((segs, label))
+}
+
+/// Titles EchoMind generated itself; a smart title may replace these, but a
+/// title the user typed must never be overwritten by a re-transcription.
+pub(crate) fn is_auto_generated_title(title: &str) -> bool {
+    let t = title.trim();
+    t.is_empty()
+        || t.starts_with("Toplantı - ")
+        || t.starts_with("İçe Aktarıldı:")
+        || t.starts_with("Meeting - ")
+        || t.contains(" Toplantısı - ")
+        || t.contains(" Toplantısı (")
 }
 
 /// Decodes any external audio file (.mp3, .m4a, .opus, .ogg, .wav, .flac, .aac, .3gp, .caf) into 16,000 Hz Mono float32 PCM samples.
@@ -249,59 +376,15 @@ pub async fn import_audio_file(
 
         let lang = language.as_deref().unwrap_or("auto");
 
-        // 4. Cloud ASR vs Offline Engines vs Local Whisper ASR
-        let mut segments = None;
-
-        if let Some(prov) = cloud_provider.as_deref() {
-            let clean_prov = prov.trim().to_lowercase();
-            if clean_prov == "apple_speech" || clean_prov == "apple_native" || clean_prov == "apple" {
-                println!("🍎 macOS Yerel Ses Tanıma (Apple Speech / ANE) başlatılıyor...");
-                if let Ok(apple_segs) = crate::offline_engines::transcribe_apple_speech(&flac_file_path, lang) {
-                    segments = Some(apple_segs);
-                    println!("✅ Apple Yerel Ses Tanıma tamamlandı!");
-                }
-            } else if clean_prov == "sensevoice" {
-                println!("⚡ SenseVoice Yerel Çevrimdışı ASR başlatılıyor...");
-                if let Ok(sv_segs) = crate::offline_engines::transcribe_sensevoice(&flac_file_path, lang) {
-                    segments = Some(sv_segs);
-                    println!("✅ SenseVoice tamamlandı!");
-                }
-            } else if let Some(key) = api_key.as_deref() {
-                let clean_key = key.trim();
-                if !clean_key.is_empty() && (clean_prov == "groq" || clean_prov == "openai" || clean_prov == "gemini") {
-                    // HARD REJECT in Paranoid / Air-Gapped Mode
-                    crate::security::check_cloud_access_allowed()?;
-
-                    println!("🌐 Online Bulut ASR başlatılıyor (Sağlayıcı: {}, Model: {:?})...", clean_prov, model_version);
-                    if let Ok(mut cloud_segs) = crate::cloud_transcriber::transcribe_audio_cloud(
-                        &flac_file_path,
-                        &clean_prov,
-                        clean_key,
-                        lang,
-                        model_version.as_deref(),
-                    ) {
-                        crate::diarization::cluster_speakers(&mut cloud_segs, &pcm_16k, 16000, 6);
-                        crate::diarization::resolve_speaker_names(&mut cloud_segs);
-                        segments = Some(cloud_segs);
-                        println!("✅ Online Bulut ASR başarıyla tamamlandı!");
-                    } else {
-                        println!("⚠️ Bulut ASR başarısız oldu, yerel modele geçiliyor...");
-                    }
-                }
-            }
-        }
-
-        // Fallback to local Whisper engine if cloud wasn't used or failed
-        let segments = match segments {
-            Some(segs) => segs,
-            None => {
-                let transcriber = crate::transcriber::get_global_transcriber();
-                let res = transcriber.transcribe_pcm(&pcm_16k, lang)?;
-                // Auto-cleanup local context memory after heavy batch transcription
-                transcriber.cleanup_context();
-                res
-            }
-        };
+        // 4. ASR (cloud / offline engine, local Whisper fallback with honest label)
+        let (segments, engine_label) = run_asr_engine(
+            &flac_file_path,
+            &pcm_16k,
+            lang,
+            cloud_provider.as_deref(),
+            api_key.as_deref(),
+            model_version.as_deref(),
+        )?;
 
         // Explicitly free 16k PCM vector after compression
         drop(pcm_16k);
@@ -361,16 +444,6 @@ pub async fn import_audio_file(
             None,
             None,
         );
-
-        let engine_label = if let (Some(prov), Some(key)) = (cloud_provider.as_deref(), api_key.as_deref()) {
-            if !key.trim().is_empty() {
-                format!("⚡ Bulut Zekası ({})", prov.to_uppercase())
-            } else {
-                with_model_fallback_warning("🔒 Bilgisayarınızda (Standart Mod)".to_string())
-            }
-        } else {
-            with_model_fallback_warning("🔒 Bilgisayarınızda (Standart Mod)".to_string())
-        };
 
         let final_title = if let Some(ref st) = summary_res.smart_title {
             let clean = st.trim();
@@ -619,18 +692,23 @@ pub async fn retranscribe_meeting(
     custom_model: Option<String>,
 ) -> Result<MeetingRecord, String> {
     tauri::async_runtime::spawn_blocking(move || {
+        crate::storage::require_storage_ready()?;
         let storage = crate::storage::get_global_storage();
-        let mut meetings_lock = storage.meetings.lock().unwrap();
 
-        let target_index = meetings_lock
-            .iter()
-            .position(|m| m.id == meeting_id)
-            .ok_or_else(|| format!("Toplantı kaydı bulunamadı: {}", meeting_id))?;
-
-        let audio_path_opt = meetings_lock[target_index].audio_file_path.clone();
-        let audio_path_str = audio_path_opt.ok_or_else(|| {
-            "Bu toplantı için kaydedilmiş ses dosyası bulunamadı. Yeniden transkribe işlemi için orijinal ses kaydı gereklidir.".to_string()
-        })?;
+        // Read what we need, then release the history lock: transcription of a
+        // long recording (plus a cloud summary) takes minutes, and holding the
+        // lock that long blocks every history read/write, including saving a
+        // new recording.
+        let audio_path_str = {
+            let meetings = storage.meetings.lock().unwrap();
+            let target = meetings
+                .iter()
+                .find(|m| m.id == meeting_id)
+                .ok_or_else(|| format!("Toplantı kaydı bulunamadı: {}", meeting_id))?;
+            target.audio_file_path.clone().ok_or_else(|| {
+                "Bu toplantı için kaydedilmiş ses dosyası bulunamadı. Yeniden transkribe işlemi için orijinal ses kaydı gereklidir.".to_string()
+            })?
+        };
 
         let mut path = PathBuf::from(&audio_path_str);
         if !path.exists() {
@@ -655,53 +733,15 @@ pub async fn retranscribe_meeting(
 
         let lang = language.as_deref().unwrap_or("auto");
 
-        // 2. Cloud ASR vs Offline Engines vs Local Whisper ASR
-        let mut segments = None;
-
-        if let Some(prov) = cloud_provider.as_deref() {
-            let clean_prov = prov.trim().to_lowercase();
-            if clean_prov == "apple_speech" || clean_prov == "apple_native" || clean_prov == "apple" {
-                if let Ok(apple_segs) = crate::offline_engines::transcribe_apple_speech(&path, lang) {
-                    segments = Some(apple_segs);
-                }
-            } else if clean_prov == "sensevoice" {
-                if let Ok(sv_segs) = crate::offline_engines::transcribe_sensevoice(&path, lang) {
-                    segments = Some(sv_segs);
-                }
-            } else if let Some(key) = api_key.as_deref() {
-                let clean_key = key.trim();
-                if !clean_key.is_empty() && (clean_prov == "groq" || clean_prov == "openai" || clean_prov == "gemini") {
-                    // HARD REJECT in Paranoid / Air-Gapped Mode
-                    crate::security::check_cloud_access_allowed()?;
-                    if let Ok(mut cloud_segs) = crate::cloud_transcriber::transcribe_audio_cloud(
-                        &path,
-                        &clean_prov,
-                        clean_key,
-                        lang,
-                        model_version.as_deref(),
-                    ) {
-                        crate::diarization::cluster_speakers(&mut cloud_segs, &pcm_16k, 16000, 6);
-                        crate::diarization::resolve_speaker_names(&mut cloud_segs);
-                        segments = Some(cloud_segs);
-                    }
-                }
-            }
-        }
-
-        // Switch local model if local model key provided
-        if segments.is_none() {
-            if let Some(ref local_model_key) = model_version {
-                if ["tiny", "base", "small", "medium", "large-v3-turbo"].contains(&local_model_key.as_str()) {
-                    let _ = crate::transcriber::switch_transcription_model(local_model_key.clone());
-                }
-            }
-            let transcriber = crate::transcriber::get_global_transcriber();
-            let res = transcriber.transcribe_pcm(&pcm_16k, lang)?;
-            transcriber.cleanup_context();
-            segments = Some(res);
-        }
-
-        let segments_raw = segments.unwrap_or_default();
+        // 2. ASR (cloud / offline engine, local Whisper fallback with honest label)
+        let (segments_raw, engine_label) = run_asr_engine(
+            &path,
+            &pcm_16k,
+            lang,
+            cloud_provider.as_deref(),
+            api_key.as_deref(),
+            model_version.as_deref(),
+        )?;
         drop(pcm_16k);
 
         let total_duration_ms = duration_seconds * 1000;
@@ -759,54 +799,39 @@ pub async fn retranscribe_meeting(
             None,
         );
 
-        let engine_label = if let (Some(prov), Some(key)) = (cloud_provider.as_deref(), api_key.as_deref()) {
-            if !key.trim().is_empty() {
-                format!("⚡ Bulut Zekası ({})", prov.to_uppercase())
-            } else {
-                let model_name = match model_version.as_deref() {
-                    Some("medium") => "Gelişmiş Mod",
-                    Some("large-v3-turbo") => "Zirve Netlik",
-                    Some("base") => "Hızlı Mod",
-                    _ => "Standart Mod",
-                };
-                with_model_fallback_warning(format!("🔒 Bilgisayarınızda ({})", model_name))
+        // 3. Write back under a short lock; the meeting may have been deleted meanwhile.
+        let updated_record = {
+            let mut meetings = storage.meetings.lock().unwrap();
+            let target = meetings
+                .iter_mut()
+                .find(|m| m.id == meeting_id)
+                .ok_or_else(|| format!("Toplantı kaydı bulunamadı: {}", meeting_id))?;
+            if let Some(ref st) = summary_res.smart_title {
+                let clean = st.trim();
+                if !clean.is_empty() && is_auto_generated_title(&target.title) {
+                    target.title = clean.to_string();
+                }
             }
-        } else {
-            let model_name = match model_version.as_deref() {
-                Some("medium") => "Gelişmiş Mod",
-                Some("large-v3-turbo") => "Zirve Netlik",
-                Some("base") => "Hızlı Mod",
-                _ => "Standart Mod",
-            };
-            format!("🔒 Bilgisayarınızda ({})", model_name)
+            target.segments = segments;
+            target.transcript_pending = false;
+            target.summary = summary_res.summary;
+            target.key_decisions = summary_res.key_decisions;
+            target.meeting_goal = Some(summary_res.meeting_goal);
+            target.key_highlights = Some(summary_res.key_highlights);
+            target.action_items = Some(summary_res.action_items);
+            target.phase1_agreed = Some(summary_res.phase1_agreed);
+            target.phase2_deferred = Some(summary_res.phase2_deferred);
+            target.detailed_topics = Some(summary_res.detailed_topics);
+            target.participants = Some(summary_res.participants);
+            target.engine_used = Some(engine_label);
+            target.summary_provider = Some(summary_res.provider_used);
+            target.clone()
         };
 
-        let target = &mut meetings_lock[target_index];
-        if let Some(ref st) = summary_res.smart_title {
-            let clean = st.trim();
-            if !clean.is_empty() {
-                target.title = clean.to_string();
-            }
-        }
-        target.segments = segments;
-        target.transcript_pending = false;
-        target.summary = summary_res.summary;
-        target.key_decisions = summary_res.key_decisions;
-        target.meeting_goal = Some(summary_res.meeting_goal);
-        target.key_highlights = Some(summary_res.key_highlights);
-        target.action_items = Some(summary_res.action_items);
-        target.phase1_agreed = Some(summary_res.phase1_agreed);
-        target.phase2_deferred = Some(summary_res.phase2_deferred);
-        target.detailed_topics = Some(summary_res.detailed_topics);
-        target.participants = Some(summary_res.participants);
-        target.engine_used = Some(engine_label);
-        target.summary_provider = Some(summary_res.provider_used);
-
-        let updated_record = target.clone();
-
-        // Persist to disk
-        let json_data = serde_json::to_string_pretty(&*meetings_lock).map_err(|e| e.to_string())?;
-        std::fs::write(&storage.file_path, json_data).map_err(|e| e.to_string())?;
+        // Persist through the encrypted store (this path used to write the
+        // whole history to disk as plaintext JSON).
+        storage.save_to_disk()?;
+        crate::transcription_queue::forget_meeting(&meeting_id);
 
         Ok(updated_record)
     })
@@ -852,6 +877,20 @@ pub async fn pick_and_import_audio_file(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn test_retranscribe_never_overwrites_user_titles() {
+        assert!(is_auto_generated_title(
+            "Toplantı - 30 September 2026, 16:29"
+        ));
+        assert!(is_auto_generated_title("İçe Aktarıldı: q3-roadmap-demo"));
+        assert!(is_auto_generated_title(
+            "Google Meet Toplantısı (abc-defg-hij) - 30 Eylül"
+        ));
+        assert!(is_auto_generated_title("   "));
+        assert!(!is_auto_generated_title("Q3 bütçe toplantısı"));
+        assert!(!is_auto_generated_title("Müşteri görüşmesi - Acme"));
+    }
+
     use super::*;
 
     #[test]
