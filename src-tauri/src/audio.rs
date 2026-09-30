@@ -479,6 +479,10 @@ impl GlobalAudioEngine {
             state.recording_session_id = state.recording_session_id.wrapping_add(1).max(1);
             state.session_saved = false;
         }
+        // A new session must start with an empty live transcript. Otherwise
+        // segments left over from an earlier session (e.g. one that was never
+        // saved) end up in this meeting's transcript when it is saved.
+        crate::transcriber::get_global_transcriber().clear_history();
 
         // Keep the catalog worker off CoreAudio for the whole capture lifetime
         // (build → run → teardown). Device open below still talks to HAL on

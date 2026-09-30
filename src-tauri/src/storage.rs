@@ -370,8 +370,21 @@ impl StorageEngine {
             &self.file_path,
         ) {
             Ok(records) => {
-                let mut lock = self.meetings.lock().unwrap();
-                *lock = records.clone();
+                {
+                    let mut lock = self.meetings.lock().unwrap();
+                    *lock = records.clone();
+                }
+                // Plaintext (older builds' re-transcribe path wrote the history
+                // unencrypted) or legacy-V1 files: re-encrypt right away instead
+                // of leaving meeting content readable until the next save.
+                if !crate::encrypted_storage::is_current_format(&self.file_path) {
+                    match self.save_to_disk() {
+                        Ok(()) => {
+                            eprintln!("🔐 Meeting history re-encrypted (was plaintext/legacy)")
+                        }
+                        Err(e) => eprintln!("⚠️ Meeting history re-encryption failed: {}", e),
+                    }
+                }
                 Ok(records)
             }
             Err(e) => {
@@ -1656,6 +1669,60 @@ mod tests {
         let metadata = fs::metadata(&test_flac_path).unwrap();
         assert!(metadata.len() > 0);
         let _ = fs::remove_dir_all(&sample_dir);
+    }
+
+    #[test]
+    fn test_load_from_disk_reencrypts_plaintext_history() {
+        // Regression: the re-transcribe path wrote the history as plaintext JSON;
+        // the next launch must re-encrypt it instead of leaving it readable.
+        let _unlock = crate::secure_key::key_unlock_test_lock()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let file_path = std::env::temp_dir().join(format!(
+            "echomind_test_plain_history_{}.json",
+            std::process::id()
+        ));
+        let meeting = MeetingRecord {
+            id: "plain_1".into(),
+            title: "Gizli toplantı".into(),
+            date_formatted: "1".into(),
+            duration_seconds: 1,
+            duration_formatted: "00:01".into(),
+            audio_file_path: None,
+            segments: Vec::new(),
+            summary: "özet".into(),
+            key_decisions: Vec::new(),
+            meeting_goal: None,
+            key_highlights: None,
+            action_items: None,
+            phase1_agreed: None,
+            phase2_deferred: None,
+            detailed_topics: None,
+            participants: None,
+            engine_used: None,
+            summary_provider: None,
+            tags: None,
+            transcript_pending: false,
+        };
+        fs::write(&file_path, serde_json::to_vec(&vec![meeting]).unwrap()).unwrap();
+        assert!(!crate::encrypted_storage::is_current_format(&file_path));
+
+        let engine = StorageEngine {
+            file_path: file_path.clone(),
+            meetings: Arc::new(Mutex::new(Vec::new())),
+        };
+        let loaded = engine.load_from_disk().unwrap();
+        assert_eq!(loaded.len(), 1);
+        assert!(
+            crate::encrypted_storage::is_current_format(&file_path),
+            "plaintext history must be re-encrypted on load"
+        );
+        let raw = fs::read(&file_path).unwrap();
+        assert!(!String::from_utf8_lossy(&raw).contains("Gizli toplantı"));
+        // And it still loads after re-encryption.
+        assert_eq!(engine.load_from_disk().unwrap().len(), 1);
+
+        let _ = fs::remove_file(file_path);
     }
 
     #[test]
