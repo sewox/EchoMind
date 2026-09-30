@@ -89,8 +89,14 @@ impl Default for GlobalAudioEngine {
 /// Result of atomically claiming a recording session's PCM for persistence.
 #[derive(Debug)]
 pub enum PcmClaim {
-    /// First claim with audio worth persisting.
-    Claimed { session_id: u64, pcm: Vec<f32> },
+    /// First claim with audio worth persisting. `live_covered_samples` is how
+    /// much of `pcm` (from the start) live transcription already consumed, so
+    /// the save path can tell a partial live transcript from a complete one.
+    Claimed {
+        session_id: u64,
+        pcm: Vec<f32>,
+        live_covered_samples: usize,
+    },
     /// First claim but buffer empty / too short — session marked saved so
     /// nothing retries; caller must not create a meeting or FLAC.
     NothingToSave { session_id: u64 },
@@ -819,11 +825,16 @@ impl GlobalAudioEngine {
         }
         state.session_saved = true;
         let pcm = std::mem::take(&mut state.pcm_16k_buffer);
+        let live_covered_samples = state.live_transcribe_cursor.min(pcm.len());
         state.live_transcribe_cursor = 0;
         if pcm.len() < MIN_SAVE_PCM_SAMPLES {
             return PcmClaim::NothingToSave { session_id };
         }
-        PcmClaim::Claimed { session_id, pcm }
+        PcmClaim::Claimed {
+            session_id,
+            pcm,
+            live_covered_samples,
+        }
     }
 
     /// Test helper: inject PCM without starting capture.
@@ -834,6 +845,12 @@ impl GlobalAudioEngine {
         state.live_transcribe_cursor = 0;
         state.recording_session_id = session_id;
         state.session_saved = false;
+    }
+
+    /// Test helper: pretend live transcription already consumed `samples`.
+    #[cfg(test)]
+    pub fn set_live_cursor_for_test(&self, samples: usize) {
+        self.state.lock().unwrap().live_transcribe_cursor = samples;
     }
 
     /// Test helper: append samples as if the capture callback just wrote them.
@@ -1551,7 +1568,9 @@ mod tests {
         engine.inject_pcm_for_test(samples.clone(), 7);
 
         match engine.claim_pcm_for_save() {
-            PcmClaim::Claimed { session_id, pcm } => {
+            PcmClaim::Claimed {
+                session_id, pcm, ..
+            } => {
                 assert_eq!(session_id, 7);
                 assert_eq!(pcm.len(), samples.len());
             }
@@ -1594,7 +1613,9 @@ mod tests {
             state.live_transcribe_cursor = 0;
         }
         match engine.claim_pcm_for_save() {
-            PcmClaim::Claimed { session_id, pcm } => {
+            PcmClaim::Claimed {
+                session_id, pcm, ..
+            } => {
                 assert_eq!(session_id, 2);
                 assert_eq!(pcm.len(), 5000);
             }
@@ -1624,7 +1645,9 @@ mod tests {
         }
 
         match engine.claim_pcm_for_save() {
-            PcmClaim::Claimed { session_id, pcm } => {
+            PcmClaim::Claimed {
+                session_id, pcm, ..
+            } => {
                 assert_eq!(session_id, 42);
                 assert_eq!(
                     pcm.len(),

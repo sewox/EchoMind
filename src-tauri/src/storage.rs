@@ -470,12 +470,18 @@ impl StorageEngine {
             .iter_mut()
             .find(|m| m.id == meeting_id)
             .ok_or_else(|| format!("Toplantı bulunamadı: {}", meeting_id))?;
+        // Summary / decisions auto-derived from the old (empty or partial)
+        // transcript are rebuilt; anything the user or an AI report wrote stays.
+        let summary_was_auto =
+            mtg.summary.is_empty() || mtg.summary == generate_summary_from_segments(&mtg.segments);
+        let decisions_were_auto = mtg.key_decisions.is_empty()
+            || mtg.key_decisions == extract_key_decisions(&mtg.segments);
         mtg.segments = segments;
         mtg.transcript_pending = false;
-        if mtg.summary.is_empty() {
+        if summary_was_auto {
             mtg.summary = generate_summary_from_segments(&mtg.segments);
         }
-        if mtg.key_decisions.is_empty() {
+        if decisions_were_auto {
             mtg.key_decisions = extract_key_decisions(&mtg.segments);
         }
         let updated = mtg.clone();
@@ -791,6 +797,21 @@ pub fn compress_audio_to_flac(samples_f32: &[f32], output_path: &PathBuf) -> Res
         .map_err(|e| format!("FLAC ses verisi yazılamadı: {}", e))?;
 
     Ok(())
+}
+
+/// Untranscribed tail above which a live transcript counts as partial (~20 s).
+/// Smaller gaps (the last few seconds before Stop) are normal and not worth a
+/// full re-transcription.
+pub const PARTIAL_TRANSCRIPT_REQUEUE_SAMPLES: usize = 16000 * 20;
+
+/// Whether a just-saved recording should get a full-file transcription job.
+pub fn needs_full_transcription(
+    segments: &[TranscriptSegment],
+    total_samples: usize,
+    live_covered_samples: usize,
+) -> bool {
+    segments.is_empty()
+        || total_samples.saturating_sub(live_covered_samples) >= PARTIAL_TRANSCRIPT_REQUEUE_SAMPLES
 }
 
 /// Helper function to generate an intelligent summary from meeting transcript segments
@@ -1112,7 +1133,8 @@ fn save_current_meeting_blocking(
     // Explicit order: stop is done by the caller; finalize segments, then claim.
     let segments = transcriber.take_history();
 
-    let (session_id, raw_pcm_buffer) = match audio_engine.claim_pcm_for_save() {
+    let (session_id, raw_pcm_buffer, live_covered_samples) = match audio_engine.claim_pcm_for_save()
+    {
         PcmClaim::AlreadySaved { session_id } => {
             // Wait until the winner publishes Done/Nothing — never bare Err.
             loop {
@@ -1147,7 +1169,11 @@ fn save_current_meeting_blocking(
             gate_cv.notify_all();
             return Err(NOTHING_TO_SAVE.to_string());
         }
-        PcmClaim::Claimed { session_id, pcm } => {
+        PcmClaim::Claimed {
+            session_id,
+            pcm,
+            live_covered_samples,
+        } => {
             *gate = Some(SessionSaveCache {
                 session_id,
                 outcome: None,
@@ -1155,7 +1181,7 @@ fn save_current_meeting_blocking(
             gate_cv.notify_all();
             // Release gate lock while doing FLAC I/O so waiters can observe Pending.
             drop(gate);
-            (session_id, pcm)
+            (session_id, pcm, live_covered_samples)
         }
     };
 
@@ -1204,7 +1230,14 @@ fn save_current_meeting_blocking(
             }
         }
 
-        let transcript_pending = deduplicated_segments.is_empty();
+        // Pending (→ full-file queue job) when there is no transcript at all, or
+        // when live transcription only covered part of the recording — e.g. it
+        // was paused while a past meeting was open, or the app quit mid-meeting.
+        let transcript_pending = needs_full_transcription(
+            &deduplicated_segments,
+            raw_pcm_buffer.len(),
+            live_covered_samples,
+        );
         // Quit never enqueues Whisper; normal save queues a durable FLAC job.
         let flac_to_enqueue = match mode {
             SaveMode::QuitNoWhisper => None,
@@ -2047,6 +2080,136 @@ mod tests {
         if let Some(p) = saved.audio_file_path {
             let _ = fs::remove_file(p);
         }
+    }
+
+    fn live_seg(id: usize, text: &str) -> TranscriptSegment {
+        TranscriptSegment {
+            id,
+            speaker_id: "Konuşmacı 1".into(),
+            speaker_name: "Konuşmacı 1".into(),
+            start_time_ms: 0,
+            end_time_ms: 4000,
+            timestamp_formatted: "00:00".into(),
+            text: text.into(),
+            language: "auto".into(),
+            confidence: 1.0,
+        }
+    }
+
+    #[test]
+    fn test_needs_full_transcription_threshold() {
+        let segs = vec![live_seg(1, "merhaba")];
+        let s = 16000;
+        assert!(
+            needs_full_transcription(&[], 60 * s, 60 * s),
+            "no transcript"
+        );
+        assert!(
+            !needs_full_transcription(&segs, 60 * s, 60 * s),
+            "fully covered"
+        );
+        assert!(
+            !needs_full_transcription(&segs, 60 * s, 48 * s),
+            "short tail before Stop is normal"
+        );
+        assert!(
+            needs_full_transcription(&segs, 204 * s, 30 * s),
+            "3:24 recording with only 30 s transcribed live must be requeued"
+        );
+        // Cursor can never claim more than the buffer.
+        assert!(!needs_full_transcription(&segs, 10 * s, 50 * s));
+    }
+
+    #[test]
+    fn test_save_requeues_partial_live_transcript() {
+        let _unlock = crate::secure_key::key_unlock_test_lock()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let _guard = global_save_test_lock().lock().unwrap();
+        crate::secure_key::reset_key_unlock_state_for_test();
+        let samples: Vec<f32> = (0..16000 * 40).map(|i| ((i % 40) as f32) * 0.002).collect();
+        let engine = crate::audio::get_global_audio_engine();
+        let session_id = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos() as u64;
+        engine.inject_pcm_for_test(samples, session_id);
+        // Live transcription covered only the first 10 s of a 40 s recording.
+        engine.set_live_cursor_for_test(16000 * 10);
+        crate::transcriber::get_global_transcriber()
+            .state
+            .lock()
+            .unwrap()
+            .segments
+            .push(live_seg(1, "ilk on saniye"));
+
+        let (saved, flac_to_enqueue) =
+            save_current_meeting_blocking("Partial".into(), 40, SaveMode::Normal).unwrap();
+        assert_eq!(
+            saved.segments.len(),
+            1,
+            "live preview is kept until the job finishes"
+        );
+        assert!(saved.transcript_pending);
+        let flac = flac_to_enqueue.expect("partial transcript must enqueue the full FLAC");
+
+        let _ = get_global_storage().delete_meeting(&saved.id);
+        let _ = fs::remove_file(flac);
+    }
+
+    #[test]
+    fn test_update_segments_refreshes_auto_summary_only() {
+        let _unlock = crate::secure_key::key_unlock_test_lock()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let storage = StorageEngine::new();
+        let partial = vec![live_seg(1, "Bütçeyi salı günü konuşacağız.")];
+        let full = vec![
+            live_seg(1, "Bütçeyi salı günü konuşacağız."),
+            live_seg(2, "Karar: mobil sürüm cuma günü yayına çıkacak."),
+            live_seg(3, "Backend ekibi önbellek katmanını ekleyecek."),
+        ];
+        let base = |id: &str, summary: &str| MeetingRecord {
+            id: id.into(),
+            title: "t".into(),
+            date_formatted: "1".into(),
+            duration_seconds: 60,
+            duration_formatted: "01:00".into(),
+            audio_file_path: None,
+            segments: partial.clone(),
+            summary: summary.into(),
+            key_decisions: Vec::new(),
+            meeting_goal: None,
+            key_highlights: None,
+            action_items: None,
+            phase1_agreed: None,
+            phase2_deferred: None,
+            detailed_topics: None,
+            participants: None,
+            engine_used: None,
+            summary_provider: None,
+            tags: None,
+            transcript_pending: true,
+        };
+
+        // Auto summary (empty at save → generated from the partial transcript).
+        storage.add_meeting(base("auto_sum", "")).unwrap();
+        let updated = storage
+            .update_meeting_segments("auto_sum", full.clone())
+            .unwrap();
+        assert_eq!(updated.summary, generate_summary_from_segments(&full));
+        assert_eq!(updated.key_decisions, extract_key_decisions(&full));
+        assert!(!updated.transcript_pending);
+
+        // A summary the user/AI wrote must survive the transcript swap.
+        storage
+            .add_meeting(base("custom_sum", "Elle yazılmış özet"))
+            .unwrap();
+        let kept = storage.update_meeting_segments("custom_sum", full).unwrap();
+        assert_eq!(kept.summary, "Elle yazılmış özet");
+
+        let _ = storage.delete_meeting("auto_sum");
+        let _ = storage.delete_meeting("custom_sum");
     }
 
     #[test]
