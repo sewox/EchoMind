@@ -12,7 +12,7 @@ const translations = {
     navSecurity: "Güvenlik & DLP",
     navHardware: "Donanım",
     navDownload: "İndir",
-    badgeRelease: "EchoMind v0.2.12 Yayında • Sıfır-Güven Mimarisi",
+    badgeRelease: "EchoMind v0.2.14 Yayında • Sıfır-Güven Mimarisi",
     heroTitle: "Toplantılarınızı Donanım Gücüyle Dinleyen Hibrit Yapay Zekâ",
     heroSubtitle:
       "Apple Metal ve NVIDIA CUDA ile %100 yerel ve gizli çalışabilen, kurumsal DLP ve toplantılar arası semantik hafıza sunan yeni nesil masaüstü toplantı asistanı.",
@@ -85,7 +85,7 @@ const translations = {
     linuxDistroTitle: "Linux Dağıtımları (.deb / .AppImage)",
     linuxDistroDesc: "Ubuntu, Debian, Fedora ve Arch x64 için yerel paketler.",
     btnDownloadWinExe: "İndir .exe (4.9 MB)",
-    btnDownloadWinMsi: "İndir .msi (6.9 MB)",
+    btnDownloadWinMsi: "İndir .msi (7.0 MB)",
     btnDownloadMacDmg: "İndir .dmg (8.2 MB)",
     footerText:
       "EchoMind © 2026. Açık Kaynaklı ve Sıfır-Güven Toplantı Zekâsı Platformu.",
@@ -96,7 +96,7 @@ const translations = {
     navSecurity: "Security & DLP",
     navHardware: "Hardware",
     navDownload: "Download",
-    badgeRelease: "EchoMind v0.2.12 Released • Zero-Trust Architecture",
+    badgeRelease: "EchoMind v0.2.14 Released • Zero-Trust Architecture",
     heroTitle: "Hardware-Aware Hybrid AI Meeting Intelligence",
     heroSubtitle:
       "A next-generation desktop meeting assistant that runs 100% locally with Apple Metal & NVIDIA CUDA, featuring enterprise DLP and cross-meeting semantic memory.",
@@ -170,7 +170,7 @@ const translations = {
     linuxDistroDesc:
       "Native packages for Ubuntu, Debian, Fedora, and Arch x64.",
     btnDownloadWinExe: "Download .exe (4.9 MB)",
-    btnDownloadWinMsi: "Download .msi (6.9 MB)",
+    btnDownloadWinMsi: "Download .msi (7.0 MB)",
     btnDownloadMacDmg: "Download .dmg (8.2 MB)",
     footerText:
       "EchoMind © 2026. Open-Source Zero-Trust Meeting Intelligence Platform.",
