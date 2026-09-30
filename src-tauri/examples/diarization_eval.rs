@@ -5,7 +5,7 @@
 //!   ground_truth.json: [{"start": 0.5, "end": 3.1, "speaker": "A"}, ...]
 //!
 //! Unlabelled mode (how many speakers are found, and how segments split):
-//!   diarization_eval <audio> --segments <segments.tsv>
+//!   diarization_eval <audio> --segments <segments.tsv> [labels_out.tsv]
 //!   segments.tsv: "<start_seconds>\t<end_seconds>" per line
 //!
 //! Runs `diarization::cluster_speakers` on the given segment boundaries only
@@ -92,6 +92,20 @@ fn main() {
             "  speaker changes between consecutive segments: {}",
             changes
         );
+        if let Some(out) = args.get(4) {
+            let lines: Vec<String> = segs
+                .iter()
+                .map(|s| {
+                    format!(
+                        "{}\t{}\t{}",
+                        s.start_time_ms / 1000,
+                        s.end_time_ms / 1000,
+                        s.speaker_id
+                    )
+                })
+                .collect();
+            std::fs::write(out, lines.join("\n")).expect("write labels");
+        }
         return;
     }
 

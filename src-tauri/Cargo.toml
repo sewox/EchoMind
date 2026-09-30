@@ -22,6 +22,14 @@ name = "qa_print_import"
 path = "examples/qa_print_import.rs"
 
 [[example]]
+name = "embed_bench"
+path = "examples/embed_bench.rs"
+
+[[example]]
+name = "onnx_probe"
+path = "examples/onnx_probe.rs"
+
+[[example]]
 name = "diarization_eval"
 path = "examples/diarization_eval.rs"
 
@@ -34,6 +42,8 @@ tauri-plugin-shell = "2.0.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 rustfft = "6"
+sha2 = "0.10"
+tract-onnx = "0.21"
 sysinfo = "0.31.4"
 cpal = "0.15"
 ringbuf = "0.4"

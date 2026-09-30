@@ -802,6 +802,14 @@ impl GlobalAudioEngine {
     /// `live_transcribe_cursor`. Returns `None` when fewer than `min_samples`
     /// unread samples are available.
     pub fn take_pcm_for_live_transcribe(&self, min_samples: usize) -> Option<Vec<f32>> {
+        self.take_pcm_for_live_transcribe_at(min_samples)
+            .map(|(_, samples)| samples)
+    }
+
+    /// Like [`Self::take_pcm_for_live_transcribe`], also returning where the
+    /// slice starts in the session buffer (samples), so live segments can be
+    /// timestamped relative to the start of the recording.
+    pub fn take_pcm_for_live_transcribe_at(&self, min_samples: usize) -> Option<(usize, Vec<f32>)> {
         let mut state = self.state.lock().unwrap();
         if state.live_transcribe_cursor > state.pcm_16k_buffer.len() {
             state.live_transcribe_cursor = state.pcm_16k_buffer.len();
@@ -813,9 +821,10 @@ impl GlobalAudioEngine {
         if unread < min_samples {
             return None;
         }
-        let samples = state.pcm_16k_buffer[state.live_transcribe_cursor..].to_vec();
+        let start = state.live_transcribe_cursor;
+        let samples = state.pcm_16k_buffer[start..].to_vec();
         state.live_transcribe_cursor = state.pcm_16k_buffer.len();
-        Some(samples)
+        Some((start, samples))
     }
 
     /// Atomically take the PCM buffer for the current recording session.

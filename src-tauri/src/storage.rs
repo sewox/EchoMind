@@ -727,6 +727,19 @@ pub fn start_storage_unlock(app: tauri::AppHandle) {
             // Must run after unlock so encrypted history is readable (#60 gate).
             crate::transcription_queue::bootstrap_after_storage_unlock(app.clone());
 
+            // Fetch the speaker-diarization model in the background (once).
+            std::thread::Builder::new()
+                .name("echomind-speaker-model".into())
+                .spawn(
+                    || match crate::speaker_embedding::ensure_model_downloaded() {
+                        Ok(_) => {}
+                        Err(e) => eprintln!(
+                            "⚠️ Speaker model unavailable, using fallback diarization: {e}"
+                        ),
+                    },
+                )
+                .ok();
+
             let status = StorageReadyStatus {
                 ready: true,
                 used_fallback: data_source.used_fallback(),
@@ -1251,6 +1264,18 @@ fn save_current_meeting_blocking(
             raw_pcm_buffer.len(),
             live_covered_samples,
         );
+        // Live slices aren't diarized (numbering would restart every slice);
+        // label speakers once for the whole session now. Skipped on quit (tight
+        // time budget) and when a full re-transcription is queued anyway.
+        if mode == SaveMode::Normal && !transcript_pending && !deduplicated_segments.is_empty() {
+            crate::diarization::cluster_speakers(
+                &mut deduplicated_segments,
+                &raw_pcm_buffer,
+                16000,
+                6,
+            );
+            crate::diarization::resolve_speaker_names(&mut deduplicated_segments);
+        }
         // Quit never enqueues Whisper; normal save queues a durable FLAC job.
         let flac_to_enqueue = match mode {
             SaveMode::QuitNoWhisper => None,

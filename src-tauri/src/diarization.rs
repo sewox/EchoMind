@@ -219,15 +219,6 @@ impl GaussStats {
             })
             .sum()
     }
-
-    fn mean(&self) -> [f64; N_CEPS] {
-        let n = self.n.max(1.0);
-        let mut m = [0.0; N_CEPS];
-        for k in 0..N_CEPS {
-            m[k] = self.sum[k] / n;
-        }
-        m
-    }
 }
 
 /// Speech-frame statistics for `[start_ms, end_ms)` of the recording.
@@ -249,6 +240,10 @@ pub fn segment_stats(ff: &FrameFeatures, start_ms: u64, end_ms: u64) -> GaussSta
     st
 }
 
+/// Segments with fewer speech frames than this (~1 s) don't seed a BIC
+/// cluster; they're attached to the nearest speaker afterwards.
+const MIN_TURN_SPEECH: usize = 100;
+
 /// Adjacent 10 ms frames are strongly correlated; BIC treats every sample as
 /// independent, so frame counts are divided by this to get an effective count.
 const FRAME_DECORRELATION: f64 = 4.0;
@@ -258,27 +253,8 @@ pub const BIC_LAMBDA: f64 = 2.0;
 
 /// ΔBIC for modelling `a` and `b` with one Gaussian instead of two.
 /// Negative ⇒ the two are better explained as the same speaker.
-fn tuning() -> (f64, f64) {
-    static T: std::sync::OnceLock<(f64, f64)> = std::sync::OnceLock::new();
-    *T.get_or_init(|| {
-        let l = std::env::var("ECHOMIND_BIC_LAMBDA")
-            .ok()
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(BIC_LAMBDA);
-        let d = std::env::var("ECHOMIND_BIC_DECORR")
-            .ok()
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(FRAME_DECORRELATION);
-        (l, d)
-    })
-}
-
 fn delta_bic(a: &GaussStats, b: &GaussStats) -> f64 {
-    delta_bic_with(a, b, tuning().0)
-}
-
-fn delta_bic_with(a: &GaussStats, b: &GaussStats, lambda: f64) -> f64 {
-    let decorr = tuning().1;
+    let (lambda, decorr) = (BIC_LAMBDA, FRAME_DECORRELATION);
     let m = a.merged(b);
     let (na, nb, nm) = (a.n / decorr, b.n / decorr, m.n / decorr);
     let gain = 0.5 * (nm * m.log_det() - na * a.log_det() - nb * b.log_det());
@@ -348,125 +324,9 @@ pub fn bic_cluster(items: &[GaussStats], max_k: usize) -> Vec<usize> {
     parent
 }
 
-/// Diarization works on the recording itself, not on ASR segments: ASR
-/// segments are often long (up to 30 s) and can contain several speakers,
-/// which would form "mixed" clusters of their own.
-///
-/// Stage 1 (speaker-change detection): walk 1 s windows in time order and
-/// grow the current turn while ΔBIC says the next window is the same voice.
-/// Stage 2 (clustering): BIC agglomerative clustering over those turns, which
-/// are long enough for stable statistics.
-const WINDOW_FRAMES: usize = 100; // 1 s
-/// A window needs this many speech frames (~0.4 s) to take part.
-const MIN_WINDOW_SPEECH: usize = 40;
-/// Turns shorter than this many speech frames (~1 s) don't seed a cluster;
-/// they're attached to the nearest speaker afterwards.
-const MIN_TURN_SPEECH: usize = 100;
-/// Complexity weight for stage 1 (turn growing). Lower than the clustering
-/// weight: a missed change point costs more than an extra split, because
-/// stage 2 re-joins same-speaker turns anyway.
-pub const BIC_LAMBDA_CHANGE: f64 = 1.0;
-
-fn change_lambda() -> f64 {
-    static T: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
-    *T.get_or_init(|| {
-        std::env::var("ECHOMIND_BIC_CHANGE")
-            .ok()
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(BIC_LAMBDA_CHANGE)
-    })
-}
-
-/// A homogeneous speaker turn: a run of windows `[first_win, last_win]`.
-struct Turn {
-    first_win: usize,
-    last_win: usize,
-    stats: GaussStats,
-}
-
-/// Speaker label per window (index = window number), `None` for windows
-/// without enough speech. Exposed for evaluation tooling.
-pub fn diarize_windows(ff: &FrameFeatures, max_k: usize) -> Vec<Option<usize>> {
-    let n_win = ff.ceps.len().div_ceil(WINDOW_FRAMES);
-    let fps = (ff.sample_rate as u64 / HOP_LEN as u64).max(1);
-    let win_ms = WINDOW_FRAMES as u64 * 1000 / fps;
-    let stats: Vec<GaussStats> = (0..n_win)
-        .map(|w| segment_stats(ff, w as u64 * win_ms, (w as u64 + 1) * win_ms))
-        .collect();
-
-    // Stage 1: grow turns. Windows without enough speech don't break a turn.
-    let lc = change_lambda();
-    let mut turns: Vec<Turn> = Vec::new();
-    for (w, st) in stats.iter().enumerate() {
-        if (st.n as usize) < MIN_WINDOW_SPEECH {
-            continue;
-        }
-        let same = turns
-            .last()
-            .map(|t| delta_bic_with(&t.stats, st, lc) < 0.0)
-            .unwrap_or(false);
-        if same {
-            let t = turns.last_mut().unwrap();
-            t.stats.add(st);
-            t.last_win = w;
-        } else {
-            turns.push(Turn {
-                first_win: w,
-                last_win: w,
-                stats: st.clone(),
-            });
-        }
-    }
-    let mut out = vec![None; n_win];
-    if turns.is_empty() {
-        return out;
-    }
-
-    // Stage 2: cluster the turns that carry enough speech.
-    let seeds: Vec<usize> = (0..turns.len())
-        .filter(|&i| turns[i].stats.n as usize >= MIN_TURN_SPEECH)
-        .collect();
-    let seeds = if seeds.is_empty() {
-        (0..turns.len()).collect()
-    } else {
-        seeds
-    };
-    let items: Vec<GaussStats> = seeds.iter().map(|&i| turns[i].stats.clone()).collect();
-    let raw = bic_cluster(&items, max_k);
-    let mut turn_label = vec![usize::MAX; turns.len()];
-    let mut models: HashMap<usize, GaussStats> = HashMap::new();
-    for (k, &i) in seeds.iter().enumerate() {
-        turn_label[i] = raw[k];
-        models
-            .entry(raw[k])
-            .or_insert_with(GaussStats::empty)
-            .add(&items[k]);
-    }
-    // Short turns: the cluster whose model absorbs them at the lowest ΔBIC.
-    for i in 0..turns.len() {
-        if turn_label[i] == usize::MAX {
-            turn_label[i] = *models
-                .iter()
-                .min_by(|a, b| {
-                    delta_bic(a.1, &turns[i].stats)
-                        .partial_cmp(&delta_bic(b.1, &turns[i].stats))
-                        .unwrap_or(std::cmp::Ordering::Equal)
-                })
-                .unwrap()
-                .0;
-        }
-    }
-    for (i, t) in turns.iter().enumerate() {
-        for w in t.first_win..=t.last_win {
-            if (stats[w].n as usize) >= MIN_WINDOW_SPEECH {
-                out[w] = Some(turn_label[i]);
-            }
-        }
-    }
-    out
-}
-
-/// Segment-level variant: one Gaussian per ASR segment, BIC-clustered.
+/// Fallback when the neural model is unavailable: one diagonal Gaussian per
+/// ASR segment, BIC-clustered; short segments join the closest speaker model
+/// and silent ones inherit the previous speaker.
 fn cluster_by_segments(segments: &mut [TranscriptSegment], ff: &FrameFeatures, max_k: usize) {
     let stats: Vec<GaussStats> = segments
         .iter()
@@ -518,9 +378,259 @@ fn cluster_by_segments(segments: &mut [TranscriptSegment], ff: &FrameFeatures, m
     }
 }
 
+// ---------------------------------------------------------------------------
+// Neural path: CAM++ speaker embeddings on sliding windows + cosine AHC.
+// ---------------------------------------------------------------------------
+
+/// 1.5 s embedding window, 0.75 s hop (in 10 ms frames).
+const NN_WIN: usize = 150;
+const NN_HOP: usize = 75;
+/// Cosine distance at which clusters stop merging. Calibrated with
+/// `examples/diarization_eval.rs`: results are identical across 0.20–0.35 on
+/// labelled 1- and 4-voice sets (clean, noisy, multi-speaker segments) and on
+/// a real two-person meeting, so 0.30 sits mid-plateau.
+pub const NN_MERGE_THRESHOLD: f32 = 0.30;
+
+/// Path of the speaker model to use, if one is available.
+fn neural_model_path() -> Option<std::path::PathBuf> {
+    if let Ok(p) = std::env::var("ECHOMIND_SPEAKER_MODEL") {
+        let p = std::path::PathBuf::from(p);
+        return p.exists().then_some(p);
+    }
+    let p = crate::speaker_embedding::model_path();
+    p.exists().then_some(p)
+}
+
+/// Per-frame speaker label (10 ms frames) from neural embeddings, or `None`
+/// when the model is unavailable or fails.
+fn neural_frame_labels(pcm: &[f32], speech: &[bool], max_k: usize) -> Option<Vec<Option<usize>>> {
+    use crate::speaker_embedding as se;
+    let model_path = neural_model_path()?;
+    let fbank = se::kaldi_fbank(pcm, 16000);
+    let n = fbank.len().min(speech.len());
+    if n < NN_WIN {
+        return None;
+    }
+    // Windows with at least half speech.
+    let starts: Vec<usize> = (0..=(n - NN_WIN))
+        .step_by(NN_HOP)
+        .filter(|&s| speech[s..s + NN_WIN].iter().filter(|&&v| v).count() * 2 >= NN_WIN)
+        .collect();
+    if starts.len() < 2 {
+        return None;
+    }
+
+    // Embed in parallel; each thread owns a runnable plan.
+    let threads = std::thread::available_parallelism()
+        .map(|v| v.get())
+        .unwrap_or(4)
+        .clamp(1, 8);
+    let chunk = starts.len().div_ceil(threads);
+    let embs: Vec<Vec<f32>> = std::thread::scope(|scope| {
+        let handles: Vec<_> = starts
+            .chunks(chunk)
+            .map(|part| {
+                let fb = &fbank;
+                let mp = &model_path;
+                scope.spawn(move || -> Result<Vec<Vec<f32>>, String> {
+                    let emb = se::SpeakerEmbedder::load(mp, NN_WIN)?;
+                    part.iter()
+                        .map(|&s| {
+                            let mut w = fb[s..s + NN_WIN].to_vec();
+                            se::mean_normalise(&mut w);
+                            emb.embed(&w)
+                        })
+                        .collect()
+                })
+            })
+            .collect();
+        let mut all = Vec::with_capacity(starts.len());
+        for h in handles {
+            match h.join() {
+                Ok(Ok(v)) => all.extend(v),
+                Ok(Err(e)) => {
+                    eprintln!("⚠️ speaker embedding failed: {e}");
+                    return Vec::new();
+                }
+                Err(_) => return Vec::new(),
+            }
+        }
+        all
+    });
+    if embs.len() != starts.len() {
+        return None;
+    }
+
+    let labels = cosine_ahc(&embs, NN_MERGE_THRESHOLD, max_k);
+
+    // Frame labels: majority vote of the windows covering each frame.
+    let mut votes: Vec<HashMap<usize, u16>> = vec![HashMap::new(); n];
+    for (k, &s) in starts.iter().enumerate() {
+        for v in &mut votes[s..s + NN_WIN] {
+            *v.entry(labels[k]).or_default() += 1;
+        }
+    }
+    Some(
+        votes
+            .into_iter()
+            .map(|v| {
+                v.into_iter()
+                    .max_by_key(|&(c, n)| (n, usize::MAX - c))
+                    .map(|(c, _)| c)
+            })
+            .collect(),
+    )
+}
+
+/// Average-linkage AHC on unit vectors with a cosine-distance stop threshold
+/// (then merging further only to respect `max_k`). Clusters holding < 2% of
+/// the windows are folded into their nearest large cluster.
+fn cosine_ahc(embs: &[Vec<f32>], threshold: f32, max_k: usize) -> Vec<usize> {
+    use crate::speaker_embedding::cosine;
+    let n = embs.len();
+    let mut dist = vec![0f32; n * n];
+    for i in 0..n {
+        for j in (i + 1)..n {
+            let d = 1.0 - cosine(&embs[i], &embs[j]);
+            dist[i * n + j] = d;
+            dist[j * n + i] = d;
+        }
+    }
+    let mut size = vec![1usize; n];
+    let mut alive = vec![true; n];
+    let mut parent: Vec<usize> = (0..n).collect();
+    let nearest = |i: usize, dist: &[f32], alive: &[bool]| -> (usize, f32) {
+        let mut best = (usize::MAX, f32::MAX);
+        for j in 0..n {
+            if j != i && alive[j] && dist[i * n + j] < best.1 {
+                best = (j, dist[i * n + j]);
+            }
+        }
+        best
+    };
+    let mut nn: Vec<(usize, f32)> = (0..n).map(|i| nearest(i, &dist, &alive)).collect();
+    let mut clusters = n;
+    while clusters > 1 {
+        let (i, &(j, d)) = nn
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| alive[*i])
+            .min_by(|a, b| {
+                a.1 .1
+                    .partial_cmp(&b.1 .1)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
+            .unwrap();
+        if j == usize::MAX || (d > threshold && clusters <= max_k) {
+            break;
+        }
+        let (si, sj) = (size[i] as f32, size[j] as f32);
+        for k in 0..n {
+            if alive[k] && k != i && k != j {
+                let nd = (si * dist[i * n + k] + sj * dist[j * n + k]) / (si + sj);
+                dist[i * n + k] = nd;
+                dist[k * n + i] = nd;
+            }
+        }
+        size[i] += size[j];
+        alive[j] = false;
+        for p in parent.iter_mut() {
+            if *p == j {
+                *p = i;
+            }
+        }
+        clusters -= 1;
+        for k in 0..n {
+            if !alive[k] {
+                continue;
+            }
+            if k == i || nn[k].0 == i || nn[k].0 == j {
+                nn[k] = nearest(k, &dist, &alive);
+            } else if dist[k * n + i] < nn[k].1 {
+                nn[k] = (i, dist[k * n + i]);
+            }
+        }
+    }
+
+    // Fold tiny clusters (stray windows: coughs, crosstalk, noise).
+    let mut counts: HashMap<usize, usize> = HashMap::new();
+    for &p in &parent {
+        *counts.entry(p).or_default() += 1;
+    }
+    let min_size = (n / 50).max(2);
+    let big: Vec<usize> = counts
+        .iter()
+        .filter(|(_, &c)| c >= min_size)
+        .map(|(&k, _)| k)
+        .collect();
+    if !big.is_empty() && big.len() < counts.len() {
+        let centroid = |c: usize| -> Vec<f32> {
+            let mut acc = vec![0f32; embs[0].len()];
+            for (k, &p) in parent.iter().enumerate() {
+                if p == c {
+                    acc.iter_mut().zip(&embs[k]).for_each(|(a, b)| *a += b);
+                }
+            }
+            let norm = acc.iter().map(|x| x * x).sum::<f32>().sqrt().max(1e-6);
+            acc.iter_mut().for_each(|x| *x /= norm);
+            acc
+        };
+        let cents: Vec<(usize, Vec<f32>)> = big.iter().map(|&c| (c, centroid(c))).collect();
+        for k in 0..n {
+            if !big.contains(&parent[k]) {
+                parent[k] = cents
+                    .iter()
+                    .max_by(|a, b| {
+                        cosine(&embs[k], &a.1)
+                            .partial_cmp(&cosine(&embs[k], &b.1))
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                    })
+                    .unwrap()
+                    .0;
+            }
+        }
+    }
+    parent
+}
+
+/// Each segment gets the speaker holding most of its speech frames; segments
+/// with no labelled speech inherit the previous speaker.
+fn label_segments_by_frames(
+    segments: &mut [TranscriptSegment],
+    frame_labels: &[Option<usize>],
+    speech: &[bool],
+    fps: u64,
+) {
+    let mut last: Option<usize> = frame_labels.iter().flatten().next().copied();
+    let mut remap: HashMap<usize, usize> = HashMap::new();
+    for seg in segments.iter_mut() {
+        let a = ((seg.start_time_ms * fps) / 1000) as usize;
+        let b = (((seg.end_time_ms * fps) / 1000) as usize).min(frame_labels.len());
+        let mut votes: HashMap<usize, usize> = HashMap::new();
+        for (f, label) in frame_labels.iter().enumerate().take(b.max(a)).skip(a) {
+            if speech.get(f).copied().unwrap_or(false) {
+                if let Some(c) = label {
+                    *votes.entry(*c).or_default() += 1;
+                }
+            }
+        }
+        if let Some((c, _)) = votes.into_iter().max_by_key(|&(c, n)| (n, usize::MAX - c)) {
+            last = Some(c);
+        }
+        let c = last.unwrap_or(0);
+        let next = remap.len() + 1;
+        let n = *remap.entry(c).or_insert(next);
+        seg.speaker_id = format!("Konuşmacı {}", n);
+        seg.speaker_name = format!("Konuşmacı {}", n);
+    }
+}
+
 /// Assigns `Konuşmacı N` labels to `segments` from the audio in `full_pcm`
-/// (segment times are relative to the start of `full_pcm`). Each segment gets
-/// the speaker who holds most of the speech inside it.
+/// (segment times are relative to the start of `full_pcm`).
+///
+/// Uses neural speaker embeddings when the model is available (each segment
+/// gets the speaker holding most of its speech, so segments that span two
+/// speakers don't form clusters of their own); otherwise MFCC + BIC per segment.
 pub fn cluster_speakers(
     segments: &mut [TranscriptSegment],
     full_pcm: &[f32],
@@ -532,85 +642,15 @@ pub fn cluster_speakers(
     }
     let max_k = max_speakers.clamp(1, 8);
     let ff = compute_frame_features(full_pcm, sample_rate);
-    if std::env::var("ECHOMIND_DIAR_MODE").as_deref() == Ok("segment") {
-        cluster_by_segments(segments, &ff, max_k);
-        return;
-    }
-    let win = diarize_windows(&ff, max_k);
-    let fps = (sample_rate as u64 / HOP_LEN as u64).max(1);
-
-    // Cluster models, for segments that no labelled window covers.
-    let mut models: HashMap<usize, GaussStats> = HashMap::new();
-    let win_ms = WINDOW_FRAMES as u64 * 1000 / fps;
-    for (w, l) in win.iter().enumerate() {
-        if let Some(c) = l {
-            let st = segment_stats(&ff, w as u64 * win_ms, (w as u64 + 1) * win_ms);
-            models.entry(*c).or_insert_with(GaussStats::empty).add(&st);
+    // `ECHOMIND_DIAR_MODE=bic` forces the fallback (evaluation tooling).
+    if std::env::var("ECHOMIND_DIAR_MODE").as_deref() != Ok("bic") && sample_rate == 16000 {
+        if let Some(frame_labels) = neural_frame_labels(full_pcm, &ff.speech, max_k) {
+            let fps = (sample_rate as u64 / HOP_LEN as u64).max(1);
+            label_segments_by_frames(segments, &frame_labels, &ff.speech, fps);
+            return;
         }
     }
-
-    let mut labels: Vec<Option<usize>> = Vec::with_capacity(segments.len());
-    for s in segments.iter() {
-        let a = ((s.start_time_ms * fps) / 1000) as usize;
-        let b = (((s.end_time_ms * fps) / 1000) as usize).min(ff.speech.len());
-        // Speech frames per speaker inside the segment.
-        let mut votes: HashMap<usize, usize> = HashMap::new();
-        for f in a..b.max(a) {
-            if ff.speech[f] {
-                if let Some(Some(c)) = win.get(f / WINDOW_FRAMES) {
-                    *votes.entry(*c).or_default() += 1;
-                }
-            }
-        }
-        let mut label = votes
-            .into_iter()
-            .max_by_key(|&(c, n)| (n, usize::MAX - c))
-            .map(|(c, _)| c);
-        if label.is_none() && !models.is_empty() {
-            let st = segment_stats(&ff, s.start_time_ms, s.end_time_ms);
-            if st.n > 0.0 {
-                let m = st.mean();
-                label = models
-                    .iter()
-                    .min_by(|x, y| {
-                        let dx: f64 =
-                            x.1.mean()
-                                .iter()
-                                .zip(m.iter())
-                                .map(|(p, q)| (p - q).powi(2))
-                                .sum();
-                        let dy: f64 =
-                            y.1.mean()
-                                .iter()
-                                .zip(m.iter())
-                                .map(|(p, q)| (p - q).powi(2))
-                                .sum();
-                        dx.partial_cmp(&dy).unwrap_or(std::cmp::Ordering::Equal)
-                    })
-                    .map(|(c, _)| *c);
-            }
-        }
-        labels.push(label);
-    }
-    // Silent segments inherit the previous speaker.
-    let mut last = labels.iter().flatten().next().copied().unwrap_or(0);
-    let labels: Vec<usize> = labels
-        .into_iter()
-        .map(|l| {
-            if let Some(c) = l {
-                last = c;
-            }
-            last
-        })
-        .collect();
-
-    let mut remap: HashMap<usize, usize> = HashMap::new();
-    for (seg, &c) in segments.iter_mut().zip(&labels) {
-        let next = remap.len() + 1;
-        let n = *remap.entry(c).or_insert(next);
-        seg.speaker_id = format!("Konuşmacı {}", n);
-        seg.speaker_name = format!("Konuşmacı {}", n);
-    }
+    cluster_by_segments(segments, &ff, max_k);
 }
 
 /// Automatically extract speaker names from English & Turkish self-introductions, vocatives, and turn-taking dialogues
@@ -924,6 +964,222 @@ fn is_stopword(s: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn seg(id: usize, start_ms: u64, end_ms: u64) -> TranscriptSegment {
+        TranscriptSegment {
+            id,
+            speaker_id: String::new(),
+            speaker_name: String::new(),
+            start_time_ms: start_ms,
+            end_time_ms: end_ms,
+            timestamp_formatted: String::new(),
+            text: "x".into(),
+            language: "tr".into(),
+            confidence: 1.0,
+        }
+    }
+
+    /// A buzzy "voice": harmonics of `f0` with a spectral tilt, plus a little noise.
+    fn voice(f0: f32, tilt: f32, secs: f32, seed: u32) -> Vec<f32> {
+        let n = (secs * 16000.0) as usize;
+        let mut rng = seed;
+        (0..n)
+            .map(|i| {
+                let t = i as f32 / 16000.0;
+                let mut v = 0.0;
+                for h in 1..=12 {
+                    v += (2.0 * std::f32::consts::PI * f0 * h as f32 * t).sin()
+                        / (h as f32).powf(tilt);
+                }
+                rng = rng.wrapping_mul(1664525).wrapping_add(1013904223);
+                v * 0.08 + ((rng >> 8) as f32 / (1u32 << 24) as f32 - 0.5) * 0.004
+            })
+            .collect()
+    }
+
+    fn unit(v: Vec<f32>) -> Vec<f32> {
+        let n = v.iter().map(|x| x * x).sum::<f32>().sqrt();
+        v.into_iter().map(|x| x / n).collect()
+    }
+
+    #[test]
+    fn test_old_bug_all_voices_one_speaker_is_fixed_in_fallback() {
+        // Regression: the old features were time-slice energies, so every voice
+        // looked the same and everything became "Konuşmacı 1".
+        std::env::set_var("ECHOMIND_DIAR_MODE", "bic");
+        let a = voice(110.0, 0.6, 3.0, 1);
+        let b = voice(230.0, 1.6, 3.0, 2);
+        let gap = vec![0.0f32; 8000];
+        let mut pcm = Vec::new();
+        let mut segs = Vec::new();
+        let mut t = 0u64;
+        for i in 0..8 {
+            let v = if i % 2 == 0 { &a } else { &b };
+            segs.push(seg(i + 1, t, t + 3000));
+            pcm.extend_from_slice(v);
+            pcm.extend_from_slice(&gap);
+            t += 3500;
+        }
+        cluster_speakers(&mut segs, &pcm, 16000, 6);
+        std::env::remove_var("ECHOMIND_DIAR_MODE");
+        let ids: std::collections::HashSet<_> = segs.iter().map(|s| s.speaker_id.clone()).collect();
+        assert_eq!(
+            ids.len(),
+            2,
+            "two distinct voices must give two speakers: {:?}",
+            segs.iter().map(|s| &s.speaker_id).collect::<Vec<_>>()
+        );
+        for i in 0..8 {
+            assert_eq!(segs[i].speaker_id, segs[i % 2].speaker_id);
+        }
+    }
+
+    #[test]
+    fn test_fallback_does_not_split_a_single_voice() {
+        std::env::set_var("ECHOMIND_DIAR_MODE", "bic");
+        let mut pcm = Vec::new();
+        let mut segs = Vec::new();
+        for i in 0..8u64 {
+            segs.push(seg(i as usize + 1, i * 3500, i * 3500 + 3000));
+            pcm.extend(voice(140.0, 1.0, 3.0, i as u32 + 7));
+            pcm.extend(vec![0.0f32; 8000]);
+        }
+        cluster_speakers(&mut segs, &pcm, 16000, 6);
+        std::env::remove_var("ECHOMIND_DIAR_MODE");
+        assert!(segs.iter().all(|s| s.speaker_id == "Konuşmacı 1"));
+    }
+
+    #[test]
+    fn test_cosine_ahc_groups_and_folds_strays() {
+        let mk = |base: usize, jitter: f32| {
+            unit(
+                (0..8)
+                    .map(|d| {
+                        if d == base {
+                            1.0
+                        } else {
+                            jitter * ((d * 7 + base) % 5) as f32 * 0.1
+                        }
+                    })
+                    .collect(),
+            )
+        };
+        let mut embs = Vec::new();
+        for i in 0..30 {
+            embs.push(mk(i % 3, 0.3 + (i % 4) as f32 * 0.05));
+        }
+        embs.push(unit(vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0])); // single stray
+        let labels = cosine_ahc(&embs, 0.30, 6);
+        let groups: std::collections::HashSet<_> = labels.iter().copied().collect();
+        assert_eq!(
+            groups.len(),
+            3,
+            "stray window must fold into a real speaker"
+        );
+        for i in 0..30 {
+            assert_eq!(labels[i], labels[i % 3]);
+        }
+        // One tight group stays one speaker.
+        let same: Vec<Vec<f32>> = (0..20)
+            .map(|i| mk(0, 0.2 + (i % 3) as f32 * 0.05))
+            .collect();
+        assert!(cosine_ahc(&same, 0.30, 6)
+            .iter()
+            .all(|&l| l == cosine_ahc(&same, 0.30, 6)[0]));
+    }
+
+    #[test]
+    fn test_segment_label_is_majority_of_its_speech() {
+        // 100 fps; frames 0..300 speaker 0, 300..500 speaker 1.
+        let mut labels = vec![Some(0usize); 300];
+        labels.extend(vec![Some(1usize); 200]);
+        let speech = vec![true; 500];
+        // seg 2 spans both speakers: 0.5 s of A, 1 s of B → B.
+        let mut segs = vec![
+            seg(1, 0, 2000),
+            seg(2, 2500, 4000),
+            seg(3, 4000, 5000),
+            seg(4, 5000, 5200),
+        ];
+        label_segments_by_frames(&mut segs, &labels, &speech, 100);
+        assert_eq!(segs[0].speaker_id, "Konuşmacı 1");
+        assert_eq!(
+            segs[1].speaker_id, "Konuşmacı 2",
+            "mixed segment goes to its majority speaker"
+        );
+        assert_eq!(segs[2].speaker_id, "Konuşmacı 2");
+        assert_eq!(
+            segs[3].speaker_id, "Konuşmacı 2",
+            "segment past the audio inherits the previous speaker"
+        );
+    }
+
+    #[test]
+    fn test_kaldi_fbank_shape_and_values() {
+        let pcm = voice(150.0, 1.0, 1.0, 3);
+        let fb = crate::speaker_embedding::kaldi_fbank(&pcm, 16000);
+        assert_eq!(fb.len(), 1 + (16000 - 400) / 160);
+        assert!(fb.iter().flatten().all(|v| v.is_finite()));
+        let mut w = fb[..50].to_vec();
+        crate::speaker_embedding::mean_normalise(&mut w);
+        for b in 0..crate::speaker_embedding::N_BINS {
+            let m: f32 = w.iter().map(|r| r[b]).sum::<f32>() / 50.0;
+            assert!(m.abs() < 1e-3);
+        }
+    }
+
+    /// Neural diarization on a real labelled recording. Runs only when given:
+    /// `ECHOMIND_SPEAKER_MODEL=model.onnx ECHOMIND_DIAR_WAV=dialogue.wav
+    ///  ECHOMIND_DIAR_GT=gt.json cargo test --release -- --ignored neural`
+    /// (gt.json: `[{"start": s, "end": s, "speaker": "A"}, ...]`).
+    #[test]
+    #[ignore]
+    fn test_neural_matches_labelled_recording() {
+        let wav = std::env::var("ECHOMIND_DIAR_WAV").expect("ECHOMIND_DIAR_WAV");
+        let gt: Vec<serde_json::Value> = serde_json::from_str(
+            &std::fs::read_to_string(std::env::var("ECHOMIND_DIAR_GT").expect("ECHOMIND_DIAR_GT"))
+                .unwrap(),
+        )
+        .unwrap();
+        let (pcm, _) =
+            crate::importer::decode_audio_file_to_pcm16k(std::path::Path::new(&wav)).unwrap();
+        let mut segs: Vec<TranscriptSegment> = gt
+            .iter()
+            .enumerate()
+            .map(|(i, g)| {
+                seg(
+                    i + 1,
+                    (g["start"].as_f64().unwrap() * 1000.0) as u64,
+                    (g["end"].as_f64().unwrap() * 1000.0) as u64,
+                )
+            })
+            .collect();
+        cluster_speakers(&mut segs, &pcm, 16000, 6);
+        // Purity: each predicted speaker should map to one true speaker.
+        let mut by_pred: HashMap<String, HashMap<String, usize>> = HashMap::new();
+        for (s, g) in segs.iter().zip(&gt) {
+            *by_pred
+                .entry(s.speaker_id.clone())
+                .or_default()
+                .entry(g["speaker"].as_str().unwrap().to_string())
+                .or_default() += 1;
+        }
+        let pure: usize = by_pred.values().map(|m| *m.values().max().unwrap()).sum();
+        let truth: std::collections::HashSet<_> =
+            gt.iter().map(|g| g["speaker"].as_str().unwrap()).collect();
+        assert!(
+            pure * 100 >= segs.len() * 95,
+            "purity {}/{}",
+            pure,
+            segs.len()
+        );
+        assert!(
+            by_pred.len() <= truth.len() + 1,
+            "{} speakers for {} voices",
+            by_pred.len(),
+            truth.len()
+        );
+    }
 
     #[test]
     fn test_resolve_speaker_names_english() {

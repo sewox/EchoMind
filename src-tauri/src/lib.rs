@@ -15,6 +15,7 @@ pub mod player;
 pub mod qa_e2e_tests;
 pub mod secure_key;
 pub mod security;
+pub mod speaker_embedding;
 pub mod storage;
 pub mod summarizer;
 pub mod transcriber;
