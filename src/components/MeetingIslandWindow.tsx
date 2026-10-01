@@ -100,12 +100,19 @@ const IslandContent: FC = () => {
 
   const handleAlwaysAutoStart = async () => {
     try {
+      const status = await invoke<{
+        settings: {
+          enabled: boolean;
+          auto_start_record: boolean;
+          auto_stop_on_app_close: boolean;
+          ignored_apps: string[];
+        };
+      }>("get_detector_status");
       await invoke("update_detector_settings", {
         settings: {
+          ...status.settings,
           enabled: true,
           auto_start_record: true,
-          auto_stop_on_app_close: true,
-          ignored_apps: [],
         },
       });
       await handleStart();

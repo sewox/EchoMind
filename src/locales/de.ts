@@ -356,10 +356,10 @@ export const de: TranslationKeys = {
     autoStopAlert: "{app} geschlossen, Meeting automatisch beendet.",
     settingsTitle: "Automatische Meeting-Erkennung",
     settingsDesc:
-      "Erkennt leise, wenn Zoom, Teams, Meet oder Slack gestartet wird, und erleichtert die Aufnahme.",
+      "Erkennt, wenn eine App das Mikrofon für einen Anruf nutzt, und bietet die Aufnahme an.",
     enableDetection: "Meeting-Erkennung aktivieren",
     enableDetectionDesc:
-      "Überwacht Videokonferenz-Apps und Audioaktivität im Hintergrund.",
+      "Überwacht Mikrofonaktivität jeder Meeting-App oder Browser-Registerkarte im Hintergrund.",
     autoStartToggle: "Ohne Nachfrage automatisch starten",
     autoStartToggleDesc:
       "Startet die Aufnahme direkt bei Meeting-Beginn ohne Benachrichtigung.",
@@ -367,6 +367,14 @@ export const de: TranslationKeys = {
     autoStopToggleDesc:
       "Beendet die Sitzung und erstellt Notizen, wenn die App geschlossen wird.",
     ignoredAppsTitle: "Überwachte Anwendungen",
+    ignoreListTitle: "Ignorierte Apps (Bundle-IDs)",
+    ignoreListDesc:
+      "Apps auf dieser Liste lösen keinen Meeting-Hinweis aus (Sprachmemos, Siri, Rekorder …). Fügen Sie eine macOS-Bundle-ID hinzu, um Fehlalarme zu unterdrücken.",
+    ignoreListPlaceholder: "com.example.App",
+    ignoreListAdd: "Hinzufügen",
+    ignoreListRemove: "Entfernen",
+    ignoreListEmpty:
+      "Keine ignorierten Apps — Standardwerte werden beim nächsten Start wiederhergestellt.",
   },
   updater: {
     modalTitle: "Neues Update verfügbar!",

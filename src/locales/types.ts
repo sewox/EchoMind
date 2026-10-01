@@ -327,6 +327,12 @@ export interface TranslationKeys {
     autoStopToggle: string;
     autoStopToggleDesc: string;
     ignoredAppsTitle: string;
+    ignoreListTitle: string;
+    ignoreListDesc: string;
+    ignoreListPlaceholder: string;
+    ignoreListAdd: string;
+    ignoreListRemove: string;
+    ignoreListEmpty: string;
   };
   updater?: {
     modalTitle: string;

@@ -363,10 +363,10 @@ export const tr: TranslationKeys = {
     autoStopAlert: "{app} kapandı, toplantı otomatik sonlandırıldı.",
     settingsTitle: "Otomatik Toplantı Algılama",
     settingsDesc:
-      "Zoom, Teams, Meet veya Slack açıldığında toplantıyı sessizce algılar ve kaydı kolaylaştırır.",
+      "Herhangi bir uygulamanın mikrofonu bir görüşme için kullandığını algılar ve kaydı önerir.",
     enableDetection: "Toplantı Algılayıcıyı Etkinleştir",
     enableDetectionDesc:
-      "Arka planda video konferans uygulamalarını ve ses aktivitesini izler.",
+      "Arka planda herhangi bir toplantı uygulaması veya tarayıcı sekmesindeki mikrofon etkinliğini izler.",
     autoStartToggle: "Sormadan Otomatik Başlat",
     autoStartToggleDesc:
       "Toplantı başladığında bildirim göstermeden doğrudan kaydı başlatır.",
@@ -374,6 +374,14 @@ export const tr: TranslationKeys = {
     autoStopToggleDesc:
       "Toplantı uygulaması kapandığında kaydı tamamlar ve notları hazırlar.",
     ignoredAppsTitle: "İzlenecek Uygulamalar",
+    ignoreListTitle: "Yoksayılan Uygulamalar (bundle ID)",
+    ignoreListDesc:
+      "Bu listedeki uygulamalar toplantı istemi tetiklemez (Sesli Notlar, Siri, kayıt araçları…). Yanlış pozitifleri susturmak için bir macOS bundle ID ekleyin.",
+    ignoreListPlaceholder: "com.example.App",
+    ignoreListAdd: "Ekle",
+    ignoreListRemove: "Kaldır",
+    ignoreListEmpty:
+      "Yoksayılan uygulama yok — varsayılanlar bir sonraki açılışta geri yüklenir.",
   },
   updater: {
     modalTitle: "Yeni Güncelleme Mevcut!",

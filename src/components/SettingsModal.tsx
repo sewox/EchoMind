@@ -24,6 +24,8 @@ import {
   Globe,
   ExternalLink,
   Lock,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { CredentialStore } from "../services/credentialStore";
@@ -160,6 +162,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     auto_stop_on_app_close: true,
     ignored_apps: [],
   });
+  const [ignoreBundleDraft, setIgnoreBundleDraft] = useState("");
 
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({
     groq: false,
@@ -1119,6 +1122,101 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       }
                       className="w-4 h-4 rounded border-slate-700 bg-slate-800 text-cyan-600 focus:ring-0 cursor-pointer"
                     />
+                  </div>
+
+                  {/* Ignore list (bundle IDs) */}
+                  <div className="pt-2 border-t border-slate-800/80 space-y-2">
+                    <div>
+                      <span className="text-slate-200 font-medium text-[11px]">
+                        {t("detector.ignoreListTitle")}
+                      </span>
+                      <p className="text-slate-400 text-[10px]">
+                        {t("detector.ignoreListDesc")}
+                      </p>
+                    </div>
+                    <div className="flex gap-1.5">
+                      <input
+                        type="text"
+                        value={ignoreBundleDraft}
+                        onChange={(e) => setIgnoreBundleDraft(e.target.value)}
+                        placeholder={t("detector.ignoreListPlaceholder")}
+                        className="flex-1 min-w-0 rounded-lg bg-slate-900 border border-slate-700 px-2 py-1 text-[11px] text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-cyan-500/50"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            const id = ignoreBundleDraft.trim();
+                            if (
+                              id &&
+                              !detectorSettings.ignored_apps.includes(id)
+                            ) {
+                              handleUpdateDetector({
+                                ignored_apps: [
+                                  ...detectorSettings.ignored_apps,
+                                  id,
+                                ],
+                              });
+                              setIgnoreBundleDraft("");
+                            }
+                          }
+                        }}
+                      />
+                      <button
+                        type="button"
+                        title={t("detector.ignoreListAdd")}
+                        onClick={() => {
+                          const id = ignoreBundleDraft.trim();
+                          if (
+                            id &&
+                            !detectorSettings.ignored_apps.includes(id)
+                          ) {
+                            handleUpdateDetector({
+                              ignored_apps: [
+                                ...detectorSettings.ignored_apps,
+                                id,
+                              ],
+                            });
+                            setIgnoreBundleDraft("");
+                          }
+                        }}
+                        className="shrink-0 px-2 py-1 rounded-lg bg-slate-800 border border-slate-700 text-cyan-400 text-[11px] hover:bg-slate-700 flex items-center gap-1"
+                      >
+                        <Plus className="w-3 h-3" />
+                        {t("detector.ignoreListAdd")}
+                      </button>
+                    </div>
+                    {detectorSettings.ignored_apps.length === 0 ? (
+                      <p className="text-slate-500 text-[10px]">
+                        {t("detector.ignoreListEmpty")}
+                      </p>
+                    ) : (
+                      <ul className="max-h-28 overflow-y-auto space-y-1">
+                        {detectorSettings.ignored_apps.map((id) => (
+                          <li
+                            key={id}
+                            className="flex items-center justify-between gap-2 rounded-md bg-slate-900/80 px-2 py-1"
+                          >
+                            <span className="text-[10px] text-slate-300 font-mono truncate">
+                              {id}
+                            </span>
+                            <button
+                              type="button"
+                              title={t("detector.ignoreListRemove")}
+                              onClick={() =>
+                                handleUpdateDetector({
+                                  ignored_apps:
+                                    detectorSettings.ignored_apps.filter(
+                                      (x) => x !== id,
+                                    ),
+                                })
+                              }
+                              className="shrink-0 text-rose-400/80 hover:text-rose-300 p-0.5"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
                 </div>
               )}

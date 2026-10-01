@@ -559,6 +559,85 @@ describe("SettingsModal Component", () => {
     );
   });
 
+  it("adds and removes ignored detector bundle ids", async () => {
+    (invoke as any).mockImplementation((cmd: string) => {
+      if (cmd === "list_audio_devices") return Promise.resolve([]);
+      if (cmd === "get_detector_status") {
+        return Promise.resolve({
+          is_active: true,
+          detected_apps: [],
+          settings: {
+            enabled: true,
+            auto_start_record: false,
+            auto_stop_on_app_close: true,
+            ignored_apps: ["com.apple.VoiceMemos"],
+          },
+        });
+      }
+      if (cmd === "update_detector_settings") return Promise.resolve();
+      return Promise.resolve();
+    });
+
+    render(
+      <I18nProvider>
+        <SettingsModal {...defaultProps} />
+      </I18nProvider>,
+    );
+
+    const systemTab = screen.getByRole("button", {
+      name: /Cihaz & Gizlilik/i,
+    });
+    await act(async () => {
+      fireEvent.click(systemTab);
+    });
+
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 30));
+    });
+
+    expect(await screen.findByText("com.apple.VoiceMemos")).toBeInTheDocument();
+
+    const input = screen.getByPlaceholderText("com.example.App");
+    await act(async () => {
+      fireEvent.change(input, { target: { value: "us.zoom.xos" } });
+    });
+    const addBtn = screen.getByRole("button", { name: /Ekle|Add/i });
+    await act(async () => {
+      fireEvent.click(addBtn);
+    });
+
+    expect(invoke).toHaveBeenCalledWith(
+      "update_detector_settings",
+      expect.objectContaining({
+        settings: expect.objectContaining({
+          ignored_apps: expect.arrayContaining([
+            "com.apple.VoiceMemos",
+            "us.zoom.xos",
+          ]),
+        }),
+      }),
+    );
+
+    await act(async () => {
+      fireEvent.change(input, { target: { value: "com.hnc.Discord" } });
+      fireEvent.keyDown(input, { key: "Enter", code: "Enter" });
+    });
+
+    const removeBtns = screen.getAllByTitle(/Kaldır|Remove/i);
+    await act(async () => {
+      fireEvent.click(removeBtns[0]);
+    });
+
+    expect(invoke).toHaveBeenCalledWith(
+      "update_detector_settings",
+      expect.objectContaining({
+        settings: expect.objectContaining({
+          ignored_apps: expect.any(Array),
+        }),
+      }),
+    );
+  });
+
   it("handles checking for updates when up to date, available, and on error", async () => {
     const onOpenUpdateModal = vi.fn();
     (invoke as any).mockImplementation((cmd: string) => {

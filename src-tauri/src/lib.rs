@@ -10,6 +10,7 @@ pub mod dlp;
 pub mod encrypted_storage;
 pub mod hardware;
 pub mod importer;
+pub mod mic_activity;
 pub mod offline_engines;
 pub mod player;
 pub mod qa_e2e_tests;

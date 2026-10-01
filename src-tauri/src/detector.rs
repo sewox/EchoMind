@@ -1,3 +1,8 @@
+use crate::mic_activity::{
+    browser_display_name, effective_ignore_list, is_ignored_bundle,
+    is_mic_process_listing_supported, list_mic_holding_processes, prefer_display_name,
+    recommended_title, resolve_mic_process, tracker_now_ms, MicHoldTracker, ResolvedMicApp,
+};
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
@@ -82,9 +87,16 @@ impl Default for DetectorSettings {
             enabled: true,
             auto_start_record: false,
             auto_stop_on_app_close: true,
-            ignored_apps: Vec::new(),
+            // Bundle ids of dictation / voice-memo / non-meeting recorders.
+            // Users can add or remove entries in Settings.
+            ignored_apps: crate::mic_activity::default_ignored_bundle_ids(),
         }
     }
+}
+
+fn get_mic_hold_tracker() -> &'static Mutex<MicHoldTracker> {
+    static TRACKER: OnceLock<Mutex<MicHoldTracker>> = OnceLock::new();
+    TRACKER.get_or_init(|| Mutex::new(MicHoldTracker::new()))
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -247,10 +259,250 @@ impl MeetingDetector {
         }
     }
 
+    /// Public entry used by the monitoring loop and `check_active_meetings`.
+    ///
+    /// macOS 14.2+: mic-activity path (any app holding input after debounce).
+    /// Older macOS / Linux / Windows: legacy hardcoded process-name scan.
     pub fn scan_processes() -> Vec<MeetingAppInfo> {
+        let ignore = {
+            let settings = get_global_detector().settings.lock().unwrap();
+            effective_ignore_list(&settings.ignored_apps)
+        };
+        Self::scan_processes_with_ignore(&ignore)
+    }
+
+    fn scan_processes_with_ignore(ignore: &[String]) -> Vec<MeetingAppInfo> {
+        if is_mic_process_listing_supported() {
+            if let Some(raw) = list_mic_holding_processes() {
+                return Self::scan_via_mic_activity(raw, ignore);
+            }
+        }
+        Self::scan_processes_legacy()
+    }
+
+    /// Mic-activity detection: any process holding the microphone for ~5 s is a
+    /// possible meeting. Known app names are hints only; browsers get tab/URL
+    /// enrichment when available.
+    fn scan_via_mic_activity(
+        raw: Vec<crate::mic_activity::MicHoldingProcess>,
+        ignore: &[String],
+    ) -> Vec<MeetingAppInfo> {
+        let date_str = chrono::Local::now().format("%d %B %Y").to_string();
+
+        let mut resolved: Vec<ResolvedMicApp> = Vec::new();
+        for proc in &raw {
+            if is_ignored_bundle(&proc.bundle_id, ignore) {
+                continue;
+            }
+            if let Some(app) = resolve_mic_process(proc) {
+                if is_ignored_bundle(&app.app_id, ignore) {
+                    continue;
+                }
+                // Dedupe by app_id (multiple helpers of same browser collapse).
+                if !resolved.iter().any(|r| r.app_id == app.app_id) {
+                    resolved.push(app);
+                }
+            }
+        }
+
+        let snapshot = {
+            let mut tracker = get_mic_hold_tracker().lock().unwrap();
+            tracker.tick(tracker_now_ms(), &resolved)
+        };
+
+        let mut results = Vec::new();
+        for app in &snapshot.active {
+            let info = if app.is_browser {
+                Self::enrich_browser_meeting(app, &date_str).unwrap_or_else(|| {
+                    let browser_name =
+                        browser_display_name(&app.app_id).unwrap_or(app.display_name.as_str());
+                    MeetingAppInfo {
+                        app_id: app.app_id.clone(),
+                        display_name: browser_name.to_string(),
+                        process_name: app.process_name.clone(),
+                        is_running: true,
+                        recommended_title: recommended_title(browser_name, &date_str),
+                    }
+                })
+            } else {
+                let name = prefer_display_name(&app.app_id, &app.display_name);
+                MeetingAppInfo {
+                    app_id: app.app_id.clone(),
+                    display_name: name.clone(),
+                    process_name: app.process_name.clone(),
+                    is_running: true,
+                    recommended_title: recommended_title(&name, &date_str),
+                }
+            };
+            results.push(info);
+        }
+        results
+    }
+
+    /// When the mic holder is a browser, reuse tab-title/URL logic for a nicer
+    /// Meet/Teams/… name. Returns None → caller falls back to "<Browser> Toplantısı".
+    #[cfg(target_os = "macos")]
+    fn enrich_browser_meeting(app: &ResolvedMicApp, date_str: &str) -> Option<MeetingAppInfo> {
+        let browser = browser_display_name(&app.app_id)?;
+        let tab_info = Self::scan_browser_tabs_for_meeting(browser, date_str)?;
+        Some(MeetingAppInfo {
+            // Keep bundle-derived app_id so ignore-list / session dedupe stay stable;
+            // overlay the nicer meeting display name from the tab scan.
+            app_id: app.app_id.clone(),
+            display_name: tab_info.display_name,
+            process_name: tab_info.process_name,
+            is_running: true,
+            recommended_title: tab_info.recommended_title,
+        })
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    fn enrich_browser_meeting(_app: &ResolvedMicApp, _date_str: &str) -> Option<MeetingAppInfo> {
+        None
+    }
+
+    /// AppleScript tab/URL scan for a single browser. Shared by the mic path
+    /// (enrichment) and the legacy scan.
+    #[cfg(any(test, target_os = "macos"))]
+    fn meeting_from_browser_tab_dump(
+        browser: &str,
+        raw_stdout: &str,
+        date_str: &str,
+    ) -> Option<MeetingAppInfo> {
+        let titles_str = raw_stdout.to_lowercase();
+
+        if titles_str.contains("meet.google.com")
+            || titles_str.contains("meet –")
+            || titles_str.contains("meet -")
+            || titles_str.contains("google meet")
+        {
+            if let Some(meeting_code) = extract_active_meet_code(raw_stdout) {
+                return Some(MeetingAppInfo {
+                    app_id: "meet".to_string(),
+                    display_name: "Google Meet".to_string(),
+                    process_name: format!("{} (Google Meet - {})", browser, meeting_code),
+                    is_running: true,
+                    recommended_title: format!(
+                        "Google Meet Toplantısı ({}) - {}",
+                        meeting_code, date_str
+                    ),
+                });
+            }
+        }
+
+        // Host-whitelist / Teams-title detection (not any URL/title containing "teams").
+        if detects_teams_web(raw_stdout) {
+            return Some(MeetingAppInfo {
+                app_id: "teams".to_string(),
+                display_name: "Microsoft Teams (Web)".to_string(),
+                process_name: format!("{} (Teams)", browser),
+                is_running: true,
+                recommended_title: format!("Microsoft Teams Toplantısı - {}", date_str),
+            });
+        }
+
+        // Generic web meeting hosts — only used as a nicer name when mic already
+        // confirmed the browser is capturing (mic path). Legacy scan does not
+        // gate on these; it only looks for Meet/Teams above.
+        if titles_str.contains("webex.com") || titles_str.contains("webex meetings") {
+            return Some(MeetingAppInfo {
+                app_id: "webex".to_string(),
+                display_name: "Cisco Webex (Web)".to_string(),
+                process_name: format!("{} (Webex)", browser),
+                is_running: true,
+                recommended_title: format!("Cisco Webex Toplantısı - {}", date_str),
+            });
+        }
+        if titles_str.contains("zoom.us/") || titles_str.contains("zoom meeting") {
+            return Some(MeetingAppInfo {
+                app_id: "zoom".to_string(),
+                display_name: "Zoom (Web)".to_string(),
+                process_name: format!("{} (Zoom)", browser),
+                is_running: true,
+                recommended_title: format!("Zoom Toplantısı - {}", date_str),
+            });
+        }
+        if titles_str.contains("meet.jit.si") || titles_str.contains("jitsi") {
+            return Some(MeetingAppInfo {
+                app_id: "jitsi".to_string(),
+                display_name: "Jitsi".to_string(),
+                process_name: format!("{} (Jitsi)", browser),
+                is_running: true,
+                recommended_title: format!("Jitsi Toplantısı - {}", date_str),
+            });
+        }
+        if titles_str.contains("bigbluebutton") || titles_str.contains("/html5client/") {
+            return Some(MeetingAppInfo {
+                app_id: "bbb".to_string(),
+                display_name: "BigBlueButton".to_string(),
+                process_name: format!("{} (BigBlueButton)", browser),
+                is_running: true,
+                recommended_title: format!("BigBlueButton Toplantısı - {}", date_str),
+            });
+        }
+        if titles_str.contains("gotomeeting") || titles_str.contains("goto.com") {
+            return Some(MeetingAppInfo {
+                app_id: "goto".to_string(),
+                display_name: "GoTo".to_string(),
+                process_name: format!("{} (GoTo)", browser),
+                is_running: true,
+                recommended_title: format!("GoTo Toplantısı - {}", date_str),
+            });
+        }
+        if titles_str.contains("zoho.com/meeting") || titles_str.contains("zoho meeting") {
+            return Some(MeetingAppInfo {
+                app_id: "zoho".to_string(),
+                display_name: "Zoho Meeting".to_string(),
+                process_name: format!("{} (Zoho)", browser),
+                is_running: true,
+                recommended_title: format!("Zoho Meeting Toplantısı - {}", date_str),
+            });
+        }
+        if titles_str.contains("web.whatsapp.com") {
+            return Some(MeetingAppInfo {
+                app_id: "whatsapp".to_string(),
+                display_name: "WhatsApp (Web)".to_string(),
+                process_name: format!("{} (WhatsApp)", browser),
+                is_running: true,
+                recommended_title: format!("WhatsApp Toplantısı - {}", date_str),
+            });
+        }
+
+        None
+    }
+
+    #[cfg(target_os = "macos")]
+    fn scan_browser_tabs_for_meeting(browser: &str, date_str: &str) -> Option<MeetingAppInfo> {
+        let safe_browser = escape_applescript_string(browser);
+        let script = if browser == "Safari" {
+            format!(
+                "tell application \"{}\" to if running then get {{name, URL}} of tabs of every window",
+                safe_browser
+            )
+        } else if browser == "Firefox" {
+            // Firefox has limited AppleScript; window names are the best signal.
+            format!(
+                "tell application \"System Events\" to if exists process \"Firefox\" then get name of every window of process \"Firefox\""
+            )
+        } else {
+            format!(
+                "tell application \"{}\" to if running then get {{title, URL}} of tabs of every window & name of every window",
+                safe_browser
+            )
+        };
+
+        let raw = run_osascript_with_timeout(&script, Duration::from_millis(1500))?;
+        Self::meeting_from_browser_tab_dump(browser, &raw, date_str)
+    }
+
+    /// Legacy hardcoded process-name + browser-tab scan. Used on Linux/Windows
+    /// and on macOS older than 14.2 (or when the mic-process bridge is unavailable).
+    pub fn scan_processes_legacy() -> Vec<MeetingAppInfo> {
         let mut sys = System::new_all();
         sys.refresh_processes(sysinfo::ProcessesToUpdate::All);
 
+        // Hints for nicer names / confidence only on the mic path; here they
+        // remain the detection gate for platforms without Core Audio process objects.
         let targets: Vec<(&str, &str, Vec<&str>)> = vec![
             (
                 "zoom",
@@ -361,6 +613,7 @@ impl MeetingDetector {
                 ("Brave Browser", vec!["brave", "brave browser"]),
                 ("Microsoft Edge", vec!["edge", "microsoft edge", "msedge"]),
                 ("Safari", vec!["safari"]),
+                ("Firefox", vec!["firefox"]),
             ];
 
             // Only query browsers that are actually running to avoid heavy osascript spawn overhead
@@ -378,68 +631,13 @@ impl MeetingDetector {
                 .collect();
 
             for browser in running_browsers {
-                let safe_browser = escape_applescript_string(browser);
-                let script = if browser == "Safari" {
-                    format!(
-                        "tell application \"{}\" to if running then get {{name, URL}} of tabs of every window",
-                        safe_browser
-                    )
-                } else {
-                    format!(
-                        "tell application \"{}\" to if running then get {{title, URL}} of tabs of every window & name of every window",
-                        safe_browser
-                    )
-                };
-
-                if let Ok(output) = std::process::Command::new("osascript")
-                    .args(["-e", &script])
-                    .output()
-                {
-                    if output.status.success() {
-                        let raw_stdout = String::from_utf8_lossy(&output.stdout);
-                        let titles_str = raw_stdout.to_lowercase();
-
-                        // Google Meet Detection (Active In-Call Verification)
-                        if titles_str.contains("meet.google.com")
-                            || titles_str.contains("meet –")
-                            || titles_str.contains("meet -")
-                            || titles_str.contains("google meet")
-                        {
-                            if let Some(meeting_code) = extract_active_meet_code(&raw_stdout) {
-                                if !results.iter().any(|r| r.app_id == "meet") {
-                                    let proc_name =
-                                        format!("{} (Google Meet - {})", browser, meeting_code);
-                                    let rec_title = format!(
-                                        "Google Meet Toplantısı ({}) - {}",
-                                        meeting_code, date_str
-                                    );
-
-                                    results.push(MeetingAppInfo {
-                                        app_id: "meet".to_string(),
-                                        display_name: "Google Meet".to_string(),
-                                        process_name: proc_name,
-                                        is_running: true,
-                                        recommended_title: rec_title,
-                                    });
-                                }
-                            }
-                        }
-
-                        // Web-based Microsoft Teams Detection (URL host or Teams-like title)
-                        if detects_teams_web(&raw_stdout)
-                            && !results.iter().any(|r| r.app_id == "teams")
-                        {
-                            results.push(MeetingAppInfo {
-                                app_id: "teams".to_string(),
-                                display_name: "Microsoft Teams (Web)".to_string(),
-                                process_name: format!("{} (Teams)", browser),
-                                is_running: true,
-                                recommended_title: format!(
-                                    "Microsoft Teams Toplantısı - {}",
-                                    date_str
-                                ),
-                            });
-                        }
+                if let Some(info) = Self::scan_browser_tabs_for_meeting(browser, &date_str) {
+                    // Legacy path: only surface Meet / Teams web (preserve prior
+                    // behaviour). Broader hosts are mic-path enrichment only.
+                    if (info.app_id == "meet" || info.app_id == "teams")
+                        && !results.iter().any(|r| r.app_id == info.app_id)
+                    {
+                        results.push(info);
                     }
                 }
             }
@@ -638,10 +836,11 @@ impl MeetingDetector {
                     continue;
                 }
 
-                let all_active = Self::scan_processes();
+                let ignore = effective_ignore_list(&current_settings.ignored_apps);
+                let all_active = Self::scan_processes_with_ignore(&ignore);
                 let filtered_active: Vec<MeetingAppInfo> = all_active
                     .into_iter()
-                    .filter(|app| !current_settings.ignored_apps.contains(&app.app_id))
+                    .filter(|app| !is_ignored_bundle(&app.app_id, &ignore))
                     .collect();
 
                 let current_count = filtered_active.len();
@@ -927,6 +1126,69 @@ mod tests {
         assert!(updated.settings.auto_start_record);
         assert!(!updated.settings.auto_stop_on_app_close);
         assert_eq!(updated.settings.ignored_apps, vec!["discord".to_string()]);
+    }
+
+    #[test]
+    fn test_default_settings_include_ignore_list() {
+        let defaults = DetectorSettings::default();
+        assert!(defaults
+            .ignored_apps
+            .iter()
+            .any(|id| id == "com.apple.VoiceMemos"));
+        assert!(defaults
+            .ignored_apps
+            .iter()
+            .any(|id| id == "com.apple.assistant_service"));
+    }
+
+    #[test]
+    fn test_meeting_from_browser_tab_dump_meet_and_fallback_hosts() {
+        let date = "01 October 2026";
+        let meet = MeetingDetector::meeting_from_browser_tab_dump(
+            "Google Chrome",
+            "Meet - abc-defg-hij, https://meet.google.com/abc-defg-hij",
+            date,
+        )
+        .expect("meet");
+        assert_eq!(meet.app_id, "meet");
+        assert!(meet.recommended_title.contains("abc-defg-hij"));
+
+        let jitsi = MeetingDetector::meeting_from_browser_tab_dump(
+            "Firefox",
+            "Cool Call - meet.jit.si/room",
+            date,
+        )
+        .expect("jitsi");
+        assert_eq!(jitsi.app_id, "jitsi");
+        assert_eq!(jitsi.display_name, "Jitsi");
+    }
+
+    #[test]
+    fn test_meeting_from_browser_tab_dump_teams_uses_host_whitelist() {
+        let date = "01 October 2026";
+        let teams = MeetingDetector::meeting_from_browser_tab_dump(
+            "Google Chrome",
+            "Microsoft Teams, https://teams.microsoft.com/v2/?meetingId=abc",
+            date,
+        )
+        .expect("teams web");
+        assert_eq!(teams.app_id, "teams");
+        assert_eq!(teams.display_name, "Microsoft Teams (Web)");
+
+        assert!(
+            MeetingDetector::meeting_from_browser_tab_dump(
+                "Google Chrome",
+                "App Store Connect, https://appstoreconnect.apple.com/teams/abc/apps",
+                date,
+            )
+            .is_none(),
+            "unrelated /teams/ paths must not detect Teams Web"
+        );
+    }
+
+    #[test]
+    fn test_scan_processes_legacy_runs_without_panic() {
+        let _ = MeetingDetector::scan_processes_legacy();
     }
 
     #[test]
