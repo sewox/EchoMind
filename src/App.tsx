@@ -54,6 +54,7 @@ import {
 } from "./hooks/useTranscriptionJobs";
 import { HistoryRecoveryNoticeBanner } from "./components/HistoryRecoveryNoticeBanner";
 import { CredentialStore } from "./services/credentialStore";
+import { getActiveEngine } from "./services/activeEngine";
 import { useStorageReady } from "./hooks/useStorageReady";
 import { useHistoryRecoveryNotice } from "./hooks/useHistoryRecoveryNotice";
 
@@ -143,10 +144,8 @@ export function App() {
   const { t, language, setLanguage } = useI18n();
   const { isParanoid } = usePrivacyMode();
   const { ready: storageReady, showHistoryRecoveryNotice } = useStorageReady();
-  const {
-    visible: historyRecoveryVisible,
-    dismiss: dismissHistoryRecovery,
-  } = useHistoryRecoveryNotice(showHistoryRecoveryNotice);
+  const { visible: historyRecoveryVisible, dismiss: dismissHistoryRecovery } =
+    useHistoryRecoveryNotice(showHistoryRecoveryNotice);
   const [hardware, setHardware] = useState<HardwareInfo | null>(null);
   const [modelStatus, setModelStatus] = useState<ModelStatus | null>(null);
   const [selectedLanguage, setSelectedLanguage] = useState<string>("auto");
@@ -808,8 +807,7 @@ export function App() {
 
   const processPickedFile = async (picked: PickedFileInfo) => {
     try {
-      const activeEngine =
-        localStorage.getItem("echomind_active_engine") || "local";
+      const activeEngine = getActiveEngine();
       const groqKey = await CredentialStore.get("echomind_groq_key");
       const geminiKey = await CredentialStore.get("echomind_gemini_key");
       const openaiKey = await CredentialStore.get("echomind_openai_key");
@@ -840,8 +838,6 @@ export function App() {
 
       if (activeEngine === "apple_speech") {
         cloudProvider = "apple_speech";
-      } else if (activeEngine === "sensevoice") {
-        cloudProvider = "sensevoice";
       } else if (activeEngine === "cloud_groq" && groqKey) {
         cloudProvider = "groq";
         apiKey = groqKey;
@@ -1486,7 +1482,10 @@ export function App() {
                             className="text-[10px] text-rose-400 font-medium"
                             data-testid={`tx-job-status-${mtg.id}`}
                           >
-                            {jobStateLabel("failed", getJob(mtg.id)?.last_error)}
+                            {jobStateLabel(
+                              "failed",
+                              getJob(mtg.id)?.last_error,
+                            )}
                           </span>
                           <button
                             type="button"

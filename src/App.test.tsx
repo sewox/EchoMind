@@ -1515,7 +1515,7 @@ describe("App Top-Level Integration", () => {
     });
   });
 
-  it("handles audio file import with Apple Speech and SenseVoice engines", async () => {
+  it("handles audio file import with the Apple Speech engine", async () => {
     localStorage.setItem("echomind_active_engine", "apple_speech");
     (invoke as any).mockImplementation((cmd: string) => {
       if (cmd === "get_all_meetings") return Promise.resolve(mockPastMeetings);
@@ -2029,7 +2029,7 @@ describe("App Top-Level Integration", () => {
     );
   });
 
-  it("handles audio import for apple_speech and sensevoice engines", async () => {
+  it("handles audio import for the apple_speech engine", async () => {
     (invoke as any).mockImplementation((cmd: string) => {
       if (cmd === "get_all_meetings") return Promise.resolve(mockPastMeetings);
       if (cmd === "pick_audio_file_dialog") {

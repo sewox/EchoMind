@@ -247,7 +247,7 @@ describe("RetranscribeModal Component", () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it("handles apple_speech, sensevoice, and ollama summary engine selections", async () => {
+  it("handles apple_speech and ollama summary engine selections", async () => {
     (invoke as any).mockImplementation((cmd: string) => {
       if (cmd === "retranscribe_meeting") {
         return Promise.resolve({
@@ -267,7 +267,7 @@ describe("RetranscribeModal Component", () => {
       </I18nProvider>,
     );
 
-    // Select sensevoice or apple_speech if available
+    // Select apple_speech if available
     const selects = screen.getAllByRole("combobox");
     if (selects.length > 0) {
       fireEvent.change(selects[0], { target: { value: "apple_speech" } });

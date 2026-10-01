@@ -236,7 +236,7 @@ describe("ModelHubModal Component", () => {
     expect(await screen.findByText(/İndirme başarısız/i)).toBeInTheDocument();
   });
 
-  it("allows selecting Apple Speech and SenseVoice offline engines", async () => {
+  it("allows selecting Apple Speech and no longer offers SenseVoice", async () => {
     (invoke as any).mockImplementation((cmd: string) => {
       if (cmd === "get_available_models") return Promise.resolve(mockModels);
       return Promise.resolve();
@@ -256,12 +256,8 @@ describe("ModelHubModal Component", () => {
     expect(localStorage.getItem("echomind_active_engine")).toBe("apple_speech");
     expect(defaultProps.onModelChanged).toHaveBeenCalled();
 
-    // Select SenseVoice
-    const senseVoiceBtn = screen.getByRole("button", {
-      name: /SenseVoice Seç/i,
-    });
-    fireEvent.click(senseVoiceBtn);
-    expect(localStorage.getItem("echomind_active_engine")).toBe("sensevoice");
+    // SenseVoice was only ever Whisper under another name; it is gone.
+    expect(screen.queryByText(/SenseVoice/i)).not.toBeInTheDocument();
   });
 
   it("handles inline API key input and activation for cloud models", async () => {
@@ -311,7 +307,7 @@ describe("ModelHubModal Component", () => {
     expect(localStorage.getItem("echomind_active_engine")).toBe("cloud_groq");
   });
 
-  it("handles Apple Speech and SenseVoice engine activation", async () => {
+  it("handles Apple Speech engine activation", async () => {
     (invoke as any).mockImplementation((cmd: string) => {
       if (cmd === "get_available_models") return Promise.resolve(mockModels);
       return Promise.resolve();
@@ -331,17 +327,6 @@ describe("ModelHubModal Component", () => {
       fireEvent.click(appleBtn);
     });
     expect(localStorage.getItem("echomind_active_engine")).toBe("apple_speech");
-
-    // Click SenseVoice activate button if present
-    const senseVoiceBtn = screen.queryByRole("button", {
-      name: /SenseVoice Small Seç/i,
-    });
-    if (senseVoiceBtn) {
-      await act(async () => {
-        fireEvent.click(senseVoiceBtn);
-      });
-      expect(localStorage.getItem("echomind_active_engine")).toBe("sensevoice");
-    }
   });
 
   it("handles model download error gracefully", async () => {

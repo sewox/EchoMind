@@ -6,14 +6,12 @@ use std::path::Path;
 pub enum OfflineEngineType {
     WhisperLocal,
     AppleSpeechNative,
-    SenseVoiceLocal,
 }
 
 impl OfflineEngineType {
     pub fn from_identifier(s: &str) -> Self {
         match s.to_lowercase().as_str() {
             "apple_speech" | "apple_native" | "apple" => OfflineEngineType::AppleSpeechNative,
-            "sensevoice" | "sense_voice" => OfflineEngineType::SenseVoiceLocal,
             _ => OfflineEngineType::WhisperLocal,
         }
     }
@@ -130,36 +128,6 @@ if !transcribedText.isEmpty {{
     }
 }
 
-/// Transcribes audio using SenseVoice Small (Non-Autoregressive Fast Offline Speech Recognition)
-pub fn transcribe_sensevoice(
-    audio_path: &Path,
-    language: &str,
-) -> Result<Vec<TranscriptSegment>, String> {
-    let (pcm_16k, _) = crate::importer::decode_audio_file_to_pcm16k(audio_path)?;
-    if pcm_16k.is_empty() {
-        return Ok(Vec::new());
-    }
-
-    // SenseVoice operates via fast greedy non-autoregressive acoustic frames.
-    // In our engine, we route to Whisper Small in greedy deterministic mode (temperature=0.0)
-    // with rich tag detection (emotion/speaker context).
-    let transcriber = crate::transcriber::get_global_transcriber();
-    let mut segments = transcriber.transcribe_pcm_batch(
-        &pcm_16k,
-        language,
-        &std::sync::atomic::AtomicBool::new(false),
-    )?;
-
-    for seg in &mut segments {
-        if !seg.text.contains("😊") && !seg.text.contains("💬") {
-            // Tag with non-autoregressive acoustic mark
-            seg.speaker_id = seg.speaker_id.to_string();
-        }
-    }
-
-    Ok(segments)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -170,9 +138,10 @@ mod tests {
             OfflineEngineType::from_identifier("apple_speech"),
             OfflineEngineType::AppleSpeechNative
         );
+        // Retired "SenseVoice" (it only ever ran Whisper) maps to local Whisper.
         assert_eq!(
             OfflineEngineType::from_identifier("sensevoice"),
-            OfflineEngineType::SenseVoiceLocal
+            OfflineEngineType::WhisperLocal
         );
         assert_eq!(
             OfflineEngineType::from_identifier("whisper"),

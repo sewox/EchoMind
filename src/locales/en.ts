@@ -647,9 +647,6 @@ export const en: TranslationKeys = {
       appleDesc:
         "Your operating system's built-in speech recognition engine. 0 MB RAM, zero latency, accelerated by the Apple Neural Engine.",
       appleSelectAria: "Select macOS speech recognition",
-      senseDesc:
-        "Next-generation local speech engine that doesn't hallucinate words and runs up to 15x faster than Whisper.",
-      senseSelectAria: "Select SenseVoice",
       activeMode: "Active",
       groqTitle: "Lightning Fast (Groq Cloud Whisper)",
       groqBadge: "Fastest (~10 s)",

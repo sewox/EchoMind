@@ -63,15 +63,7 @@ fn run_asr_engine(
                     }
                 }
             }
-            "sensevoice" => match crate::offline_engines::transcribe_sensevoice(audio_path, lang) {
-                // "SenseVoice" currently runs local Whisper (see offline_engines);
-                // label it as what actually ran.
-                Ok(segs) => return Ok((segs, "🔒 Bilgisayarınızda (Whisper)".to_string())),
-                Err(e) => {
-                    eprintln!("⚠️ SenseVoice başarısız: {}", e);
-                    failed_engine = Some("SenseVoice");
-                }
-            },
+            // "sensevoice" (retired; it only ever ran Whisper) falls through to local Whisper.
             "groq" | "openai" | "gemini" => {
                 if let Some(key) = api_key.map(str::trim).filter(|k| !k.is_empty()) {
                     // HARD REJECT in Paranoid / Air-Gapped Mode

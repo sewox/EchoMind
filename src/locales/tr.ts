@@ -653,9 +653,6 @@ export const tr: TranslationKeys = {
       appleDesc:
         "İşletim sisteminizin yerleşik Türkçe konuşma tanıma motoru. 0 MB RAM, sıfır gecikme ve Apple Neural Engine hızlandırmasıyla çalışır.",
       appleSelectAria: "macOS Yerel Ses Tanıma Seç",
-      senseDesc:
-        "Halüsinasyonsuz, kelime uydurmayan ve Whisper'dan 15 kat daha hızlı çalışan yeni nesil yerel konuşma tanıma motoru.",
-      senseSelectAria: "SenseVoice Seç",
       activeMode: "Aktif Mod",
       groqTitle: "Yıldırım Hızı (Groq Cloud Whisper)",
       groqBadge: "En Hızlı (10 Saniye)",

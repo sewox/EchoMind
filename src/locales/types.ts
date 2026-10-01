@@ -575,8 +575,6 @@ export interface TranslationKeys {
       appleTitle: string;
       appleDesc: string;
       appleSelectAria: string;
-      senseDesc: string;
-      senseSelectAria: string;
       activeMode: string;
       groqTitle: string;
       groqBadge: string;
