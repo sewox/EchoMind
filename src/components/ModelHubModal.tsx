@@ -24,6 +24,7 @@ import {
   modelLabel,
 } from "./ModelHubModalConstants";
 import { useI18n } from "../locales/i18nContext";
+import { getActiveEngine } from "../services/activeEngine";
 import { CredentialStore } from "../services/credentialStore";
 
 export interface ModelInfo {
@@ -95,8 +96,7 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
       setStatusMessage(null);
       setInlineKeyTarget(null);
       setInlineKeyValue("");
-      const engine = localStorage.getItem("echomind_active_engine") || "local";
-      setActiveEngine(engine);
+      setActiveEngine(getActiveEngine());
 
       const storedGroq =
         localStorage.getItem("echomind_groq_model_version") ||
@@ -146,12 +146,11 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
     }
   };
 
-  const handleSelectOfflineEngine = (engine: "apple_speech" | "sensevoice") => {
+  const handleSelectOfflineEngine = (engine: "apple_speech") => {
     localStorage.setItem("echomind_active_engine", engine);
     setActiveEngine(engine);
     const names: Record<string, string> = {
       apple_speech: "🍎 macOS Yerel Ses Tanıma (Apple Dikte / ANE)",
-      sensevoice: "⚡ SenseVoice Ultra Hızlı Yerel Motor",
     };
     setStatusMessage(`${names[engine]} aktif çevrimdışı motor olarak seçildi!`);
     if (onModelChanged) onModelChanged();
@@ -369,67 +368,6 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
                     }`}
                   >
                     {activeEngine === "apple_speech"
-                      ? t("ui.modelHub.inUse")
-                      : t("ui.modelHub.select")}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* SenseVoice Small Card */}
-            <div
-              className={`p-4 rounded-xl border transition-all ${
-                activeEngine === "sensevoice"
-                  ? "bg-slate-800/90 border-cyan-500/80 shadow-lg shadow-cyan-500/10"
-                  : "bg-slate-900/60 border-slate-800 hover:border-slate-700"
-              }`}
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-semibold text-white text-sm flex items-center gap-2">
-                      ⚡ SenseVoice Small (Non-Autoregressive Fast ASR)
-                    </h3>
-                    {activeEngine === "sensevoice" && (
-                      <span className="text-[11px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 px-2 py-0.5 rounded-full font-semibold">
-                        {t("ui.modelHub.inUse")}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-slate-400">
-                    {t("ui.modelHub.senseDesc")}
-                  </p>
-                  <div className="flex items-center gap-4 text-xs text-slate-400 pt-1">
-                    <span className="flex items-center gap-1">
-                      <HardDrive className="w-3.5 h-3.5 text-slate-500" />
-                      120 MB
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Cpu className="w-3.5 h-3.5 text-slate-500" />
-                      ~250 MB RAM
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Zap className="w-3.5 h-3.5 text-amber-400" />
-                      {t("ui.modelHub.speedValue", { value: 98 })}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                      {t("ui.modelHub.accuracyValue", { value: 92 })}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex flex-col gap-2 shrink-0">
-                  <button
-                    onClick={() => handleSelectOfflineEngine("sensevoice")}
-                    disabled={activeEngine === "sensevoice"}
-                    aria-label={t("ui.modelHub.senseSelectAria")}
-                    className={`px-4 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 ${
-                      activeEngine === "sensevoice"
-                        ? "bg-slate-800 text-slate-500 cursor-default"
-                        : "bg-cyan-600 hover:bg-cyan-500 text-white shadow-lg shadow-cyan-600/20"
-                    }`}
-                  >
-                    {activeEngine === "sensevoice"
                       ? t("ui.modelHub.inUse")
                       : t("ui.modelHub.select")}
                   </button>

@@ -652,9 +652,6 @@ export const es: TranslationKeys = {
       appleDesc:
         "El motor de reconocimiento de voz integrado en tu sistema. 0 MB de RAM, latencia cero y aceleración con Apple Neural Engine.",
       appleSelectAria: "Seleccionar reconocimiento de voz de macOS",
-      senseDesc:
-        "Motor de voz local de nueva generación que no alucina palabras y es hasta 15 veces más rápido que Whisper.",
-      senseSelectAria: "Seleccionar SenseVoice",
       activeMode: "Activo",
       groqTitle: "Ultrarrápido (Groq Cloud Whisper)",
       groqBadge: "El más rápido (~10 s)",

@@ -644,9 +644,6 @@ export const de: TranslationKeys = {
       appleDesc:
         "Die integrierte Spracherkennung Ihres Betriebssystems. 0 MB RAM, keine Latenz, beschleunigt durch die Apple Neural Engine.",
       appleSelectAria: "macOS-Spracherkennung auswählen",
-      senseDesc:
-        "Lokale Spracherkennung der nächsten Generation, die keine Wörter halluziniert und bis zu 15-mal schneller als Whisper ist.",
-      senseSelectAria: "SenseVoice auswählen",
       activeMode: "Aktiv",
       groqTitle: "Blitzschnell (Groq Cloud Whisper)",
       groqBadge: "Am schnellsten (~10 s)",

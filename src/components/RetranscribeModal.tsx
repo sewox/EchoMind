@@ -148,7 +148,7 @@ export const RetranscribeModal: React.FC<RetranscribeModalProps> = ({
           );
         }
       } else {
-        if (localModel === "apple_speech" || localModel === "sensevoice") {
+        if (localModel === "apple_speech") {
           cloudProv = localModel;
         } else {
           modelVer = localModel;
@@ -406,11 +406,6 @@ export const RetranscribeModal: React.FC<RetranscribeModalProps> = ({
                         id: "apple_speech",
                         name: "🍎 macOS Yerel Ses Tanıma",
                         desc: "0 MB RAM, sıfır gecikme (Apple Dikte / ANE)",
-                      },
-                      {
-                        id: "sensevoice",
-                        name: "⚡ SenseVoice Small",
-                        desc: "Ultra hızlı non-autoregressive (Sıfır halüsinasyon)",
                       },
                       {
                         id: "small",
