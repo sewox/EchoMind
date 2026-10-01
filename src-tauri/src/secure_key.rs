@@ -15,6 +15,9 @@ use keyring::Entry;
 #[cfg(not(test))]
 const SERVICE_NAME: &str = "com.echomind.assistant";
 
+/// Single OS keystore item holding both encryption keys (one unlock prompt).
+pub const MASTER_KEY_ACCOUNT: &str = "master_key";
+
 /// Logical accounts whose keys are primed during async storage unlock.
 pub const DATA_AT_REST_ACCOUNT: &str = "data_at_rest_key";
 pub const DATA_AT_REST_FALLBACK: &str = "storage.key";
@@ -64,6 +67,12 @@ fn cache_key(account: &str, key: [u8; 32]) {
     if let Ok(mut guard) = key_cache().lock() {
         guard.insert(account.to_string(), key);
     }
+}
+
+#[cfg(not(test))]
+fn cache_bundle(bundle: &KeyBundle) {
+    cache_key(DATA_AT_REST_ACCOUNT, bundle.data_at_rest);
+    cache_key(CREDENTIAL_VAULT_ACCOUNT, bundle.credential_vault);
 }
 
 pub fn key_unlock_phase() -> KeyUnlockPhase {
@@ -143,6 +152,21 @@ fn to_hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{:02x}", b)).collect()
 }
 
+/// Best-effort scrub of a secret string before drop (no key material in logs/heaps longer than needed).
+fn scrub_secret_string(s: &mut String) {
+    // SAFETY: we overwrite the UTF-8 bytes with zeros then clear; String is left empty/valid.
+    let len = s.len();
+    if len > 0 {
+        unsafe {
+            let bytes = s.as_mut_vec();
+            for b in bytes.iter_mut() {
+                *b = 0;
+            }
+        }
+    }
+    s.clear();
+}
+
 fn from_hex(s: &str) -> Option<[u8; 32]> {
     if s.len() != 64 {
         return None;
@@ -185,6 +209,53 @@ impl KeySource {
     }
 }
 
+/// Both encryption keys packaged in one OS keystore item.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct KeyBundle {
+    pub data_at_rest: [u8; 32],
+    pub credential_vault: [u8; 32],
+}
+
+/// Versioned binary blob: `version (1) || data_at_rest (32) || credential_vault (32)`.
+pub const KEY_BUNDLE_VERSION: u8 = 1;
+pub const KEY_BUNDLE_LEN: usize = 1 + 32 + 32;
+
+/// Encode both keys as a fixed-length binary blob for a single keystore secret.
+/// Never log the returned bytes.
+pub fn encode_key_bundle(bundle: &KeyBundle) -> Vec<u8> {
+    let mut out = Vec::with_capacity(KEY_BUNDLE_LEN);
+    out.push(KEY_BUNDLE_VERSION);
+    out.extend_from_slice(&bundle.data_at_rest);
+    out.extend_from_slice(&bundle.credential_vault);
+    debug_assert_eq!(out.len(), KEY_BUNDLE_LEN);
+    out
+}
+
+/// Parse a unified keystore blob. Strict length + version check; returns `None`
+/// on any malformation (caller must treat as absent and never delete legacy).
+pub fn decode_key_bundle(raw: &[u8]) -> Option<KeyBundle> {
+    if raw.len() != KEY_BUNDLE_LEN {
+        return None;
+    }
+    if raw[0] != KEY_BUNDLE_VERSION {
+        return None;
+    }
+    let mut data_at_rest = [0u8; 32];
+    let mut credential_vault = [0u8; 32];
+    data_at_rest.copy_from_slice(&raw[1..33]);
+    credential_vault.copy_from_slice(&raw[33..65]);
+    Some(KeyBundle {
+        data_at_rest,
+        credential_vault,
+    })
+}
+
+fn scrub_secret_bytes(buf: &mut [u8]) {
+    for b in buf.iter_mut() {
+        *b = 0;
+    }
+}
+
 /// Result of classifying a keystore `get_password` outcome.
 /// Factored out so NoEntry-vs-other-error behaviour is unit-testable without a
 /// real OS keychain.
@@ -199,6 +270,16 @@ pub enum KeystoreGetOutcome {
     Unavailable(String),
 }
 
+/// Outcome of reading the unified `master_key` keystore item.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum UnifiedKeystoreOutcome {
+    Found(KeyBundle),
+    /// Missing **or** corrupt/wrong-length blob (strict decode failed → yok say).
+    NoEntry,
+    /// Access denied or other platform failure — do not overwrite or delete.
+    Unavailable(String),
+}
+
 /// Next action after classifying the keystore lookup (and optional fallback file).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum KeyResolution {
@@ -208,22 +289,74 @@ pub enum KeyResolution {
     /// Neither keystore nor fallback has a key — generate and store a new one.
     CreateNewInKeystore,
     /// Keystore is broken/locked/denied — keep using the fallback file path only.
-    UseFallbackOnly {
-        reason: String,
+    UseFallbackOnly { reason: String },
+}
+
+/// Where one half of the bundle should come from during migration planning.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LegacyKeyMaterial {
+    FromKeystore([u8; 32]),
+    FromFallback([u8; 32]),
+    /// Caller must generate a fresh random key.
+    GenerateNew,
+}
+
+/// Pure migration decision for the unified `master_key` item.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum UnifiedMigrationPlan {
+    /// Unified item already holds both keys — use it (and optionally clean legacy).
+    UseUnified {
+        bundle: KeyBundle,
+        /// Best-effort delete of leftover pre-migration accounts.
+        cleanup_legacy: bool,
     },
+    /// Build / write a unified item from legacy keystore entries and/or fallbacks.
+    WriteUnified {
+        data: LegacyKeyMaterial,
+        vault: LegacyKeyMaterial,
+    },
+    /// Keystore unusable — caller must use per-account fallback files only.
+    FallbackOnly { reason: String },
 }
 
 /// Classifies a keystore get result. Only `NoEntry` authorises creating a new key.
 pub fn classify_keystore_get(result: Result<String, keyring::Error>) -> KeystoreGetOutcome {
     match result {
-        Ok(password) => match from_hex(password.trim()) {
-            Some(key) => KeystoreGetOutcome::Found(key),
-            None => {
-                KeystoreGetOutcome::Unavailable("stored key is not valid 64-char hex".to_string())
-            }
-        },
+        Ok(mut password) => {
+            let outcome = match from_hex(password.trim()) {
+                Some(key) => KeystoreGetOutcome::Found(key),
+                None => KeystoreGetOutcome::Unavailable(
+                    "stored key is not valid 64-char hex".to_string(),
+                ),
+            };
+            scrub_secret_string(&mut password);
+            outcome
+        }
         Err(keyring::Error::NoEntry) => KeystoreGetOutcome::NoEntry,
         Err(e) => KeystoreGetOutcome::Unavailable(e.to_string()),
+    }
+}
+
+/// Classifies a unified `master_key` get_secret result.
+///
+/// Corrupt / wrong-length blobs are treated as [`UnifiedKeystoreOutcome::NoEntry`]
+/// ("yok say") so migration may rewrite them — but callers must never delete
+/// legacy entries until a newly written blob verifies byte-for-byte.
+pub fn classify_unified_keystore_get(
+    result: Result<Vec<u8>, keyring::Error>,
+) -> UnifiedKeystoreOutcome {
+    match result {
+        Ok(mut secret) => {
+            let outcome = match decode_key_bundle(&secret) {
+                Some(bundle) => UnifiedKeystoreOutcome::Found(bundle),
+                // Strict length/version failure → treat as absent, do not use.
+                None => UnifiedKeystoreOutcome::NoEntry,
+            };
+            scrub_secret_bytes(&mut secret);
+            outcome
+        }
+        Err(keyring::Error::NoEntry) => UnifiedKeystoreOutcome::NoEntry,
+        Err(e) => UnifiedKeystoreOutcome::Unavailable(e.to_string()),
     }
 }
 
@@ -239,6 +372,226 @@ pub fn resolve_key_action(
             None => KeyResolution::CreateNewInKeystore,
         },
         KeystoreGetOutcome::Unavailable(reason) => KeyResolution::UseFallbackOnly { reason },
+    }
+}
+
+fn legacy_material_from(
+    outcome: KeystoreGetOutcome,
+    fallback: Option<[u8; 32]>,
+) -> Result<LegacyKeyMaterial, String> {
+    match outcome {
+        KeystoreGetOutcome::Found(key) => Ok(LegacyKeyMaterial::FromKeystore(key)),
+        KeystoreGetOutcome::NoEntry => match fallback {
+            Some(key) => Ok(LegacyKeyMaterial::FromFallback(key)),
+            None => Ok(LegacyKeyMaterial::GenerateNew),
+        },
+        KeystoreGetOutcome::Unavailable(reason) => Err(reason),
+    }
+}
+
+/// Decide how to obtain both encryption keys with a single keystore item.
+///
+/// Critical invariants:
+/// - Never invent a new key while an unreadable keystore entry may still exist.
+/// - Prefer an existing unified blob over re-reading legacy accounts.
+/// - When unified is missing, package existing legacy keys (do not derive/rotate).
+pub fn plan_unified_migration(
+    unified: UnifiedKeystoreOutcome,
+    legacy_data: KeystoreGetOutcome,
+    legacy_vault: KeystoreGetOutcome,
+    fallback_data: Option<[u8; 32]>,
+    fallback_vault: Option<[u8; 32]>,
+) -> UnifiedMigrationPlan {
+    match unified {
+        UnifiedKeystoreOutcome::Found(bundle) => UnifiedMigrationPlan::UseUnified {
+            bundle,
+            cleanup_legacy: true,
+        },
+        UnifiedKeystoreOutcome::Unavailable(reason) => {
+            UnifiedMigrationPlan::FallbackOnly { reason }
+        }
+        UnifiedKeystoreOutcome::NoEntry => {
+            let data = match legacy_material_from(legacy_data, fallback_data) {
+                Ok(m) => m,
+                Err(reason) => return UnifiedMigrationPlan::FallbackOnly { reason },
+            };
+            let vault = match legacy_material_from(legacy_vault, fallback_vault) {
+                Ok(m) => m,
+                Err(reason) => return UnifiedMigrationPlan::FallbackOnly { reason },
+            };
+            UnifiedMigrationPlan::WriteUnified { data, vault }
+        }
+    }
+}
+
+fn materialize_legacy(material: LegacyKeyMaterial) -> ([u8; 32], KeySource, bool) {
+    match material {
+        LegacyKeyMaterial::FromKeystore(key) => (key, KeySource::Keychain, true),
+        LegacyKeyMaterial::FromFallback(key) => (key, KeySource::FallbackFile, false),
+        LegacyKeyMaterial::GenerateNew => {
+            let key: [u8; 32] = ChaCha20Poly1305::generate_key(&mut OsRng).into();
+            (key, KeySource::NewKeyCreated, false)
+        }
+    }
+}
+
+/// Minimal keystore surface used by unified resolution (real OS backend or test mock).
+pub trait KeystoreBackend {
+    /// Legacy per-account hex keys (string password field).
+    fn get_password(&self, account: &str) -> Result<String, keyring::Error>;
+    fn set_password(&self, account: &str, password: &str) -> Result<(), keyring::Error>;
+    /// Unified `master_key` binary blob (secret field).
+    fn get_secret(&self, account: &str) -> Result<Vec<u8>, keyring::Error>;
+    fn set_secret(&self, account: &str, secret: &[u8]) -> Result<(), keyring::Error>;
+    fn delete(&self, account: &str) -> Result<(), keyring::Error>;
+}
+
+fn best_effort_delete_legacy<K: KeystoreBackend>(ks: &K, account: &str) {
+    match ks.delete(account) {
+        Ok(()) | Err(keyring::Error::NoEntry) => {}
+        Err(e) => {
+            // Never crash on cleanup; never log key material.
+            eprintln!(
+                "⚠️ Could not delete legacy keystore entry '{}': {}",
+                account, e
+            );
+        }
+    }
+}
+
+/// Result of resolving both keys via the unified `master_key` flow.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UnifiedResolveSuccess {
+    pub bundle: KeyBundle,
+    pub data_source: KeySource,
+    pub vault_source: KeySource,
+}
+
+/// Execute the unified key plan against a keystore backend.
+///
+/// On `Ok`, both keys are ready to cache. On `Err`, migration was aborted
+/// (denied / unreadable legacy / keystore broken) — caller must resolve each
+/// managed account independently and must not have modified legacy entries.
+pub fn execute_unified_migration<K: KeystoreBackend>(
+    ks: &K,
+    fallback_data: Option<[u8; 32]>,
+    fallback_vault: Option<[u8; 32]>,
+) -> Result<UnifiedResolveSuccess, String> {
+    let unified = classify_unified_keystore_get(ks.get_secret(MASTER_KEY_ACCOUNT));
+
+    // Only touch legacy accounts when unified is missing/corrupt — avoids extra
+    // prompts on the steady-state path after migration.
+    let (legacy_data, legacy_vault) = match &unified {
+        UnifiedKeystoreOutcome::NoEntry => (
+            classify_keystore_get(ks.get_password(DATA_AT_REST_ACCOUNT)),
+            classify_keystore_get(ks.get_password(CREDENTIAL_VAULT_ACCOUNT)),
+        ),
+        UnifiedKeystoreOutcome::Found(_) | UnifiedKeystoreOutcome::Unavailable(_) => {
+            (KeystoreGetOutcome::NoEntry, KeystoreGetOutcome::NoEntry)
+        }
+    };
+
+    let plan = plan_unified_migration(
+        unified,
+        legacy_data,
+        legacy_vault,
+        fallback_data,
+        fallback_vault,
+    );
+
+    match plan {
+        UnifiedMigrationPlan::UseUnified {
+            bundle,
+            cleanup_legacy,
+        } => {
+            if cleanup_legacy {
+                best_effort_delete_legacy(ks, DATA_AT_REST_ACCOUNT);
+                best_effort_delete_legacy(ks, CREDENTIAL_VAULT_ACCOUNT);
+            }
+            Ok(UnifiedResolveSuccess {
+                bundle,
+                data_source: KeySource::Keychain,
+                vault_source: KeySource::Keychain,
+            })
+        }
+        UnifiedMigrationPlan::FallbackOnly { reason } => Err(reason),
+        UnifiedMigrationPlan::WriteUnified { data, vault } => {
+            let (data_key, data_src, data_from_ks) = materialize_legacy(data);
+            let (vault_key, vault_src, vault_from_ks) = materialize_legacy(vault);
+            let bundle = KeyBundle {
+                data_at_rest: data_key,
+                credential_vault: vault_key,
+            };
+
+            let mut encoded = encode_key_bundle(&bundle);
+            let set_result = ks.set_secret(MASTER_KEY_ACCOUNT, &encoded);
+            scrub_secret_bytes(&mut encoded);
+
+            match set_result {
+                Ok(()) => {
+                    // Read back and compare byte-for-byte with what we intended.
+                    let verified = match ks.get_secret(MASTER_KEY_ACCOUNT) {
+                        Ok(mut read_back) => {
+                            let expected = encode_key_bundle(&bundle);
+                            let ok = read_back.as_slice() == expected.as_slice();
+                            scrub_secret_bytes(&mut read_back);
+                            ok
+                        }
+                        Err(_) => false,
+                    };
+
+                    if verified {
+                        // Only delete legacy after verified unified write.
+                        if data_from_ks {
+                            best_effort_delete_legacy(ks, DATA_AT_REST_ACCOUNT);
+                        }
+                        if vault_from_ks {
+                            best_effort_delete_legacy(ks, CREDENTIAL_VAULT_ACCOUNT);
+                        }
+                    } else {
+                        eprintln!(
+                            "⚠️ Unified master_key write could not be verified; \
+                             leaving legacy keystore entries intact"
+                        );
+                    }
+
+                    let data_source = match data_src {
+                        KeySource::NewKeyCreated => KeySource::NewKeyCreated,
+                        KeySource::FallbackFile | KeySource::Keychain => KeySource::Keychain,
+                    };
+                    let vault_source = match vault_src {
+                        KeySource::NewKeyCreated => KeySource::NewKeyCreated,
+                        KeySource::FallbackFile | KeySource::Keychain => KeySource::Keychain,
+                    };
+                    Ok(UnifiedResolveSuccess {
+                        bundle,
+                        data_source,
+                        vault_source,
+                    })
+                }
+                Err(e) => {
+                    // Could not create unified item — never delete legacy.
+                    if matches!(data_src, KeySource::NewKeyCreated)
+                        || matches!(vault_src, KeySource::NewKeyCreated)
+                    {
+                        return Err(format!(
+                            "could not write unified master_key ({e}); resolve independently"
+                        ));
+                    }
+                    // Both keys came from legacy keystore and/or fallback files —
+                    // safe to use without unified write; retry migration next launch.
+                    eprintln!(
+                        "⚠️ Could not write unified master_key ({}); using existing keys for this session",
+                        e
+                    );
+                    Ok(UnifiedResolveSuccess {
+                        bundle,
+                        data_source: data_src,
+                        vault_source: vault_src,
+                    })
+                }
+            }
+        }
     }
 }
 
@@ -300,6 +653,74 @@ fn log_key_source_once(account: &str, source: KeySource) {
     }
 }
 
+fn is_managed_account(account: &str) -> bool {
+    account == DATA_AT_REST_ACCOUNT || account == CREDENTIAL_VAULT_ACCOUNT
+}
+
+/// Resolve and cache both managed encryption keys, preferring a single keystore item.
+/// Returns the data-at-rest key source (used for history-recovery UI).
+#[cfg(not(test))]
+pub fn prime_encryption_keys() -> KeySource {
+    if try_get_cached_key(DATA_AT_REST_ACCOUNT).is_some()
+        && try_get_cached_key(CREDENTIAL_VAULT_ACCOUNT).is_some()
+    {
+        return KeySource::Keychain;
+    }
+
+    if !keystore_is_persistent() {
+        eprintln!(
+            "⚠️ OS keystore is mock/non-persistent; using stable fallback files for managed keys"
+        );
+        let data = get_or_create_fallback_key(DATA_AT_REST_FALLBACK);
+        let vault = get_or_create_fallback_key(CREDENTIAL_VAULT_FALLBACK);
+        cache_key(DATA_AT_REST_ACCOUNT, data);
+        cache_key(CREDENTIAL_VAULT_ACCOUNT, vault);
+        log_key_source_once(DATA_AT_REST_ACCOUNT, KeySource::FallbackFile);
+        log_key_source_once(CREDENTIAL_VAULT_ACCOUNT, KeySource::FallbackFile);
+        return KeySource::FallbackFile;
+    }
+
+    let ks = OsKeystore;
+    match execute_unified_migration(
+        &ks,
+        read_existing_fallback(DATA_AT_REST_FALLBACK),
+        read_existing_fallback(CREDENTIAL_VAULT_FALLBACK),
+    ) {
+        Ok(success) => {
+            cache_bundle(&success.bundle);
+            log_key_source_once(DATA_AT_REST_ACCOUNT, success.data_source);
+            log_key_source_once(CREDENTIAL_VAULT_ACCOUNT, success.vault_source);
+            success.data_source
+        }
+        Err(reason) => {
+            // Migration aborted (e.g. user denied one legacy prompt). Do not touch
+            // legacy entries; resolve each account with the pre-unification path.
+            eprintln!(
+                "⚠️ Unified key migration aborted ({reason}). Leaving legacy keystore \
+                 entries intact; resolving each key independently."
+            );
+            let (data, data_source) =
+                resolve_single_account(DATA_AT_REST_ACCOUNT, DATA_AT_REST_FALLBACK);
+            let (vault, vault_source) =
+                resolve_single_account(CREDENTIAL_VAULT_ACCOUNT, CREDENTIAL_VAULT_FALLBACK);
+            cache_key(DATA_AT_REST_ACCOUNT, data);
+            cache_key(CREDENTIAL_VAULT_ACCOUNT, vault);
+            log_key_source_once(DATA_AT_REST_ACCOUNT, data_source);
+            log_key_source_once(CREDENTIAL_VAULT_ACCOUNT, vault_source);
+            data_source
+        }
+    }
+}
+
+#[cfg(test)]
+pub fn prime_encryption_keys() -> KeySource {
+    let data = get_or_create_fallback_key(DATA_AT_REST_FALLBACK);
+    let vault = get_or_create_fallback_key(CREDENTIAL_VAULT_FALLBACK);
+    cache_key(DATA_AT_REST_ACCOUNT, data);
+    cache_key(CREDENTIAL_VAULT_ACCOUNT, vault);
+    KeySource::FallbackFile
+}
+
 /// Returns a stable, per-installation 256-bit key for the given logical purpose
 /// (`account` distinguishes independent keys, e.g. one for the credential vault
 /// and one for data-at-rest storage, so compromising one never exposes the other).
@@ -308,6 +729,9 @@ fn log_key_source_once(account: &str, source: KeySource) {
 /// Manager / Linux Secret Service) so the key is gated behind the user's OS login
 /// session rather than being readable by anything that can read app-data files.
 /// Falls back to a random key file when no OS keystore is available at runtime.
+///
+/// Managed accounts (`data_at_rest_key` / `credential_vault_key`) share a single
+/// `master_key` keystore item so macOS prompts at most once per unlock.
 ///
 /// Test builds skip the OS keystore entirely: CI runners and sandboxed/unsigned
 /// test binaries can't reliably obtain keychain access (may prompt, silently
@@ -324,6 +748,12 @@ pub fn get_or_create_key_with_source(
 ) -> ([u8; 32], KeySource) {
     if let Some(key) = try_get_cached_key(account) {
         return (key, KeySource::FallbackFile);
+    }
+    if is_managed_account(account) {
+        let _ = prime_encryption_keys();
+        if let Some(key) = try_get_cached_key(account) {
+            return (key, KeySource::FallbackFile);
+        }
     }
     let key = get_or_create_fallback_key(fallback_filename);
     cache_key(account, key);
@@ -348,6 +778,20 @@ pub fn get_or_create_key_with_source(
         return (key, KeySource::Keychain);
     }
 
+    if is_managed_account(account) {
+        let source = prime_encryption_keys();
+        if let Some(key) = try_get_cached_key(account) {
+            return (key, source);
+        }
+        // Should be unreachable after prime; fall through to independent resolve.
+    }
+
+    resolve_single_account(account, fallback_filename)
+}
+
+/// Pre-unification per-account keystore resolve (also used when unified migration aborts).
+#[cfg(not(test))]
+fn resolve_single_account(account: &str, fallback_filename: &str) -> ([u8; 32], KeySource) {
     if !keystore_is_persistent() {
         eprintln!(
             "⚠️ OS keystore is mock/non-persistent; using stable fallback file for '{}'",
@@ -429,13 +873,169 @@ pub fn get_or_create_key_with_source(
     (key, source)
 }
 
+#[cfg(not(test))]
+struct OsKeystore;
+
+#[cfg(not(test))]
+impl KeystoreBackend for OsKeystore {
+    fn get_password(&self, account: &str) -> Result<String, keyring::Error> {
+        Entry::new(SERVICE_NAME, account)?.get_password()
+    }
+
+    fn set_password(&self, account: &str, password: &str) -> Result<(), keyring::Error> {
+        Entry::new(SERVICE_NAME, account)?.set_password(password)
+    }
+
+    fn get_secret(&self, account: &str) -> Result<Vec<u8>, keyring::Error> {
+        Entry::new(SERVICE_NAME, account)?.get_secret()
+    }
+
+    fn set_secret(&self, account: &str, secret: &[u8]) -> Result<(), keyring::Error> {
+        Entry::new(SERVICE_NAME, account)?.set_secret(secret)
+    }
+
+    fn delete(&self, account: &str) -> Result<(), keyring::Error> {
+        Entry::new(SERVICE_NAME, account)?.delete_credential()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::cell::RefCell;
+    use std::collections::HashSet;
+
+    #[derive(Default)]
+    struct MockKeystore {
+        /// Binary secrets keyed by account (legacy hex stored as UTF-8 bytes).
+        entries: RefCell<HashMap<String, Vec<u8>>>,
+        /// Accounts that return Unavailable instead of their stored value / NoEntry.
+        denied: RefCell<HashSet<String>>,
+        /// When true, `set_secret` / `set_password` always fails.
+        fail_set: RefCell<bool>,
+        /// When true, `delete` always fails (non-NoEntry).
+        fail_delete: RefCell<bool>,
+        /// Count of get_secret/get_password calls per account.
+        get_counts: RefCell<HashMap<String, usize>>,
+    }
+
+    impl MockKeystore {
+        fn with_legacy(data: [u8; 32], vault: [u8; 32]) -> Self {
+            let ks = Self::default();
+            ks.entries.borrow_mut().insert(
+                DATA_AT_REST_ACCOUNT.to_string(),
+                to_hex(&data).into_bytes(),
+            );
+            ks.entries.borrow_mut().insert(
+                CREDENTIAL_VAULT_ACCOUNT.to_string(),
+                to_hex(&vault).into_bytes(),
+            );
+            ks
+        }
+
+        fn with_unified(bundle: &KeyBundle) -> Self {
+            let ks = Self::default();
+            ks.entries
+                .borrow_mut()
+                .insert(MASTER_KEY_ACCOUNT.to_string(), encode_key_bundle(bundle));
+            ks
+        }
+
+        fn get_count(&self, account: &str) -> usize {
+            self.get_counts
+                .borrow()
+                .get(account)
+                .copied()
+                .unwrap_or(0)
+        }
+
+        fn bump_get(&self, account: &str) {
+            *self
+                .get_counts
+                .borrow_mut()
+                .entry(account.to_string())
+                .or_insert(0) += 1;
+        }
+    }
+
+    impl KeystoreBackend for MockKeystore {
+        fn get_password(&self, account: &str) -> Result<String, keyring::Error> {
+            self.bump_get(account);
+            if self.denied.borrow().contains(account) {
+                return Err(keyring::Error::Invalid(
+                    "service".into(),
+                    "access denied".into(),
+                ));
+            }
+            match self.entries.borrow().get(account) {
+                Some(v) => String::from_utf8(v.clone()).map_err(|_| {
+                    keyring::Error::Invalid("service".into(), "not utf-8".into())
+                }),
+                None => Err(keyring::Error::NoEntry),
+            }
+        }
+
+        fn set_password(&self, account: &str, password: &str) -> Result<(), keyring::Error> {
+            if *self.fail_set.borrow() {
+                return Err(keyring::Error::Invalid(
+                    "service".into(),
+                    "set denied".into(),
+                ));
+            }
+            self.entries
+                .borrow_mut()
+                .insert(account.to_string(), password.as_bytes().to_vec());
+            Ok(())
+        }
+
+        fn get_secret(&self, account: &str) -> Result<Vec<u8>, keyring::Error> {
+            self.bump_get(account);
+            if self.denied.borrow().contains(account) {
+                return Err(keyring::Error::Invalid(
+                    "service".into(),
+                    "access denied".into(),
+                ));
+            }
+            match self.entries.borrow().get(account) {
+                Some(v) => Ok(v.clone()),
+                None => Err(keyring::Error::NoEntry),
+            }
+        }
+
+        fn set_secret(&self, account: &str, secret: &[u8]) -> Result<(), keyring::Error> {
+            if *self.fail_set.borrow() {
+                return Err(keyring::Error::Invalid(
+                    "service".into(),
+                    "set denied".into(),
+                ));
+            }
+            self.entries
+                .borrow_mut()
+                .insert(account.to_string(), secret.to_vec());
+            Ok(())
+        }
+
+        fn delete(&self, account: &str) -> Result<(), keyring::Error> {
+            if *self.fail_delete.borrow() {
+                return Err(keyring::Error::Invalid(
+                    "service".into(),
+                    "delete denied".into(),
+                ));
+            }
+            match self.entries.borrow_mut().remove(account) {
+                Some(_) => Ok(()),
+                None => Err(keyring::Error::NoEntry),
+            }
+        }
+    }
+
+    fn random_key() -> [u8; 32] {
+        ChaCha20Poly1305::generate_key(&mut OsRng).into()
+    }
 
     #[test]
     fn test_hex_roundtrip() {
-        let key: [u8; 32] = ChaCha20Poly1305::generate_key(&mut OsRng).into();
+        let key = random_key();
         let encoded = to_hex(&key);
         assert_eq!(encoded.len(), 64);
         assert_eq!(from_hex(&encoded), Some(key));
@@ -445,6 +1045,27 @@ mod tests {
     fn test_from_hex_rejects_malformed_input() {
         assert_eq!(from_hex("too_short"), None);
         assert_eq!(from_hex(&"zz".repeat(32)), None);
+    }
+
+    #[test]
+    fn test_key_bundle_binary_roundtrip() {
+        let bundle = KeyBundle {
+            data_at_rest: random_key(),
+            credential_vault: random_key(),
+        };
+        let encoded = encode_key_bundle(&bundle);
+        assert_eq!(encoded.len(), KEY_BUNDLE_LEN);
+        assert_eq!(encoded[0], KEY_BUNDLE_VERSION);
+        assert_eq!(decode_key_bundle(&encoded), Some(bundle));
+
+        assert!(decode_key_bundle(&encoded[..64]).is_none());
+        let mut too_long = encoded.clone();
+        too_long.push(0);
+        assert!(decode_key_bundle(&too_long).is_none());
+        let mut bad_ver = encoded;
+        bad_ver[0] = 0xFF;
+        assert!(decode_key_bundle(&bad_ver).is_none());
+        assert!(decode_key_bundle(b"not-a-bundle").is_none());
     }
 
     #[test]
@@ -472,7 +1093,7 @@ mod tests {
         let bad_hex = classify_keystore_get(Ok("not-valid-hex".into()));
         assert!(matches!(bad_hex, KeystoreGetOutcome::Unavailable(_)));
 
-        let key: [u8; 32] = ChaCha20Poly1305::generate_key(&mut OsRng).into();
+        let key = random_key();
         assert_eq!(
             classify_keystore_get(Ok(to_hex(&key))),
             KeystoreGetOutcome::Found(key)
@@ -480,8 +1101,39 @@ mod tests {
     }
 
     #[test]
+    fn test_classify_unified_corrupt_is_treated_as_no_entry() {
+        let bundle = KeyBundle {
+            data_at_rest: random_key(),
+            credential_vault: random_key(),
+        };
+        assert_eq!(
+            classify_unified_keystore_get(Ok(encode_key_bundle(&bundle))),
+            UnifiedKeystoreOutcome::Found(bundle)
+        );
+        assert_eq!(
+            classify_unified_keystore_get(Err(keyring::Error::NoEntry)),
+            UnifiedKeystoreOutcome::NoEntry
+        );
+        assert_eq!(
+            classify_unified_keystore_get(Ok(vec![0u8; 10])),
+            UnifiedKeystoreOutcome::NoEntry
+        );
+        assert_eq!(
+            classify_unified_keystore_get(Ok(to_hex(&random_key()).into_bytes())),
+            UnifiedKeystoreOutcome::NoEntry
+        );
+        assert!(matches!(
+            classify_unified_keystore_get(Err(keyring::Error::Invalid(
+                "service".into(),
+                "denied".into()
+            ))),
+            UnifiedKeystoreOutcome::Unavailable(_)
+        ));
+    }
+
+    #[test]
     fn test_resolve_only_creates_new_key_on_no_entry_without_fallback() {
-        let key: [u8; 32] = ChaCha20Poly1305::generate_key(&mut OsRng).into();
+        let key = random_key();
 
         assert_eq!(
             resolve_key_action(KeystoreGetOutcome::Found(key), None),
@@ -504,7 +1156,6 @@ mod tests {
             &denied,
             KeyResolution::UseFallbackOnly { reason } if reason == "access denied"
         ));
-        // Critically: Unavailable must NEVER become CreateNewInKeystore.
         assert!(!matches!(denied, KeyResolution::CreateNewInKeystore));
     }
 
@@ -523,10 +1174,6 @@ mod tests {
 
     #[test]
     fn test_default_keystore_is_not_mock_store() {
-        // Runtime guard: with apple-native / windows-native / sync-secret-service
-        // enabled, the default credential builder must not be the in-memory mock
-        // (CredentialPersistence::EntryOnly). If this fails, Cargo.toml lost its
-        // platform features and every launch would rotate encryption keys again.
         assert!(
             keystore_is_persistent(),
             "default keyring credential builder must not be the mock/in-memory store; \
@@ -548,8 +1195,6 @@ mod tests {
         let err = resolve_key_nonblocking(&account, &fallback).unwrap_err();
         assert_eq!(err, STORAGE_NOT_READY);
 
-        // Priming the cache (as the unlock thread would) unblocks subsequent reads
-        // without leaving InProgress.
         let primed = get_or_create_key(&account, &fallback);
         assert_eq!(
             resolve_key_nonblocking(&account, &fallback).unwrap(),
@@ -594,5 +1239,296 @@ mod tests {
         mark_keys_ready();
         assert!(!begin_key_unlock());
         reset_key_unlock_state_for_test();
+    }
+
+    #[test]
+    fn test_plan_prefers_unified_over_legacy() {
+        let bundle = KeyBundle {
+            data_at_rest: random_key(),
+            credential_vault: random_key(),
+        };
+        let other = random_key();
+        let plan = plan_unified_migration(
+            UnifiedKeystoreOutcome::Found(bundle),
+            KeystoreGetOutcome::Found(other),
+            KeystoreGetOutcome::Found(other),
+            None,
+            None,
+        );
+        assert_eq!(
+            plan,
+            UnifiedMigrationPlan::UseUnified {
+                bundle,
+                cleanup_legacy: true
+            }
+        );
+    }
+
+    #[test]
+    fn test_plan_migrates_legacy_pair_into_write() {
+        let data = random_key();
+        let vault = random_key();
+        let plan = plan_unified_migration(
+            UnifiedKeystoreOutcome::NoEntry,
+            KeystoreGetOutcome::Found(data),
+            KeystoreGetOutcome::Found(vault),
+            None,
+            None,
+        );
+        assert_eq!(
+            plan,
+            UnifiedMigrationPlan::WriteUnified {
+                data: LegacyKeyMaterial::FromKeystore(data),
+                vault: LegacyKeyMaterial::FromKeystore(vault),
+            }
+        );
+    }
+
+    #[test]
+    fn test_plan_unavailable_forces_fallback_only() {
+        let plan = plan_unified_migration(
+            UnifiedKeystoreOutcome::Unavailable("denied".into()),
+            KeystoreGetOutcome::NoEntry,
+            KeystoreGetOutcome::NoEntry,
+            Some(random_key()),
+            Some(random_key()),
+        );
+        assert!(matches!(
+            plan,
+            UnifiedMigrationPlan::FallbackOnly { reason } if reason == "denied"
+        ));
+
+        let plan2 = plan_unified_migration(
+            UnifiedKeystoreOutcome::NoEntry,
+            KeystoreGetOutcome::Unavailable("data locked".into()),
+            KeystoreGetOutcome::NoEntry,
+            Some(random_key()),
+            None,
+        );
+        assert!(matches!(
+            plan2,
+            UnifiedMigrationPlan::FallbackOnly { reason } if reason == "data locked"
+        ));
+    }
+
+    #[test]
+    fn test_plan_generates_when_both_legacy_missing() {
+        let plan = plan_unified_migration(
+            UnifiedKeystoreOutcome::NoEntry,
+            KeystoreGetOutcome::NoEntry,
+            KeystoreGetOutcome::NoEntry,
+            None,
+            None,
+        );
+        assert_eq!(
+            plan,
+            UnifiedMigrationPlan::WriteUnified {
+                data: LegacyKeyMaterial::GenerateNew,
+                vault: LegacyKeyMaterial::GenerateNew,
+            }
+        );
+    }
+
+    #[test]
+    fn test_plan_one_legacy_missing_generates_only_that_half() {
+        let data = random_key();
+        let plan = plan_unified_migration(
+            UnifiedKeystoreOutcome::NoEntry,
+            KeystoreGetOutcome::Found(data),
+            KeystoreGetOutcome::NoEntry,
+            None,
+            None,
+        );
+        assert_eq!(
+            plan,
+            UnifiedMigrationPlan::WriteUnified {
+                data: LegacyKeyMaterial::FromKeystore(data),
+                vault: LegacyKeyMaterial::GenerateNew,
+            }
+        );
+    }
+
+    #[test]
+    fn test_migrate_legacy_two_entries_to_unified_preserves_keys() {
+        let data = random_key();
+        let vault = random_key();
+        let ks = MockKeystore::with_legacy(data, vault);
+
+        let success = execute_unified_migration(&ks, None, None).expect("migrate");
+        assert_eq!(success.bundle.data_at_rest, data);
+        assert_eq!(success.bundle.credential_vault, vault);
+        assert_eq!(success.data_source, KeySource::Keychain);
+
+        assert!(ks.entries.borrow().contains_key(MASTER_KEY_ACCOUNT));
+        assert!(!ks.entries.borrow().contains_key(DATA_AT_REST_ACCOUNT));
+        assert!(!ks.entries.borrow().contains_key(CREDENTIAL_VAULT_ACCOUNT));
+
+        let stored = ks.entries.borrow().get(MASTER_KEY_ACCOUNT).cloned().unwrap();
+        assert_eq!(stored, encode_key_bundle(&success.bundle));
+    }
+
+    #[test]
+    fn test_crash_after_write_before_delete_retries_safely() {
+        let data = random_key();
+        let vault = random_key();
+        let bundle = KeyBundle {
+            data_at_rest: data,
+            credential_vault: vault,
+        };
+
+        let ks = MockKeystore::with_unified(&bundle);
+        ks.entries.borrow_mut().insert(
+            DATA_AT_REST_ACCOUNT.to_string(),
+            to_hex(&data).into_bytes(),
+        );
+        ks.entries.borrow_mut().insert(
+            CREDENTIAL_VAULT_ACCOUNT.to_string(),
+            to_hex(&vault).into_bytes(),
+        );
+
+        let success = execute_unified_migration(&ks, None, None).expect("resume");
+        assert_eq!(success.bundle, bundle);
+        assert!(!ks.entries.borrow().contains_key(DATA_AT_REST_ACCOUNT));
+        assert!(!ks.entries.borrow().contains_key(CREDENTIAL_VAULT_ACCOUNT));
+        assert!(ks.entries.borrow().contains_key(MASTER_KEY_ACCOUNT));
+
+        let ks2 = MockKeystore::with_unified(&bundle);
+        let _ = execute_unified_migration(&ks2, None, None).unwrap();
+        assert_eq!(ks2.get_count(MASTER_KEY_ACCOUNT), 1);
+        assert_eq!(ks2.get_count(DATA_AT_REST_ACCOUNT), 0);
+        assert_eq!(ks2.get_count(CREDENTIAL_VAULT_ACCOUNT), 0);
+    }
+
+    #[test]
+    fn test_fresh_install_both_legacy_missing_creates_unified() {
+        let ks = MockKeystore::default();
+        let success = execute_unified_migration(&ks, None, None).expect("create");
+        assert_ne!(success.bundle.data_at_rest, success.bundle.credential_vault);
+        assert_eq!(success.data_source, KeySource::NewKeyCreated);
+        assert_eq!(success.vault_source, KeySource::NewKeyCreated);
+
+        let stored = ks.entries.borrow().get(MASTER_KEY_ACCOUNT).cloned().unwrap();
+        assert_eq!(decode_key_bundle(&stored), Some(success.bundle));
+        assert_eq!(stored.len(), KEY_BUNDLE_LEN);
+        assert!(!ks.entries.borrow().contains_key(DATA_AT_REST_ACCOUNT));
+        assert!(!ks.entries.borrow().contains_key(CREDENTIAL_VAULT_ACCOUNT));
+    }
+
+    #[test]
+    fn test_one_legacy_missing_still_migrates() {
+        let data = random_key();
+        let ks = MockKeystore::default();
+        ks.entries.borrow_mut().insert(
+            DATA_AT_REST_ACCOUNT.to_string(),
+            to_hex(&data).into_bytes(),
+        );
+
+        let success = execute_unified_migration(&ks, None, None).expect("partial migrate");
+        assert_eq!(success.bundle.data_at_rest, data);
+        assert_ne!(success.bundle.credential_vault, data);
+        assert!(!ks.entries.borrow().contains_key(DATA_AT_REST_ACCOUNT));
+        assert!(ks.entries.borrow().contains_key(MASTER_KEY_ACCOUNT));
+    }
+
+    #[test]
+    fn test_corrupt_unified_does_not_delete_legacy_until_rewrite_verifies() {
+        let data = random_key();
+        let vault = random_key();
+        let ks = MockKeystore::with_legacy(data, vault);
+        ks.entries
+            .borrow_mut()
+            .insert(MASTER_KEY_ACCOUNT.to_string(), vec![0u8; 3]);
+
+        let success = execute_unified_migration(&ks, None, None).expect("rewrite corrupt");
+        assert_eq!(success.bundle.data_at_rest, data);
+        assert_eq!(success.bundle.credential_vault, vault);
+
+        let stored = ks.entries.borrow().get(MASTER_KEY_ACCOUNT).cloned().unwrap();
+        assert_eq!(stored.len(), KEY_BUNDLE_LEN);
+        assert_eq!(decode_key_bundle(&stored), Some(success.bundle));
+        assert!(!ks.entries.borrow().contains_key(DATA_AT_REST_ACCOUNT));
+        assert!(!ks.entries.borrow().contains_key(CREDENTIAL_VAULT_ACCOUNT));
+    }
+
+    #[test]
+    fn test_legacy_denied_aborts_migration_without_touching_entries() {
+        let data = random_key();
+        let vault = random_key();
+        let ks = MockKeystore::with_legacy(data, vault);
+        ks.denied
+            .borrow_mut()
+            .insert(CREDENTIAL_VAULT_ACCOUNT.to_string());
+
+        let err = execute_unified_migration(&ks, None, None).unwrap_err();
+        assert!(err.contains("denied") || err.contains("access"));
+        assert!(!ks.entries.borrow().contains_key(MASTER_KEY_ACCOUNT));
+        assert!(ks.entries.borrow().contains_key(DATA_AT_REST_ACCOUNT));
+        assert!(ks.entries.borrow().contains_key(CREDENTIAL_VAULT_ACCOUNT));
+    }
+
+    #[test]
+    fn test_master_key_denied_aborts_without_touching_legacy() {
+        let data = random_key();
+        let vault = random_key();
+        let ks = MockKeystore::with_legacy(data, vault);
+        ks.denied.borrow_mut().insert(MASTER_KEY_ACCOUNT.to_string());
+
+        let err = execute_unified_migration(&ks, Some(data), Some(vault)).unwrap_err();
+        assert!(err.contains("denied") || err.contains("access"));
+        assert!(!ks.entries.borrow().contains_key(MASTER_KEY_ACCOUNT));
+        assert!(ks.entries.borrow().contains_key(DATA_AT_REST_ACCOUNT));
+        assert!(ks.entries.borrow().contains_key(CREDENTIAL_VAULT_ACCOUNT));
+    }
+
+    #[test]
+    fn test_migrate_from_fallback_files_when_keystore_empty() {
+        let data = random_key();
+        let vault = random_key();
+        let ks = MockKeystore::default();
+
+        let success =
+            execute_unified_migration(&ks, Some(data), Some(vault)).expect("fallback migrate");
+        assert_eq!(success.bundle.data_at_rest, data);
+        assert_eq!(success.bundle.credential_vault, vault);
+        assert_eq!(success.data_source, KeySource::Keychain);
+        assert!(ks.entries.borrow().contains_key(MASTER_KEY_ACCOUNT));
+    }
+
+    #[test]
+    fn test_failed_unified_write_keeps_legacy_keys() {
+        let data = random_key();
+        let vault = random_key();
+        let ks = MockKeystore::with_legacy(data, vault);
+        *ks.fail_set.borrow_mut() = true;
+
+        let success = execute_unified_migration(&ks, None, None).expect("session keys");
+        assert_eq!(success.bundle.data_at_rest, data);
+        assert_eq!(success.bundle.credential_vault, vault);
+        assert!(ks.entries.borrow().contains_key(DATA_AT_REST_ACCOUNT));
+        assert!(ks.entries.borrow().contains_key(CREDENTIAL_VAULT_ACCOUNT));
+        assert!(!ks.entries.borrow().contains_key(MASTER_KEY_ACCOUNT));
+    }
+
+    #[test]
+    fn test_failed_unified_write_of_new_keys_errors_to_independent_resolve() {
+        let ks = MockKeystore::default();
+        *ks.fail_set.borrow_mut() = true;
+        let err = execute_unified_migration(&ks, None, None).unwrap_err();
+        assert!(err.contains("resolve independently") || err.contains("fallback"));
+        assert!(ks.entries.borrow().is_empty());
+    }
+
+    #[test]
+    fn test_delete_failure_after_verify_does_not_panic() {
+        let data = random_key();
+        let vault = random_key();
+        let ks = MockKeystore::with_legacy(data, vault);
+        *ks.fail_delete.borrow_mut() = true;
+
+        let success = execute_unified_migration(&ks, None, None).expect("migrate");
+        assert_eq!(success.bundle.data_at_rest, data);
+        assert!(ks.entries.borrow().contains_key(MASTER_KEY_ACCOUNT));
+        assert!(ks.entries.borrow().contains_key(DATA_AT_REST_ACCOUNT));
+        assert!(ks.entries.borrow().contains_key(CREDENTIAL_VAULT_ACCOUNT));
     }
 }

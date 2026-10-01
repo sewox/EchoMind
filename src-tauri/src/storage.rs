@@ -668,11 +668,7 @@ pub fn require_storage_ready() -> Result<(), String> {
 /// Spawns Keychain / keystore resolution + history load off the UI thread.
 /// Safe to call once from Tauri `setup` after the main window can render.
 pub fn start_storage_unlock(app: tauri::AppHandle) {
-    use crate::secure_key::{
-        begin_key_unlock, get_or_create_key_with_source, mark_keys_ready, quit_abort_requested,
-        CREDENTIAL_VAULT_ACCOUNT, CREDENTIAL_VAULT_FALLBACK, DATA_AT_REST_ACCOUNT,
-        DATA_AT_REST_FALLBACK,
-    };
+    use crate::secure_key::{begin_key_unlock, mark_keys_ready, prime_encryption_keys, quit_abort_requested};
     use tauri::Emitter;
 
     if !begin_key_unlock() {
@@ -696,10 +692,8 @@ pub fn start_storage_unlock(app: tauri::AppHandle) {
         .name("echomind-storage-unlock".into())
         .spawn(move || {
             // May block on macOS Keychain Access prompt — must stay off the main thread.
-            let (_data_key, data_source) =
-                get_or_create_key_with_source(DATA_AT_REST_ACCOUNT, DATA_AT_REST_FALLBACK);
-            let (_vault_key, _vault_source) =
-                get_or_create_key_with_source(CREDENTIAL_VAULT_ACCOUNT, CREDENTIAL_VAULT_FALLBACK);
+            // Single master_key keystore item → at most one prompt for both encryption keys.
+            let data_source = prime_encryption_keys();
 
             if quit_abort_requested() {
                 // Quit while the prompt was open: do not load/emit; process is exiting.
