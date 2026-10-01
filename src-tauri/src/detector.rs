@@ -155,6 +155,81 @@ fn extract_active_meet_code(raw_stdout: &str) -> Option<String> {
     None
 }
 
+/// Hosts that belong to Microsoft Teams Web (exact host or a subdomain).
+/// Path/query substrings like `/teams/` on unrelated sites must never match.
+#[cfg(any(test, target_os = "macos"))]
+fn is_teams_web_host(host: &str) -> bool {
+    let host = host
+        .trim()
+        .trim_end_matches('.')
+        .split(':')
+        .next()
+        .unwrap_or(host)
+        .to_lowercase();
+
+    let is_exact_or_subdomain = |base: &str| host == base || host.ends_with(&format!(".{base}"));
+
+    is_exact_or_subdomain("teams.microsoft.com")
+        || is_exact_or_subdomain("teams.live.com")
+        || is_exact_or_subdomain("teams.cloud.microsoft")
+}
+
+/// Pull http(s) hosts out of an AppleScript tab dump (titles mixed with URLs).
+#[cfg(any(test, target_os = "macos"))]
+fn iter_url_hosts(raw_stdout: &str) -> impl Iterator<Item = String> + '_ {
+    raw_stdout
+        .split([',', ' ', '\n', '\t', '"', '\'', ';', '(', ')'])
+        .filter_map(|chunk| {
+            let chunk = chunk.trim().trim_matches(|c: char| {
+                c == '[' || c == ']' || c == '{' || c == '}' || c == '<' || c == '>'
+            });
+            let lower = chunk.to_lowercase();
+            let scheme_at = lower.find("https://").or_else(|| lower.find("http://"))?;
+            let url = &chunk[scheme_at..];
+            let after_scheme = url.split("://").nth(1)?;
+            let host = after_scheme
+                .split(['/', '?', '#'])
+                .next()?
+                .trim()
+                .trim_end_matches(|c: char| {
+                    !c.is_ascii_alphanumeric() && c != '.' && c != '-' && c != ':'
+                });
+            if host.is_empty() {
+                None
+            } else {
+                Some(host.to_lowercase())
+            }
+        })
+}
+
+/// Tab-title fallback when the dump has no Teams URL: require a real Teams
+/// page title (`… | Microsoft Teams`) or `Microsoft Teams` plus a meeting word.
+/// Plain `teams` / `teams |` alone must never match.
+#[cfg(any(test, target_os = "macos"))]
+fn looks_like_teams_web_title(raw_stdout: &str) -> bool {
+    let lower = raw_stdout.to_lowercase();
+    if lower.contains("| microsoft teams") {
+        return true;
+    }
+    if lower.contains("microsoft teams") {
+        return lower.contains("meeting")
+            || lower.contains("toplantı")
+            || lower.contains("call")
+            || lower.contains("görüşme")
+            || lower.contains("arama");
+    }
+    false
+}
+
+/// True when browser-tab AppleScript output indicates Microsoft Teams Web.
+#[cfg(any(test, target_os = "macos"))]
+fn detects_teams_web(raw_stdout: &str) -> bool {
+    if iter_url_hosts(raw_stdout).any(|host| is_teams_web_host(&host)) {
+        return true;
+    }
+    looks_like_teams_web_title(raw_stdout)
+}
+
 /// Whether a freshly detected meeting should pop up the floating island prompt.
 /// Never while a recording is already running — there's nothing to prompt for,
 /// and it would just overlay/block the main window (matching the existing
@@ -315,12 +390,8 @@ impl MeetingDetector {
             }
         }
 
-        if titles_str.contains("teams.microsoft.com")
-            || titles_str.contains("teams.live.com")
-            || titles_str.contains("teams |")
-            || (titles_str.contains("teams") && titles_str.contains("meeting"))
-            || (titles_str.contains("teams") && titles_str.contains("toplantı"))
-        {
+        // Host-whitelist / Teams-title detection (not any URL/title containing "teams").
+        if detects_teams_web(raw_stdout) {
             return Some(MeetingAppInfo {
                 app_id: "teams".to_string(),
                 display_name: "Microsoft Teams (Web)".to_string(),
@@ -1093,6 +1164,29 @@ mod tests {
     }
 
     #[test]
+    fn test_meeting_from_browser_tab_dump_teams_uses_host_whitelist() {
+        let date = "01 October 2026";
+        let teams = MeetingDetector::meeting_from_browser_tab_dump(
+            "Google Chrome",
+            "Microsoft Teams, https://teams.microsoft.com/v2/?meetingId=abc",
+            date,
+        )
+        .expect("teams web");
+        assert_eq!(teams.app_id, "teams");
+        assert_eq!(teams.display_name, "Microsoft Teams (Web)");
+
+        assert!(
+            MeetingDetector::meeting_from_browser_tab_dump(
+                "Google Chrome",
+                "App Store Connect, https://appstoreconnect.apple.com/teams/abc/apps",
+                date,
+            )
+            .is_none(),
+            "unrelated /teams/ paths must not detect Teams Web"
+        );
+    }
+
+    #[test]
     fn test_scan_processes_legacy_runs_without_panic() {
         let _ = MeetingDetector::scan_processes_legacy();
     }
@@ -1142,6 +1236,68 @@ mod tests {
     #[test]
     fn test_extract_active_meet_code_none_when_no_meet_url_present() {
         assert_eq!(extract_active_meet_code("New Tab, Google Chrome"), None);
+    }
+
+    #[test]
+    fn test_detects_teams_web_positive_microsoft_url() {
+        assert!(detects_teams_web(
+            "Microsoft Teams, https://teams.microsoft.com/v2/?meetingId=abc"
+        ));
+    }
+
+    #[test]
+    fn test_detects_teams_web_positive_live_url() {
+        assert!(detects_teams_web(
+            "Join meeting, https://teams.live.com/meet/abc123"
+        ));
+    }
+
+    #[test]
+    fn test_detects_teams_web_positive_cloud_microsoft_host() {
+        assert!(detects_teams_web(
+            "Teams, https://teams.cloud.microsoft/v2/meetings"
+        ));
+        assert!(detects_teams_web(
+            "Teams, https://gov.teams.microsoft.com/l/meetup-join/abc"
+        ));
+    }
+
+    #[test]
+    fn test_detects_teams_web_positive_title_microsoft_teams_suffix() {
+        assert!(detects_teams_web("Meeting | Microsoft Teams"));
+    }
+
+    #[test]
+    fn test_detects_teams_web_negative_app_store_connect_url() {
+        assert!(!detects_teams_web(
+            "App Store Connect, https://appstoreconnect.apple.com/teams/abc/apps"
+        ));
+    }
+
+    #[test]
+    fn test_detects_teams_web_negative_example_teams_path() {
+        assert!(!detects_teams_web("Example, https://example.com/teams/"));
+    }
+
+    #[test]
+    fn test_detects_teams_web_negative_teams_pipe_unrelated_title() {
+        assert!(!detects_teams_web("Teams | App Store Connect"));
+    }
+
+    #[test]
+    fn test_detects_teams_web_negative_plain_teams_meeting_notes() {
+        assert!(!detects_teams_web(
+            "Our teams meeting notes, https://docs.example.com/notes/1"
+        ));
+    }
+
+    #[test]
+    fn test_is_teams_web_host_rejects_lookalike_hosts() {
+        assert!(!is_teams_web_host("notteams.microsoft.com"));
+        assert!(!is_teams_web_host("teams.microsoft.com.evil.com"));
+        assert!(!is_teams_web_host("appstoreconnect.apple.com"));
+        assert!(is_teams_web_host("teams.microsoft.com"));
+        assert!(is_teams_web_host("sub.teams.live.com"));
     }
 
     #[test]
