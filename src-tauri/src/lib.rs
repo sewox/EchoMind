@@ -13,11 +13,13 @@ pub mod importer;
 pub mod offline_engines;
 pub mod player;
 pub mod qa_e2e_tests;
+pub mod resample;
 pub mod secure_key;
 pub mod security;
 pub mod speaker_embedding;
 pub mod storage;
 pub mod summarizer;
+pub mod system_audio;
 pub mod transcriber;
 pub mod transcription_queue;
 pub mod updater;
@@ -28,9 +30,9 @@ use security::{get_privacy_mode, set_privacy_mode};
 use updater::{check_for_updates, download_and_install_update};
 
 use audio::{
-    cancel_audio_capture, get_audio_status, list_audio_devices, open_audio_midi_setup,
-    start_audio_capture, start_meeting_recording, start_mic_preview, stop_audio_capture,
-    stop_mic_preview,
+    cancel_audio_capture, get_audio_status, get_system_audio_enabled, get_system_audio_support,
+    list_audio_devices, open_audio_midi_setup, set_system_audio_enabled, start_audio_capture,
+    start_meeting_recording, start_mic_preview, stop_audio_capture, stop_mic_preview,
 };
 use audio_clipper::clip_meeting_soundbite;
 use cross_memory::{get_cross_meeting_memory_stats, search_cross_meeting_memory};
@@ -87,6 +89,9 @@ pub fn run() {
             get_audio_status,
             list_audio_devices,
             open_audio_midi_setup,
+            set_system_audio_enabled,
+            get_system_audio_enabled,
+            get_system_audio_support,
             transcribe_audio_buffer,
             get_transcription_history,
             clear_transcription_history,

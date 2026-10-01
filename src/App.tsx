@@ -259,6 +259,13 @@ export function App() {
     CredentialStore.migrateLegacyStorage().catch(() => {});
   }, [storageReady]);
 
+  // Sync native system-audio preference before the first recording starts.
+  useEffect(() => {
+    const enabled =
+      localStorage.getItem("echomind_system_audio_enabled") !== "false";
+    invoke("set_system_audio_enabled", { enabled }).catch(() => {});
+  }, []);
+
   useEffect(() => {
     const autoCheck =
       localStorage.getItem("echomind_auto_check_updates") !== "false";

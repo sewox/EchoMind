@@ -36,6 +36,10 @@ path = "examples/diarization_eval.rs"
 [build-dependencies]
 tauri-build = { version = "2.0.5", features = [] }
 
+# Swift bridge for Core Audio process taps — only needed when building for macOS.
+[target.'cfg(target_os = "macos")'.build-dependencies]
+swift-rs = { version = "1.0", features = ["build"] }
+
 [dependencies]
 tauri = { version = "2.2.0", features = ["macos-private-api", "protocol-asset"] }
 tauri-plugin-shell = "2.0.0"
@@ -65,6 +69,7 @@ keyring = { version = "3", features = ["apple-native", "windows-native", "sync-s
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc = "0.2"
+swift-rs = "1.0"
 whisper-rs = { version = "0.16.0", features = ["metal"] }
 
 [target.'cfg(not(target_os = "macos"))'.dependencies]

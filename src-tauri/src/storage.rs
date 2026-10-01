@@ -1159,57 +1159,58 @@ fn save_current_meeting_blocking(
     // Explicit order: stop is done by the caller; finalize segments, then claim.
     let segments = transcriber.take_history();
 
-    let (session_id, raw_pcm_buffer, live_covered_samples) = match audio_engine.claim_pcm_for_save()
-    {
-        PcmClaim::AlreadySaved { session_id } => {
-            // Wait until the winner publishes Done/Nothing — never bare Err.
-            loop {
-                match gate.as_ref() {
-                    Some(cache) if cache.session_id == session_id => {
-                        if let Some(ref outcome) = cache.outcome {
-                            return match outcome {
-                                SessionSaveOutcome::Done(m) => Ok(((**m).clone(), None)),
-                                SessionSaveOutcome::Nothing => Err(NOTHING_TO_SAVE.to_string()),
-                            };
+    let (session_id, raw_pcm_buffer, live_covered_samples, session_channels) =
+        match audio_engine.claim_pcm_for_save() {
+            PcmClaim::AlreadySaved { session_id } => {
+                // Wait until the winner publishes Done/Nothing — never bare Err.
+                loop {
+                    match gate.as_ref() {
+                        Some(cache) if cache.session_id == session_id => {
+                            if let Some(ref outcome) = cache.outcome {
+                                return match outcome {
+                                    SessionSaveOutcome::Done(m) => Ok(((**m).clone(), None)),
+                                    SessionSaveOutcome::Nothing => Err(NOTHING_TO_SAVE.to_string()),
+                                };
+                            }
+                            gate = gate_cv.wait(gate).unwrap();
                         }
-                        gate = gate_cv.wait(gate).unwrap();
-                    }
-                    _ => {
-                        let (g, wait_result) = gate_cv
-                            .wait_timeout(gate, std::time::Duration::from_millis(200))
-                            .unwrap();
-                        gate = g;
-                        if wait_result.timed_out() {
-                            // Winner never published — treat as silent no-op.
-                            return Err(NOTHING_TO_SAVE.to_string());
+                        _ => {
+                            let (g, wait_result) = gate_cv
+                                .wait_timeout(gate, std::time::Duration::from_millis(200))
+                                .unwrap();
+                            gate = g;
+                            if wait_result.timed_out() {
+                                // Winner never published — treat as silent no-op.
+                                return Err(NOTHING_TO_SAVE.to_string());
+                            }
                         }
                     }
                 }
             }
-        }
-        PcmClaim::NothingToSave { session_id } => {
-            *gate = Some(SessionSaveCache {
+            PcmClaim::NothingToSave { session_id } => {
+                *gate = Some(SessionSaveCache {
+                    session_id,
+                    outcome: Some(SessionSaveOutcome::Nothing),
+                });
+                gate_cv.notify_all();
+                return Err(NOTHING_TO_SAVE.to_string());
+            }
+            PcmClaim::Claimed {
                 session_id,
-                outcome: Some(SessionSaveOutcome::Nothing),
-            });
-            gate_cv.notify_all();
-            return Err(NOTHING_TO_SAVE.to_string());
-        }
-        PcmClaim::Claimed {
-            session_id,
-            pcm,
-            live_covered_samples,
-        } => {
-            *gate = Some(SessionSaveCache {
-                session_id,
-                outcome: None,
-            });
-            gate_cv.notify_all();
-            // Release gate lock while doing FLAC I/O so waiters can observe Pending.
-            drop(gate);
-            (session_id, pcm, live_covered_samples)
-        }
-    };
+                pcm,
+                live_covered_samples,
+                channels,
+            } => {
+                *gate = Some(SessionSaveCache {
+                    session_id,
+                    outcome: None,
+                });
+                gate_cv.notify_all();
+                // Release gate lock while doing FLAC I/O so waiters can observe Pending.
+                drop(gate);
+                (session_id, pcm, live_covered_samples, channels)
+            }
+        };
 
     flac_save_in_flight().store(true, Ordering::SeqCst);
     let save_result = (|| {
@@ -1268,13 +1269,22 @@ fn save_current_meeting_blocking(
         // label speakers once for the whole session now. Skipped on quit (tight
         // time budget) and when a full re-transcription is queued anyway.
         if mode == SaveMode::Normal && !transcript_pending && !deduplicated_segments.is_empty() {
-            crate::diarization::cluster_speakers(
-                &mut deduplicated_segments,
-                &raw_pcm_buffer,
-                16000,
-                6,
-            );
-            crate::diarization::resolve_speaker_names(&mut deduplicated_segments);
+            if let Some(ref ch) = session_channels {
+                crate::diarization::attribute_speakers_by_channel(
+                    &mut deduplicated_segments,
+                    &ch.mic,
+                    &ch.system,
+                    16000,
+                );
+            } else {
+                crate::diarization::cluster_speakers(
+                    &mut deduplicated_segments,
+                    &raw_pcm_buffer,
+                    16000,
+                    6,
+                );
+                crate::diarization::resolve_speaker_names(&mut deduplicated_segments);
+            }
         }
         // Quit never enqueues Whisper; normal save queues a durable FLAC job.
         let flac_to_enqueue = match mode {

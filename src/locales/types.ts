@@ -482,6 +482,10 @@ export interface TranslationKeys {
       yourVoice: string;
       systemAudioLoopback: string;
       systemAudioSpeaker: string;
+      systemAudioCaptureToggle: string;
+      systemAudioCaptureDesc: string;
+      systemAudioUnsupported: string;
+      systemAudioDeniedHint: string;
       testingAudio: string;
       testInput: string;
       openSoundPanelTitle: string;

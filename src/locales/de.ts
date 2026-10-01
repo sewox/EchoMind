@@ -534,6 +534,13 @@ export const de: TranslationKeys = {
       yourVoice: "Ihre Stimme: aktiver Eingang",
       systemAudioLoopback: "Systemaudio: Loopback aktiv",
       systemAudioSpeaker: "Systemaudio: Lautsprecher/Raum",
+      systemAudioCaptureToggle: "Systemaudio aufnehmen (entfernte Teilnehmer)",
+      systemAudioCaptureDesc:
+        "Unter macOS 14.2+ wird Meeting-App-Audio zusammen mit dem Mikrofon aufgenommen. Aus = nur Mikrofon.",
+      systemAudioUnsupported:
+        "Native Systemaudio-Aufnahme wird auf dieser Plattform nicht unterstützt. Nutzen Sie ein virtuelles Loopback-Gerät oder nur das Mikrofon.",
+      systemAudioDeniedHint:
+        "Systemaudio-Berechtigung verweigert oder Start fehlgeschlagen. Entfernte Teilnehmer fehlen möglicherweise.",
       testingAudio: "Audio wird getestet (VU aktiv)...",
       testInput: "Eingang testen (5 s)",
       openSoundPanelTitle: "Sound-Systemsteuerung oder Audio-MIDI-Setup öffnen",

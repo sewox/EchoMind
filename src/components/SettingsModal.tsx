@@ -144,6 +144,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   const [askCloudConfirm, setAskCloudConfirm] = useState<boolean>(true);
+  const [systemAudioEnabled, setSystemAudioEnabled] = useState<boolean>(true);
+  const [systemAudioSupported, setSystemAudioSupported] =
+    useState<boolean>(false);
 
   // Meeting Detector Settings State
   const [detectorSettings, setDetectorSettings] = useState<{
@@ -230,6 +233,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       const savedDev =
         localStorage.getItem("echomind_selected_audio_device") || "default";
       setSelectedAudioDevice(savedDev);
+
+      const sysAudioPref =
+        localStorage.getItem("echomind_system_audio_enabled") !== "false";
+      setSystemAudioEnabled(sysAudioPref);
+      invoke("set_system_audio_enabled", { enabled: sysAudioPref }).catch(
+        () => {},
+      );
+      invoke<boolean>("get_system_audio_support")
+        .then((supported) => setSystemAudioSupported(!!supported))
+        .catch(() => setSystemAudioSupported(false));
 
       CredentialStore.get("echomind_groq_key").then((k) => setGroqKey(k || ""));
       CredentialStore.get("echomind_gemini_key").then((k) =>
@@ -349,6 +362,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     } else {
       localStorage.setItem("echomind_selected_audio_device", devName);
     }
+  };
+
+  const handleSystemAudioToggle = (enabled: boolean) => {
+    setSystemAudioEnabled(enabled);
+    if (enabled) {
+      localStorage.setItem("echomind_system_audio_enabled", "true");
+    } else {
+      localStorage.setItem("echomind_system_audio_enabled", "false");
+    }
+    invoke("set_system_audio_enabled", { enabled }).catch(console.error);
   };
 
   const handleSaveKeys = async () => {
@@ -596,6 +619,34 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <span>{t("ui.settings.filter")}</span>
                 </div>
               </div>
+            </div>
+
+            {/* Native system-audio capture (macOS process tap) */}
+            <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/80 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <label className="text-slate-200 font-medium flex items-center gap-1.5">
+                  <Volume2 className="w-4 h-4 text-cyan-400 shrink-0" />
+                  {t("ui.settings.systemAudioCaptureToggle")}
+                </label>
+                <p className="text-slate-400 text-[11px] mt-0.5">
+                  {t("ui.settings.systemAudioCaptureDesc")}
+                </p>
+                {!systemAudioSupported && (
+                  <p
+                    className="text-amber-300/90 text-[10.5px] mt-1.5 leading-relaxed"
+                    data-testid="system-audio-unsupported"
+                  >
+                    {t("ui.settings.systemAudioUnsupported")}
+                  </p>
+                )}
+              </div>
+              <input
+                type="checkbox"
+                checked={systemAudioEnabled}
+                onChange={(e) => handleSystemAudioToggle(e.target.checked)}
+                data-testid="system-audio-toggle"
+                className="w-4 h-4 rounded border-slate-700 bg-slate-800 text-cyan-600 focus:ring-0 cursor-pointer shrink-0"
+              />
             </div>
 
             {/* Dynamic System Audio & Loopback Status Card */}
