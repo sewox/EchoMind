@@ -28,6 +28,22 @@ private var session: TapSession?
 private let kUnsupportedOS: Int32 = -1
 private let kAlreadyRunning: Int32 = -2
 
+/// Translates a unix PID into the Core Audio process object the tap API expects.
+private func processObjectID(for pid: pid_t) -> AudioObjectID? {
+    var pidValue = pid
+    var objectID = AudioObjectID(kAudioObjectUnknown)
+    var size = UInt32(MemoryLayout<AudioObjectID>.size)
+    var address = AudioObjectPropertyAddress(
+        mSelector: kAudioHardwarePropertyTranslatePIDToProcessObject,
+        mScope: kAudioObjectPropertyScopeGlobal,
+        mElement: kAudioObjectPropertyElementMain)
+    let status = AudioObjectGetPropertyData(
+        AudioObjectID(kAudioObjectSystemObject), &address,
+        UInt32(MemoryLayout<pid_t>.size), &pidValue, &size, &objectID)
+    guard status == noErr, objectID != kAudioObjectUnknown else { return nil }
+    return objectID
+}
+
 private func teardown(_ s: TapSession) {
     if let p = s.procID {
         AudioDeviceStop(s.aggregateID, p)
@@ -55,8 +71,11 @@ public func echomind_systap_start(
 
     let s = TapSession()
     // Exclude this process so EchoMind playback is not fed back into the tap.
-    let selfPid = ProcessInfo.processInfo.processIdentifier
-    let description = CATapDescription(stereoGlobalTapButExcludeProcesses: [selfPid])
+    var excluded: [AudioObjectID] = []
+    if let selfObject = processObjectID(for: ProcessInfo.processInfo.processIdentifier) {
+        excluded.append(selfObject)
+    }
+    let description = CATapDescription(stereoGlobalTapButExcludeProcesses: excluded)
     description.uuid = UUID()
     description.muteBehavior = .unmuted
     description.isPrivate = true
