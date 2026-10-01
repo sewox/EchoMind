@@ -141,4 +141,25 @@ describe("I18nContext", () => {
     );
     expect(screen.getByTestId("current-lang").textContent).toBe("tr");
   });
+
+  it("follows language changes made in another window (floating island)", () => {
+    render(
+      <I18nProvider>
+        <TestConsumer />
+      </I18nProvider>,
+    );
+    const fire = (key: string | null, newValue: string | null) =>
+      act(() => {
+        window.dispatchEvent(new StorageEvent("storage", { key, newValue }));
+      });
+
+    fire("echomind_app_language", "en");
+    expect(screen.getByTestId("current-lang").textContent).toBe("en");
+
+    // Unrelated keys, cleared values and unknown languages are ignored.
+    fire("some_other_key", "de");
+    fire("echomind_app_language", null);
+    fire("echomind_app_language", "xx");
+    expect(screen.getByTestId("current-lang").textContent).toBe("en");
+  });
 });
