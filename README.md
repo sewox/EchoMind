@@ -280,6 +280,10 @@ npm run test:rust       # Cargo Backend Testleri (66 Test)
 Bu proje **[MIT Lisansı](LICENSE)** altında lisanslanmıştır.  
 This project is licensed under the terms of the **MIT License**.
 
+**Üçüncü taraf modeller / Third-party models** (ilk kullanımda indirilir, cihazda çalışır / downloaded on first use, run on-device):
+- Konuşma tanıma / Speech recognition: [whisper.cpp GGML modelleri](https://huggingface.co/ggerganov/whisper.cpp) (OpenAI Whisper, MIT)
+- Konuşmacı ayrıştırma / Speaker diarization: [3D-Speaker CAM++ (VoxCeleb)](https://www.modelscope.cn/models/iic/speech_campplus_sv_en_voxceleb_16k/summary), ONNX dönüştürmesi [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) (Apache-2.0)
+
 <div align="center">
   <br/>
   <b>Built with ❤️ by EchoMind Team</b>

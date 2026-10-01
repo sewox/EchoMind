@@ -331,7 +331,19 @@ impl GlobalTranscriberEngine {
         samples: &[f32],
         language: &str,
     ) -> Result<Vec<TranscriptSegment>, String> {
-        self.transcribe_pcm_impl(samples, language, None)
+        self.transcribe_pcm_impl(samples, language, None, 0)
+    }
+
+    /// Live path for a slice that starts `offset_ms` into the recording: new
+    /// segments are timestamped relative to the start of the recording, so the
+    /// whole session can be diarized consistently when it is saved.
+    pub fn transcribe_pcm_live(
+        &self,
+        samples: &[f32],
+        language: &str,
+        offset_ms: u64,
+    ) -> Result<Vec<TranscriptSegment>, String> {
+        self.transcribe_pcm_impl(samples, language, None, offset_ms)
     }
 
     /// Background (queue) path: never touches the live transcript history,
@@ -345,7 +357,7 @@ impl GlobalTranscriberEngine {
         language: &str,
         cancel: &AtomicBool,
     ) -> Result<Vec<TranscriptSegment>, String> {
-        self.transcribe_pcm_impl(samples, language, Some(cancel))
+        self.transcribe_pcm_impl(samples, language, Some(cancel), 0)
     }
 
     fn transcribe_pcm_impl(
@@ -353,6 +365,7 @@ impl GlobalTranscriberEngine {
         samples: &[f32],
         language: &str,
         batch_cancel: Option<&AtomicBool>,
+        offset_ms: u64,
     ) -> Result<Vec<TranscriptSegment>, String> {
         let is_batch = batch_cancel.is_some();
         let cancelled =
@@ -618,11 +631,19 @@ impl GlobalTranscriberEngine {
             }
         }
 
-        // 1. Cluster speakers into real acoustic voice groups based on physical pitch/timbre
-        crate::diarization::cluster_speakers(&mut new_segments, samples, 16000, 6);
-
-        // 2. Automatically resolve speaker names from Turkish vocative addressing and introductions
-        crate::diarization::resolve_speaker_names(&mut new_segments);
+        if is_batch {
+            // Whole recording: diarize here. Live slices are diarized once for
+            // the whole session when it is saved (per-slice clustering would
+            // restart speaker numbering every few seconds).
+            crate::diarization::cluster_speakers(&mut new_segments, samples, 16000, 6);
+            crate::diarization::resolve_speaker_names(&mut new_segments);
+        } else if offset_ms > 0 {
+            for seg in new_segments.iter_mut() {
+                seg.start_time_ms += offset_ms;
+                seg.end_time_ms += offset_ms;
+                seg.timestamp_formatted = format_span(seg.start_time_ms, seg.end_time_ms);
+            }
+        }
 
         if is_batch {
             // An abort during the last chunk's full() only shows up here.
@@ -824,6 +845,12 @@ fn segment_by_detected_language(
     runs
 }
 
+/// "MM:SS -> MM:SS" (hours folded into minutes), as shown in the transcript.
+pub fn format_span(start_ms: u64, end_ms: u64) -> String {
+    let (s, e) = (start_ms / 1000, end_ms / 1000);
+    format!("{:02}:{:02} -> {:02}:{:02}", s / 60, s % 60, e / 60, e % 60)
+}
+
 pub fn get_global_transcriber() -> &'static GlobalTranscriberEngine {
     static ENGINE: OnceLock<GlobalTranscriberEngine> = OnceLock::new();
     ENGINE.get_or_init(GlobalTranscriberEngine::new)
@@ -835,14 +862,14 @@ pub fn transcribe_audio_buffer(language: String) -> Result<Vec<TranscriptSegment
     let audio_engine = crate::audio::get_global_audio_engine();
     // Live transcription advances a cursor only — never take/clear the session
     // persist buffer (that is exclusive to claim_pcm_for_save).
-    let samples = match audio_engine
-        .take_pcm_for_live_transcribe(crate::audio::GlobalAudioEngine::LIVE_TRANSCRIBE_MIN_SAMPLES)
-    {
+    let (start, samples) = match audio_engine.take_pcm_for_live_transcribe_at(
+        crate::audio::GlobalAudioEngine::LIVE_TRANSCRIBE_MIN_SAMPLES,
+    ) {
         Some(s) => s,
         None => return Ok(engine.get_history()),
     };
 
-    engine.transcribe_pcm(&samples, &language)
+    engine.transcribe_pcm_live(&samples, &language, (start as u64 * 1000) / 16000)
 }
 
 #[tauri::command]

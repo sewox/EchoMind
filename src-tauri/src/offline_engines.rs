@@ -111,14 +111,22 @@ if !transcribedText.isEmpty {{
 
         // Seamless fallback to Whisper Local if Swift CLI is not permitted
         let transcriber = crate::transcriber::get_global_transcriber();
-        transcriber.transcribe_pcm(&pcm_16k, language)
+        transcriber.transcribe_pcm_batch(
+            &pcm_16k,
+            language,
+            &std::sync::atomic::AtomicBool::new(false),
+        )
     }
 
     #[cfg(not(target_os = "macos"))]
     {
         let (pcm_16k, _) = crate::importer::decode_audio_file_to_pcm16k(audio_path)?;
         let transcriber = crate::transcriber::get_global_transcriber();
-        transcriber.transcribe_pcm(&pcm_16k, language)
+        transcriber.transcribe_pcm_batch(
+            &pcm_16k,
+            language,
+            &std::sync::atomic::AtomicBool::new(false),
+        )
     }
 }
 
@@ -136,7 +144,11 @@ pub fn transcribe_sensevoice(
     // In our engine, we route to Whisper Small in greedy deterministic mode (temperature=0.0)
     // with rich tag detection (emotion/speaker context).
     let transcriber = crate::transcriber::get_global_transcriber();
-    let mut segments = transcriber.transcribe_pcm(&pcm_16k, language)?;
+    let mut segments = transcriber.transcribe_pcm_batch(
+        &pcm_16k,
+        language,
+        &std::sync::atomic::AtomicBool::new(false),
+    )?;
 
     for seg in &mut segments {
         if !seg.text.contains("😊") && !seg.text.contains("💬") {

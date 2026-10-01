@@ -1,182 +1,636 @@
 use crate::transcriber::TranscriptSegment;
 use regex::Regex;
+use rustfft::{num_complex::Complex32, FftPlanner};
 use std::collections::HashMap;
 
-/// 8-Band spectral energy profile representing the vocal tract filter envelope
-#[derive(Debug, Clone)]
-pub struct AcousticFeatures {
-    pub pitch_f0: f32,            // Median fundamental frequency in Hz (80 Hz - 400 Hz)
-    pub spectral_bands: [f32; 8], // 8-band log-energy spectral distribution
-    pub zero_crossing_rate: f32,  // Phonetic articulation speed
-    pub rms_energy: f32,          // Segment volume dynamics
-    pub voiced_frame_count: usize, // Number of valid voiced speech frames
+// ---------------------------------------------------------------------------
+// Speaker diarization.
+//
+// 1. MFCC front end over the whole recording (25 ms frames, 10 ms hop,
+//    40 mel filters, 19 cepstra), with an energy VAD and recording-level
+//    mean/variance normalisation (removes microphone / room colouring).
+// 2. Each transcript segment is modelled as a diagonal Gaussian over the
+//    cepstra of its speech frames.
+// 3. Greedy agglomerative clustering with the Bayesian Information Criterion:
+//    two clusters merge only while one speaker explains them better than two
+//    (ΔBIC < 0), so the speaker count comes out of the data and a single
+//    speaker is not split. O(n²) ΔBIC evaluations via nearest-neighbour tracking.
+// 4. Segments too short for reliable statistics are attached to the nearest
+//    speaker; silent ones inherit the previous speaker.
+// ---------------------------------------------------------------------------
+
+const FRAME_LEN: usize = 400; // 25 ms @ 16 kHz
+const HOP_LEN: usize = 160; // 10 ms
+const N_FFT: usize = 512;
+const N_MELS: usize = 40;
+const N_CEPS: usize = 19; // c1..c19 (c0 = loudness, dropped)
+
+/// Per-frame normalised cepstra for a whole recording plus a speech mask.
+pub struct FrameFeatures {
+    ceps: Vec<[f32; N_CEPS]>,
+    speech: Vec<bool>,
+    sample_rate: u32,
 }
 
-impl Default for AcousticFeatures {
-    fn default() -> Self {
-        Self {
-            pitch_f0: 150.0,
-            spectral_bands: [0.35355339; 8],
-            zero_crossing_rate: 0.05,
-            rms_energy: 0.05,
-            voiced_frame_count: 0,
+fn hz_to_mel(f: f32) -> f32 {
+    2595.0 * (1.0 + f / 700.0).log10()
+}
+
+fn mel_to_hz(m: f32) -> f32 {
+    700.0 * (10f32.powf(m / 2595.0) - 1.0)
+}
+
+fn mel_filterbank(sample_rate: u32) -> Vec<Vec<(usize, f32)>> {
+    let bins = N_FFT / 2 + 1;
+    let f_max = (sample_rate as f32 / 2.0).min(7600.0);
+    let (m_lo, m_hi) = (hz_to_mel(60.0), hz_to_mel(f_max));
+    let pts: Vec<f32> = (0..N_MELS + 2)
+        .map(|i| mel_to_hz(m_lo + (m_hi - m_lo) * i as f32 / (N_MELS + 1) as f32))
+        .map(|hz| hz * N_FFT as f32 / sample_rate as f32)
+        .collect();
+    (0..N_MELS)
+        .map(|m| {
+            let (l, c, r) = (pts[m], pts[m + 1], pts[m + 2]);
+            (0..bins)
+                .filter_map(|k| {
+                    let k_f = k as f32;
+                    let w = if k_f > l && k_f <= c {
+                        (k_f - l) / (c - l)
+                    } else if k_f > c && k_f < r {
+                        (r - k_f) / (r - c)
+                    } else {
+                        0.0
+                    };
+                    (w > 0.0).then_some((k, w))
+                })
+                .collect()
+        })
+        .collect()
+}
+
+/// MFCC + energy VAD + recording-level CMVN.
+pub fn compute_frame_features(pcm: &[f32], sample_rate: u32) -> FrameFeatures {
+    let empty = FrameFeatures {
+        ceps: Vec::new(),
+        speech: Vec::new(),
+        sample_rate,
+    };
+    if pcm.len() < FRAME_LEN {
+        return empty;
+    }
+    let n_frames = (pcm.len() - FRAME_LEN) / HOP_LEN + 1;
+    let window: Vec<f32> = (0..FRAME_LEN)
+        .map(|i| {
+            0.54 - 0.46 * (2.0 * std::f32::consts::PI * i as f32 / (FRAME_LEN - 1) as f32).cos()
+        })
+        .collect();
+    let fb = mel_filterbank(sample_rate);
+    // DCT-II basis for c1..c19.
+    let dct: Vec<[f32; N_MELS]> = (1..=N_CEPS)
+        .map(|k| {
+            let mut row = [0f32; N_MELS];
+            for (m, v) in row.iter_mut().enumerate() {
+                *v = (std::f32::consts::PI * k as f32 * (m as f32 + 0.5) / N_MELS as f32).cos();
+            }
+            row
+        })
+        .collect();
+
+    let fft = FftPlanner::<f32>::new().plan_fft_forward(N_FFT);
+    let mut buf = vec![Complex32::new(0.0, 0.0); N_FFT];
+    let mut ceps = Vec::with_capacity(n_frames);
+    let mut log_energy = Vec::with_capacity(n_frames);
+
+    for f in 0..n_frames {
+        let frame = &pcm[f * HOP_LEN..f * HOP_LEN + FRAME_LEN];
+        let mut energy = 0f32;
+        let mut prev = 0f32;
+        for (i, b) in buf.iter_mut().enumerate() {
+            if i < FRAME_LEN {
+                // pre-emphasis + Hamming
+                let x = frame[i] - 0.97 * prev;
+                prev = frame[i];
+                energy += frame[i] * frame[i];
+                *b = Complex32::new(x * window[i], 0.0);
+            } else {
+                *b = Complex32::new(0.0, 0.0);
+            }
+        }
+        fft.process(&mut buf);
+        let mut mel = [0f32; N_MELS];
+        for (m, filt) in fb.iter().enumerate() {
+            let mut acc = 0f32;
+            for &(k, w) in filt {
+                acc += w * buf[k].norm_sqr();
+            }
+            mel[m] = (acc + 1e-10).ln();
+        }
+        let mut c = [0f32; N_CEPS];
+        for (k, row) in dct.iter().enumerate() {
+            c[k] = row.iter().zip(mel.iter()).map(|(a, b)| a * b).sum();
+        }
+        ceps.push(c);
+        log_energy.push(10.0 * (energy / FRAME_LEN as f32 + 1e-10).log10());
+    }
+
+    // Energy VAD: speech = frames well above the recording's noise floor.
+    let mut sorted = log_energy.clone();
+    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    let noise_floor = sorted[sorted.len() / 10];
+    let loud = sorted[(sorted.len() * 95) / 100];
+    let threshold = (noise_floor + 9.0).max(loud - 35.0).max(-60.0);
+    let speech: Vec<bool> = log_energy.iter().map(|&e| e > threshold).collect();
+
+    // CMVN over speech frames.
+    let mut mean = [0f64; N_CEPS];
+    let mut sq = [0f64; N_CEPS];
+    let mut n = 0f64;
+    for (c, &s) in ceps.iter().zip(&speech) {
+        if s {
+            for k in 0..N_CEPS {
+                mean[k] += c[k] as f64;
+                sq[k] += (c[k] as f64).powi(2);
+            }
+            n += 1.0;
         }
     }
-}
-
-/// Extract frame-by-frame acoustic features across the ENTIRE segment (32ms frames with 16ms hop)
-pub fn extract_segment_features(samples: &[f32], sample_rate: u32) -> AcousticFeatures {
-    if samples.is_empty() {
-        return AcousticFeatures::default();
-    }
-
-    let frame_size = ((sample_rate as f32) * 0.032) as usize; // 32ms (~512 samples at 16kHz)
-    let hop_size = ((sample_rate as f32) * 0.016) as usize; // 16ms (~256 samples at 16kHz)
-
-    if samples.len() < frame_size {
-        // Fallback for extremely short bursts
-        let rms_energy =
-            (samples.iter().map(|&s| s * s).sum::<f32>() / samples.len().max(1) as f32).sqrt();
-        return AcousticFeatures {
-            rms_energy,
-            ..Default::default()
+    if n < 2.0 {
+        return FrameFeatures {
+            ceps,
+            speech,
+            sample_rate,
         };
     }
-
-    let min_lag = (sample_rate / 400) as usize; // ~40 samples (400 Hz)
-    let max_lag = (sample_rate / 80) as usize; // ~200 samples (80 Hz)
-
-    let mut pitch_list: Vec<f32> = Vec::new();
-    let mut band_energy_accum = [0.0f32; 8];
-    let mut zcr_sum = 0.0f32;
-    let mut rms_sum = 0.0f32;
-    let mut total_voiced_frames = 0;
-
-    let num_frames = (samples.len() - frame_size) / hop_size + 1;
-
-    for f_idx in 0..num_frames {
-        let start = f_idx * hop_size;
-        let end = start + frame_size;
-        let frame = &samples[start..end];
-
-        // Frame Energy
-        let frame_sum_sq: f32 = frame.iter().map(|&s| s * s).sum();
-        let frame_rms = (frame_sum_sq / frame_size as f32).sqrt();
-
-        // Skip silent or background noise frames
-        if frame_rms < 0.005 {
-            continue;
+    let mut std = [0f64; N_CEPS];
+    for k in 0..N_CEPS {
+        mean[k] /= n;
+        std[k] = (sq[k] / n - mean[k] * mean[k]).max(1e-6).sqrt();
+    }
+    for c in ceps.iter_mut() {
+        for k in 0..N_CEPS {
+            c[k] = ((c[k] as f64 - mean[k]) / std[k]) as f32;
         }
+    }
+    FrameFeatures {
+        ceps,
+        speech,
+        sample_rate,
+    }
+}
 
-        // Zero-Crossing Rate
-        let mut zc = 0;
-        for i in 1..frame_size {
-            if (frame[i] >= 0.0 && frame[i - 1] < 0.0) || (frame[i] < 0.0 && frame[i - 1] >= 0.0) {
-                zc += 1;
-            }
+/// Sufficient statistics of a diagonal Gaussian over normalised cepstra.
+#[derive(Clone)]
+pub struct GaussStats {
+    n: f64,
+    sum: [f64; N_CEPS],
+    sq: [f64; N_CEPS],
+}
+
+impl GaussStats {
+    fn empty() -> Self {
+        Self {
+            n: 0.0,
+            sum: [0.0; N_CEPS],
+            sq: [0.0; N_CEPS],
         }
-        let frame_zcr = (zc as f32) / (frame_size as f32);
-
-        // Autocorrelation Pitch Estimation for Voiced Frames
-        let mut best_lag = 0;
-        let mut best_corr = -1.0f32;
-
-        for lag in min_lag..=max_lag.min(frame_size / 2) {
-            let mut corr = 0.0f32;
-            let count = frame_size - lag;
-            for i in 0..count {
-                corr += frame[i] * frame[i + lag];
-            }
-            corr /= count as f32;
-
-            if corr > best_corr {
-                best_corr = corr;
-                best_lag = lag;
-            }
-        }
-
-        // Check if periodicity is strong enough (Voiced speech indication)
-        let is_voiced = best_corr > (frame_sum_sq / frame_size as f32) * 0.28 && best_lag > 0;
-
-        if is_voiced {
-            let f0 = (sample_rate as f32) / (best_lag as f32);
-            if (80.0..=380.0).contains(&f0) {
-                pitch_list.push(f0);
-            }
-        }
-
-        // 8-Band Spectral Distribution Approximation (Vocal Tract Resonances)
-        let mut frame_bands = [0.0f32; 8];
-        let sub_chunk = frame_size / 8;
-        for b in 0..8 {
-            let b_start = b * sub_chunk;
-            let b_end = (b + 1) * sub_chunk;
-            let b_energy: f32 = frame[b_start..b_end].iter().map(|&s| s * s).sum();
-            frame_bands[b] = (b_energy / sub_chunk as f32).sqrt();
-            band_energy_accum[b] += frame_bands[b];
-        }
-
-        zcr_sum += frame_zcr;
-        rms_sum += frame_rms;
-        total_voiced_frames += 1;
     }
 
-    if total_voiced_frames == 0 {
-        return AcousticFeatures::default();
+    fn add(&mut self, o: &GaussStats) {
+        self.n += o.n;
+        for k in 0..N_CEPS {
+            self.sum[k] += o.sum[k];
+            self.sq[k] += o.sq[k];
+        }
     }
 
-    // Median Pitch (much more robust than arithmetic mean against outliers)
-    pitch_list.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-    let median_pitch = if !pitch_list.is_empty() {
-        pitch_list[pitch_list.len() / 2]
-    } else {
-        150.0
+    fn merged(&self, o: &GaussStats) -> GaussStats {
+        let mut m = self.clone();
+        m.add(o);
+        m
+    }
+
+    /// log |Σ| for the diagonal covariance.
+    fn log_det(&self) -> f64 {
+        let n = self.n.max(1.0);
+        (0..N_CEPS)
+            .map(|k| {
+                let mean = self.sum[k] / n;
+                (self.sq[k] / n - mean * mean).max(1e-3).ln()
+            })
+            .sum()
+    }
+}
+
+/// Speech-frame statistics for `[start_ms, end_ms)` of the recording.
+pub fn segment_stats(ff: &FrameFeatures, start_ms: u64, end_ms: u64) -> GaussStats {
+    let fps = ff.sample_rate as u64 / HOP_LEN as u64;
+    let a = ((start_ms * fps) / 1000) as usize;
+    let b = (((end_ms * fps) / 1000) as usize).min(ff.ceps.len());
+    let mut st = GaussStats::empty();
+    for i in a..b.max(a) {
+        if ff.speech[i] {
+            for k in 0..N_CEPS {
+                let v = ff.ceps[i][k] as f64;
+                st.sum[k] += v;
+                st.sq[k] += v * v;
+            }
+            st.n += 1.0;
+        }
+    }
+    st
+}
+
+/// Segments with fewer speech frames than this (~1 s) don't seed a BIC
+/// cluster; they're attached to the nearest speaker afterwards.
+const MIN_TURN_SPEECH: usize = 100;
+
+/// Adjacent 10 ms frames are strongly correlated; BIC treats every sample as
+/// independent, so frame counts are divided by this to get an effective count.
+const FRAME_DECORRELATION: f64 = 4.0;
+/// BIC model-complexity weight. Higher → fewer speakers. Calibrated with
+/// `examples/diarization_eval.rs` (single-speaker, 2–4 speaker, noisy sets).
+pub const BIC_LAMBDA: f64 = 2.0;
+
+/// ΔBIC for modelling `a` and `b` with one Gaussian instead of two.
+/// Negative ⇒ the two are better explained as the same speaker.
+fn delta_bic(a: &GaussStats, b: &GaussStats) -> f64 {
+    let (lambda, decorr) = (BIC_LAMBDA, FRAME_DECORRELATION);
+    let m = a.merged(b);
+    let (na, nb, nm) = (a.n / decorr, b.n / decorr, m.n / decorr);
+    let gain = 0.5 * (nm * m.log_det() - na * a.log_det() - nb * b.log_det());
+    let params = 2.0 * N_CEPS as f64; // diagonal mean + variance
+    gain - lambda * 0.5 * params * nm.max(2.0).ln()
+}
+
+/// Greedy BIC agglomerative clustering: repeatedly merge the pair with the
+/// lowest ΔBIC while it is negative (then only as needed to respect `max_k`).
+/// Returns a cluster index per input.
+pub fn bic_cluster(items: &[GaussStats], max_k: usize) -> Vec<usize> {
+    let n = items.len();
+    if n <= 1 {
+        return vec![0; n];
+    }
+    let mut stats: Vec<GaussStats> = items.to_vec();
+    let mut alive = vec![true; n];
+    let mut parent: Vec<usize> = (0..n).collect();
+    let nearest = |i: usize, stats: &[GaussStats], alive: &[bool]| -> (usize, f64) {
+        let mut best = (usize::MAX, f64::MAX);
+        for j in 0..n {
+            if j != i && alive[j] {
+                let d = delta_bic(&stats[i], &stats[j]);
+                if d < best.1 {
+                    best = (j, d);
+                }
+            }
+        }
+        best
     };
-
-    // Normalize Spectral Energy Vector to Unit Magnitude (L2 Norm)
-    let mut normalized_bands = [0.0f32; 8];
-    let norm_denom = band_energy_accum.iter().map(|&e| e * e).sum::<f32>().sqrt();
-    if norm_denom > 0.0001 {
-        for b in 0..8 {
-            normalized_bands[b] = band_energy_accum[b] / norm_denom;
+    let mut nn: Vec<(usize, f64)> = (0..n).map(|i| nearest(i, &stats, &alive)).collect();
+    let mut clusters = n;
+    while clusters > 1 {
+        let (i, &(j, d)) = nn
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| alive[*i])
+            .min_by(|a, b| {
+                a.1 .1
+                    .partial_cmp(&b.1 .1)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
+            .unwrap();
+        if j == usize::MAX || (d >= 0.0 && clusters <= max_k) {
+            break;
         }
-    } else {
-        normalized_bands = [0.125; 8];
+        let sj = stats[j].clone();
+        stats[i].add(&sj);
+        alive[j] = false;
+        for p in parent.iter_mut() {
+            if *p == j {
+                *p = i;
+            }
+        }
+        clusters -= 1;
+        for k in 0..n {
+            if alive[k] && (k == i || nn[k].0 == i || nn[k].0 == j) {
+                nn[k] = nearest(k, &stats, &alive);
+            } else if alive[k] {
+                let dk = delta_bic(&stats[k], &stats[i]);
+                if dk < nn[k].1 {
+                    nn[k] = (i, dk);
+                }
+            }
+        }
     }
-
-    AcousticFeatures {
-        pitch_f0: median_pitch,
-        spectral_bands: normalized_bands,
-        zero_crossing_rate: zcr_sum / (total_voiced_frames as f32),
-        rms_energy: rms_sum / (total_voiced_frames as f32),
-        voiced_frame_count: total_voiced_frames,
-    }
+    parent
 }
 
-/// Compute cosine distance between two spectral profiles + normalized pitch distance
-pub fn acoustic_distance(a: &AcousticFeatures, b: &AcousticFeatures) -> f32 {
-    // 1. Cosine Distance on 8-Band Spectral Profile (Vocal Tract Envelope)
-    let dot: f32 = a
-        .spectral_bands
+/// Fallback when the neural model is unavailable: one diagonal Gaussian per
+/// ASR segment, BIC-clustered; short segments join the closest speaker model
+/// and silent ones inherit the previous speaker.
+fn cluster_by_segments(segments: &mut [TranscriptSegment], ff: &FrameFeatures, max_k: usize) {
+    let stats: Vec<GaussStats> = segments
         .iter()
-        .zip(b.spectral_bands.iter())
-        .map(|(&x, &y)| x * y)
-        .sum();
-    let spectral_cosine_dist = (1.0 - dot).clamp(0.0, 2.0);
-
-    // 2. Relative Pitch ($F_0$) Distance
-    let pitch_diff = (a.pitch_f0 - b.pitch_f0).abs();
-    let pitch_mean = (a.pitch_f0 + b.pitch_f0) * 0.5 + 1.0;
-    let pitch_dist = (pitch_diff / pitch_mean).clamp(0.0, 1.5);
-
-    // 3. ZCR Distance (Phonetic Pace)
-    let zcr_dist = (a.zero_crossing_rate - b.zero_crossing_rate).abs() / 0.15;
-
-    // Weighted acoustic combination
-    (spectral_cosine_dist * 0.60) + (pitch_dist * 0.30) + (zcr_dist.clamp(0.0, 1.0) * 0.10)
+        .map(|s| segment_stats(ff, s.start_time_ms, s.end_time_ms))
+        .collect();
+    let seeds: Vec<usize> = (0..segments.len())
+        .filter(|&i| stats[i].n as usize >= MIN_TURN_SPEECH)
+        .collect();
+    let mut labels = vec![usize::MAX; segments.len()];
+    if !seeds.is_empty() {
+        let items: Vec<GaussStats> = seeds.iter().map(|&i| stats[i].clone()).collect();
+        let raw = bic_cluster(&items, max_k);
+        let mut models: HashMap<usize, GaussStats> = HashMap::new();
+        for (k, &i) in seeds.iter().enumerate() {
+            labels[i] = raw[k];
+            models
+                .entry(raw[k])
+                .or_insert_with(GaussStats::empty)
+                .add(&items[k]);
+        }
+        for i in 0..segments.len() {
+            if labels[i] == usize::MAX && stats[i].n > 0.0 {
+                labels[i] = *models
+                    .iter()
+                    .min_by(|a, b| {
+                        delta_bic(a.1, &stats[i])
+                            .partial_cmp(&delta_bic(b.1, &stats[i]))
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                    })
+                    .unwrap()
+                    .0;
+            }
+        }
+    }
+    let mut last = labels
+        .iter()
+        .copied()
+        .find(|&l| l != usize::MAX)
+        .unwrap_or(0);
+    let mut remap: HashMap<usize, usize> = HashMap::new();
+    for (seg, l) in segments.iter_mut().zip(labels) {
+        if l != usize::MAX {
+            last = l;
+        }
+        let next = remap.len() + 1;
+        let n = *remap.entry(last).or_insert(next);
+        seg.speaker_id = format!("Konuşmacı {}", n);
+        seg.speaker_name = format!("Konuşmacı {}", n);
+    }
 }
 
-/// Global Agglomerative Hierarchical Clustering (AHC) + Temporal Continuity Smoothing
+// ---------------------------------------------------------------------------
+// Neural path: CAM++ speaker embeddings on sliding windows + cosine AHC.
+// ---------------------------------------------------------------------------
+
+/// 1.5 s embedding window, 0.75 s hop (in 10 ms frames).
+const NN_WIN: usize = 150;
+const NN_HOP: usize = 75;
+/// Cosine distance at which clusters stop merging. Calibrated with
+/// `examples/diarization_eval.rs`: results are identical across 0.20–0.35 on
+/// labelled 1- and 4-voice sets (clean, noisy, multi-speaker segments) and on
+/// a real two-person meeting, so 0.30 sits mid-plateau.
+pub const NN_MERGE_THRESHOLD: f32 = 0.30;
+
+/// Path of the speaker model to use, if one is available.
+fn neural_model_path() -> Option<std::path::PathBuf> {
+    if let Ok(p) = std::env::var("ECHOMIND_SPEAKER_MODEL") {
+        let p = std::path::PathBuf::from(p);
+        return p.exists().then_some(p);
+    }
+    let p = crate::speaker_embedding::model_path();
+    p.exists().then_some(p)
+}
+
+/// Per-frame speaker label (10 ms frames) from neural embeddings, or `None`
+/// when the model is unavailable or fails.
+fn neural_frame_labels(pcm: &[f32], speech: &[bool], max_k: usize) -> Option<Vec<Option<usize>>> {
+    use crate::speaker_embedding as se;
+    let model_path = neural_model_path()?;
+    let fbank = se::kaldi_fbank(pcm, 16000);
+    let n = fbank.len().min(speech.len());
+    if n < NN_WIN {
+        return None;
+    }
+    // Windows with at least half speech.
+    let starts: Vec<usize> = (0..=(n - NN_WIN))
+        .step_by(NN_HOP)
+        .filter(|&s| speech[s..s + NN_WIN].iter().filter(|&&v| v).count() * 2 >= NN_WIN)
+        .collect();
+    if starts.len() < 2 {
+        return None;
+    }
+
+    // Embed in parallel; each thread owns a runnable plan.
+    let threads = std::thread::available_parallelism()
+        .map(|v| v.get())
+        .unwrap_or(4)
+        .clamp(1, 8);
+    let chunk = starts.len().div_ceil(threads);
+    let embs: Vec<Vec<f32>> = std::thread::scope(|scope| {
+        let handles: Vec<_> = starts
+            .chunks(chunk)
+            .map(|part| {
+                let fb = &fbank;
+                let mp = &model_path;
+                scope.spawn(move || -> Result<Vec<Vec<f32>>, String> {
+                    let emb = se::SpeakerEmbedder::load(mp, NN_WIN)?;
+                    part.iter()
+                        .map(|&s| {
+                            let mut w = fb[s..s + NN_WIN].to_vec();
+                            se::mean_normalise(&mut w);
+                            emb.embed(&w)
+                        })
+                        .collect()
+                })
+            })
+            .collect();
+        let mut all = Vec::with_capacity(starts.len());
+        for h in handles {
+            match h.join() {
+                Ok(Ok(v)) => all.extend(v),
+                Ok(Err(e)) => {
+                    eprintln!("⚠️ speaker embedding failed: {e}");
+                    return Vec::new();
+                }
+                Err(_) => return Vec::new(),
+            }
+        }
+        all
+    });
+    if embs.len() != starts.len() {
+        return None;
+    }
+
+    let labels = cosine_ahc(&embs, NN_MERGE_THRESHOLD, max_k);
+
+    // Frame labels: majority vote of the windows covering each frame.
+    let mut votes: Vec<HashMap<usize, u16>> = vec![HashMap::new(); n];
+    for (k, &s) in starts.iter().enumerate() {
+        for v in &mut votes[s..s + NN_WIN] {
+            *v.entry(labels[k]).or_default() += 1;
+        }
+    }
+    Some(
+        votes
+            .into_iter()
+            .map(|v| {
+                v.into_iter()
+                    .max_by_key(|&(c, n)| (n, usize::MAX - c))
+                    .map(|(c, _)| c)
+            })
+            .collect(),
+    )
+}
+
+/// Average-linkage AHC on unit vectors with a cosine-distance stop threshold
+/// (then merging further only to respect `max_k`). Clusters holding < 2% of
+/// the windows are folded into their nearest large cluster.
+fn cosine_ahc(embs: &[Vec<f32>], threshold: f32, max_k: usize) -> Vec<usize> {
+    use crate::speaker_embedding::cosine;
+    let n = embs.len();
+    let mut dist = vec![0f32; n * n];
+    for i in 0..n {
+        for j in (i + 1)..n {
+            let d = 1.0 - cosine(&embs[i], &embs[j]);
+            dist[i * n + j] = d;
+            dist[j * n + i] = d;
+        }
+    }
+    let mut size = vec![1usize; n];
+    let mut alive = vec![true; n];
+    let mut parent: Vec<usize> = (0..n).collect();
+    let nearest = |i: usize, dist: &[f32], alive: &[bool]| -> (usize, f32) {
+        let mut best = (usize::MAX, f32::MAX);
+        for j in 0..n {
+            if j != i && alive[j] && dist[i * n + j] < best.1 {
+                best = (j, dist[i * n + j]);
+            }
+        }
+        best
+    };
+    let mut nn: Vec<(usize, f32)> = (0..n).map(|i| nearest(i, &dist, &alive)).collect();
+    let mut clusters = n;
+    while clusters > 1 {
+        let (i, &(j, d)) = nn
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| alive[*i])
+            .min_by(|a, b| {
+                a.1 .1
+                    .partial_cmp(&b.1 .1)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
+            .unwrap();
+        if j == usize::MAX || (d > threshold && clusters <= max_k) {
+            break;
+        }
+        let (si, sj) = (size[i] as f32, size[j] as f32);
+        for k in 0..n {
+            if alive[k] && k != i && k != j {
+                let nd = (si * dist[i * n + k] + sj * dist[j * n + k]) / (si + sj);
+                dist[i * n + k] = nd;
+                dist[k * n + i] = nd;
+            }
+        }
+        size[i] += size[j];
+        alive[j] = false;
+        for p in parent.iter_mut() {
+            if *p == j {
+                *p = i;
+            }
+        }
+        clusters -= 1;
+        for k in 0..n {
+            if !alive[k] {
+                continue;
+            }
+            if k == i || nn[k].0 == i || nn[k].0 == j {
+                nn[k] = nearest(k, &dist, &alive);
+            } else if dist[k * n + i] < nn[k].1 {
+                nn[k] = (i, dist[k * n + i]);
+            }
+        }
+    }
+
+    // Fold tiny clusters (stray windows: coughs, crosstalk, noise).
+    let mut counts: HashMap<usize, usize> = HashMap::new();
+    for &p in &parent {
+        *counts.entry(p).or_default() += 1;
+    }
+    let min_size = (n / 50).max(2);
+    let big: Vec<usize> = counts
+        .iter()
+        .filter(|(_, &c)| c >= min_size)
+        .map(|(&k, _)| k)
+        .collect();
+    if !big.is_empty() && big.len() < counts.len() {
+        let centroid = |c: usize| -> Vec<f32> {
+            let mut acc = vec![0f32; embs[0].len()];
+            for (k, &p) in parent.iter().enumerate() {
+                if p == c {
+                    acc.iter_mut().zip(&embs[k]).for_each(|(a, b)| *a += b);
+                }
+            }
+            let norm = acc.iter().map(|x| x * x).sum::<f32>().sqrt().max(1e-6);
+            acc.iter_mut().for_each(|x| *x /= norm);
+            acc
+        };
+        let cents: Vec<(usize, Vec<f32>)> = big.iter().map(|&c| (c, centroid(c))).collect();
+        for k in 0..n {
+            if !big.contains(&parent[k]) {
+                parent[k] = cents
+                    .iter()
+                    .max_by(|a, b| {
+                        cosine(&embs[k], &a.1)
+                            .partial_cmp(&cosine(&embs[k], &b.1))
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                    })
+                    .unwrap()
+                    .0;
+            }
+        }
+    }
+    parent
+}
+
+/// Each segment gets the speaker holding most of its speech frames; segments
+/// with no labelled speech inherit the previous speaker.
+fn label_segments_by_frames(
+    segments: &mut [TranscriptSegment],
+    frame_labels: &[Option<usize>],
+    speech: &[bool],
+    fps: u64,
+) {
+    let mut last: Option<usize> = frame_labels.iter().flatten().next().copied();
+    let mut remap: HashMap<usize, usize> = HashMap::new();
+    for seg in segments.iter_mut() {
+        let a = ((seg.start_time_ms * fps) / 1000) as usize;
+        let b = (((seg.end_time_ms * fps) / 1000) as usize).min(frame_labels.len());
+        let mut votes: HashMap<usize, usize> = HashMap::new();
+        for (f, label) in frame_labels.iter().enumerate().take(b.max(a)).skip(a) {
+            if speech.get(f).copied().unwrap_or(false) {
+                if let Some(c) = label {
+                    *votes.entry(*c).or_default() += 1;
+                }
+            }
+        }
+        if let Some((c, _)) = votes.into_iter().max_by_key(|&(c, n)| (n, usize::MAX - c)) {
+            last = Some(c);
+        }
+        let c = last.unwrap_or(0);
+        let next = remap.len() + 1;
+        let n = *remap.entry(c).or_insert(next);
+        seg.speaker_id = format!("Konuşmacı {}", n);
+        seg.speaker_name = format!("Konuşmacı {}", n);
+    }
+}
+
+/// Assigns `Konuşmacı N` labels to `segments` from the audio in `full_pcm`
+/// (segment times are relative to the start of `full_pcm`).
+///
+/// Uses neural speaker embeddings when the model is available (each segment
+/// gets the speaker holding most of its speech, so segments that span two
+/// speakers don't form clusters of their own); otherwise MFCC + BIC per segment.
 pub fn cluster_speakers(
     segments: &mut [TranscriptSegment],
     full_pcm: &[f32],
@@ -186,144 +640,17 @@ pub fn cluster_speakers(
     if segments.is_empty() {
         return;
     }
-
-    let num_segs = segments.len();
     let max_k = max_speakers.clamp(1, 8);
-    let mut features: Vec<AcousticFeatures> = Vec::with_capacity(num_segs);
-
-    // 1. Extract high-resolution acoustic voice features for each segment
-    for seg in segments.iter() {
-        let start_sample = ((seg.start_time_ms as usize) * (sample_rate as usize)) / 1000;
-        let end_sample = ((seg.end_time_ms as usize) * (sample_rate as usize)) / 1000;
-
-        let start_idx = start_sample.min(full_pcm.len());
-        let end_idx = end_sample.min(full_pcm.len());
-
-        let slice = if start_idx < end_idx {
-            &full_pcm[start_idx..end_idx]
-        } else {
-            &[]
-        };
-
-        features.push(extract_segment_features(slice, sample_rate));
-    }
-
-    // 2. Agglomerative Hierarchical Clustering (AHC)
-    let mut cluster_assignments: Vec<usize> = (0..num_segs).collect();
-    let merge_distance_threshold = 0.46; // Calibrated acoustic boundary threshold
-
-    loop {
-        let mut unique_clusters: Vec<usize> = cluster_assignments.clone();
-        unique_clusters.sort_unstable();
-        unique_clusters.dedup();
-
-        if unique_clusters.len() <= 1 {
-            break;
-        }
-
-        let mut best_i = 0;
-        let mut best_j = 0;
-        let mut min_cluster_dist = f32::MAX;
-
-        for i in 0..unique_clusters.len() {
-            let c_i = unique_clusters[i];
-            let segs_i: Vec<usize> = cluster_assignments
-                .iter()
-                .enumerate()
-                .filter_map(|(idx, &c)| if c == c_i { Some(idx) } else { None })
-                .collect();
-
-            for &c_j in &unique_clusters[(i + 1)..] {
-                let segs_j: Vec<usize> = cluster_assignments
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(idx, &c)| if c == c_j { Some(idx) } else { None })
-                    .collect();
-
-                let mut dist_sum = 0.0f32;
-                let mut pairs = 0;
-
-                for &si in &segs_i {
-                    for &sj in &segs_j {
-                        dist_sum += acoustic_distance(&features[si], &features[sj]);
-                        pairs += 1;
-                    }
-                }
-
-                let avg_dist = if pairs > 0 {
-                    dist_sum / (pairs as f32)
-                } else {
-                    f32::MAX
-                };
-
-                if avg_dist < min_cluster_dist {
-                    min_cluster_dist = avg_dist;
-                    best_i = c_i;
-                    best_j = c_j;
-                }
-            }
-        }
-
-        if min_cluster_dist > merge_distance_threshold && unique_clusters.len() <= max_k {
-            break;
-        }
-
-        if min_cluster_dist >= f32::MAX {
-            break;
-        }
-
-        for c in cluster_assignments.iter_mut() {
-            if *c == best_j {
-                *c = best_i;
-            }
+    let ff = compute_frame_features(full_pcm, sample_rate);
+    // `ECHOMIND_DIAR_MODE=bic` forces the fallback (evaluation tooling).
+    if std::env::var("ECHOMIND_DIAR_MODE").as_deref() != Ok("bic") && sample_rate == 16000 {
+        if let Some(frame_labels) = neural_frame_labels(full_pcm, &ff.speech, max_k) {
+            let fps = (sample_rate as u64 / HOP_LEN as u64).max(1);
+            label_segments_by_frames(segments, &frame_labels, &ff.speech, fps);
+            return;
         }
     }
-
-    // 3. Temporal Continuity Smoothing (Markov Continuity Pass)
-    for i in 0..(num_segs.saturating_sub(1)) {
-        let gap_ms = segments[i + 1]
-            .start_time_ms
-            .saturating_sub(segments[i].end_time_ms);
-        if gap_ms < 1200 {
-            let dist = acoustic_distance(&features[i], &features[i + 1]);
-            if dist < 0.48 {
-                cluster_assignments[i + 1] = cluster_assignments[i];
-            }
-        }
-    }
-
-    // Smooth single-segment isolated blips
-    for i in 1..(num_segs.saturating_sub(1)) {
-        if cluster_assignments[i - 1] == cluster_assignments[i + 1]
-            && cluster_assignments[i] != cluster_assignments[i - 1]
-        {
-            let seg_dur_ms = segments[i]
-                .end_time_ms
-                .saturating_sub(segments[i].start_time_ms);
-            if seg_dur_ms < 2500 {
-                let dist_to_neighbor = acoustic_distance(&features[i], &features[i - 1]);
-                if dist_to_neighbor < 0.52 {
-                    cluster_assignments[i] = cluster_assignments[i - 1];
-                }
-            }
-        }
-    }
-
-    // 4. Remap cluster IDs to contiguous 1..N speaker labels
-    let mut cluster_to_speaker: HashMap<usize, usize> = HashMap::new();
-    let mut speaker_seq = 1;
-
-    for (idx, seg) in segments.iter_mut().enumerate() {
-        let raw_c = cluster_assignments[idx];
-        let spk_num = *cluster_to_speaker.entry(raw_c).or_insert_with(|| {
-            let num = speaker_seq;
-            speaker_seq += 1;
-            num
-        });
-
-        seg.speaker_id = format!("Konuşmacı {}", spk_num);
-        seg.speaker_name = format!("Konuşmacı {}", spk_num);
-    }
+    cluster_by_segments(segments, &ff, max_k);
 }
 
 /// Automatically extract speaker names from English & Turkish self-introductions, vocatives, and turn-taking dialogues
@@ -638,27 +965,220 @@ fn is_stopword(s: &str) -> bool {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_extract_segment_features() {
-        let pcm = vec![0.1f32; 16000];
-        let feats = extract_segment_features(&pcm, 16000);
-        assert!(feats.pitch_f0 > 0.0);
-        assert_eq!(feats.spectral_bands.len(), 8);
+    fn seg(id: usize, start_ms: u64, end_ms: u64) -> TranscriptSegment {
+        TranscriptSegment {
+            id,
+            speaker_id: String::new(),
+            speaker_name: String::new(),
+            start_time_ms: start_ms,
+            end_time_ms: end_ms,
+            timestamp_formatted: String::new(),
+            text: "x".into(),
+            language: "tr".into(),
+            confidence: 1.0,
+        }
+    }
+
+    /// A buzzy "voice": harmonics of `f0` with a spectral tilt, plus a little noise.
+    fn voice(f0: f32, tilt: f32, secs: f32, seed: u32) -> Vec<f32> {
+        let n = (secs * 16000.0) as usize;
+        let mut rng = seed;
+        (0..n)
+            .map(|i| {
+                let t = i as f32 / 16000.0;
+                let mut v = 0.0;
+                for h in 1..=12 {
+                    v += (2.0 * std::f32::consts::PI * f0 * h as f32 * t).sin()
+                        / (h as f32).powf(tilt);
+                }
+                rng = rng.wrapping_mul(1664525).wrapping_add(1013904223);
+                v * 0.08 + ((rng >> 8) as f32 / (1u32 << 24) as f32 - 0.5) * 0.004
+            })
+            .collect()
+    }
+
+    fn unit(v: Vec<f32>) -> Vec<f32> {
+        let n = v.iter().map(|x| x * x).sum::<f32>().sqrt();
+        v.into_iter().map(|x| x / n).collect()
     }
 
     #[test]
-    fn test_acoustic_distance_stability() {
-        let a = AcousticFeatures {
-            pitch_f0: 130.0,
-            ..Default::default()
-        };
-        let b = AcousticFeatures {
-            pitch_f0: 140.0,
-            ..Default::default()
-        };
+    fn test_old_bug_all_voices_one_speaker_is_fixed_in_fallback() {
+        // Regression: the old features were time-slice energies, so every voice
+        // looked the same and everything became "Konuşmacı 1".
+        std::env::set_var("ECHOMIND_DIAR_MODE", "bic");
+        let a = voice(110.0, 0.6, 3.0, 1);
+        let b = voice(230.0, 1.6, 3.0, 2);
+        let gap = vec![0.0f32; 8000];
+        let mut pcm = Vec::new();
+        let mut segs = Vec::new();
+        let mut t = 0u64;
+        for i in 0..8 {
+            let v = if i % 2 == 0 { &a } else { &b };
+            segs.push(seg(i + 1, t, t + 3000));
+            pcm.extend_from_slice(v);
+            pcm.extend_from_slice(&gap);
+            t += 3500;
+        }
+        cluster_speakers(&mut segs, &pcm, 16000, 6);
+        std::env::remove_var("ECHOMIND_DIAR_MODE");
+        let ids: std::collections::HashSet<_> = segs.iter().map(|s| s.speaker_id.clone()).collect();
+        assert_eq!(
+            ids.len(),
+            2,
+            "two distinct voices must give two speakers: {:?}",
+            segs.iter().map(|s| &s.speaker_id).collect::<Vec<_>>()
+        );
+        for i in 0..8 {
+            assert_eq!(segs[i].speaker_id, segs[i % 2].speaker_id);
+        }
+    }
 
-        let dist = acoustic_distance(&a, &b);
-        assert!(dist < 0.3); // Close pitch should have low acoustic distance
+    #[test]
+    fn test_fallback_does_not_split_a_single_voice() {
+        std::env::set_var("ECHOMIND_DIAR_MODE", "bic");
+        let mut pcm = Vec::new();
+        let mut segs = Vec::new();
+        for i in 0..8u64 {
+            segs.push(seg(i as usize + 1, i * 3500, i * 3500 + 3000));
+            pcm.extend(voice(140.0, 1.0, 3.0, i as u32 + 7));
+            pcm.extend(vec![0.0f32; 8000]);
+        }
+        cluster_speakers(&mut segs, &pcm, 16000, 6);
+        std::env::remove_var("ECHOMIND_DIAR_MODE");
+        assert!(segs.iter().all(|s| s.speaker_id == "Konuşmacı 1"));
+    }
+
+    #[test]
+    fn test_cosine_ahc_groups_and_folds_strays() {
+        let mk = |base: usize, jitter: f32| {
+            unit(
+                (0..8)
+                    .map(|d| {
+                        if d == base {
+                            1.0
+                        } else {
+                            jitter * ((d * 7 + base) % 5) as f32 * 0.1
+                        }
+                    })
+                    .collect(),
+            )
+        };
+        let mut embs = Vec::new();
+        for i in 0..30 {
+            embs.push(mk(i % 3, 0.3 + (i % 4) as f32 * 0.05));
+        }
+        embs.push(unit(vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0])); // single stray
+        let labels = cosine_ahc(&embs, 0.30, 6);
+        let groups: std::collections::HashSet<_> = labels.iter().copied().collect();
+        assert_eq!(
+            groups.len(),
+            3,
+            "stray window must fold into a real speaker"
+        );
+        for i in 0..30 {
+            assert_eq!(labels[i], labels[i % 3]);
+        }
+        // One tight group stays one speaker.
+        let same: Vec<Vec<f32>> = (0..20)
+            .map(|i| mk(0, 0.2 + (i % 3) as f32 * 0.05))
+            .collect();
+        assert!(cosine_ahc(&same, 0.30, 6)
+            .iter()
+            .all(|&l| l == cosine_ahc(&same, 0.30, 6)[0]));
+    }
+
+    #[test]
+    fn test_segment_label_is_majority_of_its_speech() {
+        // 100 fps; frames 0..300 speaker 0, 300..500 speaker 1.
+        let mut labels = vec![Some(0usize); 300];
+        labels.extend(vec![Some(1usize); 200]);
+        let speech = vec![true; 500];
+        // seg 2 spans both speakers: 0.5 s of A, 1 s of B → B.
+        let mut segs = vec![
+            seg(1, 0, 2000),
+            seg(2, 2500, 4000),
+            seg(3, 4000, 5000),
+            seg(4, 5000, 5200),
+        ];
+        label_segments_by_frames(&mut segs, &labels, &speech, 100);
+        assert_eq!(segs[0].speaker_id, "Konuşmacı 1");
+        assert_eq!(
+            segs[1].speaker_id, "Konuşmacı 2",
+            "mixed segment goes to its majority speaker"
+        );
+        assert_eq!(segs[2].speaker_id, "Konuşmacı 2");
+        assert_eq!(
+            segs[3].speaker_id, "Konuşmacı 2",
+            "segment past the audio inherits the previous speaker"
+        );
+    }
+
+    #[test]
+    fn test_kaldi_fbank_shape_and_values() {
+        let pcm = voice(150.0, 1.0, 1.0, 3);
+        let fb = crate::speaker_embedding::kaldi_fbank(&pcm, 16000);
+        assert_eq!(fb.len(), 1 + (16000 - 400) / 160);
+        assert!(fb.iter().flatten().all(|v| v.is_finite()));
+        let mut w = fb[..50].to_vec();
+        crate::speaker_embedding::mean_normalise(&mut w);
+        for b in 0..crate::speaker_embedding::N_BINS {
+            let m: f32 = w.iter().map(|r| r[b]).sum::<f32>() / 50.0;
+            assert!(m.abs() < 1e-3);
+        }
+    }
+
+    /// Neural diarization on a real labelled recording. Runs only when given:
+    /// `ECHOMIND_SPEAKER_MODEL=model.onnx ECHOMIND_DIAR_WAV=dialogue.wav
+    ///  ECHOMIND_DIAR_GT=gt.json cargo test --release -- --ignored neural`
+    /// (gt.json: `[{"start": s, "end": s, "speaker": "A"}, ...]`).
+    #[test]
+    #[ignore]
+    fn test_neural_matches_labelled_recording() {
+        let wav = std::env::var("ECHOMIND_DIAR_WAV").expect("ECHOMIND_DIAR_WAV");
+        let gt: Vec<serde_json::Value> = serde_json::from_str(
+            &std::fs::read_to_string(std::env::var("ECHOMIND_DIAR_GT").expect("ECHOMIND_DIAR_GT"))
+                .unwrap(),
+        )
+        .unwrap();
+        let (pcm, _) =
+            crate::importer::decode_audio_file_to_pcm16k(std::path::Path::new(&wav)).unwrap();
+        let mut segs: Vec<TranscriptSegment> = gt
+            .iter()
+            .enumerate()
+            .map(|(i, g)| {
+                seg(
+                    i + 1,
+                    (g["start"].as_f64().unwrap() * 1000.0) as u64,
+                    (g["end"].as_f64().unwrap() * 1000.0) as u64,
+                )
+            })
+            .collect();
+        cluster_speakers(&mut segs, &pcm, 16000, 6);
+        // Purity: each predicted speaker should map to one true speaker.
+        let mut by_pred: HashMap<String, HashMap<String, usize>> = HashMap::new();
+        for (s, g) in segs.iter().zip(&gt) {
+            *by_pred
+                .entry(s.speaker_id.clone())
+                .or_default()
+                .entry(g["speaker"].as_str().unwrap().to_string())
+                .or_default() += 1;
+        }
+        let pure: usize = by_pred.values().map(|m| *m.values().max().unwrap()).sum();
+        let truth: std::collections::HashSet<_> =
+            gt.iter().map(|g| g["speaker"].as_str().unwrap()).collect();
+        assert!(
+            pure * 100 >= segs.len() * 95,
+            "purity {}/{}",
+            pure,
+            segs.len()
+        );
+        assert!(
+            by_pred.len() <= truth.len() + 1,
+            "{} speakers for {} voices",
+            by_pred.len(),
+            truth.len()
+        );
     }
 
     #[test]

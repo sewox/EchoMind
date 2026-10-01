@@ -64,7 +64,9 @@ fn run_asr_engine(
                 }
             }
             "sensevoice" => match crate::offline_engines::transcribe_sensevoice(audio_path, lang) {
-                Ok(segs) => return Ok((segs, "⚡ SenseVoice (Yerel)".to_string())),
+                // "SenseVoice" currently runs local Whisper (see offline_engines);
+                // label it as what actually ran.
+                Ok(segs) => return Ok((segs, "🔒 Bilgisayarınızda (Whisper)".to_string())),
                 Err(e) => {
                     eprintln!("⚠️ SenseVoice başarısız: {}", e);
                     failed_engine = Some("SenseVoice");
