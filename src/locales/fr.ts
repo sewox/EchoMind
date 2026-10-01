@@ -534,6 +534,14 @@ export const fr: TranslationKeys = {
       yourVoice: "Votre voix : entrée active",
       systemAudioLoopback: "Audio système : loopback actif",
       systemAudioSpeaker: "Audio système : haut-parleur/pièce",
+      systemAudioCaptureToggle:
+        "Capturer l'audio système (participants distants)",
+      systemAudioCaptureDesc:
+        "Sous macOS 14.2+, enregistre l'audio des apps de réunion avec le micro. Désactivé = micro uniquement.",
+      systemAudioUnsupported:
+        "La capture native de l'audio système n'est pas prise en charge sur cette plateforme. Utilisez un périphérique loopback virtuel ou le micro seul.",
+      systemAudioDeniedHint:
+        "Permission audio système refusée ou démarrage impossible. Les participants distants peuvent manquer dans l'enregistrement.",
       testingAudio: "Test audio en cours (écoute VU)...",
       testInput: "Tester l'entrée (5 s)",
       openSoundPanelTitle:

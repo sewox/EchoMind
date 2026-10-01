@@ -653,6 +653,129 @@ pub fn cluster_speakers(
     cluster_by_segments(segments, &ff, max_k);
 }
 
+/// Local-user label when the microphone channel dominates a segment.
+pub const LOCAL_SPEAKER_LABEL: &str = "Siz";
+
+fn peak_normalize(samples: &[f32]) -> Vec<f32> {
+    let peak = samples.iter().map(|s| s.abs()).fold(0.0f32, f32::max);
+    if peak < 1e-8 {
+        return samples.to_vec();
+    }
+    samples.iter().map(|s| s / peak).collect()
+}
+
+fn window_rms(pcm: &[f32], start: usize, end: usize) -> f32 {
+    if start >= pcm.len() || start >= end {
+        return 0.0;
+    }
+    let end = end.min(pcm.len());
+    let slice = &pcm[start..end];
+    if slice.is_empty() {
+        return 0.0;
+    }
+    (slice.iter().map(|s| s * s).sum::<f32>() / slice.len() as f32).sqrt()
+}
+
+/// Pearson correlation over a window — used to detect speaker→mic bleed of
+/// remote audio (echo). Returns 0 when either side is silent.
+fn window_correlation(a: &[f32], b: &[f32], start: usize, end: usize) -> f32 {
+    if start >= end {
+        return 0.0;
+    }
+    let end = end.min(a.len()).min(b.len());
+    if start >= end {
+        return 0.0;
+    }
+    let n = (end - start) as f32;
+    let mut mean_a = 0.0f32;
+    let mut mean_b = 0.0f32;
+    for i in start..end {
+        mean_a += a[i];
+        mean_b += b[i];
+    }
+    mean_a /= n;
+    mean_b /= n;
+    let mut num = 0.0f32;
+    let mut den_a = 0.0f32;
+    let mut den_b = 0.0f32;
+    for i in start..end {
+        let da = a[i] - mean_a;
+        let db = b[i] - mean_b;
+        num += da * db;
+        den_a += da * da;
+        den_b += db * db;
+    }
+    let den = (den_a * den_b).sqrt();
+    if den < 1e-12 {
+        0.0
+    } else {
+        (num / den).clamp(-1.0, 1.0)
+    }
+}
+
+fn samples_for_ms(ms: u64, sample_rate: u32) -> usize {
+    ((ms * sample_rate as u64) / 1000) as usize
+}
+
+/// Channel-based speaker assignment when both microphone and system audio were
+/// captured. Mic-dominant segments → "Siz"; system-dominant segments are
+/// diarized on the system track alone (remote people). Each channel is
+/// peak-normalized before comparison; correlated mic energy during remote
+/// speech is treated as echo/bleed and discounted.
+///
+/// When only a mixed mono track exists, callers keep using [`cluster_speakers`].
+pub fn attribute_speakers_by_channel(
+    segments: &mut [TranscriptSegment],
+    mic: &[f32],
+    system: &[f32],
+    sample_rate: u32,
+) {
+    if segments.is_empty() {
+        return;
+    }
+    let mic_n = peak_normalize(mic);
+    let sys_n = peak_normalize(system);
+
+    let mut remote_indices: Vec<usize> = Vec::new();
+    for (i, seg) in segments.iter_mut().enumerate() {
+        let start = samples_for_ms(seg.start_time_ms, sample_rate);
+        let end = samples_for_ms(seg.end_time_ms, sample_rate).max(start + 1);
+        let mut mic_e = window_rms(&mic_n, start, end);
+        let sys_e = window_rms(&sys_n, start, end);
+
+        // Speakers playing remote audio into the mic: mic correlates with
+        // system. Discount the correlated portion so dominance is not flipped.
+        let corr = window_correlation(&mic_n, &sys_n, start, end).abs();
+        if sys_e > 0.02 && corr > 0.35 {
+            mic_e = (mic_e - sys_e * corr * corr * 0.85).max(0.0);
+        }
+
+        const DOMINANCE: f32 = 1.25;
+        if mic_e > sys_e * DOMINANCE && mic_e > 0.015 {
+            seg.speaker_id = LOCAL_SPEAKER_LABEL.to_string();
+            seg.speaker_name = LOCAL_SPEAKER_LABEL.to_string();
+        } else {
+            remote_indices.push(i);
+        }
+    }
+
+    if remote_indices.is_empty() {
+        return;
+    }
+
+    // Diarize only the remote side on the system channel.
+    let mut remote_segs: Vec<TranscriptSegment> = remote_indices
+        .iter()
+        .map(|&i| segments[i].clone())
+        .collect();
+    cluster_speakers(&mut remote_segs, system, sample_rate, 6);
+    resolve_speaker_names(&mut remote_segs);
+    for (k, &i) in remote_indices.iter().enumerate() {
+        segments[i].speaker_id = remote_segs[k].speaker_id.clone();
+        segments[i].speaker_name = remote_segs[k].speaker_name.clone();
+    }
+}
+
 /// Automatically extract speaker names from English & Turkish self-introductions, vocatives, and turn-taking dialogues
 pub fn resolve_speaker_names(segments: &mut [TranscriptSegment]) {
     if segments.is_empty() {
@@ -1286,5 +1409,86 @@ mod tests {
         resolve_speaker_names(&mut segments);
         assert_ne!(segments[1].speaker_name, "Serkan Bey");
         assert_eq!(segments[1].speaker_name, "Konuşmacı 2");
+    }
+
+    fn tone(freq: f32, rate: u32, start_ms: u64, end_ms: u64, amp: f32) -> Vec<f32> {
+        let n = (rate as u64 * end_ms / 1000) as usize;
+        let start = (rate as u64 * start_ms / 1000) as usize;
+        let end = (rate as u64 * end_ms / 1000) as usize;
+        let mut v = vec![0.0f32; n];
+        for (i, s) in v.iter_mut().enumerate().take(end).skip(start) {
+            *s = amp * (2.0 * std::f32::consts::PI * freq * i as f32 / rate as f32).sin();
+        }
+        v
+    }
+
+    fn seg_text(start_ms: u64, end_ms: u64, text: &str) -> TranscriptSegment {
+        let mut s = seg(1, start_ms, end_ms);
+        s.text = text.to_string();
+        s
+    }
+
+    #[test]
+    fn test_attribute_mic_dominant_labelled_siz() {
+        // Mic speaks 0–1s; system silent. Force BIC so the remote path (if any)
+        // stays deterministic without needing the neural model.
+        std::env::set_var("ECHOMIND_DIAR_MODE", "bic");
+        let mic = tone(220.0, 16000, 0, 1000, 0.5);
+        let sys = vec![0.0f32; mic.len()];
+        let mut segs = vec![seg_text(0, 900, "Merhaba ekip")];
+        attribute_speakers_by_channel(&mut segs, &mic, &sys, 16000);
+        assert_eq!(segs[0].speaker_id, LOCAL_SPEAKER_LABEL);
+        assert_eq!(segs[0].speaker_name, LOCAL_SPEAKER_LABEL);
+        std::env::remove_var("ECHOMIND_DIAR_MODE");
+    }
+
+    #[test]
+    fn test_attribute_sys_dominant_not_siz() {
+        std::env::set_var("ECHOMIND_DIAR_MODE", "bic");
+        let sys = tone(440.0, 16000, 0, 1000, 0.5);
+        let mic = vec![0.0f32; sys.len()];
+        let mut segs = vec![seg_text(0, 900, "Hello from remote")];
+        attribute_speakers_by_channel(&mut segs, &mic, &sys, 16000);
+        assert_ne!(segs[0].speaker_id, LOCAL_SPEAKER_LABEL);
+        assert!(segs[0].speaker_id.starts_with("Konuşmacı"));
+        std::env::remove_var("ECHOMIND_DIAR_MODE");
+    }
+
+    #[test]
+    fn test_attribute_echo_bleed_does_not_mislabel_remote_as_siz() {
+        // Remote speech on system, plus a quieter correlated copy on the mic
+        // (speaker bleed). Must still attribute to the remote side.
+        std::env::set_var("ECHOMIND_DIAR_MODE", "bic");
+        let sys = tone(330.0, 16000, 0, 1200, 0.6);
+        let mic: Vec<f32> = sys.iter().map(|&s| s * 0.35).collect();
+        let mut segs = vec![seg_text(0, 1100, "Remote with bleed")];
+        attribute_speakers_by_channel(&mut segs, &mic, &sys, 16000);
+        assert_ne!(
+            segs[0].speaker_id, LOCAL_SPEAKER_LABEL,
+            "bleed into mic must not flip dominance to Siz"
+        );
+        std::env::remove_var("ECHOMIND_DIAR_MODE");
+    }
+
+    #[test]
+    fn test_attribute_alternating_channels() {
+        std::env::set_var("ECHOMIND_DIAR_MODE", "bic");
+        let mut mic = tone(200.0, 16000, 0, 1000, 0.5);
+        let mut sys = vec![0.0f32; mic.len()];
+        // Second second: remote only.
+        let remote = tone(500.0, 16000, 1000, 2000, 0.5);
+        mic.resize(remote.len(), 0.0);
+        sys.resize(remote.len(), 0.0);
+        for i in 16000..remote.len() {
+            sys[i] = remote[i];
+        }
+        let mut segs = vec![
+            seg_text(0, 900, "Ben buradayım"),
+            seg_text(1100, 1900, "And I am remote"),
+        ];
+        attribute_speakers_by_channel(&mut segs, &mic, &sys, 16000);
+        assert_eq!(segs[0].speaker_name, LOCAL_SPEAKER_LABEL);
+        assert_ne!(segs[1].speaker_name, LOCAL_SPEAKER_LABEL);
+        std::env::remove_var("ECHOMIND_DIAR_MODE");
     }
 }

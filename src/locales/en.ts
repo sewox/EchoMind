@@ -537,6 +537,13 @@ export const en: TranslationKeys = {
       yourVoice: "Your Voice: Active Input",
       systemAudioLoopback: "System Audio: Loopback Active",
       systemAudioSpeaker: "System Audio: Speaker/Room",
+      systemAudioCaptureToggle: "Capture system audio (remote participants)",
+      systemAudioCaptureDesc:
+        "On macOS 14.2+, records meeting-app audio alongside the microphone. When off, only the microphone is used.",
+      systemAudioUnsupported:
+        "Native system-audio capture is not supported on this platform. Use a virtual loopback device or record microphone only.",
+      systemAudioDeniedHint:
+        "System-audio permission was denied or capture could not start. Remote participants may be missing from the recording.",
       testingAudio: "Testing Audio (Listening to VU)...",
       testInput: "Test Input (5 s)",
       openSoundPanelTitle:

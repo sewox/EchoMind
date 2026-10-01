@@ -709,4 +709,36 @@ describe("SettingsModal Component", () => {
       expect(localStorage.getItem("echomind_privacy_mode")).toBe("balanced");
     }
   });
+
+  it("toggles system-audio capture preference and shows unsupported hint", async () => {
+    (invoke as any).mockImplementation((cmd: string) => {
+      if (cmd === "list_audio_devices") return Promise.resolve([]);
+      if (cmd === "get_system_audio_support") return Promise.resolve(false);
+      return Promise.resolve();
+    });
+
+    render(
+      <I18nProvider>
+        <SettingsModal {...defaultProps} />
+      </I18nProvider>,
+    );
+
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 20));
+    });
+
+    expect(
+      await screen.findByTestId("system-audio-unsupported"),
+    ).toBeInTheDocument();
+
+    const toggle = screen.getByTestId("system-audio-toggle") as HTMLInputElement;
+    expect(toggle.checked).toBe(true);
+
+    fireEvent.click(toggle);
+    expect(toggle.checked).toBe(false);
+    expect(localStorage.getItem("echomind_system_audio_enabled")).toBe("false");
+    expect(invoke).toHaveBeenCalledWith("set_system_audio_enabled", {
+      enabled: false,
+    });
+  });
 });
