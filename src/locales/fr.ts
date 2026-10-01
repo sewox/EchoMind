@@ -357,10 +357,10 @@ export const fr: TranslationKeys = {
     autoStopAlert: "{app} fermée, réunion terminée automatiquement.",
     settingsTitle: "Détection Automatique des Réunions",
     settingsDesc:
-      "Détecte discrètement lorsque Zoom, Teams, Meet ou Slack démarre et facilite l'enregistrement.",
+      "Détecte quand une app utilise le micro pour un appel et propose d'enregistrer.",
     enableDetection: "Activer le Détecteur de Réunions",
     enableDetectionDesc:
-      "Surveille les applications de visioconférence et l'activité audio en arrière-plan.",
+      "Surveille l'activité micro de toute app de réunion ou onglet navigateur en arrière-plan.",
     autoStartToggle: "Démarrage Automatique Sans Confirmation",
     autoStartToggleDesc:
       "Démarre l'enregistrement immédiatement sans afficher de bannière au début d'une réunion.",
@@ -368,6 +368,14 @@ export const fr: TranslationKeys = {
     autoStopToggleDesc:
       "Termine la session et génère les notes dès que l'application de réunion se ferme.",
     ignoredAppsTitle: "Applications Surveillées",
+    ignoreListTitle: "Apps ignorées (bundle IDs)",
+    ignoreListDesc:
+      "Les apps de cette liste ne déclenchent pas l'invite de réunion (Mémos Vocaux, Siri, enregistreurs…). Ajoutez un bundle ID macOS pour couper les faux positifs.",
+    ignoreListPlaceholder: "com.example.App",
+    ignoreListAdd: "Ajouter",
+    ignoreListRemove: "Retirer",
+    ignoreListEmpty:
+      "Aucune app ignorée — les valeurs par défaut seront restaurées au prochain lancement.",
   },
   updater: {
     modalTitle: "Nouvelle mise à jour disponible !",

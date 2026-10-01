@@ -359,10 +359,10 @@ export const es: TranslationKeys = {
     autoStopAlert: "{app} cerrada, reunión finalizada automáticamente.",
     settingsTitle: "Detección Automática de Reuniones",
     settingsDesc:
-      "Detecta discretamente cuando inicia Zoom, Teams, Meet o Slack y simplifica la grabación.",
+      "Detecta cuando cualquier app usa el micrófono para una llamada y ofrece grabar.",
     enableDetection: "Activar Detector de Reuniones",
     enableDetectionDesc:
-      "Supervisa las aplicaciones de videoconferencia y la actividad de audio en segundo plano.",
+      "Supervisa la actividad del micrófono de cualquier app o pestaña del navegador en segundo plano.",
     autoStartToggle: "Inicio Automático Sin Confirmación",
     autoStartToggleDesc:
       "Inicia la grabación directamente sin mostrar avisos al comenzar una reunión.",
@@ -370,6 +370,14 @@ export const es: TranslationKeys = {
     autoStopToggleDesc:
       "Finaliza la sesión y genera notas en cuanto se cierra la aplicación de la reunión.",
     ignoredAppsTitle: "Aplicaciones Supervisadas",
+    ignoreListTitle: "Apps ignoradas (bundle IDs)",
+    ignoreListDesc:
+      "Las apps de esta lista no disparan el aviso de reunión (Notas de Voz, Siri, grabadoras…). Añada un bundle ID de macOS para silenciar falsos positivos.",
+    ignoreListPlaceholder: "com.example.App",
+    ignoreListAdd: "Añadir",
+    ignoreListRemove: "Quitar",
+    ignoreListEmpty:
+      "No hay apps ignoradas: los valores por defecto se restaurarán en el próximo inicio.",
   },
   updater: {
     modalTitle: "¡Nueva actualización disponible!",

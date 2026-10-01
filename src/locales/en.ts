@@ -360,10 +360,10 @@ export const en: TranslationKeys = {
     autoStopAlert: "{app} closed, meeting finished automatically.",
     settingsTitle: "Automatic Meeting Detection",
     settingsDesc:
-      "Quietly detects when Zoom, Teams, Meet, or Slack starts and simplifies recording.",
+      "Detects when any app uses the microphone for a call and offers to start recording.",
     enableDetection: "Enable Meeting Detector",
     enableDetectionDesc:
-      "Monitors video conferencing apps and audio activity in the background.",
+      "Monitors microphone activity from any meeting app or browser tab in the background.",
     autoStartToggle: "Auto-Start Without Prompting",
     autoStartToggleDesc:
       "Automatically begins recording without showing a banner when a meeting starts.",
@@ -371,6 +371,13 @@ export const en: TranslationKeys = {
     autoStopToggleDesc:
       "Concludes the session and generates notes when the meeting application closes.",
     ignoredAppsTitle: "Monitored Applications",
+    ignoreListTitle: "Ignored Apps (bundle IDs)",
+    ignoreListDesc:
+      "Apps on this list never trigger a meeting prompt (Voice Memos, Siri, recorders, …). Add a macOS bundle ID to silence false positives.",
+    ignoreListPlaceholder: "com.example.App",
+    ignoreListAdd: "Add",
+    ignoreListRemove: "Remove",
+    ignoreListEmpty: "No ignored apps — defaults will be restored on next launch.",
   },
   updater: {
     modalTitle: "New Update Available!",

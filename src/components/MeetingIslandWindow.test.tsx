@@ -22,6 +22,12 @@ describe("MeetingIslandWindow Component", () => {
               recommended_title: "Google Meet Toplantısı - 02 Eylül 2026",
             },
           ],
+          settings: {
+            enabled: true,
+            auto_start_record: false,
+            auto_stop_on_app_close: true,
+            ignored_apps: ["com.apple.VoiceMemos"],
+          },
         });
       }
       return Promise.resolve();
@@ -81,7 +87,7 @@ describe("MeetingIslandWindow Component", () => {
         enabled: true,
         auto_start_record: true,
         auto_stop_on_app_close: true,
-        ignored_apps: [],
+        ignored_apps: ["com.apple.VoiceMemos"],
       },
     });
   });
