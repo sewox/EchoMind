@@ -116,6 +116,18 @@ describe("FollowUpModal Component", () => {
     expect(screen.queryByText(/One-Click Follow-up/i)).not.toBeInTheDocument();
   });
 
+  it("shows the error instead of a silent fallback when the bundle fails", async () => {
+    (invoke as any).mockImplementation((cmd: string) =>
+      cmd === "export_followup_bundle"
+        ? Promise.reject("Toplantı bulunamadı: test-meeting-101")
+        : Promise.resolve(),
+    );
+    renderComponent();
+    expect(await screen.findByTestId("followup-error")).toHaveTextContent(
+      "Toplantı bulunamadı: test-meeting-101",
+    );
+  });
+
   it("loads and renders email draft", async () => {
     renderComponent();
 

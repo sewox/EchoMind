@@ -74,6 +74,7 @@ export const de: TranslationKeys = {
     retranscribe: "Neu Transkribieren",
     retranscribeTooltip:
       "Audiodatei mit einem anderen KI-Modell erneut transkribieren",
+    actionFailed: "Aktion fehlgeschlagen: {error}",
     lowQualityWarningTitle: "Transkript-Zuverlässigkeitswarnung:",
     lowQualityWarningDesc:
       "In dieser Aufnahme wurden schwache Sprachsignale oder sich wiederholende Muster erkannt. Die Transkriptgenauigkeit kann beeinträchtigt sein.",

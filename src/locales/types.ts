@@ -66,6 +66,7 @@ export interface TranslationKeys {
     searchPlaceholder: string;
     retranscribe: string;
     retranscribeTooltip: string;
+    actionFailed: string;
     lowQualityWarningTitle: string;
     lowQualityWarningDesc: string;
     shareReport: string;

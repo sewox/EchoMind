@@ -72,6 +72,7 @@ export const fr: TranslationKeys = {
     searchPlaceholder: "Rechercher dans le dialogue...",
     retranscribe: "Retranscrire",
     retranscribeTooltip: "Retraiter l'audio avec un autre modèle d'IA",
+    actionFailed: "Action impossible : {error}",
     lowQualityWarningTitle: "Avertissement de Fiabilité de la Transcription :",
     lowQualityWarningDesc:
       "Des signaux vocaux faibles ou des répétitions ont été détectés dans cet enregistrement. La précision peut être dégradée.",

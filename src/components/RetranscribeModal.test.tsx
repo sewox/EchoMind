@@ -237,6 +237,32 @@ describe("RetranscribeModal Component", () => {
     expect(defaultProps.onClose).toHaveBeenCalled();
   });
 
+  it("pre-selects Apple dictation when it is the active engine", async () => {
+    localStorage.setItem("echomind_active_engine", "apple_speech");
+    (invoke as any).mockImplementation((cmd: string) =>
+      cmd === "retranscribe_meeting"
+        ? Promise.resolve({ ...mockMeeting })
+        : Promise.resolve(),
+    );
+
+    render(
+      <I18nProvider>
+        <RetranscribeModal {...defaultProps} />
+      </I18nProvider>,
+    );
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /Yeniden Yazıya Dök/i }),
+      );
+    });
+
+    expect(invoke).toHaveBeenCalledWith(
+      "retranscribe_meeting",
+      expect.objectContaining({ cloudProvider: "apple_speech" }),
+    );
+  });
+
   it("does not render when isOpen is false", () => {
     const { container } = render(
       <I18nProvider>

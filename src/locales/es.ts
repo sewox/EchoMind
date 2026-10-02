@@ -74,6 +74,7 @@ export const es: TranslationKeys = {
     retranscribe: "Retranscribir",
     retranscribeTooltip:
       "Vuelve a procesar el audio con un modelo de IA diferente",
+    actionFailed: "No se pudo completar la acción: {error}",
     lowQualityWarningTitle: "Advertencia de Fiabilidad de Transcripción:",
     lowQualityWarningDesc:
       "Se detectaron señales débiles de voz o repeticiones en esta grabación. La precisión puede verse comprometida.",
