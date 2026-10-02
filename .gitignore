@@ -15,6 +15,8 @@ src-tauri/swift/EchoMindAudio/.build/
 
 # Local models and large binaries
 src-tauri/models/*.bin
+src-tauri/models/*.onnx
+src-tauri/models/*.part
 models/*.bin
 *.gguf
 *.bin
@@ -50,3 +52,6 @@ yarn-error.log*
 *.njsproj
 *.sln
 *.sw?
+
+# Dev app data (meeting history, recordings, preferences) — never commit
+/data/

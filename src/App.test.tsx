@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, act } from "@testing-library/react";
+import {
+  render,
+  screen,
+  fireEvent,
+  act,
+  waitFor,
+} from "@testing-library/react";
 import App, { MeetingRecord } from "./App";
 import { I18nProvider } from "./locales/i18nContext";
 import { invoke } from "@tauri-apps/api/core";
@@ -582,6 +588,62 @@ describe("App Top-Level Integration", () => {
         filePath: "/path/to/large_meeting.wav",
       }),
     );
+  });
+
+  it("imports with Apple dictation in Paranoid Mode, without the large-file advisor", async () => {
+    localStorage.setItem("echomind_active_engine", "apple_speech");
+    localStorage.setItem("echomind_privacy_mode", "paranoid");
+    (invoke as any).mockImplementation((cmd: string) => {
+      if (cmd === "get_all_meetings") return Promise.resolve(mockPastMeetings);
+      if (cmd === "get_privacy_mode") return Promise.resolve("paranoid");
+      if (cmd === "get_asr_engine")
+        return Promise.resolve({
+          engine: "apple_speech",
+          stored: true,
+          apple_available: true,
+        });
+      if (cmd === "pick_audio_file_dialog") {
+        return Promise.resolve({
+          path: "/path/to/large_meeting.flac",
+          file_name: "large_meeting.flac",
+          file_size_mb: 30.0,
+          is_large_file: true,
+        });
+      }
+      if (cmd === "process_audio_file_path") {
+        return Promise.resolve({
+          ...mockPastMeetings[0],
+          id: "mtg-imported-apple",
+        });
+      }
+      return Promise.resolve();
+    });
+
+    render(
+      <I18nProvider>
+        <App />
+      </I18nProvider>,
+    );
+
+    const importBtns = screen.getAllByRole("button", { name: /Ses Dosyası/i });
+    await act(async () => {
+      fireEvent.click(importBtns[0]);
+    });
+
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith(
+        "process_audio_file_path",
+        expect.objectContaining({
+          filePath: "/path/to/large_meeting.flac",
+          cloudProvider: "apple_speech",
+        }),
+      ),
+    );
+    expect(
+      screen.queryByText(/Akıllı İşlem Tavsiyesi/i),
+    ).not.toBeInTheDocument();
+    localStorage.removeItem("echomind_privacy_mode");
+    localStorage.removeItem("echomind_active_engine");
   });
 
   it("handles audio file import with Cloud Privacy confirmation modal", async () => {

@@ -85,3 +85,7 @@ windows = { version = "0.58", features = ["Win32_System_SystemInformation", "Win
 [[example]]
 name = "qa_listen_20x"
 path = "examples/qa_listen_20x.rs"
+
+[[example]]
+name = "transcript_dump"
+path = "examples/transcript_dump.rs"
