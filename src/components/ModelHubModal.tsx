@@ -24,7 +24,7 @@ import {
   modelLabel,
 } from "./ModelHubModalConstants";
 import { useI18n } from "../locales/i18nContext";
-import { getActiveEngine } from "../services/activeEngine";
+import { getActiveEngine, storeActiveEngine } from "../services/activeEngine";
 import { CredentialStore } from "../services/credentialStore";
 
 export interface ModelInfo {
@@ -134,7 +134,7 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
     try {
       setLoading(true);
       await invoke("switch_transcription_model", { modelKey: key });
-      localStorage.setItem("echomind_active_engine", "local");
+      storeActiveEngine("local");
       setActiveEngine("local");
       await fetchModels();
       setStatusMessage("Yerel model başarıyla aktifleştirildi.");
@@ -147,7 +147,7 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
   };
 
   const handleSelectOfflineEngine = (engine: "apple_speech") => {
-    localStorage.setItem("echomind_active_engine", engine);
+    storeActiveEngine(engine);
     setActiveEngine(engine);
     const names: Record<string, string> = {
       apple_speech: "🍎 macOS Yerel Ses Tanıma (Apple Dikte / ANE)",
@@ -178,7 +178,7 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
     }
 
     const engineKey = `cloud_${engine}`;
-    localStorage.setItem("echomind_active_engine", engineKey);
+    storeActiveEngine(engineKey);
     setActiveEngine(engineKey);
     setInlineKeyTarget(null);
 
@@ -208,7 +208,7 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
 
     await CredentialStore.set(keyStorageMap[engine], trimmed);
     const engineKey = `cloud_${engine}`;
-    localStorage.setItem("echomind_active_engine", engineKey);
+    storeActiveEngine(engineKey);
     setActiveEngine(engineKey);
     setInlineKeyTarget(null);
     setInlineKeyValue("");

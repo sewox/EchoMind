@@ -1,3 +1,4 @@
+pub mod asr_engine;
 pub mod audio;
 pub mod audio_clipper;
 pub mod auto_tagger;
@@ -25,6 +26,7 @@ pub mod transcriber;
 pub mod transcription_queue;
 pub mod updater;
 
+use asr_engine::{get_asr_engine, set_asr_engine};
 use credentials::{delete_secure_credential, get_secure_credential, save_secure_credential};
 use dlp::redact_sensitive_text;
 use security::{get_privacy_mode, set_privacy_mode};
@@ -81,6 +83,8 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![
             get_hardware_info,
+            get_asr_engine,
+            set_asr_engine,
             start_audio_capture,
             start_meeting_recording,
             stop_audio_capture,

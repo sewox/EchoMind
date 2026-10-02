@@ -477,6 +477,7 @@ impl StorageEngine {
         &self,
         meeting_id: &str,
         segments: Vec<TranscriptSegment>,
+        engine_used: Option<String>,
     ) -> Result<MeetingRecord, String> {
         let mut lock = self.meetings.lock().unwrap();
         let mtg = lock
@@ -491,6 +492,9 @@ impl StorageEngine {
             || mtg.key_decisions == extract_key_decisions(&mtg.segments);
         mtg.segments = segments;
         mtg.transcript_pending = false;
+        if engine_used.is_some() {
+            mtg.engine_used = engine_used;
+        }
         if summary_was_auto {
             mtg.summary = generate_summary_from_segments(&mtg.segments);
         }
@@ -784,18 +788,28 @@ pub fn dismiss_history_recovery_notice() -> Result<(), String> {
 
 /// Encodes 16kHz mono float audio PCM samples into FLAC format (100% Lossless, 0 Distortion)
 pub fn compress_audio_to_flac(samples_f32: &[f32], output_path: &PathBuf) -> Result<(), String> {
-    if samples_f32.is_empty() {
+    compress_channels_to_flac(&[samples_f32], output_path)
+}
+
+/// Encodes sample-aligned 16 kHz channels (e.g. microphone + system audio) as
+/// one multi-channel FLAC. Shorter channels are padded with silence.
+pub fn compress_channels_to_flac(channels_f32: &[&[f32]], output_path: &PathBuf) -> Result<(), String> {
+    let frames = channels_f32.iter().map(|c| c.len()).max().unwrap_or(0);
+    if frames == 0 || channels_f32.is_empty() {
         return Ok(());
     }
 
-    // Convert f32 PCM [-1.0, 1.0] to i32 PCM [-32768, 32767]
-    let samples_i32: Vec<i32> = samples_f32
-        .iter()
-        .map(|&s| (s.clamp(-1.0, 1.0) * 32767.0) as i32)
-        .collect();
+    // Interleave and convert f32 PCM [-1.0, 1.0] to i32 PCM [-32768, 32767]
+    let mut samples_i32: Vec<i32> = Vec::with_capacity(frames * channels_f32.len());
+    for i in 0..frames {
+        for ch in channels_f32 {
+            let s = ch.get(i).copied().unwrap_or(0.0);
+            samples_i32.push((s.clamp(-1.0, 1.0) * 32767.0) as i32);
+        }
+    }
 
     let sample_rate = 16000;
-    let channels = 1;
+    let channels = channels_f32.len();
     let bits_per_sample = 16;
 
     let source = MemSource::from_samples(&samples_i32, channels, bits_per_sample, sample_rate);
@@ -1229,7 +1243,14 @@ fn save_current_meeting_blocking(
         }
         let flac_file_path = rec_dir.join(format!("{}.flac", id));
 
-        let audio_file_path = match compress_audio_to_flac(&raw_pcm_buffer, &flac_file_path) {
+        // With system audio, keep both sides: left = microphone, right =
+        // system audio, so later re-transcriptions can still tell local from
+        // remote speakers. Playback and ASR decode it as their average.
+        let written = match &session_channels {
+            Some(ch) => compress_channels_to_flac(&[&ch.mic, &ch.system], &flac_file_path),
+            None => compress_audio_to_flac(&raw_pcm_buffer, &flac_file_path),
+        };
+        let audio_file_path = match written {
             Ok(_) => Some(flac_file_path.to_string_lossy().to_string()),
             Err(e) => {
                 eprintln!("FLAC kaydetme uyarısı: {}", e);
@@ -1254,11 +1275,16 @@ fn save_current_meeting_blocking(
         // Pending (→ full-file queue job) when there is no transcript at all, or
         // when live transcription only covered part of the recording — e.g. it
         // was paused while a past meeting was open, or the app quit mid-meeting.
+        // With Apple dictation chosen, the live (Whisper) text is only a
+        // preview: the whole recording is re-transcribed by Apple in the queue.
         let transcript_pending = needs_full_transcription(
             &deduplicated_segments,
             raw_pcm_buffer.len(),
             live_covered_samples,
-        );
+        ) || (mode == SaveMode::Normal
+            && audio_file_path.is_some()
+            && raw_pcm_buffer.len() >= 16000
+            && crate::asr_engine::queue_uses_apple());
         // Live slices aren't diarized (numbering would restart every slice);
         // label speakers once for the whole session now. Skipped on quit (tight
         // time budget) and when a full re-transcription is queued anyway.
@@ -2291,7 +2317,7 @@ mod tests {
         // Auto summary (empty at save → generated from the partial transcript).
         storage.add_meeting(base("auto_sum", "")).unwrap();
         let updated = storage
-            .update_meeting_segments("auto_sum", full.clone())
+            .update_meeting_segments("auto_sum", full.clone(), None)
             .unwrap();
         assert_eq!(updated.summary, generate_summary_from_segments(&full));
         assert_eq!(updated.key_decisions, extract_key_decisions(&full));
@@ -2301,7 +2327,10 @@ mod tests {
         storage
             .add_meeting(base("custom_sum", "Elle yazılmış özet"))
             .unwrap();
-        let kept = storage.update_meeting_segments("custom_sum", full).unwrap();
+        let kept = storage
+            .update_meeting_segments("custom_sum", full, Some("Whisper".to_string()))
+            .unwrap();
+        assert_eq!(kept.engine_used.as_deref(), Some("Whisper"));
         assert_eq!(kept.summary, "Elle yazılmış özet");
 
         let _ = storage.delete_meeting("auto_sum");

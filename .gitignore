@@ -11,6 +11,7 @@ coverage/
 # Rust & Tauri builds
 src-tauri/target/
 target/
+src-tauri/swift/EchoMindAudio/.build/
 
 # Local models and large binaries
 src-tauri/models/*.bin

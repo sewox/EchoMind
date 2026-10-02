@@ -54,7 +54,7 @@ import {
 } from "./hooks/useTranscriptionJobs";
 import { HistoryRecoveryNoticeBanner } from "./components/HistoryRecoveryNoticeBanner";
 import { CredentialStore } from "./services/credentialStore";
-import { getActiveEngine } from "./services/activeEngine";
+import { getActiveEngine, syncActiveEngine } from "./services/activeEngine";
 import { useStorageReady } from "./hooks/useStorageReady";
 import { useHistoryRecoveryNotice } from "./hooks/useHistoryRecoveryNotice";
 
@@ -258,6 +258,11 @@ export function App() {
     // Automatically migrate any legacy plaintext localStorage API keys to the native encrypted vault
     CredentialStore.migrateLegacyStorage().catch(() => {});
   }, [storageReady]);
+
+  // Background transcription follows the same engine as the UI.
+  useEffect(() => {
+    syncActiveEngine().catch(() => {});
+  }, []);
 
   // Sync native system-audio preference before the first recording starts.
   useEffect(() => {

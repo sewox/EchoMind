@@ -3,7 +3,7 @@ use std::fs::File;
 use std::path::{Path, PathBuf};
 
 use crate::transcriber::TranscriptSegment;
-use symphonia::core::audio::{AudioBufferRef, Signal};
+use symphonia::core::audio::AudioBufferRef;
 use symphonia::core::codecs::DecoderOptions;
 use symphonia::core::errors::Error;
 use symphonia::core::formats::FormatOptions;
@@ -55,8 +55,12 @@ fn run_asr_engine(
         let clean_prov = prov.trim().to_lowercase();
         match clean_prov.as_str() {
             "apple_speech" | "apple_native" | "apple" => {
-                match crate::offline_engines::transcribe_apple_speech(audio_path, lang) {
-                    Ok(segs) => return Ok((segs, "🍎 macOS Yerel Ses Tanıma".to_string())),
+                match crate::offline_engines::transcribe_apple_pcm(pcm_16k, lang) {
+                    Ok(mut segs) => {
+                        crate::diarization::cluster_speakers(&mut segs, pcm_16k, 16000, 6);
+                        crate::diarization::resolve_speaker_names(&mut segs);
+                        return Ok((segs, crate::asr_engine::APPLE_ENGINE_LABEL.to_string()));
+                    }
                     Err(e) => {
                         eprintln!("⚠️ Apple Speech başarısız: {}", e);
                         failed_engine = Some("Apple Speech");
@@ -148,6 +152,33 @@ pub(crate) fn is_auto_generated_title(title: &str) -> bool {
 
 /// Decodes any external audio file (.mp3, .m4a, .opus, .ogg, .wav, .flac, .aac, .3gp, .caf) into 16,000 Hz Mono float32 PCM samples.
 pub fn decode_audio_file_to_pcm16k(file_path: &Path) -> Result<(Vec<f32>, u64), String> {
+    let mono = mix_channels(&decode_audio_file_channels_16k(file_path)?);
+    let duration_seconds = (mono.len() as u64) / 16000;
+    Ok((mono, duration_seconds))
+}
+
+/// Averages channels into one mono track (shorter channels count as silence).
+pub fn mix_channels(channels: &[Vec<f32>]) -> Vec<f32> {
+    if let [only] = channels {
+        return only.clone();
+    }
+    let n = channels.iter().map(Vec::len).max().unwrap_or(0);
+    let k = channels.len().max(1) as f32;
+    (0..n)
+        .map(|i| {
+            channels
+                .iter()
+                .map(|c| c.get(i).copied().unwrap_or(0.0))
+                .sum::<f32>()
+                / k
+        })
+        .collect()
+}
+
+/// Decodes an audio file to 16 kHz, one vector per channel. EchoMind stores
+/// recordings with system audio as stereo FLAC (left = microphone, right =
+/// system audio), which keeps local vs remote speakers separable later.
+pub fn decode_audio_file_channels_16k(file_path: &Path) -> Result<Vec<Vec<f32>>, String> {
     let file = File::open(file_path).map_err(|e| format!("Ses dosyası açılamadı: {}", e))?;
     let mss = MediaSourceStream::new(Box::new(file), Default::default());
 
@@ -157,12 +188,13 @@ pub fn decode_audio_file_to_pcm16k(file_path: &Path) -> Result<(Vec<f32>, u64), 
         hint.with_extension(ext);
     }
 
-    let format_opts = FormatOptions::default();
-    let metadata_opts = MetadataOptions::default();
-    let decoder_opts = DecoderOptions::default();
-
     let probed = symphonia::default::get_probe()
-        .format(&hint, mss, &format_opts, &metadata_opts)
+        .format(
+            &hint,
+            mss,
+            &FormatOptions::default(),
+            &MetadataOptions::default(),
+        )
         .map_err(|e| format!("Ses formatı çözümlenemedi: {:?}", e))?;
 
     let mut format_reader = probed.format;
@@ -174,14 +206,25 @@ pub fn decode_audio_file_to_pcm16k(file_path: &Path) -> Result<(Vec<f32>, u64), 
         .ok_or_else(|| "Ses izi (audio track) bulunamadı".to_string())?;
 
     let src_sample_rate = track.codec_params.sample_rate.unwrap_or(44100);
-    let num_channels = track.codec_params.channels.map(|c| c.count()).unwrap_or(1);
+    let num_channels = track
+        .codec_params
+        .channels
+        .map(|c| c.count())
+        .unwrap_or(1)
+        .max(1);
 
     let mut decoder = symphonia::default::get_codecs()
-        .make(&track.codec_params, &decoder_opts)
+        .make(&track.codec_params, &DecoderOptions::default())
         .map_err(|e| format!("Ses dekoderi oluşturulamadı: {:?}", e))?;
 
     let track_id = track.id;
-    let mut raw_pcm_samples: Vec<f32> = Vec::new();
+    // Low-pass + resample per channel as packets arrive (no full-rate copy
+    // of the whole file in memory, and no aliasing from plain interpolation).
+    let mut resamplers: Vec<crate::resample::Downsampler> = (0..num_channels)
+        .map(|_| crate::resample::Downsampler::new(src_sample_rate, 16000))
+        .collect();
+    let mut out: Vec<Vec<f32>> = vec![Vec::new(); num_channels];
+    let mut planar: Vec<Vec<f32>> = vec![Vec::new(); num_channels];
 
     loop {
         let packet = match format_reader.next_packet() {
@@ -197,108 +240,41 @@ pub fn decode_audio_file_to_pcm16k(file_path: &Path) -> Result<(Vec<f32>, u64), 
 
         match decoder.decode(&packet) {
             Ok(decoded) => {
-                append_audio_buffer_samples(&decoded, &mut raw_pcm_samples, num_channels);
+                for p in planar.iter_mut() {
+                    p.clear();
+                }
+                append_audio_buffer_channels(&decoded, &mut planar);
+                for (ch, samples) in planar.iter().enumerate() {
+                    let resampled = resamplers[ch].process(samples);
+                    out[ch].extend_from_slice(&resampled);
+                }
             }
             Err(Error::DecodeError(_)) => continue,
             Err(e) => return Err(format!("Dekodlama hatası: {:?}", e)),
         }
     }
 
-    if raw_pcm_samples.is_empty() {
+    if out.iter().all(Vec::is_empty) {
         return Err("Ses dosyasından veri okunamadı".to_string());
     }
-
-    // Resample to 16,000 Hz Mono PCM
-    let target_sample_rate = 16000;
-    let resampled_pcm = resample_mono_pcm(&raw_pcm_samples, src_sample_rate, target_sample_rate);
-    drop(raw_pcm_samples); // Immediately free raw uncompressed vector from RAM
-
-    let duration_seconds = (resampled_pcm.len() as u64) / (target_sample_rate as u64);
-
-    Ok((resampled_pcm, duration_seconds))
+    Ok(out)
 }
 
-fn append_audio_buffer_samples(decoded: &AudioBufferRef, out: &mut Vec<f32>, num_channels: usize) {
+fn append_audio_buffer_channels(decoded: &AudioBufferRef, out: &mut [Vec<f32>]) {
+    fn push<T: Copy>(planes: &[&[T]], out: &mut [Vec<f32>], conv: impl Fn(T) -> f32) {
+        for (ch, dst) in out.iter_mut().enumerate() {
+            if let Some(src) = planes.get(ch) {
+                dst.extend(src.iter().map(|&x| conv(x)));
+            }
+        }
+    }
     match decoded {
-        AudioBufferRef::F32(buf) => {
-            let planes = buf.planes();
-            let num_frames = buf.frames();
-            for frame in 0..num_frames {
-                let mut sum = 0.0;
-                for ch in 0..num_channels {
-                    if ch < planes.planes().len() {
-                        sum += planes.planes()[ch][frame];
-                    }
-                }
-                out.push(sum / (num_channels as f32));
-            }
-        }
-        AudioBufferRef::U8(buf) => {
-            let planes = buf.planes();
-            let num_frames = buf.frames();
-            for frame in 0..num_frames {
-                let mut sum = 0.0;
-                for ch in 0..num_channels {
-                    if ch < planes.planes().len() {
-                        sum += (planes.planes()[ch][frame] as f32 - 128.0) / 128.0;
-                    }
-                }
-                out.push(sum / (num_channels as f32));
-            }
-        }
-        AudioBufferRef::S16(buf) => {
-            let planes = buf.planes();
-            let num_frames = buf.frames();
-            for frame in 0..num_frames {
-                let mut sum = 0.0;
-                for ch in 0..num_channels {
-                    if ch < planes.planes().len() {
-                        sum += planes.planes()[ch][frame] as f32 / 32768.0;
-                    }
-                }
-                out.push(sum / (num_channels as f32));
-            }
-        }
-        AudioBufferRef::S32(buf) => {
-            let planes = buf.planes();
-            let num_frames = buf.frames();
-            for frame in 0..num_frames {
-                let mut sum = 0.0;
-                for ch in 0..num_channels {
-                    if ch < planes.planes().len() {
-                        sum += planes.planes()[ch][frame] as f32 / 2147483648.0;
-                    }
-                }
-                out.push(sum / (num_channels as f32));
-            }
-        }
+        AudioBufferRef::F32(buf) => push(buf.planes().planes(), out, |x| x),
+        AudioBufferRef::U8(buf) => push(buf.planes().planes(), out, |x| (x as f32 - 128.0) / 128.0),
+        AudioBufferRef::S16(buf) => push(buf.planes().planes(), out, |x| x as f32 / 32768.0),
+        AudioBufferRef::S32(buf) => push(buf.planes().planes(), out, |x| x as f32 / 2147483648.0),
         _ => {}
     }
-}
-
-fn resample_mono_pcm(src: &[f32], src_rate: u32, target_rate: u32) -> Vec<f32> {
-    if src_rate == target_rate {
-        return src.to_vec();
-    }
-
-    let ratio = src_rate as f64 / target_rate as f64;
-    let target_len = ((src.len() as f64) / ratio) as usize;
-    let mut out = Vec::with_capacity(target_len);
-
-    for i in 0..target_len {
-        let src_index = (i as f64) * ratio;
-        let idx0 = src_index.floor() as usize;
-        let idx1 = (idx0 + 1).min(src.len() - 1);
-        let frac = (src_index - (idx0 as f64)) as f32;
-
-        let sample0 = src.get(idx0).copied().unwrap_or(0.0);
-        let sample1 = src.get(idx1).copied().unwrap_or(0.0);
-        let interpolated = sample0 + frac * (sample1 - sample0);
-
-        out.push(interpolated);
-    }
-
-    out
 }
 
 #[tauri::command]
@@ -722,13 +698,15 @@ pub async fn retranscribe_meeting(
         }
 
         // 1. Decode audio to 16kHz PCM
-        let (mut pcm_16k, duration_seconds) = decode_audio_file_to_pcm16k(&path)?;
+        let channels = decode_audio_file_channels_16k(&path)?;
+        let mut pcm_16k = mix_channels(&channels);
+        let duration_seconds = (pcm_16k.len() as u64) / 16000;
         crate::audio::normalize_audio_samples(&mut pcm_16k);
 
         let lang = language.as_deref().unwrap_or("auto");
 
         // 2. ASR (cloud / offline engine, local Whisper fallback with honest label)
-        let (segments_raw, engine_label) = run_asr_engine(
+        let (mut segments_raw, engine_label) = run_asr_engine(
             &path,
             &pcm_16k,
             lang,
@@ -737,6 +715,11 @@ pub async fn retranscribe_meeting(
             model_version.as_deref(),
         )?;
         drop(pcm_16k);
+        // Recordings with system audio: microphone vs remote side by channel.
+        if let [mic, system] = channels.as_slice() {
+            crate::diarization::attribute_speakers_by_channel(&mut segments_raw, mic, system, 16000);
+        }
+        drop(channels);
 
         let total_duration_ms = duration_seconds * 1000;
         let mut clean_segs = Vec::new();
@@ -888,10 +871,50 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_resample_mono_pcm() {
-        let src_samples = vec![0.0, 0.5, 1.0, 0.5, 0.0];
-        let resampled = resample_mono_pcm(&src_samples, 44100, 16000);
-        assert!(!resampled.is_empty());
+    fn test_mix_channels_averages_and_pads_short_channels() {
+        assert_eq!(mix_channels(&[]), Vec::<f32>::new());
+        assert_eq!(mix_channels(&[vec![0.5, -0.5]]), vec![0.5, -0.5]);
+        assert_eq!(
+            mix_channels(&[vec![1.0, 1.0, 1.0], vec![0.0, 1.0]]),
+            vec![0.5, 1.0, 0.5]
+        );
+    }
+
+    #[test]
+    fn test_decode_keeps_stereo_channels_apart_and_resamples() {
+        // Left = 440 Hz (microphone), right = silence (system audio), 48 kHz.
+        let path =
+            std::env::temp_dir().join(format!("echomind_test_stereo_{}.wav", std::process::id()));
+        let spec = hound::WavSpec {
+            channels: 2,
+            sample_rate: 48000,
+            bits_per_sample: 16,
+            sample_format: hound::SampleFormat::Int,
+        };
+        let mut w = hound::WavWriter::create(&path, spec).unwrap();
+        for i in 0..48000 {
+            let v = (2.0 * std::f32::consts::PI * 440.0 * i as f32 / 48000.0).sin() * 0.5;
+            w.write_sample((v * 32767.0) as i16).unwrap();
+            w.write_sample(0i16).unwrap();
+        }
+        w.finalize().unwrap();
+
+        let ch = decode_audio_file_channels_16k(&path).unwrap();
+        assert_eq!(ch.len(), 2);
+        assert!(
+            (ch[0].len() as i64 - 16000).abs() < 100,
+            "len {}",
+            ch[0].len()
+        );
+        let rms = |v: &[f32]| (v.iter().map(|x| x * x).sum::<f32>() / v.len() as f32).sqrt();
+        assert!(rms(&ch[0][500..]) > 0.3);
+        assert!(rms(&ch[1]) < 1e-4);
+        let (mono, _) = decode_audio_file_to_pcm16k(&path).unwrap();
+        assert!(
+            (rms(&mono[500..]) - rms(&ch[0][500..]) / 2.0).abs() < 0.02,
+            "mono is the channel average"
+        );
+        let _ = std::fs::remove_file(path);
     }
 
     #[test]
