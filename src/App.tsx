@@ -1617,6 +1617,7 @@ export function App() {
               }}
               onAddTag={handleAddMeetingTag}
               onRemoveTag={handleRemoveMeetingTag}
+              onOpenModelHub={() => setIsModelHubOpen(true)}
             />
           </div>
         </div>
