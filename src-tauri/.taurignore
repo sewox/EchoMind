@@ -1,0 +1,3 @@
+# Downloaded models change while the app runs; never restart `tauri dev` for them.
+models/
+examples/

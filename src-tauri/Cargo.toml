@@ -30,6 +30,10 @@ name = "onnx_probe"
 path = "examples/onnx_probe.rs"
 
 [[example]]
+name = "apple_dictation_check"
+path = "examples/apple_dictation_check.rs"
+
+[[example]]
 name = "diarization_eval"
 path = "examples/diarization_eval.rs"
 
@@ -81,3 +85,7 @@ windows = { version = "0.58", features = ["Win32_System_SystemInformation", "Win
 [[example]]
 name = "qa_listen_20x"
 path = "examples/qa_listen_20x.rs"
+
+[[example]]
+name = "transcript_dump"
+path = "examples/transcript_dump.rs"

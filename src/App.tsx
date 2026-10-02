@@ -54,7 +54,7 @@ import {
 } from "./hooks/useTranscriptionJobs";
 import { HistoryRecoveryNoticeBanner } from "./components/HistoryRecoveryNoticeBanner";
 import { CredentialStore } from "./services/credentialStore";
-import { getActiveEngine } from "./services/activeEngine";
+import { getActiveEngine, syncActiveEngine } from "./services/activeEngine";
 import { useStorageReady } from "./hooks/useStorageReady";
 import { useHistoryRecoveryNotice } from "./hooks/useHistoryRecoveryNotice";
 
@@ -259,6 +259,11 @@ export function App() {
     CredentialStore.migrateLegacyStorage().catch(() => {});
   }, [storageReady]);
 
+  // Background transcription follows the same engine as the UI.
+  useEffect(() => {
+    syncActiveEngine().catch(() => {});
+  }, []);
+
   // Sync native system-audio preference before the first recording starts.
   useEffect(() => {
     const enabled =
@@ -365,6 +370,8 @@ export function App() {
       setProcessingStatusText(
         `⚡ OpenAI (${modelVersion || "whisper-1"}) ile Çözümleniyor...`,
       );
+    } else if (cloudProvider === "apple_speech") {
+      setProcessingStatusText("Apple Dikte ile yazıya dökülüyor…");
     } else {
       setProcessingStatusText(
         "🔒 Cihazınızda Çevrimdışı Olarak Çözümleniyor (%100 Gizli)...",
@@ -669,6 +676,8 @@ export function App() {
       setProcessingStatusText(
         `⚡ OpenAI (${modelVersion || "whisper-1"}) ile Bulutta Çözümleniyor...`,
       );
+    } else if (cloudProvider === "apple_speech") {
+      setProcessingStatusText("Apple Dikte ile yazıya dökülüyor…");
     } else {
       setProcessingStatusText(
         "🔒 Cihazınızda Çevrimdışı Olarak Çözümleniyor (%100 Gizli)...",
@@ -819,6 +828,13 @@ export function App() {
       const geminiKey = await CredentialStore.get("echomind_gemini_key");
       const openaiKey = await CredentialStore.get("echomind_openai_key");
 
+      // Apple dictation runs on this Mac: allowed in Paranoid Mode, and large
+      // files need no cloud advice (the advisor offers Whisper or cloud only).
+      if (activeEngine === "apple_speech") {
+        checkCloudPrivacyAndExecute(picked.path, "apple_speech", null);
+        return;
+      }
+
       // In Paranoid Mode: 100% offline local processing only (zero cloud leakage)
       if (isParanoid) {
         checkCloudPrivacyAndExecute(picked.path, null, null, undefined);
@@ -843,9 +859,7 @@ export function App() {
       let apiKey: string | null = null;
       let modelVersion: string | undefined = undefined;
 
-      if (activeEngine === "apple_speech") {
-        cloudProvider = "apple_speech";
-      } else if (activeEngine === "cloud_groq" && groqKey) {
+      if (activeEngine === "cloud_groq" && groqKey) {
         cloudProvider = "groq";
         apiKey = groqKey;
         modelVersion =

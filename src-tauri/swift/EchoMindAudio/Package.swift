@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "EchoMindAudio",
-    platforms: [.macOS(.v11)],
+    platforms: [.macOS(.v12)],
     products: [
         .library(name: "EchoMindAudio", type: .static, targets: ["EchoMindAudio"]),
     ],

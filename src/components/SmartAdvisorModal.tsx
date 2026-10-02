@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { storeActiveEngine } from "../services/activeEngine";
 import {
   Zap,
   ShieldCheck,
@@ -107,7 +108,7 @@ export const SmartAdvisorModal: React.FC<SmartAdvisorModalProps> = ({
       const engine = `cloud_${selectedCloudProvider}` as
         "cloud_groq" | "cloud_gemini" | "cloud_openai";
       if (rememberChoice) {
-        localStorage.setItem("echomind_active_engine", engine);
+        storeActiveEngine(engine);
       }
       onConfirm(engine, currentKey, getModelVersion(), importLanguage);
     } else {
@@ -133,14 +134,14 @@ export const SmartAdvisorModal: React.FC<SmartAdvisorModalProps> = ({
     const engine = `cloud_${selectedCloudProvider}` as
       "cloud_groq" | "cloud_gemini" | "cloud_openai";
     if (rememberChoice) {
-      localStorage.setItem("echomind_active_engine", engine);
+      storeActiveEngine(engine);
     }
     onConfirm(engine, trimmed, getModelVersion(), importLanguage);
   };
 
   const handleSelectLocal = () => {
     if (rememberChoice) {
-      localStorage.setItem("echomind_active_engine", "local");
+      storeActiveEngine("local");
     }
     onConfirm("local", undefined, undefined, importLanguage);
   };

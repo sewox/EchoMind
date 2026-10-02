@@ -23,8 +23,15 @@ export default defineConfig(async () => ({
         }
       : undefined,
     watch: {
-      // 3. tell vite to ignore watching `src-tauri`
-      ignored: ['**/src-tauri/**'],
+      // 3. tell vite to ignore watching `src-tauri`, plus generated/runtime
+      //    output (coverage reports, dev app data) and tests — a change there must
+      //    never reload the app mid-import.
+      ignored: [
+        '**/src-tauri/**',
+        '**/coverage/**',
+        '**/data/**',
+        '**/*.test.{ts,tsx}',
+      ],
     },
   },
 }));
