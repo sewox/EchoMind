@@ -40,6 +40,14 @@ export const tr: TranslationKeys = {
     modelHub: "Modeller",
     language: "Dil Seçimi",
   },
+  importProgress: {
+    decoding: "Ses dosyası okunuyor…",
+    transcribing: "Yazıya dökülüyor…",
+    diarizing: "Konuşmacılar ayrıştırılıyor…",
+    saving: "Kaydediliyor…",
+    remainingMinutes: "~{n} dk kaldı",
+    remainingSeconds: "~{n} sn kaldı",
+  },
   sidebar: {
     title: "Toplantı Geçmişi",
     searchPlaceholder: "Geçmiş toplantılarda ara...",

@@ -40,6 +40,14 @@ export const en: TranslationKeys = {
     modelHub: "Models",
     language: "Language",
   },
+  importProgress: {
+    decoding: "Reading the audio file…",
+    transcribing: "Transcribing…",
+    diarizing: "Separating speakers…",
+    saving: "Saving…",
+    remainingMinutes: "~{n} min left",
+    remainingSeconds: "~{n} s left",
+  },
   sidebar: {
     title: "Meeting History",
     searchPlaceholder: "Search past meetings...",

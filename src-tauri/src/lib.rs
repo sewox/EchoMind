@@ -10,6 +10,7 @@ pub mod diarization;
 pub mod dlp;
 pub mod encrypted_storage;
 pub mod hardware;
+pub mod import_progress;
 pub mod importer;
 pub mod mic_activity;
 pub mod offline_engines;
@@ -44,6 +45,7 @@ use detector::{
     show_main_window, start_meeting_detector, stop_meeting_detector, update_detector_settings,
 };
 use hardware::get_hardware_info;
+use import_progress::is_import_running;
 use importer::{
     import_audio_file, pick_and_import_audio_file, pick_audio_file_dialog, process_audio_file_path,
     retranscribe_meeting, save_uploaded_audio_bytes,
@@ -84,6 +86,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_hardware_info,
             get_asr_engine,
+            is_import_running,
             set_asr_engine,
             start_audio_capture,
             start_meeting_recording,
@@ -178,6 +181,7 @@ pub fn run() {
         .setup(|app| {
             // Resolve Keychain / keystore keys on a background thread so the main
             // window can paint even while macOS shows its Keychain Access prompt.
+            import_progress::init(app.handle().clone());
             storage::start_storage_unlock(app.handle().clone());
             Ok(())
         })

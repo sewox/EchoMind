@@ -52,19 +52,15 @@ describe("useFirstRunModelSetup", () => {
 
     renderHook(() => useFirstRunModelSetup());
 
-    expect(invoke).not.toHaveBeenCalledWith(
-      "get_available_models",
-      undefined,
-    );
+    expect(invoke).not.toHaveBeenCalledWith("get_available_models", undefined);
   });
 
-  it("shows a placeholder banner immediately, before the first invoke resolves", () => {
+  it("shows no banner while it is still checking whether a download is needed", () => {
     (invoke as any).mockImplementation(() => new Promise(() => {})); // never resolves
 
     const { result } = renderHook(() => useFirstRunModelSetup());
 
-    expect(result.current.progress).not.toBeNull();
-    expect(result.current.progress?.status).toBe("downloading");
+    expect(result.current.progress).toBeNull();
   });
 
   it("downloads the recommended model and tracks progress when none is present", async () => {

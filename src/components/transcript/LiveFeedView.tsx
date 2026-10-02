@@ -411,8 +411,8 @@ export const LiveFeedView: React.FC<LiveFeedViewProps> = ({
                       <Scissors className="w-3.5 h-3.5" />
                     </button>
                   )}
-                  <span className="text-xs 2xl:text-sm font-mono text-slate-400">
-                    {seg.timestamp_formatted}
+                  <span className="text-xs 2xl:text-sm font-mono text-slate-400 whitespace-nowrap">
+                    {seg.timestamp_formatted.replace(" -> ", " – ")}
                   </span>
                   <span className="text-[10px] 2xl:text-xs px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 font-mono">
                     #{seg.id}
@@ -421,7 +421,7 @@ export const LiveFeedView: React.FC<LiveFeedViewProps> = ({
               </div>
 
               {/* Speech Text */}
-              <p className="text-sm 2xl:text-base text-slate-100 leading-relaxed pl-1 pt-1 font-normal">
+              <p className="text-sm 2xl:text-base text-slate-100 leading-relaxed pl-1 pt-1 font-normal [overflow-wrap:anywhere]">
                 {displaySpeechText}
               </p>
             </div>

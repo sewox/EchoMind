@@ -646,6 +646,40 @@ describe("App Top-Level Integration", () => {
     localStorage.removeItem("echomind_active_engine");
   });
 
+  it("shows the import progress bar in place of the waveform", async () => {
+    (invoke as any).mockImplementation((cmd: string) => {
+      if (cmd === "get_all_meetings") return Promise.resolve([]);
+      return Promise.resolve();
+    });
+
+    const { container } = render(
+      <I18nProvider>
+        <App />
+      </I18nProvider>,
+    );
+    expect(container.querySelector(".wave-container")).not.toBeNull();
+
+    await waitFor(() =>
+      expect(globalTestEventListeners["import-progress"]?.length).toBe(1),
+    );
+    act(() => {
+      globalTestEventListeners["import-progress"].forEach((cb) =>
+        cb({ payload: { stage: "transcribing", percent: 40 } }),
+      );
+    });
+
+    expect(await screen.findByTestId("import-progress")).toBeInTheDocument();
+    expect(container.querySelector(".wave-container")).toBeNull();
+
+    act(() => {
+      globalTestEventListeners["import-progress"].forEach((cb) =>
+        cb({ payload: { stage: "finished", percent: 100 } }),
+      );
+    });
+    expect(screen.queryByTestId("import-progress")).not.toBeInTheDocument();
+    expect(container.querySelector(".wave-container")).not.toBeNull();
+  });
+
   it("handles audio file import with Cloud Privacy confirmation modal", async () => {
     (invoke as any).mockImplementation((cmd: string) => {
       if (cmd === "get_all_meetings") return Promise.resolve(mockPastMeetings);
@@ -2285,7 +2319,9 @@ describe("App Top-Level Integration", () => {
       </I18nProvider>,
     );
 
-    expect(await screen.findByText(/⚡ Groq Cloud/i)).toBeInTheDocument();
+    expect(
+      await screen.findByTitle("⚡ Groq Cloud (Whisper Turbo)"),
+    ).toHaveTextContent("Groq Cloud (Whisper Turbo)");
 
     // Re-click same selected meeting
     const meetingCard = screen.getByText("Haftalık İcra Kurulu Toplantısı");

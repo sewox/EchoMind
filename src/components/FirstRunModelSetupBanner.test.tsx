@@ -28,6 +28,26 @@ describe("FirstRunModelSetupBanner", () => {
     expect(screen.getByText(/100 \/ 487 MB/)).toBeInTheDocument();
   });
 
+  it("shows an indeterminate bar instead of a frozen 0% before the size is known", () => {
+    render(
+      <FirstRunModelSetupBanner
+        progress={{
+          model_key: "small",
+          percentage: 0,
+          downloaded_bytes: 0,
+          total_bytes: 0,
+          status: "downloading",
+        }}
+        onDismiss={vi.fn()}
+      />,
+    );
+    expect(
+      screen.getByTestId("first-run-model-setup-indeterminate"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("0%")).not.toBeInTheDocument();
+    expect(screen.getByText("Bağlanıyor…")).toBeInTheDocument();
+  });
+
   it("shows a completed state and calls onDismiss when closed", () => {
     const onDismiss = vi.fn();
     render(
