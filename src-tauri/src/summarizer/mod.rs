@@ -20,7 +20,7 @@ pub use suggestions::*;
 pub use translator::*;
 pub use types::*;
 
-use crate::storage::{get_storage_dir, MeetingRecord, StorageEngine};
+use crate::storage::{get_global_storage, get_storage_dir, MeetingRecord};
 use crate::transcriber::TranscriptSegment;
 use std::time::Instant;
 
@@ -273,17 +273,21 @@ pub async fn generate_meeting_summary(
             return Err("Toplantı geçmişi bulunamadı.".to_string());
         }
 
-        let storage = StorageEngine::new();
-        let mut meetings_lock = storage.meetings.lock().unwrap();
-
-        let target_meeting = meetings_lock
-            .iter_mut()
-            .find(|m| m.id == meeting_id)
-            .ok_or_else(|| format!("Toplantı kaydı bulunamadı: {}", meeting_id))?;
+        let storage = get_global_storage();
+        // Copy the transcript and release the history lock: an LLM summary
+        // takes a while, and holding the lock blocks every other history access.
+        let segments = {
+            let meetings_lock = storage.meetings.lock().unwrap();
+            meetings_lock
+                .iter()
+                .find(|m| m.id == meeting_id)
+                .map(|m| m.segments.clone())
+                .ok_or_else(|| format!("Toplantı kaydı bulunamadı: {}", meeting_id))?
+        };
 
         let prov = provider.unwrap_or_else(|| "local".to_string());
         let result = SummarizerEngine::generate_summary(
-            &target_meeting.segments,
+            &segments,
             &prov,
             api_key.as_deref(),
             custom_endpoint.as_deref(),
@@ -292,21 +296,26 @@ pub async fn generate_meeting_summary(
             custom_prompt.as_deref(),
         );
 
-        // Update meeting record with rich intelligence
-        target_meeting.summary = result.summary.clone();
-        target_meeting.key_decisions = result.key_decisions.clone();
-        target_meeting.meeting_goal = Some(result.meeting_goal.clone());
-        target_meeting.key_highlights = Some(result.key_highlights.clone());
-        target_meeting.action_items = Some(result.action_items.clone());
-        target_meeting.phase1_agreed = Some(result.phase1_agreed.clone());
-        target_meeting.phase2_deferred = Some(result.phase2_deferred.clone());
-        target_meeting.detailed_topics = Some(result.detailed_topics.clone());
-        target_meeting.participants = Some(result.participants.clone());
-        target_meeting.summary_provider = Some(result.provider_used.clone());
-
-        // Persist to disk
-        let json_data = serde_json::to_string_pretty(&*meetings_lock).map_err(|e| e.to_string())?;
-        std::fs::write(&storage.file_path, json_data).map_err(|e| e.to_string())?;
+        {
+            let mut meetings_lock = storage.meetings.lock().unwrap();
+            let target_meeting = meetings_lock
+                .iter_mut()
+                .find(|m| m.id == meeting_id)
+                .ok_or_else(|| format!("Toplantı kaydı bulunamadı: {}", meeting_id))?;
+            // Update meeting record with rich intelligence
+            target_meeting.summary = result.summary.clone();
+            target_meeting.key_decisions = result.key_decisions.clone();
+            target_meeting.meeting_goal = Some(result.meeting_goal.clone());
+            target_meeting.key_highlights = Some(result.key_highlights.clone());
+            target_meeting.action_items = Some(result.action_items.clone());
+            target_meeting.phase1_agreed = Some(result.phase1_agreed.clone());
+            target_meeting.phase2_deferred = Some(result.phase2_deferred.clone());
+            target_meeting.detailed_topics = Some(result.detailed_topics.clone());
+            target_meeting.participants = Some(result.participants.clone());
+            target_meeting.summary_provider = Some(result.provider_used.clone());
+        }
+        // Encrypted, atomic write (never plaintext JSON).
+        storage.save_to_disk()?;
 
         Ok(result)
     })
@@ -348,7 +357,7 @@ pub fn export_meeting_notes(
     custom_summary: Option<SummaryResult>,
     lang_code: Option<String>,
 ) -> Result<String, String> {
-    let storage = StorageEngine::new();
+    let storage = get_global_storage();
     let meetings_lock = storage.meetings.lock().unwrap();
 
     let target_meeting = meetings_lock
@@ -369,7 +378,7 @@ pub fn export_meeting_notes_html(
     custom_summary: Option<SummaryResult>,
     lang_code: Option<String>,
 ) -> Result<String, String> {
-    let storage = StorageEngine::new();
+    let storage = get_global_storage();
     let meetings_lock = storage.meetings.lock().unwrap();
 
     let target_meeting = meetings_lock
@@ -390,7 +399,7 @@ pub fn export_meeting_email_digest(
     custom_summary: Option<SummaryResult>,
     lang_code: Option<String>,
 ) -> Result<String, String> {
-    let storage = StorageEngine::new();
+    let storage = get_global_storage();
     let meetings_lock = storage.meetings.lock().unwrap();
 
     let target_meeting = meetings_lock
@@ -411,7 +420,7 @@ pub fn export_meeting_notes_slack(
     custom_summary: Option<SummaryResult>,
     lang_code: Option<String>,
 ) -> Result<String, String> {
-    let storage = StorageEngine::new();
+    let storage = get_global_storage();
     let meetings_lock = storage.meetings.lock().unwrap();
 
     let target_meeting = meetings_lock
@@ -431,7 +440,7 @@ pub fn export_meeting_action_items_csv(
     meeting_id: String,
     custom_summary: Option<SummaryResult>,
 ) -> Result<String, String> {
-    let storage = StorageEngine::new();
+    let storage = get_global_storage();
     let meetings_lock = storage.meetings.lock().unwrap();
 
     let target_meeting = meetings_lock
@@ -450,7 +459,7 @@ pub fn export_meeting_action_items_markdown(
     meeting_id: String,
     custom_summary: Option<SummaryResult>,
 ) -> Result<String, String> {
-    let storage = StorageEngine::new();
+    let storage = get_global_storage();
     let meetings_lock = storage.meetings.lock().unwrap();
 
     let target_meeting = meetings_lock
@@ -470,7 +479,7 @@ pub fn export_meeting_followup_email(
     custom_summary: Option<SummaryResult>,
     lang_code: Option<String>,
 ) -> Result<FollowupEmailResult, String> {
-    let storage = StorageEngine::new();
+    let storage = get_global_storage();
     let meetings_lock = storage.meetings.lock().unwrap();
 
     let target_meeting = meetings_lock
@@ -490,7 +499,7 @@ pub fn filter_meeting_filler_words(
     meeting_id: String,
     lang_code: Option<String>,
 ) -> Result<CleanedTranscriptResult, String> {
-    let storage = StorageEngine::new();
+    let storage = get_global_storage();
     let meetings_lock = storage.meetings.lock().unwrap();
 
     let target_meeting = meetings_lock
@@ -522,7 +531,7 @@ pub fn get_meeting_analytics(
 
 #[tauri::command]
 pub fn get_meeting_analytics_by_id(meeting_id: String) -> Result<MeetingAnalytics, String> {
-    let storage = StorageEngine::new();
+    let storage = get_global_storage();
     let meetings_lock = storage.meetings.lock().unwrap();
 
     let target_meeting = meetings_lock
@@ -548,7 +557,7 @@ pub fn open_meeting_html_report(
     custom_summary: Option<SummaryResult>,
     lang_code: Option<String>,
 ) -> Result<String, String> {
-    let storage = StorageEngine::new();
+    let storage = get_global_storage();
     let meetings_lock = storage.meetings.lock().unwrap();
     let target = meetings_lock
         .iter()
@@ -603,7 +612,7 @@ pub async fn save_meeting_export_file(
         .filter(|c| c.is_alphanumeric() || *c == '-')
         .collect();
     let (content, default_ext, file_filter_name) = {
-        let storage = StorageEngine::new();
+        let storage = get_global_storage();
         let meetings_lock = storage.meetings.lock().unwrap();
         let target = meetings_lock
             .iter()
@@ -720,7 +729,7 @@ pub fn export_followup_bundle(
     custom_summary: Option<SummaryResult>,
     lang_code: Option<String>,
 ) -> Result<FollowUpBundle, String> {
-    let storage = StorageEngine::new();
+    let storage = get_global_storage();
     let meetings_lock = storage.meetings.lock().unwrap();
     let target = meetings_lock
         .iter()
@@ -765,23 +774,29 @@ pub async fn enhance_meeting_transcript(
     api_key: Option<String>,
 ) -> Result<MeetingRecord, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let storage = StorageEngine::new();
-        let mut meetings_lock = storage.meetings.lock().unwrap();
+        let storage = get_global_storage();
+        let mut segments = {
+            let meetings_lock = storage.meetings.lock().unwrap();
+            meetings_lock
+                .iter()
+                .find(|m| m.id == meeting_id)
+                .map(|m| m.segments.clone())
+                .ok_or_else(|| format!("Toplantı kaydı bulunamadı: {}", meeting_id))?
+        };
 
-        let target_meeting = meetings_lock
-            .iter_mut()
-            .find(|m| m.id == meeting_id)
-            .ok_or_else(|| format!("Toplantı kaydı bulunamadı: {}", meeting_id))?;
+        TranscriptRedactor::redact_segments(&mut segments, provider.as_deref(), api_key.as_deref());
 
-        TranscriptRedactor::redact_segments(
-            &mut target_meeting.segments,
-            provider.as_deref(),
-            api_key.as_deref(),
-        );
-
-        let updated_record = target_meeting.clone();
-        let json_data = serde_json::to_string_pretty(&*meetings_lock).map_err(|e| e.to_string())?;
-        std::fs::write(&storage.file_path, json_data).map_err(|e| e.to_string())?;
+        let updated_record = {
+            let mut meetings_lock = storage.meetings.lock().unwrap();
+            let target_meeting = meetings_lock
+                .iter_mut()
+                .find(|m| m.id == meeting_id)
+                .ok_or_else(|| format!("Toplantı kaydı bulunamadı: {}", meeting_id))?;
+            target_meeting.segments = segments;
+            target_meeting.clone()
+        };
+        // Encrypted, atomic write (never plaintext JSON).
+        storage.save_to_disk()?;
 
         Ok(updated_record)
     })
@@ -814,7 +829,7 @@ pub async fn ask_global_assistant(
     custom_model: Option<String>,
 ) -> Result<GlobalAssistantResponse, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let storage = StorageEngine::new();
+        let storage = get_global_storage();
         let meetings_lock = storage.meetings.lock().unwrap();
 
         let q = query.trim();
@@ -1427,5 +1442,61 @@ mod tests {
         assert!(email_res.body.contains("Sözleşme taslağını ilet"));
         assert!(email_res.mailto_url.starts_with("mailto:?subject="));
         assert!(email_res.mailto_url.contains("&body="));
+    }
+
+    /// Regression: these commands used to open a fresh, empty StorageEngine
+    /// and reported every meeting as missing ("Toplantı kaydı bulunamadı").
+    #[test]
+    fn test_commands_read_meetings_from_the_loaded_history() {
+        let id = "global-history-regression";
+        let record = MeetingRecord {
+            id: id.to_string(),
+            title: "Bütçe Toplantısı".to_string(),
+            date_formatted: "02.10.2026".to_string(),
+            duration_seconds: 60,
+            duration_formatted: "01:00".to_string(),
+            audio_file_path: None,
+            segments: vec![TranscriptSegment {
+                id: 1,
+                speaker_id: "Konuşmacı 1".to_string(),
+                speaker_name: "Konuşmacı 1".to_string(),
+                start_time_ms: 0,
+                end_time_ms: 5000,
+                timestamp_formatted: "00:00 -> 00:05".to_string(),
+                text: "Bütçeyi cuma günü onaylayacağız.".to_string(),
+                language: "tr".to_string(),
+                confidence: 0.9,
+            }],
+            summary: "Bütçe konuşuldu.".to_string(),
+            key_decisions: Vec::new(),
+            meeting_goal: None,
+            key_highlights: None,
+            action_items: None,
+            phase1_agreed: None,
+            phase2_deferred: None,
+            detailed_topics: None,
+            participants: None,
+            engine_used: None,
+            summary_provider: None,
+            tags: None,
+            transcript_pending: false,
+        };
+        get_global_storage().meetings.lock().unwrap().push(record);
+
+        let analytics = get_meeting_analytics_by_id(id.to_string());
+        let bundle = export_followup_bundle(id.to_string(), None, Some("tr".to_string()));
+        let notes = export_meeting_notes(id.to_string(), None, None);
+        let search = RAGEngine::global_search("bütçe");
+
+        get_global_storage()
+            .meetings
+            .lock()
+            .unwrap()
+            .retain(|m| m.id != id);
+
+        assert!(analytics.is_ok(), "{:?}", analytics.err());
+        assert!(bundle.is_ok(), "{:?}", bundle.err());
+        assert!(notes.is_ok(), "{:?}", notes.err());
+        assert!(search.iter().any(|r| r.meeting_id == id));
     }
 }

@@ -1,5 +1,5 @@
 use super::types::{GeminiContent, GeminiGenerationConfig, GeminiPart, GeminiRequest};
-use crate::storage::{MeetingRecord, StorageEngine};
+use crate::storage::{get_global_storage, MeetingRecord};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -155,7 +155,7 @@ impl RAGEngine {
             return Vec::new();
         }
 
-        let storage = StorageEngine::new();
+        let storage = get_global_storage();
         let meetings_lock = storage.meetings.lock().unwrap();
         let mut results: Vec<GlobalSearchResult> = Vec::new();
 
