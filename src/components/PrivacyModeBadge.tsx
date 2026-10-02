@@ -66,13 +66,13 @@ export const PrivacyModeBadge: React.FC<PrivacyModeBadgeProps> = ({
       : "bg-cyan-950/60 border-cyan-500/40 text-cyan-200 hover:bg-cyan-900/60 hover:border-cyan-400";
 
   return (
-    <div className="relative inline-block text-left" ref={dropdownRef}>
+    <div className="relative inline-block shrink-0 text-left" ref={dropdownRef}>
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         data-testid="privacy-mode-badge-button"
         title={t("privacyModes.quickSwitch")}
-        className={`flex items-center gap-1.5 rounded-full border transition-all duration-200 cursor-pointer shadow-sm ${currentBadgeStyles} ${
+        className={`flex items-center gap-1.5 whitespace-nowrap rounded-full border transition-all duration-200 cursor-pointer shadow-sm ${currentBadgeStyles} ${
           compact
             ? "px-2 py-0.5 text-[10px]"
             : "px-2.5 py-1 text-xs font-medium"

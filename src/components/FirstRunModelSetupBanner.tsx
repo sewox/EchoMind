@@ -23,7 +23,7 @@ export const FirstRunModelSetupBanner: React.FC<
 
   return (
     <div
-      className="fixed bottom-5 right-5 z-50 w-80 animate-in fade-in slide-in-from-bottom-4 duration-300"
+      className="fixed bottom-14 right-5 z-50 w-80 animate-in fade-in slide-in-from-bottom-4 duration-300"
       data-testid="first-run-model-setup-banner"
     >
       <div className="rounded-2xl bg-slate-900/95 border border-cyan-500/30 shadow-2xl shadow-cyan-950/50 backdrop-blur-xl p-4">
@@ -65,13 +65,25 @@ export const FirstRunModelSetupBanner: React.FC<
             {progress.status === "downloading" && (
               <>
                 <div className="mt-2 w-full h-1.5 rounded-full bg-slate-800 overflow-hidden border border-slate-700/60">
-                  <div
-                    className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 transition-all duration-300 rounded-full"
-                    style={{ width: `${Math.max(3, progress.percentage)}%` }}
-                  />
+                  {progress.total_bytes > 0 ? (
+                    <div
+                      className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 transition-all duration-300 rounded-full"
+                      style={{ width: `${Math.max(3, progress.percentage)}%` }}
+                    />
+                  ) : (
+                    // Size not known yet: an indeterminate bar, not a frozen 0%.
+                    <div
+                      className="h-full w-1/3 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full animate-pulse"
+                      data-testid="first-run-model-setup-indeterminate"
+                    />
+                  )}
                 </div>
                 <div className="mt-1 flex items-center justify-between text-[10px] text-slate-500 font-mono">
-                  <span>{progress.percentage.toFixed(0)}%</span>
+                  <span>
+                    {progress.total_bytes > 0
+                      ? `${progress.percentage.toFixed(0)}%`
+                      : "Bağlanıyor…"}
+                  </span>
                   {progress.total_bytes > 0 && (
                     <span>
                       {formatMb(progress.downloaded_bytes)} /{" "}

@@ -55,6 +55,9 @@ import {
 import { HistoryRecoveryNoticeBanner } from "./components/HistoryRecoveryNoticeBanner";
 import { CredentialStore } from "./services/credentialStore";
 import { getActiveEngine, syncActiveEngine } from "./services/activeEngine";
+import { shortEngineLabel } from "./services/engineLabel";
+import { useImportProgress } from "./hooks/useImportProgress";
+import { ImportProgressBar } from "./components/ImportProgressBar";
 import { useStorageReady } from "./hooks/useStorageReady";
 import { useHistoryRecoveryNotice } from "./hooks/useHistoryRecoveryNotice";
 
@@ -373,9 +376,7 @@ export function App() {
     } else if (cloudProvider === "apple_speech") {
       setProcessingStatusText("Apple Dikte ile yazıya dökülüyor…");
     } else {
-      setProcessingStatusText(
-        "🔒 Cihazınızda Çevrimdışı Olarak Çözümleniyor (%100 Gizli)...",
-      );
+      setProcessingStatusText("Cihazda yazıya dökülüyor…");
     }
 
     const startTime = Date.now();
@@ -441,6 +442,12 @@ export function App() {
   meetingTitleInputRef.current = meetingTitleInput;
   recordingSecondsRef.current = recordingSeconds;
   promptMeetingTranscriptionRef.current = promptMeetingTranscription;
+
+  // Live import progress; also restores the bar after a window reload.
+  const importProgress = useImportProgress(() =>
+    fetchPastMeetingsRef.current(),
+  );
+  const importBusy = isImporting || importProgress !== null;
   fetchPastMeetingsRef.current = fetchPastMeetings;
 
   const handleSaveCurrentMeeting = useCallback(async () => {
@@ -679,9 +686,7 @@ export function App() {
     } else if (cloudProvider === "apple_speech") {
       setProcessingStatusText("Apple Dikte ile yazıya dökülüyor…");
     } else {
-      setProcessingStatusText(
-        "🔒 Cihazınızda Çevrimdışı Olarak Çözümleniyor (%100 Gizli)...",
-      );
+      setProcessingStatusText("Cihazda yazıya dökülüyor…");
     }
 
     const startTime = Date.now();
@@ -1005,29 +1010,37 @@ export function App() {
       )}
 
       {/* Top Header Bar */}
-      <header className="shrink-0 h-16 border-b border-white/10 px-8 flex items-center justify-between bg-[#090d16]/90 backdrop-blur-xl z-50">
+      <header className="shrink-0 h-16 border-b border-white/10 px-4 lg:px-8 flex items-center justify-between gap-4 bg-[#090d16]/90 backdrop-blur-xl z-50">
         {/* App Logo & Title */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3 lg:gap-4 min-w-0">
           <EchoMindLogo showTagline={true} />
 
           {/* Status Capsule */}
-          <div className="ml-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 flex items-center gap-2 text-xs">
+          <div
+            className="ml-1 min-w-0 max-w-[280px] px-3 py-1 rounded-full bg-white/5 border border-white/10 flex items-center gap-2 text-xs"
+            title={importBusy ? processingStatusText || undefined : undefined}
+          >
             <span
-              className={`w-2 h-2 rounded-full ${
+              className={`w-2 h-2 shrink-0 rounded-full ${
                 isRecording
                   ? "bg-emerald-400"
-                  : isImporting
+                  : importBusy
                     ? "bg-amber-400"
                     : "bg-slate-400"
               }`}
             />
-            <span className="text-slate-300 font-medium">
+            <span className="text-slate-300 font-medium truncate whitespace-nowrap">
               {isRecording
                 ? `${t("nav.listening")} (${formatTimer(recordingSeconds)})`
-                : isImporting
+                : importBusy
                   ? processingStatusText || t("retranscribe.processingButton")
                   : t("nav.ready")}
             </span>
+            {!isRecording && importProgress?.percent != null && (
+              <span className="shrink-0 font-mono tabular-nums text-cyan-300">
+                {Math.round(importProgress.percent)}%
+              </span>
+            )}
           </div>
 
           {/* Loopback / System Audio Warning Badge during recording. A matching
@@ -1039,7 +1052,7 @@ export function App() {
             <button
               type="button"
               onClick={() => setIsSettingsOpen(true)}
-              className="px-2.5 py-1 rounded-full bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-[11px] text-amber-300 flex items-center gap-1.5 transition"
+              className="shrink-0 whitespace-nowrap px-2.5 py-1 rounded-full bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-[11px] text-amber-300 flex items-center gap-1.5 transition"
               title={t("ui.app.micOnlyTooltip")}
             >
               <Volume2 className="w-3 h-3 text-amber-400" />
@@ -1052,7 +1065,7 @@ export function App() {
         </div>
 
         {/* Right Action: Language Switcher, Global Assistant, Model Hub & Settings */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 shrink-0 whitespace-nowrap">
           {/* Language Switcher */}
           <div className="relative">
             <select
@@ -1107,7 +1120,7 @@ export function App() {
 
           <button
             onClick={() => setIsSettingsOpen(true)}
-            className="p-2 rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition duration-200"
+            className="p-2 shrink-0 rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition duration-200"
             title={t("nav.settings")}
           >
             <Settings className="w-5 h-5" />
@@ -1166,7 +1179,7 @@ export function App() {
               {/* Record Toggle Button */}
               <button
                 onClick={handleToggleRecording}
-                disabled={isImporting}
+                disabled={importBusy}
                 className={`px-8 py-3 rounded-full font-medium text-sm md:text-base hover:scale-[0.98] transition-all duration-200 shadow-[0px_20px_40px_rgba(0,0,0,0.4)] flex items-center gap-2.5 border ${
                   isRecording
                     ? "bg-rose-600 hover:bg-rose-500 text-white border-rose-400"
@@ -1190,11 +1203,11 @@ export function App() {
               {!isRecording && (
                 <button
                   onClick={handlePickAndImportAudioFile}
-                  disabled={isImporting}
+                  disabled={importBusy}
                   className="px-6 py-3 rounded-full font-medium text-xs md:text-sm bg-[#152031] hover:bg-[#1f2a3c] text-slate-200 border border-white/10 shadow-md transition flex items-center gap-2 disabled:opacity-50"
                   title={t("sidebar.importAudio")}
                 >
-                  {isImporting ? (
+                  {importBusy ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin text-cyan-400" />
                       <span>{t("sidebar.importing")}</span>
@@ -1220,21 +1233,28 @@ export function App() {
               )}
             </div>
 
-            {/* Waveform Animation */}
-            <div className="wave-container !h-[36px]">
-              {Array.from({ length: 19 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="wave-bar"
-                  style={{
-                    animationPlayState:
-                      isRecording || isImporting ? "running" : "paused",
-                    height: isRecording || isImporting ? undefined : "8px",
-                    opacity: isRecording || isImporting ? 0.9 : 0.2,
-                  }}
-                />
-              ))}
-            </div>
+            {/* Import progress replaces the waveform (same height, so the
+                layout doesn't jump); the waveform belongs to live capture. */}
+            {importProgress ? (
+              <div className="w-full h-[36px] flex items-center justify-center">
+                <ImportProgressBar progress={importProgress} />
+              </div>
+            ) : (
+              <div className="wave-container !h-[36px]">
+                {Array.from({ length: 19 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="wave-bar"
+                    style={{
+                      animationPlayState:
+                        isRecording || importBusy ? "running" : "paused",
+                      height: isRecording || importBusy ? undefined : "8px",
+                      opacity: isRecording || importBusy ? 0.9 : 0.2,
+                    }}
+                  />
+                ))}
+              </div>
+            )}
 
             {/* Loopback / System Audio Guidance */}
             {isRecording && (
@@ -1532,8 +1552,11 @@ export function App() {
                         ) : (
                           <ShieldCheck className="w-2.5 h-2.5 text-emerald-400 shrink-0" />
                         )}
-                        <span className="truncate max-w-[180px]">
-                          {mtg.engine_used || "🔒 Cihazda (Whisper Small)"}
+                        <span
+                          className="truncate max-w-[180px]"
+                          title={mtg.engine_used}
+                        >
+                          {shortEngineLabel(mtg.engine_used)}
                         </span>
                       </span>
                     </div>

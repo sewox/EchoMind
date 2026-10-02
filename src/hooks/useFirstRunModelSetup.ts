@@ -56,17 +56,9 @@ export function useFirstRunModelSetup() {
     const markDone = () => localStorage.setItem(DONE_KEY, "true");
 
     (async () => {
-      // Visible from the very first tick: if anything below throws before its
-      // own setProgress call, the user still sees "attempting" -> "error"
-      // instead of nothing at all.
-      setProgress({
-        model_key: "",
-        percentage: 0,
-        downloaded_bytes: 0,
-        total_bytes: 0,
-        status: "downloading",
-      });
-
+      // The banner appears only once a download is actually needed (a stuck
+      // "preparing… 0%" while merely checking looked broken). Failures still
+      // surface: the catch below always shows the error state.
       try {
         const models = await invoke<ModelInfo[]>("get_available_models");
         if (cancelled) return;
@@ -76,7 +68,9 @@ export function useFirstRunModelSetup() {
           return;
         }
 
-        const recommendedKey = await invoke<string>("get_recommended_model_key");
+        const recommendedKey = await invoke<string>(
+          "get_recommended_model_key",
+        );
         if (cancelled) return;
 
         unlisten = await listen<ModelDownloadProgressPayload>(

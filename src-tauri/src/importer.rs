@@ -55,8 +55,14 @@ fn run_asr_engine(
         let clean_prov = prov.trim().to_lowercase();
         match clean_prov.as_str() {
             "apple_speech" | "apple_native" | "apple" => {
-                match crate::offline_engines::transcribe_apple_pcm(pcm_16k, lang) {
+                let ticker = crate::import_progress::EstimatedTicker::start(
+                    crate::import_progress::apple_expected_duration(pcm_16k.len() as f32 / 16000.0),
+                );
+                let result = crate::offline_engines::transcribe_apple_pcm(pcm_16k, lang);
+                drop(ticker);
+                match result {
                     Ok(mut segs) => {
+                        crate::import_progress::diarizing();
                         crate::diarization::cluster_speakers(&mut segs, pcm_16k, 16000, 6);
                         crate::diarization::resolve_speaker_names(&mut segs);
                         return Ok((segs, crate::asr_engine::APPLE_ENGINE_LABEL.to_string()));
@@ -72,6 +78,7 @@ fn run_asr_engine(
                 if let Some(key) = api_key.map(str::trim).filter(|k| !k.is_empty()) {
                     // HARD REJECT in Paranoid / Air-Gapped Mode
                     crate::security::check_cloud_access_allowed()?;
+                    crate::import_progress::transcribing_unmeasured();
                     match crate::cloud_transcriber::transcribe_audio_cloud(
                         audio_path,
                         &clean_prov,
@@ -85,6 +92,7 @@ fn run_asr_engine(
                             let distinct: std::collections::HashSet<&str> =
                                 segs.iter().map(|s| s.speaker_id.as_str()).collect();
                             if distinct.len() <= 1 {
+                                crate::import_progress::diarizing();
                                 crate::diarization::cluster_speakers(&mut segs, pcm_16k, 16000, 6);
                             }
                             crate::diarization::resolve_speaker_names(&mut segs);
@@ -287,6 +295,7 @@ pub async fn import_audio_file(
     model_version: Option<String>,
 ) -> Result<MeetingRecord, String> {
     tauri::async_runtime::spawn_blocking(move || {
+        let _import = crate::import_progress::ImportGuard::acquire()?;
         let path = PathBuf::from(&file_path);
         if !path.exists() {
             return Err(format!("Dosya bulunamadı: {}", file_path));
@@ -307,6 +316,7 @@ pub async fn import_audio_file(
         }
 
         // 1. Pure Rust multi-format audio decoding
+        crate::import_progress::decoding();
         let (mut pcm_16k, duration_seconds) = decode_audio_file_to_pcm16k(&path)?;
 
         // 2. Audio AGC normalization
@@ -358,6 +368,7 @@ pub async fn import_audio_file(
 
         // Explicitly free 16k PCM vector after compression
         drop(pcm_16k);
+        crate::import_progress::saving();
 
         // Step 0: Audio duration clamp and hallucination loop filter pass
         let total_duration_ms = duration_seconds * 1000;
@@ -454,6 +465,7 @@ pub async fn import_audio_file(
     })
     .await
     .map_err(|e| format!("İçe aktarma işlem hatası: {}", e))?
+    .inspect_err(|e| eprintln!("❌ İçe aktarma başarısız: {}", e))
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -662,6 +674,7 @@ pub async fn retranscribe_meeting(
     custom_model: Option<String>,
 ) -> Result<MeetingRecord, String> {
     tauri::async_runtime::spawn_blocking(move || {
+        let _import = crate::import_progress::ImportGuard::acquire()?;
         crate::storage::require_storage_ready()?;
         let storage = crate::storage::get_global_storage();
 
@@ -698,6 +711,7 @@ pub async fn retranscribe_meeting(
         }
 
         // 1. Decode audio to 16kHz PCM
+        crate::import_progress::decoding();
         let channels = decode_audio_file_channels_16k(&path)?;
         let mut pcm_16k = mix_channels(&channels);
         let duration_seconds = (pcm_16k.len() as u64) / 16000;
@@ -715,6 +729,7 @@ pub async fn retranscribe_meeting(
             model_version.as_deref(),
         )?;
         drop(pcm_16k);
+        crate::import_progress::saving();
         // Recordings with system audio: microphone vs remote side by channel.
         if let [mic, system] = channels.as_slice() {
             crate::diarization::attribute_speakers_by_channel(&mut segments_raw, mic, system, 16000);
@@ -814,6 +829,7 @@ pub async fn retranscribe_meeting(
     })
     .await
     .map_err(|e| format!("Yeniden transkribe iş parçacığı hatası: {}", e))?
+    .inspect_err(|e| eprintln!("❌ Yeniden yazıya dökme başarısız: {}", e))
 }
 
 #[tauri::command]

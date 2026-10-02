@@ -427,6 +427,7 @@ impl GlobalTranscriberEngine {
         // language instead of whatever Whisper locks onto first. For an explicit (non-auto)
         // language selection there's no ambiguity to resolve, so it keeps the simple single
         // forced-language chunking.
+        crate::import_progress::transcribing(0.0);
         let decode_chunks: Vec<DecodeChunk> = if is_auto {
             segment_by_detected_language(ctx, samples, n_threads)
         } else {
@@ -463,6 +464,7 @@ impl GlobalTranscriberEngine {
         let total_duration_ms = ((samples.len() as f64 / 16000.0) * 1000.0) as u64;
 
         for (chunk_idx, chunk) in decode_chunks.iter().enumerate() {
+            crate::import_progress::transcribing(chunk_idx as f32 / decode_chunks.len() as f32);
             if cancelled() {
                 println!(
                     "🛑 Whisper iptal edildi (chunk {}/{}).",
@@ -632,6 +634,7 @@ impl GlobalTranscriberEngine {
         }
 
         if is_batch {
+            crate::import_progress::diarizing();
             // Whole recording: diarize here. Live slices are diarized once for
             // the whole session when it is saved (per-slice clustering would
             // restart speaker numbering every few seconds).
