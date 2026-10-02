@@ -73,6 +73,7 @@ export const tr: TranslationKeys = {
     retranscribe: "Yeniden Yazıya Dök",
     retranscribeTooltip:
       "Farklı bir yapay zeka modeliyle ses kaydını sıfırdan yeniden çözümler",
+    actionFailed: "İşlem tamamlanamadı: {error}",
     lowQualityWarningTitle: "Transkript Güvenilirlik Uyarısı:",
     lowQualityWarningDesc:
       "Bu ses kaydında zayıf dil sinyali veya tekrarlayan konuşma desenleri tespit edildi. Transkript güvenilirliği düşük olabilir. Daha yüksek doğruluk için Ayarlar'dan Whisper Small modelini kullanabilir veya dili manuel olarak seçebilirsiniz.",

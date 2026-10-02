@@ -4,7 +4,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::importer::decode_audio_file_to_pcm16k;
-use crate::storage::{get_storage_dir, StorageEngine};
+use crate::storage::{get_global_storage, get_storage_dir};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SoundbiteResult {
@@ -106,7 +106,7 @@ impl AudioClipper {
         start_ms: u64,
         end_ms: u64,
     ) -> Result<SoundbiteResult, String> {
-        let storage = StorageEngine::new();
+        let storage = get_global_storage();
         let meetings_lock = storage.meetings.lock().unwrap();
 
         let target_meeting = meetings_lock

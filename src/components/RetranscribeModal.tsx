@@ -101,8 +101,11 @@ export const RetranscribeModal: React.FC<RetranscribeModalProps> = ({
         });
       }
 
+      // Pre-select the engine the user chose (Apple dictation or a Whisper size).
       const activeModel =
-        localStorage.getItem("echomind_active_model") || "small";
+        localStorage.getItem("echomind_active_engine") === "apple_speech"
+          ? "apple_speech"
+          : localStorage.getItem("echomind_active_model") || "small";
       setLocalModel(activeModel);
     }
   }, [isOpen, isParanoid]);

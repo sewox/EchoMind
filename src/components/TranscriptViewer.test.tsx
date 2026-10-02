@@ -2591,6 +2591,36 @@ describe("TranscriptViewer Component", () => {
     unmount();
   });
 
+  it("shows an error banner when analytics fail instead of doing nothing", async () => {
+    (invoke as any).mockImplementation((cmd: string) =>
+      cmd === "get_meeting_analytics_by_id"
+        ? Promise.reject("Toplantı kaydı bulunamadı: mtg-001")
+        : Promise.resolve(),
+    );
+
+    const { unmount } = render(
+      <I18nProvider>
+        <TranscriptViewer {...defaultProps} />
+      </I18nProvider>,
+    );
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /Katılımcı & Toplantı Analitiği/i }),
+      );
+    });
+
+    const banner = await screen.findByTestId("transcript-action-error");
+    expect(banner).toHaveTextContent("Toplantı kaydı bulunamadı: mtg-001");
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Kapat" }));
+    });
+    expect(
+      screen.queryByTestId("transcript-action-error"),
+    ).not.toBeInTheDocument();
+    unmount();
+  });
+
   it("opens meeting analytics modal and fetches analytics data", async () => {
     const mockAnalytics = {
       total_duration_seconds: 120,

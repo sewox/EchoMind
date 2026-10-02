@@ -59,6 +59,7 @@ export const FollowUpModal: React.FC<FollowUpModalProps> = ({
     () => `Takip / Follow-up: ${meeting.title}`,
   );
   const [bundle, setBundle] = useState<FollowUpBundleData | null>(null);
+  const [bundleError, setBundleError] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -75,8 +76,15 @@ export const FollowUpModal: React.FC<FollowUpModalProps> = ({
         langCode: language,
       });
       setBundle(res);
+      setBundleError(null);
     } catch (err) {
       console.error("Follow-up bundle hatası:", err);
+      setBundle(null);
+      setBundleError(
+        t("transcript.actionFailed", {
+          error: err instanceof Error ? err.message : String(err),
+        }),
+      );
     }
   };
 
@@ -223,6 +231,15 @@ export const FollowUpModal: React.FC<FollowUpModalProps> = ({
 
         {/* Main Tab Content */}
         <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+          {bundleError && (
+            <div
+              role="alert"
+              data-testid="followup-error"
+              className="px-3 py-2 rounded-xl bg-rose-950/60 border border-rose-500/40 text-rose-200 text-xs [overflow-wrap:anywhere]"
+            >
+              {bundleError}
+            </div>
+          )}
           {/* TAB 1: FOLLOW-UP EMAIL */}
           {activeTab === "email" && (
             <div className="space-y-4 animate-in fade-in duration-150">

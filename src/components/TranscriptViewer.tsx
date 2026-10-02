@@ -16,6 +16,7 @@ import {
   RotateCw,
   BarChart3,
   AlertTriangle,
+  X,
 } from "lucide-react";
 import { MeetingRecord, ActionItem, TopicBreakdown } from "../App";
 import { ExportModal } from "./ExportModal";
@@ -226,7 +227,7 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
       }
       setIsAnalyticsModalOpen(true);
     } catch (err) {
-      console.error("Analytics fetch error:", err);
+      reportActionError("Analytics fetch error:", err);
     } finally {
       setIsLoadingAnalytics(false);
     }
@@ -234,6 +235,20 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
 
   // Soundbite Clipper State
   const [soundbiteToast, setSoundbiteToast] = useState<string | null>(null);
+
+  // Failed actions are shown, never only logged: a button that silently does
+  // nothing looks broken.
+  const [actionError, setActionError] = useState<string | null>(null);
+  const reportActionError = (context: string, err: unknown) => {
+    console.error(context, err);
+    const detail =
+      typeof err === "string"
+        ? err
+        : err instanceof Error
+          ? err.message
+          : String(err);
+    setActionError(t("transcript.actionFailed", { error: detail }));
+  };
 
   const handleClipSoundbite = async (segment: TranscriptSegment) => {
     if (!selectedPastMeeting?.id) return;
@@ -249,7 +264,7 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
         setTimeout(() => setSoundbiteToast(null), 3500);
       }
     } catch (err) {
-      console.error("Soundbite clip error:", err);
+      reportActionError("Soundbite clip error:", err);
     }
   };
 
@@ -625,7 +640,7 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
       setSummaryLang("tr");
       setActiveTab("summary");
     } catch (err) {
-      console.error("Summary generation error:", err);
+      reportActionError("Summary generation error:", err);
     } finally {
       setIsGeneratingSummary(false);
     }
@@ -691,7 +706,7 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
       setRichSummary(translated);
       setSummaryLang(targetLangCode);
     } catch (err) {
-      console.error("Translation error:", err);
+      reportActionError("Translation error:", err);
     } finally {
       setIsTranslating(false);
     }
@@ -729,7 +744,7 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
         setSegments(updated.segments);
       }
     } catch (err) {
-      console.error("Redaction error:", err);
+      reportActionError("Redaction error:", err);
     } finally {
       setIsRedacting(false);
     }
@@ -753,7 +768,7 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
       link.click();
       URL.revokeObjectURL(url);
     } catch (err) {
-      console.error("Export notes error:", err);
+      reportActionError("Export notes error:", err);
     }
   };
 
@@ -1103,6 +1118,24 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
         )}
 
         {/* Soundbite Clip Floating Toast Notification */}
+        {actionError && (
+          <div
+            role="alert"
+            data-testid="transcript-action-error"
+            className="mx-4 mt-3 px-3 py-2 rounded-xl bg-rose-950/60 border border-rose-500/40 text-rose-200 text-xs flex items-start justify-between gap-3"
+          >
+            <span className="[overflow-wrap:anywhere]">{actionError}</span>
+            <button
+              type="button"
+              onClick={() => setActionError(null)}
+              className="shrink-0 text-rose-300 hover:text-white"
+              aria-label={t("common.close")}
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+
         {soundbiteToast && (
           <div className="fixed bottom-16 right-8 z-50 animate-in slide-in-from-bottom-5 fade-in duration-300 pointer-events-none">
             <div className="px-4 py-2.5 rounded-2xl bg-slate-900/95 border border-amber-500/40 shadow-2xl shadow-amber-950/50 text-amber-300 text-xs font-semibold flex items-center gap-2 backdrop-blur-md">
