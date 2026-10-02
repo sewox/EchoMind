@@ -10,6 +10,7 @@ coverage/
 
 # Rust & Tauri builds
 src-tauri/target/
+src-tauri/target-*/
 target/
 src-tauri/swift/EchoMindAudio/.build/
 
