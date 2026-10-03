@@ -75,9 +75,11 @@ keyring = { version = "3", features = ["apple-native", "windows-native", "sync-s
 objc = "0.2"
 swift-rs = "1.0"
 whisper-rs = { version = "0.16.0", features = ["metal"] }
+llama-cpp-2 = { version = "=0.1.158", features = ["metal"] }
 
 [target.'cfg(not(target_os = "macos"))'.dependencies]
 whisper-rs = { version = "0.16.0" }
+llama-cpp-2 = { version = "=0.1.158" }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows = { version = "0.58", features = ["Win32_System_SystemInformation", "Win32_Graphics_Direct3D11"] }
@@ -89,3 +91,12 @@ path = "examples/qa_listen_20x.rs"
 [[example]]
 name = "transcript_dump"
 path = "examples/transcript_dump.rs"
+
+# One ggml in the app: whisper.cpp is built against llama.cpp's ggml (see
+# crates/whisper-rs-sys/build.rs). Two ggml copies silently break both.
+[patch.crates-io]
+whisper-rs-sys = { path = "crates/whisper-rs-sys" }
+
+[[example]]
+name = "llm_report_check"
+path = "examples/llm_report_check.rs"

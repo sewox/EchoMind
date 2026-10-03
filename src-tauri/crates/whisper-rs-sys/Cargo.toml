@@ -1,0 +1,37 @@
+# EchoMind fork of whisper-rs-sys 0.15.0: whisper.cpp built against the ggml of
+# llama-cpp-sys-2 (one ggml in the app). Patched in via [patch.crates-io].
+[package]
+name = "whisper-rs-sys"
+version = "0.15.0"
+edition = "2021"
+rust-version = "1.88.0"
+build = "build.rs"
+links = "whisper"
+license = "Unlicense"
+description = "whisper.cpp FFI bindings, built against llama.cpp's ggml (EchoMind fork)"
+publish = false
+
+[lib]
+name = "whisper_rs_sys"
+path = "src/lib.rs"
+
+[features]
+# Kept so whisper-rs' feature forwarding still resolves; GPU backends come
+# from the shared ggml (llama-cpp-sys-2), not from this crate.
+coreml = []
+cuda = []
+force-debug = []
+hipblas = []
+intel-sycl = []
+metal = []
+openblas = []
+openmp = []
+vulkan = []
+
+[dependencies]
+# Must match the version used by llama-cpp-2 in the app (one ggml).
+llama-cpp-sys-2 = "=0.1.158"
+
+[build-dependencies]
+bindgen = "0.72"
+cmake = "0.1"
