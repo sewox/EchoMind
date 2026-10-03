@@ -368,7 +368,6 @@ pub async fn import_audio_file(
 
         // Explicitly free 16k PCM vector after compression
         drop(pcm_16k);
-        crate::import_progress::saving();
 
         // Step 0: Audio duration clamp and hallucination loop filter pass
         let total_duration_ms = duration_seconds * 1000;
@@ -416,7 +415,8 @@ pub async fn import_audio_file(
 
         // Step 2: Immediate Deep Synthesis Summary Generation (Role-Play Intelligence)
         let prov_str = cloud_provider.as_deref().unwrap_or("local");
-        let summary_res = crate::summarizer::SummarizerEngine::generate_summary(
+        crate::import_progress::summarizing(0.0);
+        let summary_res = crate::summarizer::SummarizerEngine::generate_summary_with_progress(
             &segments,
             prov_str,
             api_key.as_deref(),
@@ -424,6 +424,7 @@ pub async fn import_audio_file(
             None,
             None,
             None,
+            &crate::import_progress::summarizing,
         );
 
         let final_title = if let Some(ref st) = summary_res.smart_title {
@@ -437,6 +438,7 @@ pub async fn import_audio_file(
             title
         };
 
+        crate::import_progress::saving();
         let meeting = MeetingRecord {
             id,
             title: final_title,
@@ -729,7 +731,6 @@ pub async fn retranscribe_meeting(
             model_version.as_deref(),
         )?;
         drop(pcm_16k);
-        crate::import_progress::saving();
         // Recordings with system audio: microphone vs remote side by channel.
         if let [mic, system] = channels.as_slice() {
             crate::diarization::attribute_speakers_by_channel(&mut segments_raw, mic, system, 16000);
@@ -781,7 +782,8 @@ pub async fn retranscribe_meeting(
 
         // Step 2: Summary Generation with chosen summary provider
         let prov_str = summary_provider.as_deref().unwrap_or("local");
-        let summary_res = crate::summarizer::SummarizerEngine::generate_summary(
+        crate::import_progress::summarizing(0.0);
+        let summary_res = crate::summarizer::SummarizerEngine::generate_summary_with_progress(
             &segments,
             prov_str,
             summary_api_key.as_deref(),
@@ -789,8 +791,10 @@ pub async fn retranscribe_meeting(
             custom_model.as_deref(),
             None,
             None,
+            &crate::import_progress::summarizing,
         );
 
+        crate::import_progress::saving();
         // 3. Write back under a short lock; the meeting may have been deleted meanwhile.
         let updated_record = {
             let mut meetings = storage.meetings.lock().unwrap();

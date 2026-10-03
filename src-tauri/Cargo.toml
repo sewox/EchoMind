@@ -100,3 +100,7 @@ whisper-rs-sys = { path = "crates/whisper-rs-sys" }
 [[example]]
 name = "llm_report_check"
 path = "examples/llm_report_check.rs"
+
+[[example]]
+name = "report_check"
+path = "examples/report_check.rs"

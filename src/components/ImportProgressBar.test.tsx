@@ -22,6 +22,11 @@ describe("ImportProgressBar", () => {
     );
   });
 
+  it("names the report stage", () => {
+    renderBar({ stage: "summarizing", percent: 80, etaSeconds: null });
+    expect(screen.getByText("Rapor hazırlanıyor…")).toBeInTheDocument();
+  });
+
   it("rounds short remaining times to seconds", () => {
     renderBar({ stage: "diarizing", percent: 92, etaSeconds: 12 });
     expect(screen.getByText(/~10/)).toBeInTheDocument();
