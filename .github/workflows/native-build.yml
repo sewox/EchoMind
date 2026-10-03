@@ -1,0 +1,34 @@
+name: Native Build (macOS / Windows)
+
+# Compiles and links the app (whisper.cpp + llama.cpp sharing one ggml, the
+# Swift bridge on macOS) on the platforms the main CI does not cover, so a
+# link or toolchain break shows up in the PR instead of at release time.
+on:
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build & link (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust Stable Toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - name: Build and link the app and its tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml --no-run
