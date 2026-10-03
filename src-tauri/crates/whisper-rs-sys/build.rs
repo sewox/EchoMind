@@ -47,7 +47,14 @@ fn main() {
         return;
     }
 
-    let mut config = cmake::Config::new("whisper.cpp");
+    // Build from a copy in OUT_DIR: whisper.cpp's CMake writes files into its
+    // source tree (bindings/javascript/package.json), which would re-trigger
+    // `rerun-if-changed=whisper.cpp` on every build — and loop `tauri dev`.
+    let src = out.join("whisper.cpp-src");
+    let _ = std::fs::remove_dir_all(&src);
+    copy_dir(std::path::Path::new("whisper.cpp"), &src).expect("copy whisper.cpp sources");
+
+    let mut config = cmake::Config::new(&src);
     config
         .define("WHISPER_USE_SYSTEM_GGML", "ON")
         .define("CMAKE_PREFIX_PATH", &ggml_cmake_dir)
@@ -91,4 +98,18 @@ fn whisper_cpp_version() -> String {
             .unwrap_or_else(|| panic!("WHISPER_VERSION_{name} not found"))
     };
     format!("{}.{}.{}", part("MAJOR"), part("MINOR"), part("PATCH"))
+}
+
+fn copy_dir(from: &std::path::Path, to: &std::path::Path) -> std::io::Result<()> {
+    std::fs::create_dir_all(to)?;
+    for entry in std::fs::read_dir(from)? {
+        let entry = entry?;
+        let dest = to.join(entry.file_name());
+        if entry.file_type()?.is_dir() {
+            copy_dir(&entry.path(), &dest)?;
+        } else {
+            std::fs::copy(entry.path(), dest)?;
+        }
+    }
+    Ok(())
 }
