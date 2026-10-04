@@ -66,6 +66,10 @@ export interface TranslationKeys {
     backToLive: string;
   };
   transcript: {
+    bar: Record<
+      "retranscribe" | "analytics" | "copy" | "copied" | "followUp" | "export",
+      { label: string; hint: string }
+    >;
     tabs: {
       stream: string;
       report: string;

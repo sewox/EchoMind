@@ -425,7 +425,7 @@ describe("TranscriptViewer Component", () => {
     ).toBeInTheDocument();
 
     // Clear transcript
-    const clearBtn = await screen.findByTitle("Temizle");
+    const clearBtn = await screen.findByRole("button", { name: "Temizle" });
     await act(async () => {
       fireEvent.click(clearBtn);
     });
@@ -477,7 +477,7 @@ describe("TranscriptViewer Component", () => {
 
     // Export Modal Open
     const exportBtn = screen.getByRole("button", {
-      name: /Raporu Dışa Aktar/i,
+      name: /^Dışa Aktar$/,
     });
     await act(async () => {
       fireEvent.click(exportBtn);
@@ -1812,7 +1812,9 @@ describe("TranscriptViewer Component", () => {
       fireEvent.click(summaryTab);
     });
 
-    const retranscribeBtns = screen.getAllByTitle(/^Yeniden Yazıya Dök$/);
+    const retranscribeBtns = screen.getAllByRole("button", {
+      name: /^Yeniden Yazıya Dök$/,
+    });
     if (retranscribeBtns.length > 0) {
       await act(async () => {
         fireEvent.click(retranscribeBtns[0]);
@@ -2603,9 +2605,7 @@ describe("TranscriptViewer Component", () => {
     );
 
     await act(async () => {
-      fireEvent.click(
-        screen.getByRole("button", { name: /Katılımcı & Toplantı Analitiği/i }),
-      );
+      fireEvent.click(screen.getByRole("button", { name: /^Analitik$/ }));
     });
 
     const banner = await screen.findByTestId("transcript-action-error");
@@ -2673,7 +2673,7 @@ describe("TranscriptViewer Component", () => {
     );
 
     const analyticsBtn = screen.getByRole("button", {
-      name: /Katılımcı & Toplantı Analitiği/i,
+      name: /^Analitik$/,
     });
     expect(analyticsBtn).toBeInTheDocument();
 

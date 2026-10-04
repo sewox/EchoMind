@@ -73,6 +73,32 @@ export const es: TranslationKeys = {
     backToLive: "Volver a la Sesión en Vivo",
   },
   transcript: {
+    bar: {
+      retranscribe: {
+        label: "Retranscribir",
+        hint: "Vuelve a convertir la grabación en texto con otro modelo o idioma.",
+      },
+      analytics: {
+        label: "Análisis",
+        hint: "Muestra quién habló cuánto y el equilibrio de la reunión.",
+      },
+      copy: {
+        label: "Copiar",
+        hint: "Copia toda la transcripción al portapapeles.",
+      },
+      copied: {
+        label: "Copiado",
+        hint: "La transcripción está en el portapapeles.",
+      },
+      followUp: {
+        label: "Seguimiento",
+        hint: "Prepara el correo de seguimiento, la lista de tareas y la invitación.",
+      },
+      export: {
+        label: "Exportar",
+        hint: "Guarda o comparte el informe como PDF, Markdown, resumen de Slack/Teams o JSON.",
+      },
+    },
     tabs: {
       stream: "Flujo de Diálogo",
       report: "Informe de Reunión",

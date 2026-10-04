@@ -392,7 +392,7 @@ describe("Senior QA Edge-Case & Chaos / Monkey Testing Suite", () => {
 
       // 3. Analytics button with backend error
       const analyticsBtn = screen.queryByRole("button", {
-        name: /Katılımcı & Toplantı Analitiği/i,
+        name: /^Analitik$/,
       });
       if (analyticsBtn) {
         await act(async () => {

@@ -72,6 +72,32 @@ export const tr: TranslationKeys = {
     backToLive: "Canlı Akışa Dön",
   },
   transcript: {
+    bar: {
+      retranscribe: {
+        label: "Yeniden Yazıya Dök",
+        hint: "Kaydı farklı bir model veya dille baştan metne çevirir.",
+      },
+      analytics: {
+        label: "Analitik",
+        hint: "Kimin ne kadar konuştuğunu ve toplantının dengesini gösterir.",
+      },
+      copy: {
+        label: "Kopyala",
+        hint: "Tüm konuşma metnini panoya kopyalar.",
+      },
+      copied: {
+        label: "Kopyalandı",
+        hint: "Konuşma metni panoda.",
+      },
+      followUp: {
+        label: "Takip",
+        hint: "Toplantı sonrası e-posta, görev listesi ve takvim davetini hazırlar.",
+      },
+      export: {
+        label: "Dışa Aktar",
+        hint: "Raporu PDF, Markdown, Slack/Teams özeti veya JSON olarak kaydeder ya da paylaşır.",
+      },
+    },
     tabs: {
       stream: "Konuşma Akışı",
       report: "Toplantı Raporu",

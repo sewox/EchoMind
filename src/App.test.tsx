@@ -1223,7 +1223,7 @@ describe("App Top-Level Integration", () => {
 
     // Open export modal
     const exportBtn = await screen.findByRole("button", {
-      name: /Raporu Dışa Aktar/i,
+      name: /^Dışa Aktar$/,
     });
     await act(async () => {
       fireEvent.click(exportBtn);

@@ -33,11 +33,14 @@ import { MeetingTemplate, BUILTIN_TEMPLATES } from "../types/templates";
 import { MeetingAnalytics } from "../types/analytics";
 import { CredentialStore } from "../services/credentialStore";
 import { SoundbiteResult } from "../types/soundbite";
+import { Tooltip } from "./ui/Tooltip";
 import { useI18n } from "../locales/i18nContext";
 import { useLiveSuggestions } from "../hooks/useLiveSuggestions";
 
-const ICON_BUTTON =
-  "p-2 rounded-xl border border-white/10 text-slate-300 hover:bg-white/10 hover:text-white transition disabled:opacity-30";
+const BAR_BUTTON =
+  "h-9 px-3 rounded-xl border text-xs font-semibold transition flex items-center gap-2 whitespace-nowrap disabled:opacity-30 disabled:cursor-not-allowed";
+// Secondary labels fold into the icon on narrow windows; the tooltip still names them.
+const BAR_LABEL = "hidden lg:inline";
 
 export const SUMMARY_LANGUAGES = [
   { code: "tr", name: "Türkçe", flag: "🇹🇷", label: "Türkçe (Varsayılan)" },
@@ -1162,76 +1165,124 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
 
         <div className="flex items-center gap-2 shrink-0">
           {selectedPastMeeting?.audio_file_path && (
-            <button
-              onClick={() => setIsRetranscribeModalOpen(true)}
-              className={ICON_BUTTON}
-              title={t("transcript.retranscribe")}
-              aria-label={t("transcript.retranscribe")}
+            <Tooltip
+              title={t("transcript.bar.retranscribe.label")}
+              description={t("transcript.bar.retranscribe.hint")}
             >
-              <RotateCw className="w-3.5 h-3.5" />
-            </button>
+              <button
+                onClick={() => setIsRetranscribeModalOpen(true)}
+                aria-label={t("transcript.bar.retranscribe.label")}
+                className={`${BAR_BUTTON} border-amber-500/30 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20 hover:border-amber-400/60`}
+              >
+                <RotateCw className="w-4 h-4 shrink-0 text-amber-400" />
+                <span className={BAR_LABEL}>
+                  {t("transcript.bar.retranscribe.label")}
+                </span>
+              </button>
+            </Tooltip>
           )}
 
           {selectedPastMeeting && segments.length > 0 && (
-            <button
-              onClick={handleOpenAnalytics}
-              disabled={isLoadingAnalytics}
-              className={ICON_BUTTON}
-              title={t("transcript.analytics.button")}
-              aria-label={t("transcript.analytics.button")}
+            <Tooltip
+              title={t("transcript.bar.analytics.label")}
+              description={t("transcript.bar.analytics.hint")}
             >
-              {isLoadingAnalytics ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <BarChart3 className="w-3.5 h-3.5" />
-              )}
-            </button>
+              <button
+                onClick={handleOpenAnalytics}
+                disabled={isLoadingAnalytics}
+                aria-label={t("transcript.bar.analytics.label")}
+                className={`${BAR_BUTTON} border-indigo-500/30 bg-indigo-500/10 text-indigo-200 hover:bg-indigo-500/20 hover:border-indigo-400/60`}
+              >
+                {isLoadingAnalytics ? (
+                  <Loader2 className="w-4 h-4 shrink-0 animate-spin text-indigo-400" />
+                ) : (
+                  <BarChart3 className="w-4 h-4 shrink-0 text-indigo-400" />
+                )}
+                <span className={BAR_LABEL}>
+                  {t("transcript.bar.analytics.label")}
+                </span>
+              </button>
+            </Tooltip>
           )}
 
-          <button
-            onClick={handleCopyAll}
-            disabled={segments.length === 0}
-            className={ICON_BUTTON}
-            title={t("common.copy")}
-            aria-label={t("common.copy")}
-          >
-            {isCopied ? (
-              <Check className="w-3.5 h-3.5 text-emerald-400" />
-            ) : (
-              <Copy className="w-3.5 h-3.5" />
+          <Tooltip
+            title={t(
+              isCopied
+                ? "transcript.bar.copied.label"
+                : "transcript.bar.copy.label",
             )}
-          </button>
+            description={t(
+              isCopied
+                ? "transcript.bar.copied.hint"
+                : "transcript.bar.copy.hint",
+            )}
+          >
+            <button
+              onClick={handleCopyAll}
+              disabled={segments.length === 0}
+              aria-label={t("transcript.bar.copy.label")}
+              className={`${BAR_BUTTON} border-slate-600/60 bg-slate-800/60 text-slate-200 hover:bg-slate-700 hover:border-slate-500`}
+            >
+              {isCopied ? (
+                <Check className="w-4 h-4 shrink-0 text-emerald-400" />
+              ) : (
+                <Copy className="w-4 h-4 shrink-0 text-slate-300" />
+              )}
+              <span className={BAR_LABEL}>
+                {t(
+                  isCopied
+                    ? "transcript.bar.copied.label"
+                    : "transcript.bar.copy.label",
+                )}
+              </span>
+            </button>
+          </Tooltip>
 
           {selectedPastMeeting && (
-            <button
-              onClick={() => setIsFollowUpModalOpen(true)}
-              disabled={segments.length === 0}
-              className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700 font-semibold text-xs transition flex items-center gap-1.5 whitespace-nowrap disabled:opacity-30"
-              title={t("followUp.modalTitle")}
+            <Tooltip
+              title={t("transcript.bar.followUp.label")}
+              description={t("transcript.bar.followUp.hint")}
+              align="end"
             >
-              <Mail className="w-3.5 h-3.5 text-cyan-400" />
-              <span>{t("followUp.shortLabel")}</span>
-            </button>
+              <button
+                onClick={() => setIsFollowUpModalOpen(true)}
+                disabled={segments.length === 0}
+                aria-label={t("transcript.bar.followUp.label")}
+                className={`${BAR_BUTTON} border-violet-400/40 bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-md shadow-violet-950/40 hover:from-violet-500 hover:to-indigo-500`}
+              >
+                <Mail className="w-4 h-4 shrink-0" />
+                <span>{t("transcript.bar.followUp.label")}</span>
+              </button>
+            </Tooltip>
           )}
 
-          <button
-            onClick={() => setIsExportModalOpen(true)}
-            disabled={segments.length === 0}
-            className="px-3.5 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-xs transition flex items-center gap-1.5 whitespace-nowrap disabled:opacity-30"
+          <Tooltip
+            title={t("transcript.bar.export.label")}
+            description={t("transcript.bar.export.hint")}
+            align="end"
           >
-            <Download className="w-3.5 h-3.5" />
-            <span>{t("ui.transcript.exportReport")}</span>
-          </button>
+            <button
+              onClick={() => setIsExportModalOpen(true)}
+              disabled={segments.length === 0}
+              aria-label={t("transcript.bar.export.label")}
+              className={`${BAR_BUTTON} border-cyan-400/40 bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-md shadow-cyan-950/40 hover:from-cyan-500 hover:to-blue-500`}
+            >
+              <Download className="w-4 h-4 shrink-0" />
+              <span>{t("transcript.bar.export.label")}</span>
+            </button>
+          </Tooltip>
 
           {!selectedPastMeeting && (
-            <button
-              onClick={handleClear}
-              disabled={segments.length === 0}
-              className="p-2 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-white/5 transition disabled:opacity-30"
-              title="Temizle"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
+            <Tooltip title="Temizle" align="end">
+              <button
+                onClick={handleClear}
+                disabled={segments.length === 0}
+                aria-label="Temizle"
+                className="p-2 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-white/5 transition disabled:opacity-30"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </Tooltip>
           )}
         </div>
       </div>

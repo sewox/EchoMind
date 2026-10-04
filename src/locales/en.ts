@@ -72,6 +72,32 @@ export const en: TranslationKeys = {
     backToLive: "Back to Live Session",
   },
   transcript: {
+    bar: {
+      retranscribe: {
+        label: "Re-transcribe",
+        hint: "Converts the recording to text again with another model or language.",
+      },
+      analytics: {
+        label: "Analytics",
+        hint: "Shows who spoke how much and how balanced the meeting was.",
+      },
+      copy: {
+        label: "Copy",
+        hint: "Copies the whole transcript to the clipboard.",
+      },
+      copied: {
+        label: "Copied",
+        hint: "The transcript is on the clipboard.",
+      },
+      followUp: {
+        label: "Follow-up",
+        hint: "Prepares the follow-up email, task list and calendar invite.",
+      },
+      export: {
+        label: "Export",
+        hint: "Saves or shares the report as PDF, Markdown, a Slack/Teams summary or JSON.",
+      },
+    },
     tabs: {
       stream: "Dialogue Stream",
       report: "Meeting Report",
