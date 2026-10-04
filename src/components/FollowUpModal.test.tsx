@@ -128,6 +128,25 @@ describe("FollowUpModal Component", () => {
     );
   });
 
+  it("asks the backend for the chosen tone", async () => {
+    renderComponent();
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith(
+        "export_followup_bundle",
+        expect.objectContaining({ tone: "standard" }),
+      ),
+    );
+    await act(async () => {
+      fireEvent.click(screen.getByText(/Yönetici/i));
+    });
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith(
+        "export_followup_bundle",
+        expect.objectContaining({ tone: "executive" }),
+      ),
+    );
+  });
+
   it("loads and renders email draft", async () => {
     renderComponent();
 

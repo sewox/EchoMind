@@ -74,6 +74,7 @@ export const FollowUpModal: React.FC<FollowUpModalProps> = ({
         meetingId: meeting.id,
         customSummary: null,
         langCode: language,
+        tone,
       });
       setBundle(res);
       setBundleError(null);
@@ -600,6 +601,7 @@ export const FollowUpModal: React.FC<FollowUpModalProps> = ({
                     meetingId: meeting.id,
                     customSummary: null,
                     langCode: language,
+                    tone,
                   },
                 );
                 const fullText = `=== E-POSTA ===\nKonu: ${bundleData.email_subject}\n\n${bundleData.email_body}\n\n=== AKSİYONLAR ===\n${bundleData.action_items_md}\n\n=== SLACK ===\n${bundleData.slack_md}\n\n=== CALENDAR ICS ===\n${bundleData.ics_content}`;
