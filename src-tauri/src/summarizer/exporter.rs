@@ -916,14 +916,18 @@ body {
         body.push_str(&format!("{}\n\n", text.intro));
 
         if let Some(goal) = goal_opt {
-            body.push_str(&format!("📌 {}:\n{}\n\n", labels.meeting_goal_title, goal));
+            body.push_str(&format!(
+                "{}:\n{}\n\n",
+                with_icon("📌", &labels.meeting_goal_title),
+                goal
+            ));
         }
 
         // Executives and customers get the outcome, not the discussion notes.
         if matches!(tone, FollowupTone::Standard | FollowupTone::Casual) {
             if let Some(highlights) = highlights_opt {
                 if !highlights.is_empty() {
-                    body.push_str(&format!("💡 {}:\n", labels.highlights_title));
+                    body.push_str(&format!("{}:\n", with_icon("💡", &labels.highlights_title)));
                     for h in highlights {
                         body.push_str(&format!("• {}\n", h));
                     }
@@ -938,7 +942,7 @@ body {
             if let Some(phase1) = phase1_opt {
                 if !phase1.is_empty() {
                     let title = text.agreed_title.unwrap_or(&labels.phase1_title);
-                    body.push_str(&format!("⚡ {}:\n", title));
+                    body.push_str(&format!("{}:\n", with_icon("⚡", title)));
                     for p in phase1 {
                         body.push_str(&format!("• {}\n", p));
                     }
@@ -959,7 +963,7 @@ body {
             };
             if !actions.is_empty() {
                 let title = text.actions_title.unwrap_or(&labels.action_items_title);
-                body.push_str(&format!("🎯 {}:\n", title));
+                body.push_str(&format!("{}:\n", with_icon("🎯", title)));
                 for a in actions.iter().take(limit) {
                     // Internal status tags make no sense to a customer.
                     let status = if tone == FollowupTone::Sales {
@@ -1184,6 +1188,15 @@ pub struct FollowUpBundle {
     pub action_items_csv: String,
     pub slack_md: String,
     pub ics_content: String,
+}
+
+/// `icon title`, unless the title already starts with its own icon (the
+/// report labels carry one: "💡 Alınan Dersler…" must not become "💡 💡 …").
+fn with_icon(icon: &str, title: &str) -> String {
+    match title.chars().next() {
+        Some(c) if !c.is_alphanumeric() => title.to_string(),
+        _ => format!("{icon} {title}"),
+    }
 }
 
 /// Tone of the follow-up email, as chosen in the follow-up view.

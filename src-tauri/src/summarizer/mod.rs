@@ -1513,7 +1513,8 @@ mod tests {
         assert!(email_res.body.contains("🎯 Toplantı Amacı:"));
         assert!(email_res
             .body
-            .contains("🎯 ✅ Eylem Maddeleri & Sorumlular:"));
+            .contains("✅ Eylem Maddeleri & Sorumlular:"));
+        assert!(!email_res.body.contains("🎯 ✅"), "no doubled section icons");
         assert!(email_res.body.contains("Sözleşme taslağını ilet"));
         assert!(email_res.mailto_url.starts_with("mailto:?subject="));
         assert!(email_res.mailto_url.contains("&body="));
