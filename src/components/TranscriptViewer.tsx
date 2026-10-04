@@ -16,6 +16,7 @@ import {
   RotateCw,
   BarChart3,
   AlertTriangle,
+  Mail,
   X,
 } from "lucide-react";
 import { MeetingRecord, ActionItem, TopicBreakdown } from "../App";
@@ -34,6 +35,9 @@ import { CredentialStore } from "../services/credentialStore";
 import { SoundbiteResult } from "../types/soundbite";
 import { useI18n } from "../locales/i18nContext";
 import { useLiveSuggestions } from "../hooks/useLiveSuggestions";
+
+const ICON_BUTTON =
+  "p-2 rounded-xl border border-white/10 text-slate-300 hover:bg-white/10 hover:text-white transition disabled:opacity-30";
 
 export const SUMMARY_LANGUAGES = [
   { code: "tr", name: "Türkçe", flag: "🇹🇷", label: "Türkçe (Varsayılan)" },
@@ -899,59 +903,66 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
         </div>
       )}
 
-      {/* Top Header & Tab Navigation */}
-      <div className="p-4 border-b border-white/10 flex flex-wrap justify-between items-center gap-3 bg-[#0f172a]/80 backdrop-blur-md">
-        {/* Left: Title & Tabs */}
-        <div className="flex items-center gap-3 flex-wrap">
+      {/* Top Header: back, view tabs and search. Meeting actions live in the bottom bar. */}
+      <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between gap-3 bg-[#0f172a]/80 backdrop-blur-md">
+        <div className="flex items-center gap-2 min-w-0">
           {selectedPastMeeting && onReturnToLiveSession && (
             <button
               onClick={onReturnToLiveSession}
-              className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 transition flex items-center gap-1.5 text-xs font-medium border border-white/10"
-              title="Canlı Toplantı Ekranına Dön"
+              className="shrink-0 p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 transition border border-white/10"
+              title={t("sidebar.backToLive")}
+              aria-label={t("sidebar.backToLive")}
             >
               <ArrowLeft className="w-3.5 h-3.5" />
-              <span>{t("sidebar.backToLive")}</span>
             </button>
           )}
 
-          {/* Segmented Tab Controls */}
-          <div className="flex items-center p-1 bg-slate-900/90 rounded-xl border border-slate-800 text-xs font-medium">
+          <div
+            role="tablist"
+            className="flex items-center gap-1 p-1 bg-slate-900/90 rounded-xl border border-slate-800 text-xs font-medium min-w-0"
+          >
             <button
+              role="tab"
+              aria-selected={activeTab === "transcript"}
               onClick={() => setActiveTab("transcript")}
-              className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 ${
+              className={`min-w-0 px-3 py-1.5 rounded-lg border transition flex items-center gap-1.5 whitespace-nowrap ${
                 activeTab === "transcript"
-                  ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm font-semibold"
-                  : "text-slate-400 hover:text-slate-200"
+                  ? "bg-cyan-500/15 text-cyan-300 border-cyan-500/40 font-semibold"
+                  : "border-transparent text-slate-400 hover:text-slate-200"
               }`}
             >
-              <MessageSquare className="w-3.5 h-3.5" />
+              <MessageSquare className="w-3.5 h-3.5 shrink-0" />
               <span>
                 {t("transcript.tabs.stream")} ({segments.length})
               </span>
             </button>
 
             <button
+              role="tab"
+              aria-selected={activeTab === "summary"}
               onClick={() => setActiveTab("summary")}
-              className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 ${
+              className={`min-w-0 px-3 py-1.5 rounded-lg border transition flex items-center gap-1.5 whitespace-nowrap ${
                 activeTab === "summary"
-                  ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm font-semibold"
-                  : "text-slate-400 hover:text-slate-200"
+                  ? "bg-cyan-500/15 text-cyan-300 border-cyan-500/40 font-semibold"
+                  : "border-transparent text-slate-400 hover:text-slate-200"
               }`}
             >
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              <Sparkles className="w-3.5 h-3.5 shrink-0" />
               <span>{t("transcript.tabs.report")}</span>
             </button>
 
             {actionItemsCount > 0 && (
               <button
+                role="tab"
+                aria-selected={activeTab === "actions"}
                 onClick={() => setActiveTab("actions")}
-                className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 ${
+                className={`min-w-0 px-3 py-1.5 rounded-lg border transition flex items-center gap-1.5 whitespace-nowrap ${
                   activeTab === "actions"
-                    ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm font-semibold"
-                    : "text-slate-400 hover:text-slate-200"
+                    ? "bg-cyan-500/15 text-cyan-300 border-cyan-500/40 font-semibold"
+                    : "border-transparent text-slate-400 hover:text-slate-200"
                 }`}
               >
-                <CheckSquare className="w-3.5 h-3.5 text-emerald-400" />
+                <CheckSquare className="w-3.5 h-3.5 shrink-0" />
                 <span>
                   {t("transcript.tabs.tasks")} ({actionItemsCount})
                 </span>
@@ -960,72 +971,17 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
           </div>
         </div>
 
-        {/* Right: Search Box & Language */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 shrink-0">
           {activeTab === "transcript" && (
             <div className="relative">
-              <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-500" />
+              <Search className="w-3.5 h-3.5 absolute left-3 top-2 text-slate-500" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder={t("transcript.searchPlaceholder")}
-                className="pl-8 pr-3 py-1 bg-slate-950/80 border border-slate-800 rounded-xl text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500/70"
+                className="w-44 pl-8 pr-3 py-1.5 bg-slate-950/80 border border-slate-800 rounded-xl text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500/70"
               />
-            </div>
-          )}
-
-          {/* Top Bar Retranscribe & Export Buttons */}
-          {selectedPastMeeting && (
-            <div className="flex items-center gap-2">
-              {selectedPastMeeting.audio_file_path && (
-                <button
-                  onClick={() => setIsRetranscribeModalOpen(true)}
-                  className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-cyan-500/30 text-xs font-semibold shadow-sm transition flex items-center gap-1.5 shrink-0"
-                  title={t("transcript.retranscribeTooltip")}
-                >
-                  <RotateCw className="w-3.5 h-3.5" />
-                  <span>{t("transcript.retranscribe")}</span>
-                </button>
-              )}
-
-              {segments.length > 0 && (
-                <button
-                  onClick={handleOpenAnalytics}
-                  disabled={isLoadingAnalytics}
-                  className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-indigo-500/30 text-xs font-semibold shadow-sm transition flex items-center gap-1.5 shrink-0 disabled:opacity-50"
-                  title={t("transcript.analytics.modalSubtitle")}
-                >
-                  <BarChart3 className="w-3.5 h-3.5 text-indigo-400" />
-                  <span>
-                    {isLoadingAnalytics
-                      ? "..."
-                      : t("transcript.analytics.button")}
-                  </span>
-                </button>
-              )}
-
-              {segments.length > 0 && selectedPastMeeting && (
-                <button
-                  onClick={() => setIsFollowUpModalOpen(true)}
-                  className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white text-xs font-semibold shadow-md shadow-indigo-900/30 transition flex items-center gap-1.5 shrink-0"
-                  title={t("followUp.modalTitle") || "Follow-up Engine"}
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                  <span>{t("followUp.modalTitle") || "Follow-up"}</span>
-                </button>
-              )}
-
-              {segments.length > 0 && (
-                <button
-                  onClick={() => setIsExportModalOpen(true)}
-                  className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-semibold shadow-md shadow-cyan-900/30 transition flex items-center gap-1.5 shrink-0"
-                  title={t("transcript.shareReportTooltip")}
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>{t("transcript.shareReport")}</span>
-                </button>
-              )}
             </div>
           )}
 
@@ -1160,7 +1116,6 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
             onToggleActionItem={handleToggleActionItem}
             onJumpToCitation={handleJumpToCitation}
             onGenerateSummary={handleGenerateSummary}
-            onOpenRetranscribe={() => setIsRetranscribeModalOpen(true)}
             onExportNotes={handleExportNotes}
             onSelectMeeting={onSelectMeeting}
             onAddTag={onAddTag}
@@ -1178,7 +1133,7 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
       </div>
 
       {/* Bottom Control Bar */}
-      <div className="p-3 border-t border-white/10 flex justify-between items-center bg-[#040e1f]/50 rounded-b-xl px-6">
+      <div className="px-4 py-3 border-t border-white/10 flex justify-between items-center gap-3 bg-[#040e1f]/50 rounded-b-xl">
         {!selectedPastMeeting ? (
           <button
             onClick={handleTranscribeBuffer}
@@ -1198,43 +1153,71 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
             )}
           </button>
         ) : (
-          <span className="text-xs text-slate-400 font-mono">
+          <span className="min-w-0 truncate text-xs text-slate-400">
             {t("ui.transcript.pastRecording", {
               date: selectedPastMeeting.date_formatted,
             })}
           </span>
         )}
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
+          {selectedPastMeeting?.audio_file_path && (
+            <button
+              onClick={() => setIsRetranscribeModalOpen(true)}
+              className={ICON_BUTTON}
+              title={t("transcript.retranscribe")}
+              aria-label={t("transcript.retranscribe")}
+            >
+              <RotateCw className="w-3.5 h-3.5" />
+            </button>
+          )}
+
+          {selectedPastMeeting && segments.length > 0 && (
+            <button
+              onClick={handleOpenAnalytics}
+              disabled={isLoadingAnalytics}
+              className={ICON_BUTTON}
+              title={t("transcript.analytics.button")}
+              aria-label={t("transcript.analytics.button")}
+            >
+              {isLoadingAnalytics ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <BarChart3 className="w-3.5 h-3.5" />
+              )}
+            </button>
+          )}
+
           <button
             onClick={handleCopyAll}
             disabled={segments.length === 0}
-            className="px-3 py-1.5 rounded-lg border border-white/10 text-slate-300 font-medium text-xs hover:bg-white/10 hover:text-white transition flex items-center gap-1.5 disabled:opacity-30"
+            className={ICON_BUTTON}
+            title={t("common.copy")}
+            aria-label={t("common.copy")}
           >
             {isCopied ? (
               <Check className="w-3.5 h-3.5 text-emerald-400" />
             ) : (
               <Copy className="w-3.5 h-3.5" />
             )}
-            <span>{t("common.copy")}</span>
           </button>
 
           {selectedPastMeeting && (
             <button
               onClick={() => setIsFollowUpModalOpen(true)}
               disabled={segments.length === 0}
-              className="px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-medium text-xs shadow-md shadow-indigo-900/30 transition flex items-center gap-1.5 disabled:opacity-30"
-              title={t("followUp.modalTitle") || "Follow-up Engine"}
+              className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700 font-semibold text-xs transition flex items-center gap-1.5 whitespace-nowrap disabled:opacity-30"
+              title={t("followUp.modalTitle")}
             >
-              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-              <span>{t("followUp.modalTitle") || "Follow-up"}</span>
+              <Mail className="w-3.5 h-3.5 text-cyan-400" />
+              <span>{t("followUp.shortLabel")}</span>
             </button>
           )}
 
           <button
             onClick={() => setIsExportModalOpen(true)}
             disabled={segments.length === 0}
-            className="px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-medium text-xs shadow-md shadow-cyan-900/30 transition flex items-center gap-1.5 disabled:opacity-30"
+            className="px-3.5 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-xs transition flex items-center gap-1.5 whitespace-nowrap disabled:opacity-30"
           >
             <Download className="w-3.5 h-3.5" />
             <span>{t("ui.transcript.exportReport")}</span>
@@ -1244,7 +1227,7 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
             <button
               onClick={handleClear}
               disabled={segments.length === 0}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-white/5 transition disabled:opacity-30"
+              className="p-2 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-white/5 transition disabled:opacity-30"
               title="Temizle"
             >
               <Trash2 className="w-3.5 h-3.5" />

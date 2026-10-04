@@ -53,7 +53,6 @@ describe("SummaryCardsView Component", () => {
     onToggleActionItem: vi.fn(),
     onJumpToCitation: vi.fn(),
     onGenerateSummary: vi.fn(),
-    onOpenRetranscribe: vi.fn(),
     onExportNotes: vi.fn(),
     selectedTemplateId: "general",
     customTemplates: [],
@@ -76,10 +75,9 @@ describe("SummaryCardsView Component", () => {
       screen.getByText("Yurt dışı depo yatırımı onaylandı"),
     ).toBeInTheDocument();
     expect(screen.getByText("Kira sözleşmesi imzalanacak")).toBeInTheDocument();
-    expect(screen.getByText("Toplantı Şablonları:")).toBeInTheDocument();
     expect(screen.getByText("Bütçe Planlama")).toBeInTheDocument();
     expect(screen.getByText("Maliyetler %20 düşürülecek")).toBeInTheDocument();
-    expect(screen.getByText("Ahmet")).toBeInTheDocument();
+    expect(screen.getAllByText("Ahmet").length).toBeGreaterThan(1);
 
     // Export button click
     const exportBtn = screen.getByRole("button", { name: /Raporu İndir/i });

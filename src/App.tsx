@@ -1309,21 +1309,6 @@ export function App() {
               </button>
             </div>
 
-            {/* AI Assistant Quick Trigger */}
-            <button
-              onClick={() => setIsGlobalAssistantOpen(true)}
-              className="w-full px-3 py-2 rounded-xl bg-gradient-to-r from-cyan-950/60 to-blue-950/60 hover:from-cyan-900/60 hover:to-blue-900/60 border border-cyan-500/30 hover:border-cyan-500/50 text-xs text-cyan-200 font-medium transition flex items-center justify-between group shadow-sm"
-              title={t("assistant.subtitle")}
-            >
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-3.5 h-3.5 text-amber-400 group-hover:scale-110 transition" />
-                <span>{t("assistant.title")}</span>
-              </div>
-              <span className="text-[10px] text-cyan-400/80 font-mono bg-cyan-900/40 px-1.5 py-0.5 rounded border border-cyan-500/20">
-                ⌘K
-              </span>
-            </button>
-
             {/* Real-time Search Box */}
             <div className="relative">
               <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-500" />

@@ -142,7 +142,7 @@ export const en: TranslationKeys = {
       stop: "Stop",
       play: "Play",
     },
-    rebuildReport: "✨ Rebuild Report",
+    rebuildReport: "Rebuild Report",
     rebuilding: "Generating Report...",
     rebuildTooltip:
       "Generate a fresh AI executive summary from current dialogue",
@@ -386,7 +386,8 @@ export const en: TranslationKeys = {
     ignoreListPlaceholder: "com.example.App",
     ignoreListAdd: "Add",
     ignoreListRemove: "Remove",
-    ignoreListEmpty: "No ignored apps — defaults will be restored on next launch.",
+    ignoreListEmpty:
+      "No ignored apps — defaults will be restored on next launch.",
   },
   updater: {
     modalTitle: "New Update Available!",
@@ -441,6 +442,7 @@ export const en: TranslationKeys = {
     },
   },
   followUp: {
+    shortLabel: "Follow-up",
     modalTitle: "One-Click Follow-up Engine",
     modalSubtitle:
       "Instantly create professional follow-up emails, action item tables, and calendar invitations",

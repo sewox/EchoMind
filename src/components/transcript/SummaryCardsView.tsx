@@ -39,7 +39,6 @@ interface SummaryCardsViewProps {
   onToggleActionItem: (index: number) => void;
   onJumpToCitation: (citationIndex: number) => void;
   onGenerateSummary: () => void;
-  onOpenRetranscribe: () => void;
   onExportNotes: () => void;
   onSelectMeeting?: (meetingId: string) => void;
   onAddTag?: (meetingId: string, tag: string) => void;
@@ -60,7 +59,6 @@ export const SummaryCardsView: React.FC<SummaryCardsViewProps> = ({
   onToggleActionItem,
   onJumpToCitation,
   onGenerateSummary,
-  onOpenRetranscribe,
   onExportNotes,
   onSelectMeeting,
   onAddTag,
@@ -71,15 +69,12 @@ export const SummaryCardsView: React.FC<SummaryCardsViewProps> = ({
   return (
     <div className="max-w-5xl mx-auto w-full space-y-5 pb-8">
       {/* Top Controls: Template, Language & Action Buttons */}
-      <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-2xl bg-slate-900/80 border border-slate-800 backdrop-blur-sm">
+      <div className="flex items-center justify-between gap-3 p-3 rounded-2xl bg-slate-900/80 border border-slate-800">
         {/* Template & Language Selectors */}
         <div className="flex items-center gap-3 flex-wrap">
           {/* Template Selector */}
           {onSelectTemplate && onOpenCreateCustom && onDeleteCustomTemplate && (
             <div className="flex items-center gap-2">
-              <span className="text-xs sm:text-sm font-semibold text-slate-300">
-                {t("summary.templateTitle")}:
-              </span>
               <TemplateSelector
                 selectedTemplateId={selectedTemplateId}
                 customTemplates={customTemplates}
@@ -92,16 +87,17 @@ export const SummaryCardsView: React.FC<SummaryCardsViewProps> = ({
 
           {/* Language Selector */}
           <div className="flex items-center gap-2">
-            <Languages className="w-4 h-4 text-cyan-400 shrink-0" />
-            <span className="text-xs sm:text-sm font-semibold text-slate-300">
-              {t("summary.translateTo")}
-            </span>
+            <Languages
+              className="w-4 h-4 text-cyan-400 shrink-0"
+              aria-label={t("summary.translateTo")}
+            />
             <div className="relative inline-flex items-center">
               <select
                 value={summaryLang}
                 onChange={(e) => onLanguageChange(e.target.value)}
                 disabled={isTranslating || !richSummary}
-                className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-700 text-xs sm:text-sm font-medium text-slate-100 hover:border-cyan-500 focus:border-cyan-500 focus:outline-none cursor-pointer transition disabled:opacity-50"
+                aria-label={t("summary.translateTo")}
+                className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-700 text-xs font-medium text-slate-100 hover:border-cyan-500 focus:border-cyan-500 focus:outline-none cursor-pointer transition disabled:opacity-50"
               >
                 {SUMMARY_LANGUAGES.map((l) => (
                   <option key={l.code} value={l.code}>
@@ -118,31 +114,25 @@ export const SummaryCardsView: React.FC<SummaryCardsViewProps> = ({
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex items-center gap-2 flex-wrap">
+        {/* Report actions (re-transcription lives in the bottom bar) */}
+        <div className="flex items-center gap-2 shrink-0">
           {selectedPastMeeting && richSummary && (
             <button
               onClick={onGenerateSummary}
-              className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs sm:text-sm font-medium border border-slate-700 transition flex items-center gap-1.5"
+              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition"
               title={t("summary.rebuildTooltip")}
+              aria-label={t("summary.rebuildReport")}
             >
               <RotateCw className="w-3.5 h-3.5" />
-              <span>{t("summary.rebuildReport")}</span>
             </button>
           )}
           <button
-            onClick={onOpenRetranscribe}
-            className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs sm:text-sm font-medium border border-slate-700 transition flex items-center gap-1.5"
-          >
-            <Wand2 className="w-3.5 h-3.5" />
-            <span>{t("summary.changeModelAndRetranscribe")}</span>
-          </button>
-          <button
             onClick={onExportNotes}
-            className="px-3.5 py-1.5 rounded-xl bg-cyan-600/90 hover:bg-cyan-500 text-white text-xs sm:text-sm font-medium transition flex items-center gap-1.5 shadow-sm shadow-cyan-950"
+            className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition"
+            title={t("summary.downloadMarkdown")}
+            aria-label={t("summary.downloadMarkdown")}
           >
             <Download className="w-3.5 h-3.5" />
-            <span>{t("summary.downloadMarkdown")}</span>
           </button>
         </div>
       </div>
@@ -285,7 +275,7 @@ export const SummaryCardsView: React.FC<SummaryCardsViewProps> = ({
           <ul className="space-y-2 text-sm 2xl:text-base text-slate-200">
             {richSummary.phase1_agreed.map((item, idx) => (
               <li key={idx} className="flex items-start gap-2 leading-relaxed">
-                <span className="text-cyan-400 font-bold">✓</span>
+                <span className="text-cyan-400 font-bold">•</span>
                 <span>{item}</span>
               </li>
             ))}
@@ -307,7 +297,7 @@ export const SummaryCardsView: React.FC<SummaryCardsViewProps> = ({
                   key={idx}
                   className="flex items-start gap-2 leading-relaxed"
                 >
-                  <span className="text-purple-400 font-bold">⏳</span>
+                  <span className="text-purple-400 font-bold">•</span>
                   <span>{item}</span>
                 </li>
               ))}
@@ -362,7 +352,7 @@ export const SummaryCardsView: React.FC<SummaryCardsViewProps> = ({
                 key={idx}
                 className="px-3.5 py-1.5 rounded-full bg-slate-800 text-xs sm:text-sm text-slate-200 font-medium border border-slate-700"
               >
-                👤 {p}
+                {p}
               </span>
             ))}
           </div>

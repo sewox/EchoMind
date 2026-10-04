@@ -137,14 +137,14 @@ describe("TranscriptViewer Component", () => {
     }
 
     // Switch to Report Tab
-    const reportTab = screen.getByRole("button", { name: /Toplantı Raporu/i });
+    const reportTab = screen.getByRole("tab", { name: /Toplantı Raporu/i });
     fireEvent.click(reportTab);
     expect(
       screen.getByText(/Q3 hedeflerini netleştirmek/i),
     ).toBeInTheDocument();
 
     // Switch to Tasks Tab
-    const tasksTab = screen.getByRole("button", {
+    const tasksTab = screen.getByRole("tab", {
       name: /Görevler & Kararlar/i,
     });
     fireEvent.click(tasksTab);
@@ -222,7 +222,7 @@ describe("TranscriptViewer Component", () => {
     );
 
     // Switch to Report Tab
-    const reportTab = screen.getByRole("button", { name: /Toplantı Raporu/i });
+    const reportTab = screen.getByRole("tab", { name: /Toplantı Raporu/i });
     fireEvent.click(reportTab);
 
     // Change summary translation language to English
@@ -254,9 +254,9 @@ describe("TranscriptViewer Component", () => {
       expect.any(Object),
     );
 
-    // Retranscribe button inside summary view
+    // Retranscribe button in the bottom bar
     const retranscribeInSummaryBtn = screen.getByRole("button", {
-      name: /Zeka Modunu Değiştir & Yeniden Yazıya Dök/i,
+      name: /^Yeniden Yazıya Dök$/,
     });
     await act(async () => {
       fireEvent.click(retranscribeInSummaryBtn);
@@ -328,7 +328,7 @@ describe("TranscriptViewer Component", () => {
     );
 
     // Switch to Tasks Tab and Toggle Task Checkbox
-    const tasksTab = screen.getByRole("button", {
+    const tasksTab = screen.getByRole("tab", {
       name: /Görevler & Kararlar/i,
     });
     fireEvent.click(tasksTab);
@@ -489,7 +489,7 @@ describe("TranscriptViewer Component", () => {
     fireEvent.click(closeExportBtn);
 
     // Switch to Summary Tab & Test Language translation
-    const summaryTab = screen.getByRole("button", { name: /Toplantı Raporu/i });
+    const summaryTab = screen.getByRole("tab", { name: /Toplantı Raporu/i });
     await act(async () => {
       fireEvent.click(summaryTab);
     });
@@ -572,14 +572,14 @@ describe("TranscriptViewer Component", () => {
     );
 
     // Switch to summary tab where retranscribe button exists
-    const summaryTab = screen.getByRole("button", { name: /Toplantı Raporu/i });
+    const summaryTab = screen.getByRole("tab", { name: /Toplantı Raporu/i });
     await act(async () => {
       fireEvent.click(summaryTab);
     });
 
     // Find and click the retranscribe button
     const retranscribeBtn = screen.getByRole("button", {
-      name: /Zeka Modunu Değiştir/i,
+      name: /^Yeniden Yazıya Dök$/,
     });
     await act(async () => {
       fireEvent.click(retranscribeBtn);
@@ -704,7 +704,7 @@ describe("TranscriptViewer Component", () => {
     );
 
     // Switch to Tasks Tab
-    const tasksTab = screen.getByRole("button", {
+    const tasksTab = screen.getByRole("tab", {
       name: /Görevler & Kararlar|Görevler/i,
     });
     fireEvent.click(tasksTab);
@@ -756,7 +756,7 @@ describe("TranscriptViewer Component", () => {
     );
 
     // Switch to Report Tab
-    const reportTab = screen.getAllByRole("button", {
+    const reportTab = screen.getAllByRole("tab", {
       name: /Toplantı Raporu/i,
     })[0];
     fireEvent.click(reportTab);
@@ -793,7 +793,7 @@ describe("TranscriptViewer Component", () => {
     );
 
     // Switch to Tasks Tab
-    const tasksTab = screen.getByRole("button", {
+    const tasksTab = screen.getByRole("tab", {
       name: /Görevler & Kararlar|Görevler/i,
     });
     fireEvent.click(tasksTab);
@@ -900,7 +900,7 @@ describe("TranscriptViewer Component", () => {
     ).toBeInTheDocument();
 
     // Switch to Report Tab and translate
-    const reportTab = screen.getAllByRole("button", {
+    const reportTab = screen.getAllByRole("tab", {
       name: /Toplantı Raporu/i,
     })[0];
     fireEvent.click(reportTab);
@@ -1226,7 +1226,7 @@ describe("TranscriptViewer Component", () => {
     );
 
     // Switch to report tab
-    const reportTab = screen.getByRole("button", { name: /Toplantı Raporu/i });
+    const reportTab = screen.getByRole("tab", { name: /Toplantı Raporu/i });
     await act(async () => {
       fireEvent.click(reportTab);
     });
@@ -1313,7 +1313,7 @@ describe("TranscriptViewer Component", () => {
       </I18nProvider>,
     );
 
-    const tasksTab = screen.getByRole("button", {
+    const tasksTab = screen.getByRole("tab", {
       name: /Görevler & Kararlar/i,
     });
     await act(async () => {
@@ -1454,7 +1454,7 @@ describe("TranscriptViewer Component", () => {
     );
 
     // Click back to live button
-    const backBtn = screen.getByTitle(/Canlı Toplantı Ekranına Dön/i);
+    const backBtn = screen.getByTitle(/Canlı Akışa Dön/i);
     fireEvent.click(backBtn);
     expect(onReturnToLiveSessionMock).toHaveBeenCalled();
     unmount();
@@ -1512,7 +1512,7 @@ describe("TranscriptViewer Component", () => {
     );
 
     // Switch to Summary Tab (Toplantı Raporu)
-    const summaryTab = screen.getByRole("button", { name: /Toplantı Raporu/i });
+    const summaryTab = screen.getByRole("tab", { name: /Toplantı Raporu/i });
     await act(async () => {
       fireEvent.click(summaryTab);
     });
@@ -1532,7 +1532,7 @@ describe("TranscriptViewer Component", () => {
     }
 
     // Switch to Tasks Tab (Görevler & Kararlar)
-    const tasksTab = screen.getByRole("button", {
+    const tasksTab = screen.getByRole("tab", {
       name: /Görevler & Kararlar/i,
     });
     await act(async () => {
@@ -1566,7 +1566,7 @@ describe("TranscriptViewer Component", () => {
     }
 
     // Switch back to Transcript Tab (Konuşma Akışı)
-    const transcriptTab = screen.getByRole("button", {
+    const transcriptTab = screen.getByRole("tab", {
       name: /Konuşma Akışı/i,
     });
     await act(async () => {
@@ -1729,7 +1729,7 @@ describe("TranscriptViewer Component", () => {
     );
 
     // Switch to Summary Tab to trigger handleExportNotes
-    const summaryTab = screen.getByRole("button", { name: /Toplantı Raporu/i });
+    const summaryTab = screen.getByRole("tab", { name: /Toplantı Raporu/i });
     await act(async () => {
       fireEvent.click(summaryTab);
     });
@@ -1748,7 +1748,7 @@ describe("TranscriptViewer Component", () => {
     }
 
     // Switch back to Transcript Tab
-    const transcriptTab = screen.getByRole("button", {
+    const transcriptTab = screen.getByRole("tab", {
       name: /Konuşma Akışı/i,
     });
     await act(async () => {
@@ -1807,14 +1807,12 @@ describe("TranscriptViewer Component", () => {
     );
 
     // Open Retranscribe modal from summary tab
-    const summaryTab = screen.getByRole("button", { name: /Toplantı Raporu/i });
+    const summaryTab = screen.getByRole("tab", { name: /Toplantı Raporu/i });
     await act(async () => {
       fireEvent.click(summaryTab);
     });
 
-    const retranscribeBtns = screen.getAllByTitle(
-      /yeniden çözümler|baştan çözümleyin/i,
-    );
+    const retranscribeBtns = screen.getAllByTitle(/^Yeniden Yazıya Dök$/);
     if (retranscribeBtns.length > 0) {
       await act(async () => {
         fireEvent.click(retranscribeBtns[0]);
@@ -1858,7 +1856,7 @@ describe("TranscriptViewer Component", () => {
     );
 
     // Switch to Summary Tab
-    const summaryTab = screen.getByRole("button", { name: /Toplantı Raporu/i });
+    const summaryTab = screen.getByRole("tab", { name: /Toplantı Raporu/i });
     await act(async () => {
       fireEvent.click(summaryTab);
     });
@@ -1964,7 +1962,7 @@ describe("TranscriptViewer Component", () => {
       </I18nProvider>,
     );
 
-    const summaryTab = screen.getByRole("button", { name: /Toplantı Raporu/i });
+    const summaryTab = screen.getByRole("tab", { name: /Toplantı Raporu/i });
     await act(async () => {
       fireEvent.click(summaryTab);
     });
@@ -2182,7 +2180,7 @@ describe("TranscriptViewer Component", () => {
     expect(writeTextSpy).toHaveBeenCalled();
 
     // Export Notes from Summary Tab
-    const summaryTab = screen.getByRole("button", { name: /Toplantı Raporu/i });
+    const summaryTab = screen.getByRole("tab", { name: /Toplantı Raporu/i });
     await act(async () => {
       fireEvent.click(summaryTab);
     });
@@ -2260,7 +2258,7 @@ describe("TranscriptViewer Component", () => {
       </I18nProvider>,
     );
 
-    const summaryTab = screen.getByRole("button", { name: /Toplantı Raporu/i });
+    const summaryTab = screen.getByRole("tab", { name: /Toplantı Raporu/i });
     await act(async () => {
       fireEvent.click(summaryTab);
     });
@@ -2420,7 +2418,7 @@ describe("TranscriptViewer Component", () => {
     );
 
     // Switch to summary tab
-    const summaryTab = screen.getByRole("button", { name: /Toplantı Raporu/i });
+    const summaryTab = screen.getByRole("tab", { name: /Toplantı Raporu/i });
     await act(async () => {
       fireEvent.click(summaryTab);
     });
@@ -2784,7 +2782,7 @@ describe("TranscriptViewer Component", () => {
       </I18nProvider>,
     );
 
-    const followUpBtns = screen.getAllByRole("button", { name: /Follow-up/i });
+    const followUpBtns = screen.getAllByRole("button", { name: /Takip/i });
     expect(followUpBtns.length).toBeGreaterThan(0);
 
     await act(async () => {

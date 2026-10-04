@@ -393,6 +393,7 @@ export interface TranslationKeys {
   };
   followUp?: {
     modalTitle: string;
+    shortLabel: string;
     modalSubtitle: string;
     tabs: {
       email: string;

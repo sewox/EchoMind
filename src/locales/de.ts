@@ -140,7 +140,7 @@ export const de: TranslationKeys = {
       stop: "Stopp",
       play: "Anhören",
     },
-    rebuildReport: "✨ Bericht Neu Erstellen",
+    rebuildReport: "Bericht Neu Erstellen",
     rebuilding: "Bericht wird erstellt...",
     rebuildTooltip: "Erstellen Sie eine neue KI-Zusammenfassung aus dem Dialog",
     changeModelAndRetranscribe: "Modell Wechseln & Neu Transkribieren",
@@ -439,6 +439,7 @@ export const de: TranslationKeys = {
     },
   },
   followUp: {
+    shortLabel: "Follow-up",
     modalTitle: "One-Click Follow-up Engine",
     modalSubtitle:
       "Erstellen Sie professionelle Follow-up-E-Mails, Aufgabenlisten und Kalendereinladungen mit einem Klick",

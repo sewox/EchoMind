@@ -142,7 +142,7 @@ export const tr: TranslationKeys = {
       stop: "Durdur",
       play: "Dinle",
     },
-    rebuildReport: "✨ Raporu Yeniden Oluştur",
+    rebuildReport: "Raporu Yeniden Oluştur",
     rebuilding: "Rapor Hazırlanıyor...",
     rebuildTooltip: "Mevcut konuşmalardan yeni bir yapay zeka özeti çıkarın",
     changeModelAndRetranscribe: "Zeka Modunu Değiştir & Yeniden Yazıya Dök",
@@ -446,6 +446,7 @@ export const tr: TranslationKeys = {
     },
   },
   followUp: {
+    shortLabel: "Takip",
     modalTitle: "One-Click Follow-up Engine",
     modalSubtitle:
       "Toplantı sonrası profesyonel e-posta, görev tablosu ve takvim davetiyesini tek tıkla oluşturun",

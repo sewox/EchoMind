@@ -139,7 +139,7 @@ export const fr: TranslationKeys = {
       stop: "Arrêter",
       play: "Écouter",
     },
-    rebuildReport: "✨ Recréer le Rapport",
+    rebuildReport: "Recréer le Rapport",
     rebuilding: "Génération du rapport...",
     rebuildTooltip: "Générer un nouveau résumé IA à partir des dialogues",
     changeModelAndRetranscribe: "Changer de Modèle & Retranscrire",
@@ -438,6 +438,7 @@ export const fr: TranslationKeys = {
     },
   },
   followUp: {
+    shortLabel: "Suivi",
     modalTitle: "One-Click Follow-up Engine",
     modalSubtitle:
       "Générez instantanément des e-mails de suivi, des tableaux d'actions et des invitations calendrier",
