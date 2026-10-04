@@ -1156,7 +1156,7 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
             )}
           </button>
         ) : (
-          <span className="min-w-0 truncate text-xs text-slate-400">
+          <span className="hidden 2xl:block min-w-0 truncate text-xs text-slate-400">
             {t("ui.transcript.pastRecording", {
               date: selectedPastMeeting.date_formatted,
             })}

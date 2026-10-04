@@ -147,7 +147,7 @@ export const es: TranslationKeys = {
     speaker: "Hablante",
     confidence: "Precisión",
     noRecordings: "Aún no hay grabaciones de conversación.",
-    smartRedaction: "✍️ Redacción y Corrección Inteligente",
+    smartRedaction: "Redacción y Corrección Inteligente",
     redacting: "Redactando...",
     noSearchResults:
       "No se encontraron conversaciones que coincidan con la búsqueda.",

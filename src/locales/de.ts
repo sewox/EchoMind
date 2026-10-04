@@ -147,7 +147,7 @@ export const de: TranslationKeys = {
     speaker: "Sprecher",
     confidence: "Genauigkeit",
     noRecordings: "Noch keine Gesprächsaufnahmen vorhanden.",
-    smartRedaction: "✍️ Intelligente Redaktion & Korrektur",
+    smartRedaction: "Intelligente Redaktion & Korrektur",
     redacting: "Wird redigiert...",
     noSearchResults: "Keine passenden Gespräche gefunden.",
     listeningLive: "Live-Zuhören aktiv, Text erscheint gleich...",

@@ -149,7 +149,7 @@ export const en: TranslationKeys = {
     speaker: "Speaker",
     confidence: "Confidence",
     noRecordings: "No transcript recordings yet.",
-    smartRedaction: "✍️ Smart Redaction & Cleanup",
+    smartRedaction: "Smart Redaction & Cleanup",
     redacting: "Redacting...",
     noSearchResults: "No speech matches found for your search.",
     listeningLive: "Listening to speech, streaming live...",

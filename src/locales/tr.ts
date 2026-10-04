@@ -149,7 +149,7 @@ export const tr: TranslationKeys = {
     speaker: "Konuşmacı",
     confidence: "Doğruluk",
     noRecordings: "Henüz bir konuşma kaydı bulunmuyor.",
-    smartRedaction: "✍️ Akıllı Redaksiyon & Düzeltme",
+    smartRedaction: "Akıllı Redaksiyon & Düzeltme",
     redacting: "Redakte Ediliyor...",
     noSearchResults: "Aramanızla eşleşen konuşma bulunamadı.",
     listeningLive: "Konuşmalar dinleniyor, anlık yazıya dökülecek...",
