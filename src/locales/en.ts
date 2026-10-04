@@ -27,6 +27,9 @@ export const en: TranslationKeys = {
     storageUnlocking: "Opening secure storage…",
     storageUnlockHint:
       "Waiting for Keychain access. The window stays responsive; your history loads after you allow access.",
+    storageLocked: "Couldn't open secure storage",
+    storageLockedHint: "Keychain access was not allowed. Your meeting history was not deleted; it opens once you allow access.",
+    retry: "Try again",
     historyRecoveryNotice:
       "Previous encrypted history could not be opened in this version; backups were kept. New recordings are now protected with Keychain.",
   },

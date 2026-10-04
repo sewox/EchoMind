@@ -56,7 +56,7 @@ use player::{
 };
 use storage::{
     add_meeting_tag, delete_meeting_by_id, dismiss_history_recovery_notice, get_all_meetings,
-    get_all_tags, get_related_meetings, get_storage_ready, remove_meeting_tag,
+    get_all_tags, get_related_meetings, get_storage_ready, remove_meeting_tag, retry_storage_unlock,
     save_current_meeting, toggle_action_item_status, update_meeting_speaker_name,
     update_meeting_title,
 };
@@ -106,6 +106,7 @@ pub fn run() {
             get_model_status,
             get_all_meetings,
             get_storage_ready,
+            retry_storage_unlock,
             dismiss_history_recovery_notice,
             save_current_meeting,
             enqueue_meeting_transcription,

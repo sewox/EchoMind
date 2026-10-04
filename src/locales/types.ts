@@ -24,6 +24,9 @@ export interface TranslationKeys {
     hours: string;
     storageUnlocking: string;
     storageUnlockHint: string;
+    storageLocked: string;
+    storageLockedHint: string;
+    retry: string;
     historyRecoveryNotice: string;
   };
   nav: {
