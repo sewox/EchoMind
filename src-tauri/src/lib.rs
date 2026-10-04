@@ -9,6 +9,7 @@ pub mod detector;
 pub mod diarization;
 pub mod dlp;
 pub mod encrypted_storage;
+pub mod glossary;
 pub mod hardware;
 pub mod import_progress;
 pub mod importer;
@@ -44,6 +45,7 @@ use detector::{
     check_active_meetings, get_detector_status, hide_island_window, show_island_window,
     show_main_window, start_meeting_detector, stop_meeting_detector, update_detector_settings,
 };
+use glossary::{get_glossary, set_glossary};
 use hardware::get_hardware_info;
 use import_progress::is_import_running;
 use importer::{
@@ -86,6 +88,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_hardware_info,
             get_asr_engine,
+            get_glossary,
+            set_glossary,
             is_import_running,
             set_asr_engine,
             start_audio_capture,
