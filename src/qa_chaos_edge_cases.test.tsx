@@ -212,7 +212,7 @@ describe("Senior QA Edge-Case & Chaos / Monkey Testing Suite", () => {
       );
 
       // Switch to search tab
-      const searchTab = screen.getByRole("button", { name: /Ara\.\.\./i });
+      const searchTab = screen.getByRole("tab", { name: /^Ara$/i });
       fireEvent.click(searchTab);
 
       const searchInput = screen.getByPlaceholderText(

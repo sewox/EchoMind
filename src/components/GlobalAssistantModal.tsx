@@ -26,6 +26,7 @@ import {
   FileText,
   ShieldAlert,
 } from "lucide-react";
+import { ModalShell } from "./ui/ModalShell";
 import { useI18n } from "../locales/i18nContext";
 import { MemoryStats } from "../types/memory";
 import { CredentialStore } from "../services/credentialStore";
@@ -269,474 +270,426 @@ export const GlobalAssistantModal: React.FC<GlobalAssistantModalProps> = ({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200 select-text cursor-pointer"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) {
-          onClose();
-        }
-      }}
+    <ModalShell
+      onClose={onClose}
+      icon={Sparkles}
+      title={t("assistant.title")}
+      subtitle={
+        isParanoid
+          ? "Paranoid Mod aktif: %100 çevrimdışı yerel motor ile sorgulanır."
+          : t("assistant.subtitle")
+      }
+      badge={
+        isParanoid ? (
+          <span
+            data-testid="assistant-airgapped-badge"
+            className="shrink-0 flex items-center gap-1 text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-purple-950/80 border border-purple-500/40 text-purple-300"
+          >
+            <ShieldAlert className="w-3 h-3 text-purple-400" />
+            <span>Air-Gapped</span>
+          </span>
+        ) : undefined
+      }
+      closeLabel={t("common.close")}
+      size="xl"
+      height="fixed"
+      scrollBody={false}
+      tabs={[
+        { id: "chat", label: t("assistant.title"), icon: Bot },
+        { id: "search", label: t("common.search"), icon: Search },
+      ]}
+      activeTab={activeTab}
+      onTabChange={setActiveTab}
     >
-      <div
-        className="relative w-full max-w-4xl h-[85vh] rounded-3xl bg-gradient-to-b from-slate-900/95 via-[#0b1428]/95 to-slate-950/95 border border-cyan-500/30 shadow-2xl shadow-cyan-950/60 flex flex-col overflow-hidden select-text cursor-default"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Top Header */}
-        <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between shrink-0 bg-slate-900/40 select-none">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-2xl bg-gradient-to-tr from-cyan-600 to-blue-600 text-white shadow-lg shadow-cyan-500/30">
-              <Sparkles className="w-5 h-5 text-amber-300" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-base md:text-lg font-bold text-white">
-                  {t("assistant.title")}
-                </h2>
-                {isParanoid && (
-                  <span
-                    data-testid="assistant-airgapped-badge"
-                    className="flex items-center gap-1 text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-purple-950/80 border border-purple-500/40 text-purple-300"
-                  >
-                    <ShieldAlert className="w-3 h-3 text-purple-400" />
-                    <span>Air-Gapped</span>
-                  </span>
+      {/* Tab 1: AI Chat Assistant */}
+      {activeTab === "chat" && (
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+          {/* Messages Area */}
+          <div className="flex-1 min-h-0 overflow-y-auto space-y-4 pr-2 select-text">
+            {messages.map((msg) => (
+              <div
+                key={msg.id}
+                className={`flex gap-3.5 ${
+                  msg.role === "user" ? "justify-end" : "justify-start"
+                }`}
+              >
+                {msg.role === "assistant" && (
+                  <div className="w-8 h-8 rounded-2xl bg-gradient-to-tr from-cyan-600 to-blue-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-cyan-900/40 mt-1 select-none">
+                    <Bot className="w-4 h-4" />
+                  </div>
                 )}
-              </div>
-              <p className="text-xs text-slate-400">
-                {isParanoid
-                  ? "Paranoid Mod aktif: %100 çevrimdışı yerel motor ile sorgulanır."
-                  : t("assistant.subtitle")}
-              </p>
-            </div>
-          </div>
 
-          {/* Navigation Tabs & Close */}
-          <div className="flex items-center gap-3">
-            <div className="flex items-center p-1 rounded-xl bg-slate-950/80 border border-slate-800 text-xs">
-              <button
-                onClick={() => setActiveTab("chat")}
-                className={`px-3 py-1.5 rounded-lg font-medium transition flex items-center gap-1.5 ${
-                  activeTab === "chat"
-                    ? "bg-cyan-500/20 text-cyan-300 font-semibold shadow-sm"
-                    : "text-slate-400 hover:text-slate-200"
-                }`}
-              >
-                <Bot className="w-3.5 h-3.5" />
-                <span>{t("assistant.title")}</span>
-              </button>
-              <button
-                onClick={() => setActiveTab("search")}
-                className={`px-3 py-1.5 rounded-lg font-medium transition flex items-center gap-1.5 ${
-                  activeTab === "search"
-                    ? "bg-cyan-500/20 text-cyan-300 font-semibold shadow-sm"
-                    : "text-slate-400 hover:text-slate-200"
-                }`}
-              >
-                <Search className="w-3.5 h-3.5" />
-                <span>{t("common.search")}</span>
-              </button>
-            </div>
-
-            <button
-              onClick={onClose}
-              className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition"
-              title={t("common.close")}
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-
-        {/* Tab 1: AI Chat Assistant */}
-        {activeTab === "chat" && (
-          <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-4 pr-3 select-text">
-              {messages.map((msg) => (
                 <div
-                  key={msg.id}
-                  className={`flex gap-3.5 ${
-                    msg.role === "user" ? "justify-end" : "justify-start"
+                  className={`max-w-2xl rounded-2xl p-4 text-xs md:text-sm leading-relaxed shadow-lg select-text ${
+                    msg.role === "user"
+                      ? "bg-gradient-to-r from-cyan-600 to-blue-600 text-white rounded-tr-none"
+                      : "bg-slate-900/90 border border-slate-800 text-slate-200 rounded-tl-none"
                   }`}
                 >
-                  {msg.role === "assistant" && (
-                    <div className="w-8 h-8 rounded-2xl bg-gradient-to-tr from-cyan-600 to-blue-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-cyan-900/40 mt-1 select-none">
-                      <Bot className="w-4 h-4" />
-                    </div>
-                  )}
-
-                  <div
-                    className={`max-w-2xl rounded-2xl p-4 text-xs md:text-sm leading-relaxed shadow-lg select-text ${
-                      msg.role === "user"
-                        ? "bg-gradient-to-r from-cyan-600 to-blue-600 text-white rounded-tr-none"
-                        : "bg-slate-900/90 border border-slate-800 text-slate-200 rounded-tl-none"
-                    }`}
-                  >
-                    {/* Header Info */}
-                    <div className="flex items-center justify-between gap-4 mb-2 pb-1.5 border-b border-white/10 text-[11px] opacity-80 select-none">
-                      <span className="font-semibold">
-                        {msg.role === "user"
-                          ? "Siz"
-                          : msg.provider || "EchoMind Asistan"}
-                      </span>
-                      <div className="flex items-center gap-2 font-mono text-[10px]">
-                        <span>{msg.timestamp}</span>
-                        {msg.role === "assistant" && (
-                          <button
-                            onClick={() =>
-                              handleCopy(
-                                msg.id === "welcome"
-                                  ? t("ui.assistant.welcome")
-                                  : msg.content,
-                                msg.id,
-                              )
-                            }
-                            className="p-1 rounded hover:bg-white/10 transition"
-                            title={t("ui.assistant.copyReply")}
-                          >
-                            {copiedMessageId === msg.id ? (
-                              <Check className="w-3 h-3 text-emerald-400" />
-                            ) : (
-                              <Copy className="w-3 h-3 text-slate-400 hover:text-white" />
-                            )}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Markdown / Text Content */}
-                    <div className="whitespace-pre-wrap font-sans space-y-2 select-text cursor-text">
-                      {msg.id === "welcome"
-                        ? t("ui.assistant.welcome")
-                        : msg.content}
-                    </div>
-
-                    {/* Clickable Citations Footer */}
-                    {msg.citedMeetingIds && msg.citedMeetingIds.length > 0 && (
-                      <div className="mt-3 pt-2.5 border-t border-white/10 flex flex-wrap items-center gap-1.5">
-                        <span className="text-[10px] text-slate-400 flex items-center gap-1 font-medium">
-                          <Bookmark className="w-3 h-3 text-cyan-400" />
-                          <span>İlgili Toplantılar:</span>
-                        </span>
-                        {msg.citedMeetingIds.map((id) => (
-                          <button
-                            key={id}
-                            onClick={() => handleOpenMeeting(id)}
-                            className="px-2 py-0.5 rounded-md bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-300 text-[10px] font-semibold transition flex items-center gap-1"
-                          >
-                            <span>Toplantıyı Aç</span>
-                            <ExternalLink className="w-2.5 h-2.5" />
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {msg.role === "user" && (
-                    <div className="w-8 h-8 rounded-2xl bg-slate-800 text-slate-300 flex items-center justify-center shrink-0 border border-slate-700 mt-1">
-                      <User className="w-4 h-4" />
-                    </div>
-                  )}
-                </div>
-              ))}
-
-              {isLoading && (
-                <div className="flex gap-3.5 justify-start">
-                  <div className="w-8 h-8 rounded-2xl bg-gradient-to-tr from-cyan-600 to-blue-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-cyan-900/40">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  </div>
-                  <div className="flex items-center gap-2 p-3 rounded-xl bg-slate-900/60 border border-slate-800 text-xs text-cyan-300">
-                    <Sparkles className="w-4 h-4 text-amber-400" />
-                    <span>Toplantı arşivi taranıyor ve analiz ediliyor...</span>
-                  </div>
-                </div>
-              )}
-
-              <div ref={messagesEndRef} />
-            </div>
-
-            {/* Quick Prompts Bar */}
-            <div className="px-6 py-2 border-t border-white/5 bg-slate-950/40 flex items-center gap-2 overflow-x-auto shrink-0">
-              <span className="text-[11px] text-slate-500 shrink-0 font-medium flex items-center gap-1">
-                <HelpCircle className="w-3 h-3" />
-                <span>{t("ui.assistant.examples")}</span>
-              </span>
-              {QUICK_PROMPTS.map((qp, idx) => (
-                <button
-                  key={idx}
-                  onClick={() =>
-                    handleSendMessage(t(`ui.assistant.${qp.key}Prompt`))
-                  }
-                  disabled={isLoading}
-                  className="px-2.5 py-1 rounded-full bg-slate-900 hover:bg-slate-800 border border-white/10 hover:border-cyan-500/40 text-slate-300 text-xs font-medium transition flex items-center gap-1.5 shrink-0 disabled:opacity-50"
-                >
-                  <span>{qp.icon}</span>
-                  <span>{t(`ui.assistant.${qp.key}Label`)}</span>
-                </button>
-              ))}
-            </div>
-
-            {/* Input Box */}
-            <div className="p-4 md:p-6 border-t border-white/10 bg-slate-900/60 shrink-0 space-y-3">
-              {isParanoid && (
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-purple-950/40 border border-purple-500/30 text-[11px] text-purple-300">
-                  <ShieldAlert className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-                  <span>
-                    <strong>Paranoid (Air-Gapped) Mod Aktif:</strong> Sorularınız harici bulut servislerine gönderilmez; yalnızca yerel RAG & hafıza veritabanı ile yanıtlanır.
-                  </span>
-                </div>
-              )}
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  handleSendMessage();
-                }}
-                className="relative flex items-center"
-              >
-                <input
-                  type="text"
-                  value={inputQuery}
-                  onChange={(e) => setInputQuery(e.target.value)}
-                  placeholder={t("assistant.placeholder")}
-                  disabled={isLoading}
-                  className="w-full pl-4 pr-24 py-3.5 rounded-2xl bg-slate-950/90 border border-slate-800 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 shadow-inner"
-                />
-                <button
-                  type="submit"
-                  disabled={!inputQuery.trim() || isLoading}
-                  className="absolute right-2 px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-semibold shadow-md shadow-cyan-900/40 transition flex items-center gap-1.5 disabled:opacity-40"
-                >
-                  <span>{t("assistant.askButton")}</span>
-                  <Send className="w-3.5 h-3.5" />
-                </button>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* Tab 2: Global Deep Search & Cross-Meeting Memory */}
-        {activeTab === "search" && (
-          <div className="flex-1 flex flex-col min-h-0 overflow-hidden p-6 gap-4">
-            {/* Memory Knowledge Base Stats Banner */}
-            {memoryStats && (
-              <div className="p-3 rounded-2xl bg-gradient-to-r from-cyan-950/40 via-blue-950/30 to-indigo-950/40 border border-cyan-500/20 flex items-center justify-between flex-wrap gap-2 text-xs">
-                <div className="flex items-center gap-4 text-slate-300">
-                  <span className="flex items-center gap-1.5 font-medium text-cyan-300">
-                    <Database className="w-3.5 h-3.5 text-cyan-400" />
-                    <span>{memoryStats.total_meetings} Toplantı Hafızası</span>
-                  </span>
-                  <span className="flex items-center gap-1.5 text-slate-400">
-                    <Users className="w-3.5 h-3.5 text-indigo-400" />
-                    <span>{memoryStats.unique_speakers.length} Konuşmacı</span>
-                  </span>
-                  <span className="flex items-center gap-1.5 text-slate-400">
-                    <FileText className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>
-                      {memoryStats.total_words.toLocaleString()} Kelime
+                  {/* Header Info */}
+                  <div className="flex items-center justify-between gap-4 mb-2 pb-1.5 border-b border-white/10 text-[11px] opacity-80 select-none">
+                    <span className="font-semibold">
+                      {msg.role === "user"
+                        ? "Siz"
+                        : msg.provider || "EchoMind Asistan"}
                     </span>
-                  </span>
+                    <div className="flex items-center gap-2 font-mono text-[10px]">
+                      <span>{msg.timestamp}</span>
+                      {msg.role === "assistant" && (
+                        <button
+                          onClick={() =>
+                            handleCopy(
+                              msg.id === "welcome"
+                                ? t("ui.assistant.welcome")
+                                : msg.content,
+                              msg.id,
+                            )
+                          }
+                          className="p-1 rounded hover:bg-white/10 transition"
+                          title={t("ui.assistant.copyReply")}
+                        >
+                          {copiedMessageId === msg.id ? (
+                            <Check className="w-3 h-3 text-emerald-400" />
+                          ) : (
+                            <Copy className="w-3 h-3 text-slate-400 hover:text-white" />
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Markdown / Text Content */}
+                  <div className="whitespace-pre-wrap font-sans space-y-2 select-text cursor-text">
+                    {msg.id === "welcome"
+                      ? t("ui.assistant.welcome")
+                      : msg.content}
+                  </div>
+
+                  {/* Clickable Citations Footer */}
+                  {msg.citedMeetingIds && msg.citedMeetingIds.length > 0 && (
+                    <div className="mt-3 pt-2.5 border-t border-white/10 flex flex-wrap items-center gap-1.5">
+                      <span className="text-[10px] text-slate-400 flex items-center gap-1 font-medium">
+                        <Bookmark className="w-3 h-3 text-cyan-400" />
+                        <span>İlgili Toplantılar:</span>
+                      </span>
+                      {msg.citedMeetingIds.map((id) => (
+                        <button
+                          key={id}
+                          onClick={() => handleOpenMeeting(id)}
+                          className="px-2 py-0.5 rounded-md bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-300 text-[10px] font-semibold transition flex items-center gap-1"
+                        >
+                          <span>Toplantıyı Aç</span>
+                          <ExternalLink className="w-2.5 h-2.5" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {msg.role === "user" && (
+                  <div className="w-8 h-8 rounded-2xl bg-slate-800 text-slate-300 flex items-center justify-center shrink-0 border border-slate-700 mt-1">
+                    <User className="w-4 h-4" />
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {isLoading && (
+              <div className="flex gap-3.5 justify-start">
+                <div className="w-8 h-8 rounded-2xl bg-gradient-to-tr from-cyan-600 to-blue-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-cyan-900/40">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                </div>
+                <div className="flex items-center gap-2 p-3 rounded-xl bg-slate-900/60 border border-slate-800 text-xs text-cyan-300">
+                  <Sparkles className="w-4 h-4 text-amber-400" />
+                  <span>Toplantı arşivi taranıyor ve analiz ediliyor...</span>
                 </div>
               </div>
             )}
 
-            {/* Search Input & Speaker Filter Bar */}
-            <div className="flex flex-col sm:flex-row gap-2 shrink-0">
-              <div className="relative flex-1">
-                <Search className="w-4 h-4 absolute left-4 top-3.5 text-slate-400" />
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => handleGlobalSearch(e.target.value)}
-                  placeholder="Tüm toplantı başlıkları, hedefleri, kararları, görevleri ve konuşmalarında ara..."
-                  className="w-full pl-11 pr-10 py-3 rounded-2xl bg-slate-950/90 border border-slate-800 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
-                  autoFocus
-                />
-                {searchTerm && (
-                  <button
-                    onClick={() => handleGlobalSearch("")}
-                    className="absolute right-3.5 top-3.5 text-slate-500 hover:text-slate-300"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
+            <div ref={messagesEndRef} />
+          </div>
 
-              {/* Speaker Select Dropdown */}
-              {memoryStats && memoryStats.unique_speakers.length > 0 && (
-                <div className="relative shrink-0">
-                  <select
-                    value={speakerFilter}
-                    onChange={(e) => {
-                      const newSpeaker = e.target.value;
-                      setSpeakerFilter(newSpeaker);
-                      handleGlobalSearch(searchTerm, newSpeaker);
-                    }}
-                    className="px-3 py-3 rounded-2xl bg-slate-950/90 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
-                  >
-                    <option value="">Tüm Konuşmacılar</option>
-                    {memoryStats.unique_speakers.map((spk) => (
-                      <option key={spk} value={spk}>
-                        🎙️ {spk}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+          {/* Quick Prompts Bar */}
+          <div className="pt-3 mt-3 border-t border-slate-800 flex flex-wrap items-center gap-2 shrink-0">
+            <span className="text-[11px] text-slate-500 shrink-0 font-medium flex items-center gap-1">
+              <HelpCircle className="w-3 h-3" />
+              <span>{t("ui.assistant.examples")}</span>
+            </span>
+            {QUICK_PROMPTS.map((qp, idx) => (
+              <button
+                key={idx}
+                onClick={() =>
+                  handleSendMessage(t(`ui.assistant.${qp.key}Prompt`))
+                }
+                disabled={isLoading}
+                className="px-2.5 py-1 rounded-full bg-slate-900 hover:bg-slate-800 border border-white/10 hover:border-cyan-500/40 text-slate-300 text-xs font-medium transition flex items-center gap-1.5 shrink-0 disabled:opacity-50"
+              >
+                <span>{qp.icon}</span>
+                <span>{t(`ui.assistant.${qp.key}Label`)}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Input Box */}
+          <div className="pt-3 shrink-0 space-y-3">
+            {isParanoid && (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-purple-950/40 border border-purple-500/30 text-[11px] text-purple-300">
+                <ShieldAlert className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                <span>
+                  <strong>Paranoid (Air-Gapped) Mod Aktif:</strong> Sorularınız
+                  harici bulut servislerine gönderilmez; yalnızca yerel RAG &
+                  hafıza veritabanı ile yanıtlanır.
+                </span>
+              </div>
+            )}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleSendMessage();
+              }}
+              className="relative flex items-center"
+            >
+              <input
+                type="text"
+                value={inputQuery}
+                onChange={(e) => setInputQuery(e.target.value)}
+                placeholder={t("assistant.placeholder")}
+                disabled={isLoading}
+                className="w-full pl-4 pr-24 py-3.5 rounded-2xl bg-slate-950/90 border border-slate-800 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 shadow-inner"
+              />
+              <button
+                type="submit"
+                disabled={!inputQuery.trim() || isLoading}
+                className="absolute right-2 px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-semibold shadow-md shadow-cyan-900/40 transition flex items-center gap-1.5 disabled:opacity-40"
+              >
+                <span>{t("assistant.askButton")}</span>
+                <Send className="w-3.5 h-3.5" />
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Tab 2: Global Deep Search & Cross-Meeting Memory */}
+      {activeTab === "search" && (
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden gap-4">
+          {/* Memory Knowledge Base Stats Banner */}
+          {memoryStats && (
+            <div className="p-3 rounded-2xl bg-gradient-to-r from-cyan-950/40 via-blue-950/30 to-indigo-950/40 border border-cyan-500/20 flex items-center justify-between flex-wrap gap-2 text-xs">
+              <div className="flex items-center gap-4 text-slate-300">
+                <span className="flex items-center gap-1.5 font-medium text-cyan-300">
+                  <Database className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>{memoryStats.total_meetings} Toplantı Hafızası</span>
+                </span>
+                <span className="flex items-center gap-1.5 text-slate-400">
+                  <Users className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>{memoryStats.unique_speakers.length} Konuşmacı</span>
+                </span>
+                <span className="flex items-center gap-1.5 text-slate-400">
+                  <FileText className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>{memoryStats.total_words.toLocaleString()} Kelime</span>
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Search Input & Speaker Filter Bar */}
+          <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 absolute left-4 top-3.5 text-slate-400" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => handleGlobalSearch(e.target.value)}
+                placeholder="Tüm toplantı başlıkları, hedefleri, kararları, görevleri ve konuşmalarında ara..."
+                className="w-full pl-11 pr-10 py-3 rounded-2xl bg-slate-950/90 border border-slate-800 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                autoFocus
+              />
+              {searchTerm && (
+                <button
+                  onClick={() => handleGlobalSearch("")}
+                  className="absolute right-3.5 top-3.5 text-slate-500 hover:text-slate-300"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               )}
             </div>
 
-            {/* Filter Pills */}
-            <div className="flex items-center gap-2 shrink-0 overflow-x-auto pb-1 text-xs">
-              {[
-                { key: "all", label: "Tümü" },
-                { key: "title", label: "🏷️ Başlıklar" },
-                { key: "goal", label: "🎯 Hedefler" },
-                { key: "decision", label: "⚡ Kararlar" },
-                { key: "action_item", label: "✅ Eylem Maddeleri" },
-                { key: "transcript", label: "💬 Konuşma Transkripti" },
-              ].map((f) => (
-                <button
-                  key={f.key}
-                  onClick={() => setSearchFilter(f.key)}
-                  className={`px-3 py-1 rounded-lg border transition ${
-                    searchFilter === f.key
-                      ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/40 font-semibold"
-                      : "bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200"
-                  }`}
+            {/* Speaker Select Dropdown */}
+            {memoryStats && memoryStats.unique_speakers.length > 0 && (
+              <div className="relative shrink-0">
+                <select
+                  value={speakerFilter}
+                  onChange={(e) => {
+                    const newSpeaker = e.target.value;
+                    setSpeakerFilter(newSpeaker);
+                    handleGlobalSearch(searchTerm, newSpeaker);
+                  }}
+                  className="px-3 py-3 rounded-2xl bg-slate-950/90 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
                 >
-                  {f.label}
-                </button>
-              ))}
-            </div>
+                  <option value="">Tüm Konuşmacılar</option>
+                  {memoryStats.unique_speakers.map((spk) => (
+                    <option key={spk} value={spk}>
+                      {spk}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
 
-            {/* Results List */}
-            <div className="flex-1 overflow-y-auto space-y-4 pr-2">
-              {isSearching ? (
-                <div className="text-center py-16 flex flex-col items-center gap-2 text-slate-400">
-                  <Loader2 className="w-6 h-6 animate-spin text-cyan-400" />
-                  <span className="text-xs">
-                    Tüm toplantı arşivi taranıyor...
-                  </span>
-                </div>
-              ) : searchResults.length === 0 ? (
-                <div className="text-center py-16 text-slate-500 text-xs border border-dashed border-white/10 rounded-2xl p-8 flex flex-col items-center gap-2">
-                  <Search className="w-8 h-8 text-slate-600" />
-                  <span>
-                    {searchTerm
-                      ? `"${searchTerm}" ile eşleşen bir toplantı kaydı bulunamadı.`
-                      : "Aramak istediğiniz konuyu, kişiyi veya kararı yazın."}
-                  </span>
-                </div>
-              ) : (
-                searchResults.map((res) => {
-                  const filteredMatches =
-                    searchFilter === "all"
-                      ? res.matches
-                      : res.matches.filter((m) =>
-                          m.match_type.includes(searchFilter),
-                        );
+          {/* Filter Pills */}
+          <div className="flex flex-wrap items-center gap-2 shrink-0 text-xs">
+            {[
+              { key: "all", label: "Tümü" },
+              { key: "title", label: "Başlıklar" },
+              { key: "goal", label: "Hedefler" },
+              { key: "decision", label: "Kararlar" },
+              { key: "action_item", label: "Eylem Maddeleri" },
+              { key: "transcript", label: "Konuşma Transkripti" },
+            ].map((f) => (
+              <button
+                key={f.key}
+                onClick={() => setSearchFilter(f.key)}
+                className={`px-3 py-1 rounded-lg border transition ${
+                  searchFilter === f.key
+                    ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/40 font-semibold"
+                    : "bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
 
-                  if (filteredMatches.length === 0) return null;
+          {/* Results List */}
+          <div className="flex-1 min-h-0 overflow-y-auto space-y-4 pr-2">
+            {isSearching ? (
+              <div className="text-center py-16 flex flex-col items-center gap-2 text-slate-400">
+                <Loader2 className="w-6 h-6 animate-spin text-cyan-400" />
+                <span className="text-xs">
+                  Tüm toplantı arşivi taranıyor...
+                </span>
+              </div>
+            ) : searchResults.length === 0 ? (
+              <div className="text-center py-16 text-slate-500 text-xs border border-dashed border-white/10 rounded-2xl p-8 flex flex-col items-center gap-2">
+                <Search className="w-8 h-8 text-slate-600" />
+                <span>
+                  {searchTerm
+                    ? `"${searchTerm}" ile eşleşen bir toplantı kaydı bulunamadı.`
+                    : "Aramak istediğiniz konuyu, kişiyi veya kararı yazın."}
+                </span>
+              </div>
+            ) : (
+              searchResults.map((res) => {
+                const filteredMatches =
+                  searchFilter === "all"
+                    ? res.matches
+                    : res.matches.filter((m) =>
+                        m.match_type.includes(searchFilter),
+                      );
 
-                  return (
-                    <div
-                      key={res.meeting_id}
-                      className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-cyan-500/40 transition shadow-lg space-y-3"
-                    >
-                      {/* Meeting Header */}
-                      <div className="flex items-center justify-between border-b border-white/10 pb-3">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h4 className="text-sm md:text-base font-bold text-white">
-                              {res.meeting_title}
-                            </h4>
-                            {res.score > 0 && (
-                              <span className="px-2 py-0.5 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 text-[10px] font-semibold">
-                                {res.score >= 50
-                                  ? "%95 Eşleşme"
-                                  : `%${Math.min(90, res.score * 2)} Alaka`}
-                              </span>
+                if (filteredMatches.length === 0) return null;
+
+                return (
+                  <div
+                    key={res.meeting_id}
+                    className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-cyan-500/40 transition shadow-lg space-y-3"
+                  >
+                    {/* Meeting Header */}
+                    <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-sm md:text-base font-bold text-white">
+                            {res.meeting_title}
+                          </h4>
+                          {res.score > 0 && (
+                            <span className="px-2 py-0.5 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 text-[10px] font-semibold">
+                              {res.score >= 50
+                                ? "%95 Eşleşme"
+                                : `%${Math.min(90, res.score * 2)} Alaka`}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3 text-xs text-slate-400 mt-1">
+                          <span className="flex items-center gap-1">
+                            <Calendar className="w-3 h-3" />
+                            {res.date_formatted}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            {res.duration_formatted}
+                          </span>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => handleOpenMeeting(res.meeting_id)}
+                        className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-semibold shadow-md shadow-cyan-900/30 transition flex items-center gap-1.5 shrink-0"
+                      >
+                        <span>Toplantıya Git</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    {/* Matches in this meeting */}
+                    <div className="space-y-2">
+                      {filteredMatches.map((m, idx) => (
+                        <div
+                          key={idx}
+                          className="p-2.5 rounded-xl bg-slate-950/60 border border-white/5 flex items-start gap-2.5 text-xs text-slate-300"
+                        >
+                          <span className="mt-0.5">
+                            {m.match_type === "goal" && (
+                              <Target className="w-3.5 h-3.5 text-amber-400" />
                             )}
-                          </div>
-                          <div className="flex items-center gap-3 text-xs text-slate-400 mt-1">
-                            <span className="flex items-center gap-1">
-                              <Calendar className="w-3 h-3" />
-                              {res.date_formatted}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Clock className="w-3 h-3" />
-                              {res.duration_formatted}
-                            </span>
+                            {m.match_type === "decision" && (
+                              <Zap className="w-3.5 h-3.5 text-cyan-400" />
+                            )}
+                            {m.match_type === "action_item" && (
+                              <CheckSquare className="w-3.5 h-3.5 text-emerald-400" />
+                            )}
+                            {m.match_type === "transcript" && (
+                              <MessageSquare className="w-3.5 h-3.5 text-slate-400" />
+                            )}
+                            {m.match_type === "title" && (
+                              <Bookmark className="w-3.5 h-3.5 text-blue-400" />
+                            )}
+                            {m.match_type.includes("topic") && (
+                              <FolderOpen className="w-3.5 h-3.5 text-purple-400" />
+                            )}
+                          </span>
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between text-[10px] text-slate-400 mb-0.5">
+                              <span className="font-semibold uppercase tracking-wider text-cyan-400">
+                                {m.match_type === "goal"
+                                  ? "Toplantı Amacı"
+                                  : m.match_type === "decision"
+                                    ? "Alınan Karar"
+                                    : m.match_type === "action_item"
+                                      ? "Eylem Maddesi"
+                                      : m.match_type === "transcript"
+                                        ? `Konuşma (${m.speaker_name || "Bilinmeyen"})`
+                                        : "Gündem Başlığı"}
+                              </span>
+                              {m.timestamp_formatted && (
+                                <span className="font-mono text-slate-400">
+                                  {m.timestamp_formatted}
+                                </span>
+                              )}
+                            </div>
+                            <p className="leading-relaxed">{m.snippet}</p>
                           </div>
                         </div>
-
-                        <button
-                          onClick={() => handleOpenMeeting(res.meeting_id)}
-                          className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-semibold shadow-md shadow-cyan-900/30 transition flex items-center gap-1.5 shrink-0"
-                        >
-                          <span>Toplantıya Git</span>
-                          <ArrowRight className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-
-                      {/* Matches in this meeting */}
-                      <div className="space-y-2">
-                        {filteredMatches.map((m, idx) => (
-                          <div
-                            key={idx}
-                            className="p-2.5 rounded-xl bg-slate-950/60 border border-white/5 flex items-start gap-2.5 text-xs text-slate-300"
-                          >
-                            <span className="mt-0.5">
-                              {m.match_type === "goal" && (
-                                <Target className="w-3.5 h-3.5 text-amber-400" />
-                              )}
-                              {m.match_type === "decision" && (
-                                <Zap className="w-3.5 h-3.5 text-cyan-400" />
-                              )}
-                              {m.match_type === "action_item" && (
-                                <CheckSquare className="w-3.5 h-3.5 text-emerald-400" />
-                              )}
-                              {m.match_type === "transcript" && (
-                                <MessageSquare className="w-3.5 h-3.5 text-slate-400" />
-                              )}
-                              {m.match_type === "title" && (
-                                <Bookmark className="w-3.5 h-3.5 text-blue-400" />
-                              )}
-                              {m.match_type.includes("topic") && (
-                                <FolderOpen className="w-3.5 h-3.5 text-purple-400" />
-                              )}
-                            </span>
-                            <div className="flex-1">
-                              <div className="flex items-center justify-between text-[10px] text-slate-400 mb-0.5">
-                                <span className="font-semibold uppercase tracking-wider text-cyan-400">
-                                  {m.match_type === "goal"
-                                    ? "Toplantı Amacı"
-                                    : m.match_type === "decision"
-                                      ? "Alınan Karar"
-                                      : m.match_type === "action_item"
-                                        ? "Eylem Maddesi"
-                                        : m.match_type === "transcript"
-                                          ? `Konuşma (${m.speaker_name || "Bilinmeyen"})`
-                                          : "Gündem Başlığı"}
-                                </span>
-                                {m.timestamp_formatted && (
-                                  <span className="font-mono text-slate-400">
-                                    {m.timestamp_formatted}
-                                  </span>
-                                )}
-                              </div>
-                              <p className="leading-relaxed">{m.snippet}</p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+                      ))}
                     </div>
-                  );
-                })
-              )}
-            </div>
+                  </div>
+                );
+              })
+            )}
           </div>
-        )}
-      </div>
-    </div>
+        </div>
+      )}
+    </ModalShell>
   );
 };
