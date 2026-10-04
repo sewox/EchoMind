@@ -211,6 +211,7 @@ mod e2e_qa_suite {
             summary_provider: Some("🔒 Cihaz İçi Hızlı Özet".to_string()),
             tags: None,
             transcript_pending: false,
+            asr_corrections: None,
         };
 
         let md =
@@ -248,6 +249,7 @@ mod e2e_qa_suite {
             summary_provider: None,
             tags: None,
             transcript_pending: false,
+            asr_corrections: None,
         }];
 
         let chaotic_inputs = [

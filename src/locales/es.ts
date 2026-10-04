@@ -57,6 +57,8 @@ export const es: TranslationKeys = {
     hint: "Los informes provienen ahora del resumidor simple. Descarga el modelo de informes para obtener informes precisos ({size} GB).",
     openModelHub: "Descargar modelo",
     generating: "Redactando el informe en el dispositivo… {percent} %",
+    corrected: "Corregido",
+    correctedTitle: "Corrección de reconocimiento: {changes}",
   },
   glossary: {
     title: "Términos personalizados",

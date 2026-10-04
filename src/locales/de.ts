@@ -57,6 +57,8 @@ export const de: TranslationKeys = {
     hint: "Berichte stammen derzeit aus dem einfachen Zusammenfasser. Laden Sie das Berichtsmodell für genaue Berichte herunter ({size} GB).",
     openModelHub: "Modell laden",
     generating: "Bericht wird auf dem Gerät erstellt… {percent} %",
+    corrected: "Korrigiert",
+    correctedTitle: "Erkennungskorrektur: {changes}",
   },
   glossary: {
     title: "Eigene Begriffe",

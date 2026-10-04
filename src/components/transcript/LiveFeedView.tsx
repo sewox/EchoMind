@@ -74,6 +74,15 @@ export const LiveFeedView: React.FC<LiveFeedViewProps> = ({
   onClipSoundbite,
   onOpenRetranscribe,
 }) => {
+  // Recognition fixes per segment, shown as a badge with the original text.
+  const correctionsBySegment: Record<
+    number,
+    NonNullable<MeetingRecord["asr_corrections"]>
+  > = {};
+  for (const c of selectedPastMeeting?.asr_corrections ?? []) {
+    (correctionsBySegment[c.segment_id] ??= []).push(c);
+  }
+
   const { t } = useI18n();
   const [copiedSuggestionId, setCopiedSuggestionId] = useState<string | null>(
     null,
@@ -410,6 +419,19 @@ export const LiveFeedView: React.FC<LiveFeedViewProps> = ({
                     >
                       <Scissors className="w-3.5 h-3.5" />
                     </button>
+                  )}
+                  {correctionsBySegment[seg.id] && (
+                    <span
+                      data-testid={`asr-corrected-${seg.id}`}
+                      title={t("localLlm.correctedTitle", {
+                        changes: correctionsBySegment[seg.id]
+                          .map((c) => `${c.original} → ${c.corrected}`)
+                          .join(", "),
+                      })}
+                      className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 cursor-help"
+                    >
+                      {t("localLlm.corrected")}
+                    </span>
                   )}
                   <span className="text-xs 2xl:text-sm font-mono text-slate-400 whitespace-nowrap">
                     {seg.timestamp_formatted.replace(" -> ", " – ")}

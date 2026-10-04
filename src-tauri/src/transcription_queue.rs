@@ -939,6 +939,7 @@ mod tests {
             summary_provider: None,
             tags: None,
             transcript_pending: pending,
+            asr_corrections: None,
         }
     }
 

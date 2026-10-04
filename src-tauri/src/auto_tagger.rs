@@ -456,6 +456,7 @@ mod tests {
                 "Yazılım & Teknoloji".to_string(),
             ]),
             transcript_pending: false,
+            asr_corrections: None,
         };
 
         let m1 = MeetingRecord {
@@ -479,6 +480,7 @@ mod tests {
             summary_provider: None,
             tags: Some(vec!["Finans & Bütçe".to_string()]),
             transcript_pending: false,
+            asr_corrections: None,
         };
 
         let m2 = MeetingRecord {
@@ -502,6 +504,7 @@ mod tests {
             summary_provider: None,
             tags: Some(vec!["Pazarlama & Büyüme".to_string()]),
             transcript_pending: false,
+            asr_corrections: None,
         };
 
         let related = AutoTagEngine::find_related_meetings(&target, &[m1.clone(), m2.clone()], 3);

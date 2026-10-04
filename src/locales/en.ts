@@ -57,6 +57,8 @@ export const en: TranslationKeys = {
     hint: "Reports currently come from the simple summarizer. Download the on-device report model for accurate reports ({size} GB).",
     openModelHub: "Download model",
     generating: "Writing the report on this device… {percent}%",
+    corrected: "Corrected",
+    correctedTitle: "Recognition fix: {changes}",
   },
   glossary: {
     title: "Custom Terms",

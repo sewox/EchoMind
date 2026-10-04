@@ -146,6 +146,37 @@ fn run_asr_engine(
     Ok((segs, label))
 }
 
+/// Recognition fixes by the on-device model before the report (first 30% of
+/// the report stage); `None` when no model is installed or the check failed.
+fn correct_before_report(
+    segments: &mut Vec<TranscriptSegment>,
+) -> Option<Vec<crate::local_llm::correction::AsrCorrection>> {
+    let model = crate::local_llm::catalog::installed()?;
+    match crate::local_llm::correction::correct(segments, model, None, &|f| {
+        crate::import_progress::summarizing(0.3 * f)
+    }) {
+        Ok((fixed, corrections)) => {
+            *segments = fixed;
+            Some(corrections)
+        }
+        Err(e) => {
+            eprintln!("⚠️ Transkript düzeltmesi yapılamadı: {e}");
+            None
+        }
+    }
+}
+
+/// Report progress after an optional correction pass took the first 30%.
+fn report_progress(corrected: bool) -> impl Fn(f32) + Sync {
+    move |f| {
+        if corrected {
+            crate::import_progress::summarizing(0.3 + 0.7 * f)
+        } else {
+            crate::import_progress::summarizing(f)
+        }
+    }
+}
+
 /// Titles EchoMind generated itself; a smart title may replace these, but a
 /// title the user typed must never be overwritten by a re-transcription.
 pub(crate) fn is_auto_generated_title(title: &str) -> bool {
@@ -416,6 +447,7 @@ pub async fn import_audio_file(
         // Step 2: Immediate Deep Synthesis Summary Generation (Role-Play Intelligence)
         let prov_str = cloud_provider.as_deref().unwrap_or("local");
         crate::import_progress::summarizing(0.0);
+        let asr_corrections = correct_before_report(&mut segments);
         let summary_res = crate::summarizer::SummarizerEngine::generate_summary_with_progress(
             &segments,
             prov_str,
@@ -424,7 +456,7 @@ pub async fn import_audio_file(
             None,
             None,
             None,
-            &crate::import_progress::summarizing,
+            &report_progress(asr_corrections.is_some()),
         );
 
         let final_title = if let Some(ref st) = summary_res.smart_title {
@@ -460,6 +492,7 @@ pub async fn import_audio_file(
             summary_provider: Some(summary_res.provider_used),
             tags: None,
             transcript_pending: false,
+            asr_corrections,
         };
 
         let storage = crate::storage::get_global_storage();
@@ -783,6 +816,7 @@ pub async fn retranscribe_meeting(
         // Step 2: Summary Generation with chosen summary provider
         let prov_str = summary_provider.as_deref().unwrap_or("local");
         crate::import_progress::summarizing(0.0);
+        let asr_corrections = correct_before_report(&mut segments);
         let summary_res = crate::summarizer::SummarizerEngine::generate_summary_with_progress(
             &segments,
             prov_str,
@@ -791,7 +825,7 @@ pub async fn retranscribe_meeting(
             custom_model.as_deref(),
             None,
             None,
-            &crate::import_progress::summarizing,
+            &report_progress(asr_corrections.is_some()),
         );
 
         crate::import_progress::saving();
@@ -810,6 +844,7 @@ pub async fn retranscribe_meeting(
             }
             target.segments = segments;
             target.transcript_pending = false;
+            target.asr_corrections = asr_corrections;
             target.summary = summary_res.summary;
             target.key_decisions = summary_res.key_decisions;
             target.meeting_goal = Some(summary_res.meeting_goal);
