@@ -52,6 +52,7 @@ export const es: TranslationKeys = {
     error: "Error en la descarga: {error}",
     hint: "Los informes provienen ahora del resumidor simple. Descarga el modelo de informes para obtener informes precisos ({size} GB).",
     openModelHub: "Descargar modelo",
+    generating: "Redactando el informe en el dispositivo… {percent} %",
   },
   importProgress: {
     decoding: "Leyendo el archivo de audio…",

@@ -26,6 +26,7 @@ import { AudioPlayerBar } from "./transcript/AudioPlayerBar";
 import { TasksDecisionsView } from "./transcript/TasksDecisionsView";
 import { SummaryCardsView } from "./transcript/SummaryCardsView";
 import { LocalLlmHint } from "./LocalLlmSection";
+import { useReportProgress } from "../hooks/useReportProgress";
 import { LiveFeedView } from "./transcript/LiveFeedView";
 import { CustomTemplateModal } from "./transcript/CustomTemplateModal";
 import { MeetingAnalyticsModal } from "./transcript/MeetingAnalyticsModal";
@@ -243,6 +244,8 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
   // Failed actions are shown, never only logged: a button that silently does
   // nothing looks broken.
   const [actionError, setActionError] = useState<string | null>(null);
+  // Background report for the open meeting (on-device model).
+  const reportProgress = useReportProgress(selectedPastMeeting?.id);
   const reportActionError = (context: string, err: unknown) => {
     console.error(context, err);
     const detail =
@@ -1149,7 +1152,30 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
           </div>
         )}
 
-        {activeTab === "summary" && (
+        {activeTab === "summary" && reportProgress !== null && (
+          <div
+            data-testid="report-progress"
+            role="status"
+            className="mx-4 mt-3 px-3 py-2 rounded-xl bg-slate-900/80 border border-cyan-500/30 text-cyan-100 text-xs"
+          >
+            <div className="flex items-center gap-2">
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-cyan-400" />
+              <span>
+                {t("localLlm.generating", {
+                  percent: Math.round(reportProgress),
+                })}
+              </span>
+            </div>
+            <div className="mt-2 h-1 w-full rounded-full bg-slate-800 overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 transition-all duration-500"
+                style={{ width: `${Math.max(2, reportProgress)}%` }}
+              />
+            </div>
+          </div>
+        )}
+
+        {activeTab === "summary" && reportProgress === null && (
           <LocalLlmHint onOpenModelHub={onOpenModelHub} />
         )}
 

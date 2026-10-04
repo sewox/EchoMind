@@ -48,6 +48,7 @@ export interface TranslationKeys {
     error: string;
     hint: string;
     openModelHub: string;
+    generating: string;
   };
   importProgress: {
     decoding: string;

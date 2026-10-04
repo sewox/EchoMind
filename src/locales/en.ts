@@ -52,6 +52,7 @@ export const en: TranslationKeys = {
     error: "Download failed: {error}",
     hint: "Reports currently come from the simple summarizer. Download the on-device report model for accurate reports ({size} GB).",
     openModelHub: "Download model",
+    generating: "Writing the report on this device… {percent}%",
   },
   importProgress: {
     decoding: "Reading the audio file…",

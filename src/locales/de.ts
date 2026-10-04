@@ -52,6 +52,7 @@ export const de: TranslationKeys = {
     error: "Download fehlgeschlagen: {error}",
     hint: "Berichte stammen derzeit aus dem einfachen Zusammenfasser. Laden Sie das Berichtsmodell für genaue Berichte herunter ({size} GB).",
     openModelHub: "Modell laden",
+    generating: "Bericht wird auf dem Gerät erstellt… {percent} %",
   },
   importProgress: {
     decoding: "Audiodatei wird gelesen…",

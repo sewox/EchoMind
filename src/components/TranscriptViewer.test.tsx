@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, act } from "@testing-library/react";
+import {
+  render,
+  screen,
+  fireEvent,
+  act,
+  waitFor,
+} from "@testing-library/react";
+import { globalTestEventListeners } from "../test/setup";
 import { TranscriptViewer } from "./TranscriptViewer";
 import { I18nProvider } from "../locales/i18nContext";
 import { invoke } from "@tauri-apps/api/core";
@@ -2588,6 +2595,36 @@ describe("TranscriptViewer Component", () => {
       fireEvent.click(toggleBtn);
     });
 
+    unmount();
+  });
+
+  it("shows background report progress for the open meeting", async () => {
+    (invoke as any).mockImplementation(() => Promise.resolve());
+    const { unmount } = render(
+      <I18nProvider>
+        <TranscriptViewer {...defaultProps} />
+      </I18nProvider>,
+    );
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Toplantı Raporu/i }));
+    });
+    await waitFor(() =>
+      expect(globalTestEventListeners["report-progress"]?.length).toBe(1),
+    );
+    act(() => {
+      globalTestEventListeners["report-progress"].forEach((cb) =>
+        cb({ payload: { meeting_id: "mtg-001", percent: 37.4 } }),
+      );
+    });
+    expect(await screen.findByTestId("report-progress")).toHaveTextContent(
+      "%37",
+    );
+    act(() => {
+      globalTestEventListeners["report-progress"].forEach((cb) =>
+        cb({ payload: { meeting_id: "mtg-001", percent: null } }),
+      );
+    });
+    expect(screen.queryByTestId("report-progress")).not.toBeInTheDocument();
     unmount();
   });
 
