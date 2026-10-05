@@ -1224,6 +1224,7 @@ mod tests {
             summary_provider: Some("EchoMind Özet".to_string()),
             tags: None,
             transcript_pending: false,
+            asr_corrections: None,
         };
 
         let markdown = SummarizerEngine::export_notes_markdown(&record, None, None);
@@ -1261,6 +1262,7 @@ mod tests {
             summary_provider: None,
             tags: None,
             transcript_pending: false,
+            asr_corrections: None,
         };
 
         let meetings = vec![record];
@@ -1335,6 +1337,7 @@ mod tests {
             summary_provider: None,
             tags: None,
             transcript_pending: false,
+            asr_corrections: None,
         };
 
         let translated_summary = SummaryResult {
@@ -1397,6 +1400,7 @@ mod tests {
             summary_provider: None,
             tags: None,
             transcript_pending: false,
+            asr_corrections: None,
         };
 
         let slack_md = SummarizerEngine::export_notes_slack_markdown(&record, None, Some("tr"));
@@ -1442,6 +1446,7 @@ mod tests {
             summary_provider: None,
             tags: None,
             transcript_pending: false,
+            asr_corrections: None,
         };
 
         let csv = SummarizerEngine::export_action_items_csv(&record, None);
@@ -1491,6 +1496,7 @@ mod tests {
             summary_provider: None,
             tags: None,
             transcript_pending: false,
+            asr_corrections: None,
         };
         let email = |tone: &str| SummarizerEngine::export_followup_email(&record, None, Some("tr"), Some(tone));
 
@@ -1555,6 +1561,7 @@ mod tests {
             summary_provider: None,
             tags: None,
             transcript_pending: false,
+            asr_corrections: None,
         };
 
         let email_res = SummarizerEngine::export_followup_email(&record, None, Some("tr"), None);
@@ -1607,6 +1614,7 @@ mod tests {
             summary_provider: None,
             tags: None,
             transcript_pending: false,
+            asr_corrections: None,
         };
         get_global_storage().meetings.lock().unwrap().push(record);
 

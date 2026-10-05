@@ -104,3 +104,7 @@ path = "examples/llm_report_check.rs"
 [[example]]
 name = "report_check"
 path = "examples/report_check.rs"
+
+[[example]]
+name = "correction_check"
+path = "examples/correction_check.rs"

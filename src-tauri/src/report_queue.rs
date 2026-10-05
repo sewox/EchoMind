@@ -121,7 +121,7 @@ enum Outcome {
 
 fn run_one(app: &tauri::AppHandle, meeting_id: &str) -> Outcome {
     let storage = crate::storage::get_global_storage();
-    let segments = {
+    let (mut segments, checked) = {
         let meetings = storage.meetings.lock().unwrap();
         match meetings.iter().find(|m| m.id == meeting_id) {
             Some(m)
@@ -129,7 +129,7 @@ fn run_one(app: &tauri::AppHandle, meeting_id: &str) -> Outcome {
                     && !m.segments.is_empty()
                     && crate::storage::is_auto_summary(m.summary_provider.as_deref()) =>
             {
-                m.segments.clone()
+                (m.segments.clone(), m.asr_corrections.is_some())
             }
             // Deleted, still transcribing (the queue asks again when done),
             // or already has a report the user chose.
@@ -152,14 +152,37 @@ fn run_one(app: &tauri::AppHandle, meeting_id: &str) -> Outcome {
         }
         emit(app, meeting_id, Some((f * 100.0).clamp(0.0, 100.0)));
     };
-    let result = crate::local_llm::report::generate(
-        &segments,
-        model,
-        None,
-        None,
-        Some(&cancel),
-        &on_progress,
-    );
+    // 1) Recognition fixes (once per transcript), 2) the report on the
+    //    corrected text. Correction takes about a third of the time.
+    const FIX_SHARE: f32 = 0.3;
+    if !checked {
+        match crate::local_llm::correction::correct(&segments, model, Some(&cancel), &|f| {
+            on_progress(FIX_SHARE * f)
+        }) {
+            Ok((fixed, corrections)) => {
+                match storage.apply_corrections(meeting_id, fixed.clone(), corrections) {
+                    Ok(Some(updated)) => {
+                        segments = fixed;
+                        let _ = app.emit("meeting-transcript-ready", &updated);
+                    }
+                    Ok(None) => {}
+                    Err(e) => eprintln!("⚠️ Düzeltmeler kaydedilemedi ({meeting_id}): {e}"),
+                }
+            }
+            Err(e) if e == crate::local_llm::engine::CANCELLED => {
+                emit(app, meeting_id, None);
+                return Outcome::Retry;
+            }
+            // A failed check must not block the report.
+            Err(e) => eprintln!("⚠️ Transkript düzeltmesi yapılamadı ({meeting_id}): {e}"),
+        }
+    }
+    let report_share = if checked { 1.0 } else { 1.0 - FIX_SHARE };
+    let report_start = 1.0 - report_share;
+    let result =
+        crate::local_llm::report::generate(&segments, model, None, None, Some(&cancel), &|f| {
+            on_progress(report_start + report_share * f)
+        });
     match result {
         Ok(report) => {
             match storage.apply_background_report(meeting_id, &report) {

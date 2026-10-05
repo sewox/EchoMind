@@ -193,6 +193,30 @@ describe("LiveFeedView Component", () => {
     ).toBeInTheDocument();
   });
 
+  it("marks segments fixed by the recognition correction and shows the original", () => {
+    render(
+      <I18nProvider>
+        <LiveFeedView
+          {...defaultProps}
+          selectedPastMeeting={{
+            ...mockPastMeeting,
+            asr_corrections: [
+              { segment_id: 1, original: "Van", corrected: "WAN" },
+              { segment_id: 1, original: "Kyk", corrected: "KVKK" },
+            ],
+          }}
+        />
+      </I18nProvider>,
+    );
+    const badge = screen.getByTestId("asr-corrected-1");
+    expect(badge).toHaveTextContent("Düzeltildi");
+    expect(badge).toHaveAttribute(
+      "title",
+      "Ses tanıma düzeltmesi: Van → WAN, Kyk → KVKK",
+    );
+    expect(screen.queryByTestId("asr-corrected-2")).not.toBeInTheDocument();
+  });
+
   it("handles soundbite clip button click", () => {
     const handleClip = vi.fn();
     render(

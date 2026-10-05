@@ -130,6 +130,14 @@ export interface MeetingRecord {
   tags?: string[];
   /** Audio saved but transcript not ready yet (e.g. quit mid-recording). */
   transcript_pending?: boolean;
+  /** Speech-recognition fixes applied by the on-device model. */
+  asr_corrections?:
+    | {
+        segment_id: number;
+        original: string;
+        corrected: string;
+      }[]
+    | null;
 }
 
 export interface RelatedMeetingItem {

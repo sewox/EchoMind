@@ -63,6 +63,10 @@ pub struct MeetingRecord {
     /// mid-recording). Missing in older JSON → false via serde default.
     #[serde(default)]
     pub transcript_pending: bool,
+    /// Speech-recognition fixes applied by the on-device model (originals
+    /// kept for transparency). `None`: not checked yet.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub asr_corrections: Option<Vec<crate::local_llm::correction::AsrCorrection>>,
 }
 
 pub struct StorageEngine {
@@ -519,6 +523,8 @@ impl StorageEngine {
             || mtg.key_decisions == extract_key_decisions(&mtg.segments);
         mtg.segments = segments;
         mtg.transcript_pending = false;
+        // A new transcript has not been checked for recognition errors yet.
+        mtg.asr_corrections = None;
         if engine_used.is_some() {
             mtg.engine_used = engine_used;
         }
@@ -532,6 +538,30 @@ impl StorageEngine {
         drop(lock);
         self.save_to_disk()?;
         Ok(updated)
+    }
+
+    /// Stores the transcript corrected by the on-device model, once per
+    /// transcript (`asr_corrections` is `None` until checked). `Ok(None)`:
+    /// meeting gone or already checked.
+    pub fn apply_corrections(
+        &self,
+        meeting_id: &str,
+        segments: Vec<TranscriptSegment>,
+        corrections: Vec<crate::local_llm::correction::AsrCorrection>,
+    ) -> Result<Option<MeetingRecord>, String> {
+        let mut lock = self.meetings.lock().unwrap();
+        let Some(mtg) = lock.iter_mut().find(|m| m.id == meeting_id) else {
+            return Ok(None);
+        };
+        if mtg.asr_corrections.is_some() || mtg.segments.len() != segments.len() {
+            return Ok(None);
+        }
+        mtg.segments = segments;
+        mtg.asr_corrections = Some(corrections);
+        let updated = mtg.clone();
+        drop(lock);
+        self.save_to_disk()?;
+        Ok(Some(updated))
     }
 
     /// Stores a report generated in the background — only over a summary that
@@ -1491,6 +1521,7 @@ fn save_current_meeting_blocking(
             summary_provider: Some("EchoMind Akıllı Özet".to_string()),
             tags: None,
             transcript_pending,
+            asr_corrections: None,
         };
 
         let storage = get_global_storage();
@@ -1852,6 +1883,7 @@ mod tests {
             summary_provider: Some("EchoMind".to_string()),
             tags: Some(vec!["Finans & Bütçe".to_string()]),
             transcript_pending: false,
+            asr_corrections: None,
         };
 
         let added = storage.add_meeting(sample_meeting).unwrap();
@@ -1916,6 +1948,7 @@ mod tests {
             summary_provider: None,
             tags: None,
             transcript_pending: false,
+            asr_corrections: None,
         };
         fs::write(&file_path, serde_json::to_vec(&vec![meeting]).unwrap()).unwrap();
         assert!(!crate::encrypted_storage::is_current_format(&file_path));
@@ -2160,6 +2193,7 @@ mod tests {
             summary_provider: Some("AI".to_string()),
             tags: None,
             transcript_pending: false,
+            asr_corrections: None,
         };
 
         // 1. Add meeting & get by id
@@ -2438,6 +2472,60 @@ mod tests {
     }
 
     #[test]
+    fn test_corrections_are_stored_once_and_reset_by_a_new_transcript() {
+        use crate::local_llm::correction::AsrCorrection;
+        let _unlock = crate::secure_key::key_unlock_test_lock()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let storage = StorageEngine::new();
+        let mut m = MeetingRecord {
+            id: "fix".into(),
+            title: "t".into(),
+            date_formatted: "1".into(),
+            duration_seconds: 60,
+            duration_formatted: "01:00".into(),
+            audio_file_path: None,
+            segments: vec![live_seg(1, "Van'dan erişim")],
+            summary: String::new(),
+            key_decisions: Vec::new(),
+            meeting_goal: None,
+            key_highlights: None,
+            action_items: None,
+            phase1_agreed: None,
+            phase2_deferred: None,
+            detailed_topics: None,
+            participants: None,
+            engine_used: None,
+            summary_provider: None,
+            tags: None,
+            transcript_pending: false,
+            asr_corrections: None,
+        };
+        m.segments[0].id = 1;
+        storage.add_meeting(m).unwrap();
+        let fixed = vec![live_seg(1, "WAN'dan erişim")];
+        let c = vec![AsrCorrection {
+            segment_id: 1,
+            original: "Van'dan".into(),
+            corrected: "WAN'dan".into(),
+        }];
+        let updated = storage
+            .apply_corrections("fix", fixed.clone(), c.clone())
+            .unwrap()
+            .unwrap();
+        assert_eq!(updated.segments[0].text, "WAN'dan erişim");
+        assert_eq!(updated.asr_corrections.as_deref(), Some(&c[..]));
+        // Checked once: a second pass is ignored.
+        assert!(storage.apply_corrections("fix", fixed, Vec::new()).unwrap().is_none());
+        // A new transcript is unchecked again.
+        let again = storage
+            .update_meeting_segments("fix", vec![live_seg(1, "Van")], None)
+            .unwrap();
+        assert!(again.asr_corrections.is_none());
+        assert!(storage.apply_corrections("missing", Vec::new(), Vec::new()).unwrap().is_none());
+    }
+
+    #[test]
     fn test_auto_summary_labels() {
         assert!(is_auto_summary(None));
         assert!(is_auto_summary(Some("EchoMind Akıllı Özet")));
@@ -2476,6 +2564,7 @@ mod tests {
             summary_provider: provider.map(String::from),
             tags: None,
             transcript_pending: false,
+            asr_corrections: None,
         };
         let report = crate::summarizer::SummaryResult {
             meeting_goal: "Bütçe".into(),
@@ -2569,6 +2658,7 @@ mod tests {
             summary_provider: None,
             tags: None,
             transcript_pending: true,
+            asr_corrections: None,
         };
 
         // Auto summary (empty at save → generated from the partial transcript).

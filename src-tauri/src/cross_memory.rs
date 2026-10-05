@@ -303,6 +303,7 @@ mod tests {
                 summary_provider: None,
                 tags: None,
                 transcript_pending: false,
+                asr_corrections: None,
             },
             MeetingRecord {
                 id: "m-2".to_string(),
@@ -335,6 +336,7 @@ mod tests {
                 summary_provider: None,
                 tags: None,
                 transcript_pending: false,
+                asr_corrections: None,
             },
         ]
     }

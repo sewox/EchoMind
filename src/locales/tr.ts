@@ -57,6 +57,8 @@ export const tr: TranslationKeys = {
     hint: "Raporlar şu an basit özetleyiciyle hazırlanıyor. Daha doğru rapor için cihaz içi rapor modelini indirin ({size} GB).",
     openModelHub: "Modeli indir",
     generating: "Rapor cihazda hazırlanıyor… %{percent}",
+    corrected: "Düzeltildi",
+    correctedTitle: "Ses tanıma düzeltmesi: {changes}",
   },
   glossary: {
     title: "Özel Terimler",
