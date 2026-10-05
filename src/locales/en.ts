@@ -27,6 +27,9 @@ export const en: TranslationKeys = {
     storageUnlocking: "Opening secure storage…",
     storageUnlockHint:
       "Waiting for Keychain access. The window stays responsive; your history loads after you allow access.",
+    storageLocked: "Couldn't open secure storage",
+    storageLockedHint: "Keychain access was not allowed. Your meeting history was not deleted; it opens once you allow access.",
+    retry: "Try again",
     historyRecoveryNotice:
       "Previous encrypted history could not be opened in this version; backups were kept. New recordings are now protected with Keychain.",
   },
@@ -39,6 +42,15 @@ export const en: TranslationKeys = {
     settings: "Settings",
     modelHub: "Models",
     language: "Language",
+  },
+  glossary: {
+    title: "Custom Terms",
+    desc: "List company, product and people names or technical terms that transcription should recognize, one per line. Short, specific lists work best (up to 100 terms).",
+    placeholder: "SonicWall\nAcme Software\nJane Doe",
+    count: "{count} terms",
+    saved: "Saved",
+    error: "Could not save",
+    save: "Save",
   },
   importProgress: {
     decoding: "Reading the audio file…",
@@ -72,6 +84,32 @@ export const en: TranslationKeys = {
     backToLive: "Back to Live Session",
   },
   transcript: {
+    bar: {
+      retranscribe: {
+        label: "Re-transcribe",
+        hint: "Converts the recording to text again with another model or language.",
+      },
+      analytics: {
+        label: "Analytics",
+        hint: "Shows who spoke how much and how balanced the meeting was.",
+      },
+      copy: {
+        label: "Copy",
+        hint: "Copies the whole transcript to the clipboard.",
+      },
+      copied: {
+        label: "Copied",
+        hint: "The transcript is on the clipboard.",
+      },
+      followUp: {
+        label: "Follow-up",
+        hint: "Prepares the follow-up email, task list and calendar invite.",
+      },
+      export: {
+        label: "Export",
+        hint: "Saves or shares the report as PDF, Markdown, a Slack/Teams summary or JSON.",
+      },
+    },
     tabs: {
       stream: "Dialogue Stream",
       report: "Meeting Report",
@@ -123,7 +161,7 @@ export const en: TranslationKeys = {
     speaker: "Speaker",
     confidence: "Confidence",
     noRecordings: "No transcript recordings yet.",
-    smartRedaction: "✍️ Smart Redaction & Cleanup",
+    smartRedaction: "Smart Redaction & Cleanup",
     redacting: "Redacting...",
     noSearchResults: "No speech matches found for your search.",
     listeningLive: "Listening to speech, streaming live...",
@@ -157,7 +195,7 @@ export const en: TranslationKeys = {
       assigned: "{assignee}: {task}",
       overview: "Summary: {text}.",
     },
-    rebuildReport: "✨ Rebuild Report",
+    rebuildReport: "Rebuild Report",
     rebuilding: "Generating Report...",
     rebuildTooltip:
       "Generate a fresh AI executive summary from current dialogue",
@@ -457,6 +495,7 @@ export const en: TranslationKeys = {
     },
   },
   followUp: {
+    shortLabel: "Follow-up",
     modalTitle: "One-Click Follow-up Engine",
     modalSubtitle:
       "Instantly create professional follow-up emails, action item tables, and calendar invitations",

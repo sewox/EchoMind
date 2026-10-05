@@ -27,6 +27,10 @@ export const es: TranslationKeys = {
     storageUnlocking: "Abriendo almacenamiento seguro…",
     storageUnlockHint:
       "Esperando acceso al llavero. La ventana sigue respondiendo; el historial se carga tras permitir el acceso.",
+    storageLocked: "No se pudo abrir el almacenamiento seguro",
+    storageLockedHint:
+      "No se permitió el acceso al llavero. Su historial de reuniones no se eliminó; se abrirá cuando permita el acceso.",
+    retry: "Reintentar",
     historyRecoveryNotice:
       "No se pudo abrir el historial cifrado anterior en esta versión; se conservaron copias de seguridad. Las nuevas grabaciones ahora están protegidas con el llavero.",
   },
@@ -39,6 +43,15 @@ export const es: TranslationKeys = {
     settings: "Ajustes",
     modelHub: "Modelos",
     language: "Idioma",
+  },
+  glossary: {
+    title: "Términos personalizados",
+    desc: "Nombres de empresas, productos y personas o términos técnicos que la transcripción debe reconocer, uno por línea. Las listas cortas y precisas funcionan mejor (hasta 100 términos).",
+    placeholder: "SonicWall\nAcme Software\nAna García",
+    count: "{count} términos",
+    saved: "Guardado",
+    error: "No se pudo guardar",
+    save: "Guardar",
   },
   importProgress: {
     decoding: "Leyendo el archivo de audio…",
@@ -73,6 +86,32 @@ export const es: TranslationKeys = {
     backToLive: "Volver a la Sesión en Vivo",
   },
   transcript: {
+    bar: {
+      retranscribe: {
+        label: "Retranscribir",
+        hint: "Vuelve a convertir la grabación en texto con otro modelo o idioma.",
+      },
+      analytics: {
+        label: "Análisis",
+        hint: "Muestra quién habló cuánto y el equilibrio de la reunión.",
+      },
+      copy: {
+        label: "Copiar",
+        hint: "Copia toda la transcripción al portapapeles.",
+      },
+      copied: {
+        label: "Copiado",
+        hint: "La transcripción está en el portapapeles.",
+      },
+      followUp: {
+        label: "Seguimiento",
+        hint: "Prepara el correo de seguimiento, la lista de tareas y la invitación.",
+      },
+      export: {
+        label: "Exportar",
+        hint: "Guarda o comparte el informe como PDF, Markdown, resumen de Slack/Teams o JSON.",
+      },
+    },
     tabs: {
       stream: "Flujo de Diálogo",
       report: "Informe de Reunión",
@@ -121,7 +160,7 @@ export const es: TranslationKeys = {
     speaker: "Hablante",
     confidence: "Precisión",
     noRecordings: "Aún no hay grabaciones de conversación.",
-    smartRedaction: "✍️ Redacción y Corrección Inteligente",
+    smartRedaction: "Redacción y Corrección Inteligente",
     redacting: "Redactando...",
     noSearchResults:
       "No se encontraron conversaciones que coincidan con la búsqueda.",
@@ -158,7 +197,7 @@ export const es: TranslationKeys = {
       assigned: "{assignee}: {task}",
       overview: "Resumen: {text}.",
     },
-    rebuildReport: "✨ Recrear Informe",
+    rebuildReport: "Recrear Informe",
     rebuilding: "Generando informe...",
     rebuildTooltip:
       "Generar un nuevo resumen de IA a partir del diálogo actual",
@@ -458,6 +497,7 @@ export const es: TranslationKeys = {
     },
   },
   followUp: {
+    shortLabel: "Seguimiento",
     modalTitle: "One-Click Follow-up Engine",
     modalSubtitle:
       "Genere al instante correos de seguimiento, tablas de tareas y eventos de calendario",

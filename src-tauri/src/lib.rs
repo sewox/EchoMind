@@ -9,6 +9,7 @@ pub mod detector;
 pub mod diarization;
 pub mod dlp;
 pub mod encrypted_storage;
+pub mod glossary;
 pub mod hardware;
 pub mod import_progress;
 pub mod importer;
@@ -45,6 +46,7 @@ use detector::{
     check_active_meetings, get_detector_status, hide_island_window, show_island_window,
     show_main_window, start_meeting_detector, stop_meeting_detector, update_detector_settings,
 };
+use glossary::{get_glossary, set_glossary};
 use hardware::get_hardware_info;
 use import_progress::is_import_running;
 use importer::{
@@ -57,7 +59,7 @@ use player::{
 };
 use storage::{
     add_meeting_tag, delete_meeting_by_id, dismiss_history_recovery_notice, get_all_meetings,
-    get_all_tags, get_related_meetings, get_storage_ready, remove_meeting_tag,
+    get_all_tags, get_related_meetings, get_storage_ready, remove_meeting_tag, retry_storage_unlock,
     save_current_meeting, toggle_action_item_status, update_meeting_speaker_name,
     update_meeting_title,
 };
@@ -92,6 +94,8 @@ pub fn run() {
             tts::tts_resume,
             get_hardware_info,
             get_asr_engine,
+            get_glossary,
+            set_glossary,
             is_import_running,
             set_asr_engine,
             start_audio_capture,
@@ -112,6 +116,7 @@ pub fn run() {
             get_model_status,
             get_all_meetings,
             get_storage_ready,
+            retry_storage_unlock,
             dismiss_history_recovery_notice,
             save_current_meeting,
             enqueue_meeting_transcription,

@@ -27,6 +27,10 @@ export const de: TranslationKeys = {
     storageUnlocking: "Sicherer Speicher wird geöffnet…",
     storageUnlockHint:
       "Schlüsselbund-Zugriff wird erwartet. Das Fenster bleibt bedienbar; nach der Freigabe wird Ihr Verlauf geladen.",
+    storageLocked: "Sicherer Speicher konnte nicht geöffnet werden",
+    storageLockedHint:
+      "Der Schlüsselbund-Zugriff wurde nicht erlaubt. Ihr Besprechungsverlauf wurde nicht gelöscht; er öffnet sich, sobald Sie den Zugriff erlauben.",
+    retry: "Erneut versuchen",
     historyRecoveryNotice:
       "Der zuvor verschlüsselte Verlauf konnte in dieser Version nicht geöffnet werden; Sicherungen wurden behalten. Neue Aufnahmen sind jetzt über den Schlüsselbund geschützt.",
   },
@@ -39,6 +43,15 @@ export const de: TranslationKeys = {
     settings: "Einstellungen",
     modelHub: "Modelle",
     language: "Sprache",
+  },
+  glossary: {
+    title: "Eigene Begriffe",
+    desc: "Firmen-, Produkt- und Personennamen oder Fachbegriffe, die die Transkription erkennen soll, einer pro Zeile. Kurze, gezielte Listen funktionieren am besten (bis zu 100 Begriffe).",
+    placeholder: "SonicWall\nAcme Software\nErika Muster",
+    count: "{count} Begriffe",
+    saved: "Gespeichert",
+    error: "Speichern fehlgeschlagen",
+    save: "Speichern",
   },
   importProgress: {
     decoding: "Audiodatei wird gelesen…",
@@ -73,6 +86,32 @@ export const de: TranslationKeys = {
     backToLive: "Zurück zur Live-Sitzung",
   },
   transcript: {
+    bar: {
+      retranscribe: {
+        label: "Neu transkribieren",
+        hint: "Wandelt die Aufnahme mit einem anderen Modell oder einer anderen Sprache erneut in Text um.",
+      },
+      analytics: {
+        label: "Analyse",
+        hint: "Zeigt, wer wie viel gesprochen hat und wie ausgewogen das Meeting war.",
+      },
+      copy: {
+        label: "Kopieren",
+        hint: "Kopiert das gesamte Transkript in die Zwischenablage.",
+      },
+      copied: {
+        label: "Kopiert",
+        hint: "Das Transkript ist in der Zwischenablage.",
+      },
+      followUp: {
+        label: "Follow-up",
+        hint: "Erstellt Follow-up-E-Mail, Aufgabenliste und Kalendereinladung.",
+      },
+      export: {
+        label: "Exportieren",
+        hint: "Speichert oder teilt den Bericht als PDF, Markdown, Slack/Teams-Zusammenfassung oder JSON.",
+      },
+    },
     tabs: {
       stream: "Dialogverlauf",
       report: "Meeting-Bericht",
@@ -121,7 +160,7 @@ export const de: TranslationKeys = {
     speaker: "Sprecher",
     confidence: "Genauigkeit",
     noRecordings: "Noch keine Gesprächsaufnahmen vorhanden.",
-    smartRedaction: "✍️ Intelligente Redaktion & Korrektur",
+    smartRedaction: "Intelligente Redaktion & Korrektur",
     redacting: "Wird redigiert...",
     noSearchResults: "Keine passenden Gespräche gefunden.",
     listeningLive: "Live-Zuhören aktiv, Text erscheint gleich...",
@@ -156,7 +195,7 @@ export const de: TranslationKeys = {
       assigned: "{assignee}: {task}",
       overview: "Zusammenfassung: {text}.",
     },
-    rebuildReport: "✨ Bericht Neu Erstellen",
+    rebuildReport: "Bericht Neu Erstellen",
     rebuilding: "Bericht wird erstellt...",
     rebuildTooltip: "Erstellen Sie eine neue KI-Zusammenfassung aus dem Dialog",
     changeModelAndRetranscribe: "Modell Wechseln & Neu Transkribieren",
@@ -455,6 +494,7 @@ export const de: TranslationKeys = {
     },
   },
   followUp: {
+    shortLabel: "Follow-up",
     modalTitle: "One-Click Follow-up Engine",
     modalSubtitle:
       "Erstellen Sie professionelle Follow-up-E-Mails, Aufgabenlisten und Kalendereinladungen mit einem Klick",

@@ -23,6 +23,7 @@ import {
   Layers,
   Zap,
   Volume2,
+  ShieldAlert,
 } from "lucide-react";
 import {
   TranscriptViewer,
@@ -143,10 +144,17 @@ export interface RelatedMeetingItem {
 
 import { getTagColorClass } from "./components/transcript/MeetingTagsBar";
 
+const SIDEBAR_TAG_LIMIT = 6;
+
 export function App() {
   const { t, language, setLanguage } = useI18n();
   const { isParanoid } = usePrivacyMode();
-  const { ready: storageReady, showHistoryRecoveryNotice } = useStorageReady();
+  const {
+    ready: storageReady,
+    showHistoryRecoveryNotice,
+    locked: storageLocked,
+    retry: retryStorageUnlock,
+  } = useStorageReady();
   const { visible: historyRecoveryVisible, dismiss: dismissHistoryRecovery } =
     useHistoryRecoveryNotice(showHistoryRecoveryNotice);
   const [hardware, setHardware] = useState<HardwareInfo | null>(null);
@@ -193,6 +201,17 @@ export function App() {
   } = useMeetingManager(storageReady);
 
   const { getJob, enqueueRetranscribe } = useTranscriptionJobs(storageReady);
+
+  // The sidebar shows a few tags; the rest wait behind "+N" so the row
+  // wraps instead of scrolling sideways.
+  const [showAllTags, setShowAllTags] = useState(false);
+  const shownTags =
+    showAllTags || allAvailableTags.length <= SIDEBAR_TAG_LIMIT
+      ? allAvailableTags
+      : allAvailableTags.filter(
+          (tag, i) => i < SIDEBAR_TAG_LIMIT || tag === selectedTag,
+        );
+  const hiddenTagCount = allAvailableTags.length - shownTags.length;
 
   const jobStateLabel = useCallback(
     (state: TranscriptionJobState | undefined, error?: string | null) => {
@@ -986,13 +1005,34 @@ export function App() {
           data-testid="storage-unlock-overlay"
         >
           <div className="flex flex-col items-center gap-2 px-7 py-5 rounded-2xl bg-slate-900/95 border border-slate-700 shadow-2xl text-white max-w-sm mx-4 text-center">
-            <Loader2 className="w-6 h-6 animate-spin text-cyan-400" />
-            <span className="text-sm font-medium">
-              {t("common.storageUnlocking")}
-            </span>
-            <span className="text-[11px] text-slate-400 leading-relaxed">
-              {t("common.storageUnlockHint")}
-            </span>
+            {storageLocked ? (
+              <>
+                <ShieldAlert className="w-6 h-6 text-amber-400" />
+                <span className="text-sm font-medium">
+                  {t("common.storageLocked")}
+                </span>
+                <span className="text-[11px] text-slate-400 leading-relaxed">
+                  {t("common.storageLockedHint")}
+                </span>
+                <button
+                  type="button"
+                  onClick={retryStorageUnlock}
+                  className="mt-2 px-4 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-medium"
+                >
+                  {t("common.retry")}
+                </button>
+              </>
+            ) : (
+              <>
+                <Loader2 className="w-6 h-6 animate-spin text-cyan-400" />
+                <span className="text-sm font-medium">
+                  {t("common.storageUnlocking")}
+                </span>
+                <span className="text-[11px] text-slate-400 leading-relaxed">
+                  {t("common.storageUnlockHint")}
+                </span>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -1296,21 +1336,6 @@ export function App() {
               </button>
             </div>
 
-            {/* AI Assistant Quick Trigger */}
-            <button
-              onClick={() => setIsGlobalAssistantOpen(true)}
-              className="w-full px-3 py-2 rounded-xl bg-gradient-to-r from-cyan-950/60 to-blue-950/60 hover:from-cyan-900/60 hover:to-blue-900/60 border border-cyan-500/30 hover:border-cyan-500/50 text-xs text-cyan-200 font-medium transition flex items-center justify-between group shadow-sm"
-              title={t("assistant.subtitle")}
-            >
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-3.5 h-3.5 text-amber-400 group-hover:scale-110 transition" />
-                <span>{t("assistant.title")}</span>
-              </div>
-              <span className="text-[10px] text-cyan-400/80 font-mono bg-cyan-900/40 px-1.5 py-0.5 rounded border border-cyan-500/20">
-                ⌘K
-              </span>
-            </button>
-
             {/* Real-time Search Box */}
             <div className="relative">
               <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-500" />
@@ -1333,7 +1358,7 @@ export function App() {
 
             {/* Tag Filter Pills */}
             {allAvailableTags.length > 0 && (
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+              <div className="flex flex-wrap items-center gap-1.5">
                 <button
                   type="button"
                   onClick={() => setSelectedTag(null)}
@@ -1345,7 +1370,7 @@ export function App() {
                 >
                   {t("tags.allTags") || "Tümü"}
                 </button>
-                {allAvailableTags.map((tName) => {
+                {shownTags.map((tName) => {
                   const isSelected = selectedTag === tName;
                   const colors = getTagColorClass(tName);
                   return (
@@ -1363,6 +1388,22 @@ export function App() {
                     </button>
                   );
                 })}
+                {(hiddenTagCount > 0 || showAllTags) &&
+                  allAvailableTags.length > SIDEBAR_TAG_LIMIT && (
+                    <button
+                      type="button"
+                      onClick={() => setShowAllTags((v) => !v)}
+                      aria-expanded={showAllTags}
+                      aria-label={
+                        showAllTags
+                          ? "Etiketleri daralt"
+                          : "Tüm etiketleri göster"
+                      }
+                      className="shrink-0 px-2 py-1 rounded-lg text-[11px] font-medium text-slate-400 hover:text-slate-200 border border-transparent hover:border-slate-800 transition"
+                    >
+                      {showAllTags ? "−" : `+${hiddenTagCount}`}
+                    </button>
+                  )}
               </div>
             )}
 

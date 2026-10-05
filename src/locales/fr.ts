@@ -27,6 +27,10 @@ export const fr: TranslationKeys = {
     storageUnlocking: "Ouverture du stockage sécurisé…",
     storageUnlockHint:
       "En attente de l'accès au trousseau. La fenêtre reste réactive ; votre historique se charge après autorisation.",
+    storageLocked: "Impossible d'ouvrir le stockage sécurisé",
+    storageLockedHint:
+      "L'accès au trousseau n'a pas été autorisé. Votre historique n'a pas été supprimé ; il s'ouvrira dès que vous autoriserez l'accès.",
+    retry: "Réessayer",
     historyRecoveryNotice:
       "L'historique chiffré précédent n'a pas pu être ouvert dans cette version ; des sauvegardes ont été conservées. Les nouveaux enregistrements sont désormais protégés par le trousseau.",
   },
@@ -39,6 +43,15 @@ export const fr: TranslationKeys = {
     settings: "Paramètres",
     modelHub: "Modèles",
     language: "Langue",
+  },
+  glossary: {
+    title: "Termes personnalisés",
+    desc: "Noms d'entreprises, de produits et de personnes ou termes techniques que la transcription doit reconnaître, un par ligne. Les listes courtes et précises fonctionnent le mieux (100 termes max.).",
+    placeholder: "SonicWall\nAcme Logiciels\nMarie Dupont",
+    count: "{count} termes",
+    saved: "Enregistré",
+    error: "Échec de l'enregistrement",
+    save: "Enregistrer",
   },
   importProgress: {
     decoding: "Lecture du fichier audio…",
@@ -72,6 +85,32 @@ export const fr: TranslationKeys = {
     backToLive: "Retour au Direct",
   },
   transcript: {
+    bar: {
+      retranscribe: {
+        label: "Retranscrire",
+        hint: "Reconvertit l’enregistrement en texte avec un autre modèle ou une autre langue.",
+      },
+      analytics: {
+        label: "Analyse",
+        hint: "Montre qui a parlé combien et l’équilibre de la réunion.",
+      },
+      copy: {
+        label: "Copier",
+        hint: "Copie toute la transcription dans le presse-papiers.",
+      },
+      copied: {
+        label: "Copié",
+        hint: "La transcription est dans le presse-papiers.",
+      },
+      followUp: {
+        label: "Suivi",
+        hint: "Prépare l’e-mail de suivi, la liste des tâches et l’invitation.",
+      },
+      export: {
+        label: "Exporter",
+        hint: "Enregistre ou partage le rapport en PDF, Markdown, résumé Slack/Teams ou JSON.",
+      },
+    },
     tabs: {
       stream: "Flux de Dialogue",
       report: "Rapport de Réunion",
@@ -120,7 +159,7 @@ export const fr: TranslationKeys = {
     speaker: "Intervenant",
     confidence: "Précision",
     noRecordings: "Aucun enregistrement de conversation pour le moment.",
-    smartRedaction: "✍️ Rédaction & Correction Intelligente",
+    smartRedaction: "Rédaction & Correction Intelligente",
     redacting: "Rédaction en cours...",
     noSearchResults: "Aucune conversation trouvée pour cette recherche.",
     listeningLive: "Écoute en direct en cours...",
@@ -155,7 +194,7 @@ export const fr: TranslationKeys = {
       assigned: "{assignee} : {task}",
       overview: "Résumé : {text}.",
     },
-    rebuildReport: "✨ Recréer le Rapport",
+    rebuildReport: "Recréer le Rapport",
     rebuilding: "Génération du rapport...",
     rebuildTooltip: "Générer un nouveau résumé IA à partir des dialogues",
     changeModelAndRetranscribe: "Changer de Modèle & Retranscrire",
@@ -454,6 +493,7 @@ export const fr: TranslationKeys = {
     },
   },
   followUp: {
+    shortLabel: "Suivi",
     modalTitle: "One-Click Follow-up Engine",
     modalSubtitle:
       "Générez instantanément des e-mails de suivi, des tableaux d'actions et des invitations calendrier",

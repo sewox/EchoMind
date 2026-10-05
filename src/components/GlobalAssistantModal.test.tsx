@@ -167,7 +167,7 @@ describe("GlobalAssistantModal Component", () => {
     );
 
     // Switch to Search Tab
-    const searchTab = screen.getByRole("button", { name: /Ara\.\.\./i });
+    const searchTab = screen.getByRole("tab", { name: /^Ara$/i });
     await act(async () => {
       fireEvent.click(searchTab);
     });
@@ -183,12 +183,12 @@ describe("GlobalAssistantModal Component", () => {
     ).toBeInTheDocument();
 
     // Filter by Decision pill
-    const decisionPill = screen.getByRole("button", { name: /⚡ Kararlar/i });
+    const decisionPill = screen.getByRole("button", { name: /^Kararlar$/i });
     fireEvent.click(decisionPill);
 
     // Filter by Action Items pill
     const actionPill = screen.getByRole("button", {
-      name: /✅ Eylem Maddeleri/i,
+      name: /^Eylem Maddeleri$/i,
     });
     fireEvent.click(actionPill);
 
@@ -206,7 +206,7 @@ describe("GlobalAssistantModal Component", () => {
     expect(defaultProps.onSelectMeeting).toHaveBeenCalledWith("mtg-001");
 
     // Switch back to Chat Tab
-    const chatTab = screen.getByRole("button", {
+    const chatTab = screen.getByRole("tab", {
       name: /EchoMind Akıllı Asistan/i,
     });
     fireEvent.click(chatTab);
@@ -359,7 +359,7 @@ describe("GlobalAssistantModal Component", () => {
     );
 
     // Switch to search tab
-    const searchTab = screen.getByRole("button", { name: /Ara\.\.\./i });
+    const searchTab = screen.getByRole("tab", { name: /^Ara$/i });
     fireEvent.click(searchTab);
 
     // Verify memory stats banner rendered
@@ -418,7 +418,7 @@ describe("GlobalAssistantModal Component", () => {
     );
 
     // Switch to search tab
-    const searchTab = screen.getByRole("button", { name: /Ara\.\.\./i });
+    const searchTab = screen.getByRole("tab", { name: /^Ara$/i });
     fireEvent.click(searchTab);
 
     const searchInput = screen.getByPlaceholderText(/Tüm toplantı başlıkları/i);

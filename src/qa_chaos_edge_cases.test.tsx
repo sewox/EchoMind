@@ -55,14 +55,14 @@ describe("Senior QA Edge-Case & Chaos / Monkey Testing Suite", () => {
       );
 
       // Tab switching should never crash
-      const reportTab = screen.getByRole("button", {
+      const reportTab = screen.getByRole("tab", {
         name: /Toplantı Raporu/i,
       });
       await act(async () => {
         fireEvent.click(reportTab);
       });
 
-      const tasksTab = screen.queryByRole("button", {
+      const tasksTab = screen.queryByRole("tab", {
         name: /Görevler & Kararlar/i,
       });
       if (tasksTab) {
@@ -212,7 +212,7 @@ describe("Senior QA Edge-Case & Chaos / Monkey Testing Suite", () => {
       );
 
       // Switch to search tab
-      const searchTab = screen.getByRole("button", { name: /Ara\.\.\./i });
+      const searchTab = screen.getByRole("tab", { name: /^Ara$/i });
       fireEvent.click(searchTab);
 
       const searchInput = screen.getByPlaceholderText(
@@ -305,11 +305,11 @@ describe("Senior QA Edge-Case & Chaos / Monkey Testing Suite", () => {
         </I18nProvider>,
       );
 
-      const streamTab = screen.getByRole("button", { name: /Konuşma Akışı/i });
-      const reportTab = screen.getByRole("button", {
+      const streamTab = screen.getByRole("tab", { name: /Konuşma Akışı/i });
+      const reportTab = screen.getByRole("tab", {
         name: /Toplantı Raporu/i,
       });
-      const tasksTab = screen.getByRole("button", {
+      const tasksTab = screen.getByRole("tab", {
         name: /Görevler & Kararlar/i,
       });
 
@@ -392,7 +392,7 @@ describe("Senior QA Edge-Case & Chaos / Monkey Testing Suite", () => {
 
       // 3. Analytics button with backend error
       const analyticsBtn = screen.queryByRole("button", {
-        name: /Katılımcı & Toplantı Analitiği/i,
+        name: /^Analitik$/,
       });
       if (analyticsBtn) {
         await act(async () => {
