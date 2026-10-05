@@ -70,12 +70,9 @@ pub struct StorageEngine {
     pub meetings: Arc<Mutex<Vec<MeetingRecord>>>,
 }
 
-// These helpers back the release-build branch of `resolve_persistent_dir` below
-// (excluded from dev/`debug_assertions` builds, since those keep the old
-// CWD-relative behavior) but are directly unit-tested, hence `any(test, ...)`.
-#[cfg(any(test, not(debug_assertions)))]
+// These helpers back `resolve_persistent_dir` below: release builds use the
+// OS app directory, dev builds a `.dev` sibling of it for their data.
 const APP_DIR_NAME: &str = "echomind";
-#[cfg(any(test, not(debug_assertions)))]
 const APP_BUNDLE_ID: &str = "com.echomind.assistant";
 
 /// Computes the OS-standard, per-user, CWD-independent app data root for the given
@@ -85,7 +82,6 @@ const APP_BUNDLE_ID: &str = "com.echomind.assistant";
 /// Rust's parallel test runner). Returns None if the platform's expected env var
 /// isn't set (essentially never on a real desktop install) or the platform isn't
 /// one of the three we ship to — callers fall back to legacy CWD-relative behavior.
-#[cfg(any(test, not(debug_assertions)))]
 fn os_standard_app_root_for(
     target_os: &str,
     get_env: &dyn Fn(&str) -> Option<String>,
@@ -113,7 +109,7 @@ fn os_standard_app_root_for(
     }
 }
 
-#[cfg(all(not(test), not(debug_assertions)))]
+#[cfg(not(test))]
 fn os_standard_app_root() -> Option<PathBuf> {
     let target_os = std::env::consts::OS;
     os_standard_app_root_for(target_os, &|key| std::env::var(key).ok())
@@ -135,7 +131,6 @@ fn legacy_cwd_relative_dir(subdir: &str) -> PathBuf {
     PathBuf::from(subdir)
 }
 
-#[cfg(any(test, not(debug_assertions)))]
 fn copy_dir_recursive(src: &std::path::Path, dst: &std::path::Path) -> std::io::Result<()> {
     fs::create_dir_all(dst)?;
     for entry in fs::read_dir(src)? {
@@ -157,7 +152,6 @@ fn copy_dir_recursive(src: &std::path::Path, dst: &std::path::Path) -> std::io::
 /// never deleted or modified — so a bug here can never lose data, at worst it
 /// leaves the user exactly where they'd be without migration (a fresh, empty
 /// `new_dir`).
-#[cfg(any(test, not(debug_assertions)))]
 fn migrate_legacy_dir_if_present(new_dir: &std::path::Path, candidates: Vec<PathBuf>) {
     if new_dir.exists() {
         return;
@@ -189,9 +183,9 @@ fn migrate_legacy_dir_if_present(new_dir: &std::path::Path, candidates: Vec<Path
 /// `cargo run` / `cargo tauri dev`) and the candidate legacy locations to try
 /// migrating from on a release build's first run. Strategy per build context:
 /// - test: an isolated temp directory — tests must never touch real user/dev state.
-/// - dev: `dev_dir()`, unchanged from the previous CWD-relative behavior — keeps
-///   the existing developer workflow (e.g. the committed demo `data/` fixture, or
-///   models already sitting in `src-tauri/models/`) working exactly as before.
+/// - dev: `dev_dir()` — for data a `.dev` sibling of the OS app directory
+///   (outside the repository, see `dev_data_dir`); models stay in
+///   `src-tauri/models/`, which git never tracks.
 /// - release (what actually ships to users): a stable, OS-standard, per-user
 ///   directory instead of the process's CWD, which is unpredictable for a
 ///   packaged app (desktop icon vs terminal vs launcher) and can be entirely
@@ -236,10 +230,43 @@ fn exe_relative_candidate(subdir: &str) -> Option<PathBuf> {
         .and_then(|exe| exe.parent().map(|dir| dir.join(subdir)))
 }
 
+/// `<app root>.dev` next to the release app's directory: dev builds get their
+/// own data, apart from the installed app's.
+fn dev_variant_of(app_root: &std::path::Path) -> PathBuf {
+    let name = app_root
+        .file_name()
+        .map(|n| format!("{}.dev", n.to_string_lossy()))
+        .unwrap_or_else(|| "echomind.dev".to_string());
+    app_root.with_file_name(name)
+}
+
+/// Dev builds keep their data OUTSIDE the repository. It used to live in the
+/// repo's `data/`: checking out an old commit that still tracked
+/// `data/meetings_history.json` silently overwrote a developer's history, and
+/// moving back to a newer commit then deleted it. The first dev run copies the
+/// old `data/` over (copy only; nothing is deleted).
+#[cfg(all(not(test), debug_assertions))]
+fn dev_data_dir() -> PathBuf {
+    let legacy = legacy_cwd_relative_dir("data");
+    match os_standard_app_root() {
+        Some(root) => {
+            let dir = dev_variant_of(&root).join("data");
+            migrate_legacy_dir_if_present(&dir, vec![legacy]);
+            dir
+        }
+        None => legacy,
+    }
+}
+
+#[cfg(any(test, not(debug_assertions)))]
+fn dev_data_dir() -> PathBuf {
+    legacy_cwd_relative_dir("data")
+}
+
 pub fn get_storage_dir() -> PathBuf {
     resolve_persistent_dir(
         "data",
-        || legacy_cwd_relative_dir("data"),
+        dev_data_dir,
         || {
             let mut candidates = vec![legacy_cwd_relative_dir("data")];
             candidates.extend(exe_relative_candidate("data"));
@@ -1586,6 +1613,17 @@ pub fn get_all_tags() -> Result<Vec<String>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn dev_data_lives_next_to_the_app_directory() {
+        let mac = PathBuf::from("/Users/u/Library/Application Support/com.echomind.assistant");
+        assert_eq!(
+            dev_variant_of(&mac),
+            PathBuf::from("/Users/u/Library/Application Support/com.echomind.assistant.dev")
+        );
+        let win = PathBuf::from("C:/Users/u/AppData/Roaming/echomind");
+        assert_eq!(dev_variant_of(&win), PathBuf::from("C:/Users/u/AppData/Roaming/echomind.dev"));
+    }
 
     fn env_map(pairs: &[(&str, &str)]) -> impl Fn(&str) -> Option<String> {
         let pairs: Vec<(String, String)> = pairs

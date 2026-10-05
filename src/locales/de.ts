@@ -44,6 +44,15 @@ export const de: TranslationKeys = {
     modelHub: "Modelle",
     language: "Sprache",
   },
+  glossary: {
+    title: "Eigene Begriffe",
+    desc: "Firmen-, Produkt- und Personennamen oder Fachbegriffe, die die Transkription erkennen soll, einer pro Zeile. Kurze, gezielte Listen funktionieren am besten (bis zu 100 Begriffe).",
+    placeholder: "SonicWall\nAcme Software\nErika Muster",
+    count: "{count} Begriffe",
+    saved: "Gespeichert",
+    error: "Speichern fehlgeschlagen",
+    save: "Speichern",
+  },
   importProgress: {
     decoding: "Audiodatei wird gelesen…",
     transcribing: "Wird transkribiert…",

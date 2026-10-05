@@ -44,6 +44,15 @@ export const tr: TranslationKeys = {
     modelHub: "Modeller",
     language: "Dil Seçimi",
   },
+  glossary: {
+    title: "Özel Terimler",
+    desc: "Yazıya dökmenin tanıması gereken şirket, ürün ve kişi adlarını veya teknik terimleri her satıra bir tane yazın. Kısa ve isabetli liste en iyi sonucu verir (en fazla 100 terim).",
+    placeholder: "SonicWall\nAcme Yazılım\nAyşe Yılmaz",
+    count: "{count} terim",
+    saved: "Kaydedildi",
+    error: "Kaydedilemedi",
+    save: "Kaydet",
+  },
   importProgress: {
     decoding: "Ses dosyası okunuyor…",
     transcribing: "Yazıya dökülüyor…",

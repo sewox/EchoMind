@@ -39,6 +39,15 @@ export interface TranslationKeys {
     modelHub: string;
     language: string;
   };
+  glossary: {
+    title: string;
+    desc: string;
+    placeholder: string;
+    count: string;
+    saved: string;
+    error: string;
+    save: string;
+  };
   importProgress: {
     decoding: string;
     transcribing: string;
