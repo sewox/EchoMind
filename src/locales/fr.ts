@@ -40,6 +40,15 @@ export const fr: TranslationKeys = {
     modelHub: "Modèles",
     language: "Langue",
   },
+  glossary: {
+    title: "Termes personnalisés",
+    desc: "Noms d'entreprises, de produits et de personnes ou termes techniques que la transcription doit reconnaître, un par ligne. Les listes courtes et précises fonctionnent le mieux (100 termes max.).",
+    placeholder: "SonicWall\nAcme Logiciels\nMarie Dupont",
+    count: "{count} termes",
+    saved: "Enregistré",
+    error: "Échec de l'enregistrement",
+    save: "Enregistrer",
+  },
   importProgress: {
     decoding: "Lecture du fichier audio…",
     transcribing: "Transcription…",

@@ -40,6 +40,15 @@ export const en: TranslationKeys = {
     modelHub: "Models",
     language: "Language",
   },
+  glossary: {
+    title: "Custom Terms",
+    desc: "List company, product and people names or technical terms that transcription should recognize, one per line. Short, specific lists work best (up to 100 terms).",
+    placeholder: "SonicWall\nAcme Software\nJane Doe",
+    count: "{count} terms",
+    saved: "Saved",
+    error: "Could not save",
+    save: "Save",
+  },
   importProgress: {
     decoding: "Reading the audio file…",
     transcribing: "Transcribing…",
