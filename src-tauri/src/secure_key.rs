@@ -27,6 +27,11 @@ pub const CREDENTIAL_VAULT_FALLBACK: &str = "vault.key";
 /// Stable error / IPC sentinel while Keychain (or other keystore) I/O is in flight.
 pub const STORAGE_NOT_READY: &str = "storage_not_ready";
 
+/// Stable error / IPC sentinel when the keystore refused access (denied or
+/// dismissed prompt, locked keychain): nothing is decrypted or written until
+/// the user retries.
+pub const STORAGE_LOCKED: &str = "storage_locked";
+
 /// Unlock lifecycle for OS keystore reads that may block (macOS Keychain prompt).
 /// Kept off the UI/main thread via [`crate::storage::start_storage_unlock`].
 #[repr(u8)]
@@ -38,6 +43,9 @@ pub enum KeyUnlockPhase {
     InProgress = 1,
     /// Keys are cached and encrypted storage may be used.
     Ready = 2,
+    /// The keystore refused access. No key was created; storage stays closed
+    /// until [`begin_key_unlock`] is called again (retry).
+    Locked = 3,
 }
 
 fn unlock_phase_cell() -> &'static AtomicU8 {
@@ -79,6 +87,7 @@ pub fn key_unlock_phase() -> KeyUnlockPhase {
     match unlock_phase_cell().load(Ordering::SeqCst) {
         x if x == KeyUnlockPhase::InProgress as u8 => KeyUnlockPhase::InProgress,
         x if x == KeyUnlockPhase::Ready as u8 => KeyUnlockPhase::Ready,
+        x if x == KeyUnlockPhase::Locked as u8 => KeyUnlockPhase::Locked,
         _ => KeyUnlockPhase::NotStarted,
     }
 }
@@ -92,16 +101,30 @@ pub fn is_key_unlock_in_progress() -> bool {
 }
 
 /// Mark unlock as in-flight so encrypt/decrypt paths refuse to block on Keychain.
-/// Returns false if unlock was already started or completed.
+/// Returns false if unlock is already in flight or completed; a locked unlock
+/// may start again (retry).
 pub fn begin_key_unlock() -> bool {
-    unlock_phase_cell()
-        .compare_exchange(
-            KeyUnlockPhase::NotStarted as u8,
-            KeyUnlockPhase::InProgress as u8,
-            Ordering::SeqCst,
-            Ordering::SeqCst,
-        )
-        .is_ok()
+    [KeyUnlockPhase::NotStarted, KeyUnlockPhase::Locked]
+        .iter()
+        .any(|from| {
+            unlock_phase_cell()
+                .compare_exchange(
+                    *from as u8,
+                    KeyUnlockPhase::InProgress as u8,
+                    Ordering::SeqCst,
+                    Ordering::SeqCst,
+                )
+                .is_ok()
+        })
+}
+
+pub fn is_key_unlock_locked() -> bool {
+    key_unlock_phase() == KeyUnlockPhase::Locked
+}
+
+/// The keystore refused access: storage stays closed until a retry.
+pub fn mark_keys_locked() {
+    unlock_phase_cell().store(KeyUnlockPhase::Locked as u8, Ordering::SeqCst);
 }
 
 pub fn mark_keys_ready() {
@@ -129,7 +152,10 @@ pub fn resolve_key_nonblocking(account: &str, fallback_filename: &str) -> Result
     if is_key_unlock_in_progress() {
         return Err(STORAGE_NOT_READY.to_string());
     }
-    Ok(get_or_create_key(account, fallback_filename))
+    if is_key_unlock_locked() {
+        return Err(STORAGE_LOCKED.to_string());
+    }
+    try_get_or_create_key(account, fallback_filename)
 }
 
 #[cfg(test)]
@@ -659,12 +685,17 @@ fn is_managed_account(account: &str) -> bool {
 
 /// Resolve and cache both managed encryption keys, preferring a single keystore item.
 /// Returns the data-at-rest key source (used for history-recovery UI).
+///
+/// `Err` when the keystore holds (or may hold) keys it would not hand over —
+/// a denied or dismissed prompt, a locked keychain. No key is created then:
+/// a fresh key cannot open the existing history, and the app used to start
+/// with an empty history and set the real one aside as `.corrupt-*`.
 #[cfg(not(test))]
-pub fn prime_encryption_keys() -> KeySource {
+pub fn prime_encryption_keys() -> Result<KeySource, String> {
     if try_get_cached_key(DATA_AT_REST_ACCOUNT).is_some()
         && try_get_cached_key(CREDENTIAL_VAULT_ACCOUNT).is_some()
     {
-        return KeySource::Keychain;
+        return Ok(KeySource::Keychain);
     }
 
     if !keystore_is_persistent() {
@@ -677,7 +708,7 @@ pub fn prime_encryption_keys() -> KeySource {
         cache_key(CREDENTIAL_VAULT_ACCOUNT, vault);
         log_key_source_once(DATA_AT_REST_ACCOUNT, KeySource::FallbackFile);
         log_key_source_once(CREDENTIAL_VAULT_ACCOUNT, KeySource::FallbackFile);
-        return KeySource::FallbackFile;
+        return Ok(KeySource::FallbackFile);
     }
 
     let ks = OsKeystore;
@@ -690,35 +721,27 @@ pub fn prime_encryption_keys() -> KeySource {
             cache_bundle(&success.bundle);
             log_key_source_once(DATA_AT_REST_ACCOUNT, success.data_source);
             log_key_source_once(CREDENTIAL_VAULT_ACCOUNT, success.vault_source);
-            success.data_source
+            Ok(success.data_source)
         }
         Err(reason) => {
-            // Migration aborted (e.g. user denied one legacy prompt). Do not touch
-            // legacy entries; resolve each account with the pre-unification path.
+            // The keystore would not hand over an entry that exists or may
+            // exist. Never fall back to creating keys here (see above).
             eprintln!(
-                "⚠️ Unified key migration aborted ({reason}). Leaving legacy keystore \
-                 entries intact; resolving each key independently."
+                "⚠️ Keychain access refused ({reason}). No key created; secure storage stays \
+                 locked until retried."
             );
-            let (data, data_source) =
-                resolve_single_account(DATA_AT_REST_ACCOUNT, DATA_AT_REST_FALLBACK);
-            let (vault, vault_source) =
-                resolve_single_account(CREDENTIAL_VAULT_ACCOUNT, CREDENTIAL_VAULT_FALLBACK);
-            cache_key(DATA_AT_REST_ACCOUNT, data);
-            cache_key(CREDENTIAL_VAULT_ACCOUNT, vault);
-            log_key_source_once(DATA_AT_REST_ACCOUNT, data_source);
-            log_key_source_once(CREDENTIAL_VAULT_ACCOUNT, vault_source);
-            data_source
+            Err(reason)
         }
     }
 }
 
 #[cfg(test)]
-pub fn prime_encryption_keys() -> KeySource {
+pub fn prime_encryption_keys() -> Result<KeySource, String> {
     let data = get_or_create_fallback_key(DATA_AT_REST_FALLBACK);
     let vault = get_or_create_fallback_key(CREDENTIAL_VAULT_FALLBACK);
     cache_key(DATA_AT_REST_ACCOUNT, data);
     cache_key(CREDENTIAL_VAULT_ACCOUNT, vault);
-    KeySource::FallbackFile
+    Ok(KeySource::FallbackFile)
 }
 
 /// Returns a stable, per-installation 256-bit key for the given logical purpose
@@ -760,33 +783,25 @@ pub fn get_or_create_key_with_source(
     (key, KeySource::FallbackFile)
 }
 
+/// Resolves (and caches) a key. Managed accounts come from the single
+/// keystore item; when the keystore refuses access this is an error — never a
+/// newly created key that cannot open existing data.
 #[cfg(not(test))]
-pub fn get_or_create_key(account: &str, fallback_filename: &str) -> [u8; 32] {
-    get_or_create_key_with_source(account, fallback_filename).0
+pub fn try_get_or_create_key(account: &str, fallback_filename: &str) -> Result<[u8; 32], String> {
+    if let Some(key) = try_get_cached_key(account) {
+        return Ok(key);
+    }
+    if is_managed_account(account) {
+        prime_encryption_keys()?;
+        return try_get_cached_key(account)
+            .ok_or_else(|| format!("key for '{account}' missing after unlock"));
+    }
+    Ok(resolve_single_account(account, fallback_filename).0)
 }
 
-/// Same as [`get_or_create_key`] but also returns where the key came from.
-/// Results are cached so subsequent calls never re-enter the OS keystore.
-#[cfg(not(test))]
-pub fn get_or_create_key_with_source(
-    account: &str,
-    fallback_filename: &str,
-) -> ([u8; 32], KeySource) {
-    if let Some(key) = try_get_cached_key(account) {
-        // Source for a cache hit is not re-derived; treat as keychain-equivalent
-        // for logging silence (log_key_source_once already fired on first resolve).
-        return (key, KeySource::Keychain);
-    }
-
-    if is_managed_account(account) {
-        let source = prime_encryption_keys();
-        if let Some(key) = try_get_cached_key(account) {
-            return (key, source);
-        }
-        // Should be unreachable after prime; fall through to independent resolve.
-    }
-
-    resolve_single_account(account, fallback_filename)
+#[cfg(test)]
+pub fn try_get_or_create_key(account: &str, fallback_filename: &str) -> Result<[u8; 32], String> {
+    Ok(get_or_create_key(account, fallback_filename))
 }
 
 /// Pre-unification per-account keystore resolve (also used when unified migration aborts).
@@ -1225,6 +1240,48 @@ mod tests {
         assert_eq!(k1, k2);
         assert_eq!(try_get_cached_key(&account), Some(k1));
         let _ = fs::remove_file(fallback_key_path(&fallback));
+        reset_key_unlock_state_for_test();
+    }
+
+    /// A denied/dismissed Keychain prompt on the existing master_key used to
+    /// end in fresh keys and an empty history (real data set aside as
+    /// `.corrupt-*`). The migration must fail and write nothing.
+    #[test]
+    fn test_denied_master_key_creates_and_writes_nothing() {
+        let bundle = KeyBundle {
+            data_at_rest: random_key(),
+            credential_vault: random_key(),
+        };
+        let ks = MockKeystore::with_unified(&bundle);
+        ks.denied.borrow_mut().insert(MASTER_KEY_ACCOUNT.to_string());
+        let before = ks.entries.borrow().clone();
+
+        assert!(execute_unified_migration(&ks, None, None).is_err());
+        assert_eq!(*ks.entries.borrow(), before, "keystore must be untouched");
+        assert_eq!(ks.get_count(DATA_AT_REST_ACCOUNT), 0, "no legacy fallback reads");
+    }
+
+    #[test]
+    fn test_locked_unlock_refuses_keys_and_storage_until_retried() {
+        let _lock = key_unlock_test_lock()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        reset_key_unlock_state_for_test();
+        let account = "locked_test_account";
+        assert!(begin_key_unlock());
+        mark_keys_locked();
+        assert!(is_key_unlock_locked());
+        assert_eq!(
+            resolve_key_nonblocking(account, "locked_test.key").unwrap_err(),
+            STORAGE_LOCKED
+        );
+        assert_eq!(
+            crate::storage::require_storage_ready().unwrap_err(),
+            STORAGE_LOCKED
+        );
+        // Retry: unlock may start again from the locked state.
+        assert!(begin_key_unlock());
+        assert!(is_key_unlock_in_progress());
         reset_key_unlock_state_for_test();
     }
 

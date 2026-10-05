@@ -107,6 +107,50 @@ describe("useStorageReady", () => {
     expect(result.current.keySource).toBeNull();
   });
 
+  it("reports a refused Keychain as locked and retries on request", async () => {
+    invoke.mockImplementation(async (cmd: string) =>
+      cmd === "get_storage_ready"
+        ? { ready: false, used_fallback: false, locked: true, error: "denied" }
+        : undefined,
+    );
+    let eventHandler: ((event: { payload: unknown }) => void) | null = null;
+    listen.mockImplementation(
+      async (_name: string, handler: typeof eventHandler) => {
+        eventHandler = handler;
+        return () => {};
+      },
+    );
+
+    const { result } = renderHook(() => useStorageReady());
+    await waitFor(() => expect(result.current.locked).toBe(true));
+    expect(result.current.ready).toBe(false);
+
+    await act(async () => {
+      result.current.retry();
+    });
+    expect(invoke).toHaveBeenCalledWith("retry_storage_unlock");
+    expect(result.current.locked).toBe(false);
+
+    await act(async () => {
+      eventHandler?.({ payload: { ready: true, used_fallback: false } });
+    });
+    expect(result.current.ready).toBe(true);
+    expect(result.current.locked).toBe(false);
+  });
+
+  it("goes back to locked when the retry call fails", async () => {
+    invoke.mockImplementation(async (cmd: string) => {
+      if (cmd === "retry_storage_unlock") throw new Error("ipc");
+      return { ready: false, used_fallback: false, locked: true };
+    });
+    const { result } = renderHook(() => useStorageReady());
+    await waitFor(() => expect(result.current.locked).toBe(true));
+    await act(async () => {
+      result.current.retry();
+    });
+    await waitFor(() => expect(result.current.locked).toBe(true));
+  });
+
   it("stays not ready when get_storage_ready rejects", async () => {
     invoke.mockRejectedValue(new Error("not in tauri"));
     listen.mockRejectedValue(new Error("no events"));

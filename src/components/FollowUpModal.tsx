@@ -38,6 +38,10 @@ interface FollowUpModalProps {
   summary?: any | null;
 }
 
+/** Tab labels carry an emoji in the locale files; the tab icon already shows it. */
+const tabLabel = (label: string) =>
+  label.replace(/^[\p{Extended_Pictographic}\uFE0F\s]+/u, "");
+
 export const FollowUpModal: React.FC<FollowUpModalProps> = ({
   isOpen,
   onClose,
@@ -74,6 +78,7 @@ export const FollowUpModal: React.FC<FollowUpModalProps> = ({
         meetingId: meeting.id,
         customSummary: null,
         langCode: language,
+        tone,
       });
       setBundle(res);
       setBundleError(null);
@@ -146,7 +151,7 @@ export const FollowUpModal: React.FC<FollowUpModalProps> = ({
       }}
     >
       <div
-        className="w-full max-w-3xl bg-slate-900 border border-cyan-500/30 rounded-3xl shadow-2xl shadow-cyan-950/50 p-6 md:p-8 relative overflow-hidden flex flex-col max-h-[90vh] text-slate-100 cursor-default"
+        className="w-full max-w-3xl h-[90vh] max-h-[760px] bg-slate-900 border border-cyan-500/30 rounded-3xl shadow-2xl shadow-cyan-950/50 p-6 md:p-8 relative overflow-hidden flex flex-col text-slate-100 cursor-default"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Glowing Accents */}
@@ -154,7 +159,7 @@ export const FollowUpModal: React.FC<FollowUpModalProps> = ({
         <div className="absolute -bottom-24 -left-24 w-60 h-60 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
 
         {/* Header */}
-        <div className="flex items-start justify-between border-b border-slate-800 pb-4 mb-4">
+        <div className="shrink-0 flex items-start justify-between border-b border-slate-800 pb-4 mb-4">
           <div className="flex items-center gap-3">
             <div className="p-3 rounded-2xl bg-gradient-to-tr from-cyan-500/20 to-blue-500/20 border border-cyan-500/30 text-cyan-400 shadow-inner">
               <Sparkles className="w-6 h-6" />
@@ -184,7 +189,10 @@ export const FollowUpModal: React.FC<FollowUpModalProps> = ({
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex items-center gap-2 border-b border-slate-800/80 mb-5 pb-1 overflow-x-auto">
+        <div
+          role="tablist"
+          className="shrink-0 grid grid-cols-4 gap-1.5 border-b border-slate-800/80 mb-4 pb-2"
+        >
           {[
             {
               id: "email" as const,
@@ -214,23 +222,32 @@ export const FollowUpModal: React.FC<FollowUpModalProps> = ({
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-xl transition cursor-pointer whitespace-nowrap ${
+                role="tab"
+                aria-selected={isActive}
+                title={tabLabel(tab.label)}
+                className={`min-w-0 flex items-center justify-center gap-2 px-2 py-2 text-xs font-semibold rounded-xl transition cursor-pointer ${
                   isActive
                     ? "bg-cyan-500/15 border border-cyan-500/40 text-cyan-300 shadow-sm"
                     : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 border border-transparent"
                 }`}
               >
                 <Icon
-                  className={`w-4 h-4 ${isActive ? "text-cyan-400" : "text-slate-500"}`}
+                  className={`w-4 h-4 shrink-0 ${isActive ? "text-cyan-400" : "text-slate-500"}`}
                 />
-                <span>{tab.label}</span>
+                <span className="truncate">{tabLabel(tab.label)}</span>
               </button>
             );
           })}
         </div>
 
         {/* Main Tab Content */}
-        <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+        {/* The email tab fits the window (only its body scrolls); the other
+            tabs scroll as a whole. */}
+        <div
+          className={`flex-1 min-h-0 flex flex-col gap-4 ${
+            activeTab === "email" ? "overflow-hidden" : "overflow-y-auto pr-1"
+          }`}
+        >
           {bundleError && (
             <div
               role="alert"
@@ -242,9 +259,9 @@ export const FollowUpModal: React.FC<FollowUpModalProps> = ({
           )}
           {/* TAB 1: FOLLOW-UP EMAIL */}
           {activeTab === "email" && (
-            <div className="space-y-4 animate-in fade-in duration-150">
+            <div className="flex-1 min-h-0 flex flex-col gap-3 animate-in fade-in duration-150">
               {/* Tone Switcher */}
-              <div className="p-3 rounded-2xl bg-slate-950/70 border border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
+              <div className="shrink-0 p-2.5 rounded-2xl bg-slate-950/70 border border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
                 <div className="flex items-center gap-2 text-slate-300 font-medium">
                   <Sparkles className="w-4 h-4 text-amber-400" />
                   <span>{t("followUp.toneLabel") || "İletişim Tonu:"}</span>
@@ -285,7 +302,7 @@ export const FollowUpModal: React.FC<FollowUpModalProps> = ({
               </div>
 
               {/* Subject Box */}
-              <div className="space-y-1.5">
+              <div className="shrink-0 space-y-1.5">
                 <div className="flex items-center justify-between text-xs font-semibold text-slate-300">
                   <span className="flex items-center gap-1.5">
                     <FileText className="w-3.5 h-3.5 text-cyan-400" />
@@ -320,8 +337,8 @@ export const FollowUpModal: React.FC<FollowUpModalProps> = ({
                 />
               </div>
 
-              {/* Body Box */}
-              <div className="space-y-1.5">
+              {/* Body Box: fills the remaining height, the only scroll area */}
+              <div className="flex-1 min-h-0 flex flex-col gap-1.5">
                 <div className="flex items-center justify-between text-xs font-semibold text-slate-300">
                   <span className="flex items-center gap-1.5">
                     <Mail className="w-3.5 h-3.5 text-cyan-400" />
@@ -346,14 +363,14 @@ export const FollowUpModal: React.FC<FollowUpModalProps> = ({
                 </div>
                 <textarea
                   readOnly
-                  rows={8}
+                  aria-label={t("followUp.emailBody") || "E-Posta Metni"}
                   value={bundle?.email_body || meeting.summary}
-                  className="w-full p-3.5 bg-slate-950/80 border border-slate-800 rounded-xl text-xs font-mono text-slate-300 leading-relaxed focus:outline-none focus:border-cyan-500 resize-none select-all"
+                  className="flex-1 min-h-[120px] w-full p-3.5 bg-slate-950/80 border border-slate-800 rounded-xl text-xs font-mono text-slate-300 leading-relaxed focus:outline-none focus:border-cyan-500 resize-none select-all"
                 />
               </div>
 
               {/* Action Buttons */}
-              <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+              <div className="shrink-0 flex flex-wrap items-center justify-between gap-3">
                 <button
                   type="button"
                   onClick={handleOpenMailClient}
@@ -600,6 +617,7 @@ export const FollowUpModal: React.FC<FollowUpModalProps> = ({
                     meetingId: meeting.id,
                     customSummary: null,
                     langCode: language,
+                    tone,
                   },
                 );
                 const fullText = `=== E-POSTA ===\nKonu: ${bundleData.email_subject}\n\n${bundleData.email_body}\n\n=== AKSİYONLAR ===\n${bundleData.action_items_md}\n\n=== SLACK ===\n${bundleData.slack_md}\n\n=== CALENDAR ICS ===\n${bundleData.ics_content}`;

@@ -590,7 +590,114 @@ fn cosine_ahc(embs: &[Vec<f32>], threshold: f32, max_k: usize) -> Vec<usize> {
             }
         }
     }
+    dissolve_between_clusters(embs, &mut parent);
+    if std::env::var_os("ECHOMIND_DIAR_DEBUG").is_some() {
+        debug_print_clusters(embs, &parent);
+    }
     parent
+}
+
+/// A cluster lying *between* two others is not a person: it collects windows
+/// where two voices mix (crosstalk), or where one speaker sounds different
+/// (moved away from the mic, remote audio heard through the room). It is
+/// "between" a and b when it is closer to each of them than they are to each
+/// other and d(a,x) + d(x,b) < BETWEEN_RATIO · d(a,b). Such clusters are
+/// dissolved one at a time: each window moves to the nearest other centroid.
+///
+/// Calibrated with examples/diarization_eval.rs: on a real two-person meeting
+/// the mixed cluster scores 0.83 (0.14 + 0.20 vs 0.41); distinct voices in
+/// the labelled sets score ≥ 1.11.
+const BETWEEN_RATIO: f32 = 1.1;
+
+fn dissolve_between_clusters(embs: &[Vec<f32>], parent: &mut [usize]) {
+    use crate::speaker_embedding::cosine;
+    loop {
+        let mut ids: Vec<usize> = parent.to_vec();
+        ids.sort_unstable();
+        ids.dedup();
+        if ids.len() < 3 {
+            return;
+        }
+        let cents: Vec<Vec<f32>> = ids
+            .iter()
+            .map(|&c| cluster_centroid(embs, parent, c))
+            .collect();
+        let d = |i: usize, j: usize| 1.0 - cosine(&cents[i], &cents[j]);
+
+        // Most clearly "between" cluster, if any.
+        let mut worst: Option<(usize, f32)> = None;
+        for x in 0..ids.len() {
+            for a in 0..ids.len() {
+                for b in (a + 1)..ids.len() {
+                    if a == x || b == x {
+                        continue;
+                    }
+                    let (dax, dxb, dab) = (d(a, x), d(x, b), d(a, b));
+                    if dax.max(dxb) >= dab || dab <= 0.0 {
+                        continue;
+                    }
+                    let ratio = (dax + dxb) / dab;
+                    if ratio < BETWEEN_RATIO && worst.is_none_or(|(_, r)| ratio < r) {
+                        worst = Some((x, ratio));
+                    }
+                }
+            }
+        }
+        let Some((x, _)) = worst else {
+            return;
+        };
+        let gone = ids[x];
+        for k in 0..parent.len() {
+            if parent[k] == gone {
+                parent[k] = ids
+                    .iter()
+                    .zip(&cents)
+                    .filter(|(&c, _)| c != gone)
+                    .max_by(|a, b| {
+                        cosine(&embs[k], a.1)
+                            .partial_cmp(&cosine(&embs[k], b.1))
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                    })
+                    .map(|(&c, _)| c)
+                    .unwrap_or(gone);
+            }
+        }
+    }
+}
+
+/// Unit-length mean embedding of cluster `c`.
+fn cluster_centroid(embs: &[Vec<f32>], parent: &[usize], c: usize) -> Vec<f32> {
+    let mut acc = vec![0f32; embs[0].len()];
+    for (k, &p) in parent.iter().enumerate() {
+        if p == c {
+            acc.iter_mut().zip(&embs[k]).for_each(|(a, b)| *a += b);
+        }
+    }
+    let norm = acc.iter().map(|x| x * x).sum::<f32>().sqrt().max(1e-6);
+    acc.iter_mut().for_each(|x| *x /= norm);
+    acc
+}
+
+/// Cluster sizes and centroid cosine distances (calibration aid).
+fn debug_print_clusters(embs: &[Vec<f32>], parent: &[usize]) {
+    use crate::speaker_embedding::cosine;
+    let mut ids: Vec<usize> = parent.to_vec();
+    ids.sort_unstable();
+    ids.dedup();
+    let cents: Vec<Vec<f32>> = ids
+        .iter()
+        .map(|&c| cluster_centroid(embs, parent, c))
+        .collect();
+    for (i, &c) in ids.iter().enumerate() {
+        let size = parent.iter().filter(|&&p| p == c).count();
+        let dists: Vec<String> = (0..ids.len())
+            .map(|j| format!("{:.2}", 1.0 - cosine(&cents[i], &cents[j])))
+            .collect();
+        eprintln!(
+            "DIAR cluster {i}: {size} windows, centroid dist [{}]",
+            dists.join(", ")
+        );
+    }
 }
 
 /// Each segment gets the speaker holding most of its speech frames; segments
@@ -1490,5 +1597,76 @@ mod tests {
         assert_eq!(segs[0].speaker_name, LOCAL_SPEAKER_LABEL);
         assert_ne!(segs[1].speaker_name, LOCAL_SPEAKER_LABEL);
         std::env::remove_var("ECHOMIND_DIAR_MODE");
+    }
+
+    /// `n` unit vectors near `dir` (small deterministic jitter).
+    fn embedding_cloud(dir: &[f32], n: usize) -> Vec<Vec<f32>> {
+        (0..n)
+            .map(|k| {
+                let mut v: Vec<f32> = dir
+                    .iter()
+                    .enumerate()
+                    .map(|(i, x)| x + 0.02 * (((k * 7 + i * 13) % 11) as f32 - 5.0) / 5.0)
+                    .collect();
+                let norm = v.iter().map(|x| x * x).sum::<f32>().sqrt();
+                v.iter_mut().for_each(|x| *x /= norm);
+                v
+            })
+            .collect()
+    }
+
+    fn mix(a: &[f32], b: &[f32]) -> Vec<f32> {
+        a.iter().zip(b).map(|(x, y)| x + y).collect()
+    }
+
+    #[test]
+    fn test_cluster_between_two_voices_is_dissolved() {
+        let a = [1.0, 0.0, 0.0, 0.0];
+        let b = [0.0, 1.0, 0.0, 0.0];
+        let between = mix(&a, &b);
+        let mut embs = embedding_cloud(&a, 10);
+        embs.extend(embedding_cloud(&b, 10));
+        embs.extend(embedding_cloud(&between, 6));
+        let mut parent: Vec<usize> = (0..26)
+            .map(|k| {
+                if k < 10 {
+                    0
+                } else if k < 20 {
+                    1
+                } else {
+                    2
+                }
+            })
+            .collect();
+        dissolve_between_clusters(&embs, &mut parent);
+        let mut ids = parent.clone();
+        ids.sort_unstable();
+        ids.dedup();
+        assert_eq!(
+            ids,
+            vec![0, 1],
+            "mixed cluster must fold into the two voices"
+        );
+        assert!(parent[..10].iter().all(|&p| p == 0));
+        assert!(parent[10..20].iter().all(|&p| p == 1));
+    }
+
+    #[test]
+    fn test_distinct_voices_are_kept() {
+        let dirs = [
+            [1.0, 0.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ];
+        let mut embs = Vec::new();
+        let mut parent = Vec::new();
+        for (c, d) in dirs.iter().enumerate() {
+            embs.extend(embedding_cloud(d, 8));
+            parent.extend(std::iter::repeat_n(c, 8));
+        }
+        let before = parent.clone();
+        dissolve_between_clusters(&embs, &mut parent);
+        assert_eq!(parent, before);
     }
 }
