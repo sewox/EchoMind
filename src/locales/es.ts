@@ -27,6 +27,10 @@ export const es: TranslationKeys = {
     storageUnlocking: "Abriendo almacenamiento seguro…",
     storageUnlockHint:
       "Esperando acceso al llavero. La ventana sigue respondiendo; el historial se carga tras permitir el acceso.",
+    storageLocked: "No se pudo abrir el almacenamiento seguro",
+    storageLockedHint:
+      "No se permitió el acceso al llavero. Su historial de reuniones no se eliminó; se abrirá cuando permita el acceso.",
+    retry: "Reintentar",
     historyRecoveryNotice:
       "No se pudo abrir el historial cifrado anterior en esta versión; se conservaron copias de seguridad. Las nuevas grabaciones ahora están protegidas con el llavero.",
   },
@@ -39,6 +43,15 @@ export const es: TranslationKeys = {
     settings: "Ajustes",
     modelHub: "Modelos",
     language: "Idioma",
+  },
+  glossary: {
+    title: "Términos personalizados",
+    desc: "Nombres de empresas, productos y personas o términos técnicos que la transcripción debe reconocer, uno por línea. Las listas cortas y precisas funcionan mejor (hasta 100 términos).",
+    placeholder: "SonicWall\nAcme Software\nAna García",
+    count: "{count} términos",
+    saved: "Guardado",
+    error: "No se pudo guardar",
+    save: "Guardar",
   },
   importProgress: {
     decoding: "Leyendo el archivo de audio…",

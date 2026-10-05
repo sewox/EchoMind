@@ -23,6 +23,7 @@ import {
   Layers,
   Zap,
   Volume2,
+  ShieldAlert,
 } from "lucide-react";
 import {
   TranscriptViewer,
@@ -148,7 +149,12 @@ const SIDEBAR_TAG_LIMIT = 6;
 export function App() {
   const { t, language, setLanguage } = useI18n();
   const { isParanoid } = usePrivacyMode();
-  const { ready: storageReady, showHistoryRecoveryNotice } = useStorageReady();
+  const {
+    ready: storageReady,
+    showHistoryRecoveryNotice,
+    locked: storageLocked,
+    retry: retryStorageUnlock,
+  } = useStorageReady();
   const { visible: historyRecoveryVisible, dismiss: dismissHistoryRecovery } =
     useHistoryRecoveryNotice(showHistoryRecoveryNotice);
   const [hardware, setHardware] = useState<HardwareInfo | null>(null);
@@ -999,13 +1005,34 @@ export function App() {
           data-testid="storage-unlock-overlay"
         >
           <div className="flex flex-col items-center gap-2 px-7 py-5 rounded-2xl bg-slate-900/95 border border-slate-700 shadow-2xl text-white max-w-sm mx-4 text-center">
-            <Loader2 className="w-6 h-6 animate-spin text-cyan-400" />
-            <span className="text-sm font-medium">
-              {t("common.storageUnlocking")}
-            </span>
-            <span className="text-[11px] text-slate-400 leading-relaxed">
-              {t("common.storageUnlockHint")}
-            </span>
+            {storageLocked ? (
+              <>
+                <ShieldAlert className="w-6 h-6 text-amber-400" />
+                <span className="text-sm font-medium">
+                  {t("common.storageLocked")}
+                </span>
+                <span className="text-[11px] text-slate-400 leading-relaxed">
+                  {t("common.storageLockedHint")}
+                </span>
+                <button
+                  type="button"
+                  onClick={retryStorageUnlock}
+                  className="mt-2 px-4 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-medium"
+                >
+                  {t("common.retry")}
+                </button>
+              </>
+            ) : (
+              <>
+                <Loader2 className="w-6 h-6 animate-spin text-cyan-400" />
+                <span className="text-sm font-medium">
+                  {t("common.storageUnlocking")}
+                </span>
+                <span className="text-[11px] text-slate-400 leading-relaxed">
+                  {t("common.storageUnlockHint")}
+                </span>
+              </>
+            )}
           </div>
         </div>
       )}

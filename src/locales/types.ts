@@ -24,6 +24,9 @@ export interface TranslationKeys {
     hours: string;
     storageUnlocking: string;
     storageUnlockHint: string;
+    storageLocked: string;
+    storageLockedHint: string;
+    retry: string;
     historyRecoveryNotice: string;
   };
   nav: {
@@ -35,6 +38,15 @@ export interface TranslationKeys {
     settings: string;
     modelHub: string;
     language: string;
+  };
+  glossary: {
+    title: string;
+    desc: string;
+    placeholder: string;
+    count: string;
+    saved: string;
+    error: string;
+    save: string;
   };
   importProgress: {
     decoding: string;
