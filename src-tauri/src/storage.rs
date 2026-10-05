@@ -607,6 +607,12 @@ pub struct StorageReadyStatus {
     /// undecryptable `.corrupt*` history backup exists — UI should explain once.
     #[serde(default)]
     pub show_history_recovery_notice: bool,
+    /// The keystore refused access (prompt denied or dismissed, keychain
+    /// locked). History stays closed — and untouched — until retried.
+    #[serde(default)]
+    pub locked: bool,
+    #[serde(default)]
+    pub error: Option<String>,
 }
 
 /// Durable dismiss marker for the one-time history-recovery notice.
@@ -673,6 +679,8 @@ fn last_storage_ready_status() -> &'static Mutex<StorageReadyStatus> {
             used_fallback: false,
             key_source: None,
             show_history_recovery_notice: false,
+            locked: false,
+            error: None,
         })
     })
 }
@@ -691,6 +699,9 @@ pub fn require_storage_ready() -> Result<(), String> {
     }
     if is_key_unlock_in_progress() {
         return Err(STORAGE_NOT_READY.to_string());
+    }
+    if crate::secure_key::is_key_unlock_locked() {
+        return Err(crate::secure_key::STORAGE_LOCKED.to_string());
     }
     // Unlock never started (unit tests, or a path before setup): allow sync key resolve.
     Ok(())
@@ -713,6 +724,8 @@ pub fn start_storage_unlock(app: tauri::AppHandle) {
                     used_fallback: false,
                     key_source: None,
                     show_history_recovery_notice: false,
+                    locked: false,
+                    error: None,
                 });
             let _ = app.emit("storage-unlocked", status);
         }
@@ -724,7 +737,27 @@ pub fn start_storage_unlock(app: tauri::AppHandle) {
         .spawn(move || {
             // May block on macOS Keychain Access prompt — must stay off the main thread.
             // Single master_key keystore item → at most one prompt for both encryption keys.
-            let data_source = prime_encryption_keys();
+            let data_source = match prime_encryption_keys() {
+                Ok(source) => source,
+                Err(reason) => {
+                    // No key was created and nothing is loaded or written: the
+                    // history file keeps its real contents for a retry.
+                    crate::secure_key::mark_keys_locked();
+                    let status = StorageReadyStatus {
+                        ready: false,
+                        used_fallback: false,
+                        key_source: None,
+                        show_history_recovery_notice: false,
+                        locked: true,
+                        error: Some(reason),
+                    };
+                    if let Ok(mut g) = last_storage_ready_status().lock() {
+                        *g = status.clone();
+                    }
+                    let _ = app.emit("storage-unlocked", status);
+                    return;
+                }
+            };
 
             if quit_abort_requested() {
                 // Quit while the prompt was open: do not load/emit; process is exiting.
@@ -770,6 +803,8 @@ pub fn start_storage_unlock(app: tauri::AppHandle) {
                 used_fallback: data_source.used_fallback(),
                 key_source: Some(data_source.as_log_label().to_string()),
                 show_history_recovery_notice: show_notice,
+                locked: false,
+                error: None,
             };
             store_storage_ready_status(status.clone());
             let _ = app.emit("storage-unlocked", &status);
@@ -794,13 +829,31 @@ pub fn get_storage_ready() -> StorageReadyStatus {
             used_fallback: false,
             key_source: None,
             show_history_recovery_notice: false,
+            locked: false,
+            error: None,
         };
+    }
+    if crate::secure_key::is_key_unlock_locked() {
+        if let Ok(guard) = last_storage_ready_status().lock() {
+            return guard.clone();
+        }
     }
     StorageReadyStatus {
         ready: false,
         used_fallback: false,
         key_source: None,
         show_history_recovery_notice: false,
+        locked: false,
+        error: None,
+    }
+}
+
+/// Asks the keystore again after access was refused (the Keychain prompt
+/// shows again on macOS). Progress and result arrive as `storage-unlocked`.
+#[tauri::command]
+pub fn retry_storage_unlock(app: tauri::AppHandle) {
+    if crate::secure_key::is_key_unlock_locked() {
+        start_storage_unlock(app);
     }
 }
 

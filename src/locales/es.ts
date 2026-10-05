@@ -27,6 +27,10 @@ export const es: TranslationKeys = {
     storageUnlocking: "Abriendo almacenamiento seguro…",
     storageUnlockHint:
       "Esperando acceso al llavero. La ventana sigue respondiendo; el historial se carga tras permitir el acceso.",
+    storageLocked: "No se pudo abrir el almacenamiento seguro",
+    storageLockedHint:
+      "No se permitió el acceso al llavero. Su historial de reuniones no se eliminó; se abrirá cuando permita el acceso.",
+    retry: "Reintentar",
     historyRecoveryNotice:
       "No se pudo abrir el historial cifrado anterior en esta versión; se conservaron copias de seguridad. Las nuevas grabaciones ahora están protegidas con el llavero.",
   },

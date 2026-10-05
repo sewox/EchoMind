@@ -27,6 +27,10 @@ export const fr: TranslationKeys = {
     storageUnlocking: "Ouverture du stockage sécurisé…",
     storageUnlockHint:
       "En attente de l'accès au trousseau. La fenêtre reste réactive ; votre historique se charge après autorisation.",
+    storageLocked: "Impossible d'ouvrir le stockage sécurisé",
+    storageLockedHint:
+      "L'accès au trousseau n'a pas été autorisé. Votre historique n'a pas été supprimé ; il s'ouvrira dès que vous autoriserez l'accès.",
+    retry: "Réessayer",
     historyRecoveryNotice:
       "L'historique chiffré précédent n'a pas pu être ouvert dans cette version ; des sauvegardes ont été conservées. Les nouveaux enregistrements sont désormais protégés par le trousseau.",
   },
