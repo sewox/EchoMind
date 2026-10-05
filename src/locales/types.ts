@@ -78,6 +78,10 @@ export interface TranslationKeys {
     backToLive: string;
   };
   transcript: {
+    bar: Record<
+      "retranscribe" | "analytics" | "copy" | "copied" | "followUp" | "export",
+      { label: string; hint: string }
+    >;
     tabs: {
       stream: string;
       report: string;
@@ -405,6 +409,7 @@ export interface TranslationKeys {
   };
   followUp?: {
     modalTitle: string;
+    shortLabel: string;
     modalSubtitle: string;
     tabs: {
       email: string;

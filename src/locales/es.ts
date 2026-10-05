@@ -86,6 +86,32 @@ export const es: TranslationKeys = {
     backToLive: "Volver a la Sesión en Vivo",
   },
   transcript: {
+    bar: {
+      retranscribe: {
+        label: "Retranscribir",
+        hint: "Vuelve a convertir la grabación en texto con otro modelo o idioma.",
+      },
+      analytics: {
+        label: "Análisis",
+        hint: "Muestra quién habló cuánto y el equilibrio de la reunión.",
+      },
+      copy: {
+        label: "Copiar",
+        hint: "Copia toda la transcripción al portapapeles.",
+      },
+      copied: {
+        label: "Copiado",
+        hint: "La transcripción está en el portapapeles.",
+      },
+      followUp: {
+        label: "Seguimiento",
+        hint: "Prepara el correo de seguimiento, la lista de tareas y la invitación.",
+      },
+      export: {
+        label: "Exportar",
+        hint: "Guarda o comparte el informe como PDF, Markdown, resumen de Slack/Teams o JSON.",
+      },
+    },
     tabs: {
       stream: "Flujo de Diálogo",
       report: "Informe de Reunión",
@@ -134,7 +160,7 @@ export const es: TranslationKeys = {
     speaker: "Hablante",
     confidence: "Precisión",
     noRecordings: "Aún no hay grabaciones de conversación.",
-    smartRedaction: "✍️ Redacción y Corrección Inteligente",
+    smartRedaction: "Redacción y Corrección Inteligente",
     redacting: "Redactando...",
     noSearchResults:
       "No se encontraron conversaciones que coincidan con la búsqueda.",
@@ -155,7 +181,7 @@ export const es: TranslationKeys = {
       stop: "Detener",
       play: "Escuchar",
     },
-    rebuildReport: "✨ Recrear Informe",
+    rebuildReport: "Recrear Informe",
     rebuilding: "Generando informe...",
     rebuildTooltip:
       "Generar un nuevo resumen de IA a partir del diálogo actual",
@@ -455,6 +481,7 @@ export const es: TranslationKeys = {
     },
   },
   followUp: {
+    shortLabel: "Seguimiento",
     modalTitle: "One-Click Follow-up Engine",
     modalSubtitle:
       "Genere al instante correos de seguimiento, tablas de tareas y eventos de calendario",

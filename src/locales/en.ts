@@ -84,6 +84,32 @@ export const en: TranslationKeys = {
     backToLive: "Back to Live Session",
   },
   transcript: {
+    bar: {
+      retranscribe: {
+        label: "Re-transcribe",
+        hint: "Converts the recording to text again with another model or language.",
+      },
+      analytics: {
+        label: "Analytics",
+        hint: "Shows who spoke how much and how balanced the meeting was.",
+      },
+      copy: {
+        label: "Copy",
+        hint: "Copies the whole transcript to the clipboard.",
+      },
+      copied: {
+        label: "Copied",
+        hint: "The transcript is on the clipboard.",
+      },
+      followUp: {
+        label: "Follow-up",
+        hint: "Prepares the follow-up email, task list and calendar invite.",
+      },
+      export: {
+        label: "Export",
+        hint: "Saves or shares the report as PDF, Markdown, a Slack/Teams summary or JSON.",
+      },
+    },
     tabs: {
       stream: "Dialogue Stream",
       report: "Meeting Report",
@@ -135,7 +161,7 @@ export const en: TranslationKeys = {
     speaker: "Speaker",
     confidence: "Confidence",
     noRecordings: "No transcript recordings yet.",
-    smartRedaction: "✍️ Smart Redaction & Cleanup",
+    smartRedaction: "Smart Redaction & Cleanup",
     redacting: "Redacting...",
     noSearchResults: "No speech matches found for your search.",
     listeningLive: "Listening to speech, streaming live...",
@@ -154,7 +180,7 @@ export const en: TranslationKeys = {
       stop: "Stop",
       play: "Play",
     },
-    rebuildReport: "✨ Rebuild Report",
+    rebuildReport: "Rebuild Report",
     rebuilding: "Generating Report...",
     rebuildTooltip:
       "Generate a fresh AI executive summary from current dialogue",
@@ -398,7 +424,8 @@ export const en: TranslationKeys = {
     ignoreListPlaceholder: "com.example.App",
     ignoreListAdd: "Add",
     ignoreListRemove: "Remove",
-    ignoreListEmpty: "No ignored apps — defaults will be restored on next launch.",
+    ignoreListEmpty:
+      "No ignored apps — defaults will be restored on next launch.",
   },
   updater: {
     modalTitle: "New Update Available!",
@@ -453,6 +480,7 @@ export const en: TranslationKeys = {
     },
   },
   followUp: {
+    shortLabel: "Follow-up",
     modalTitle: "One-Click Follow-up Engine",
     modalSubtitle:
       "Instantly create professional follow-up emails, action item tables, and calendar invitations",

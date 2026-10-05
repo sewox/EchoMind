@@ -184,7 +184,7 @@ export const LiveFeedView: React.FC<LiveFeedViewProps> = ({
                   {isRedacting
                     ? t("transcript.redacting") || "Redakte Ediliyor..."
                     : t("transcript.smartRedaction") ||
-                      "✍️ Akıllı Redaksiyon & Düzeltme"}
+                      "Akıllı Redaksiyon & Düzeltme"}
                 </span>
               </button>
             )}

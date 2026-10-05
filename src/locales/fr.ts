@@ -85,6 +85,32 @@ export const fr: TranslationKeys = {
     backToLive: "Retour au Direct",
   },
   transcript: {
+    bar: {
+      retranscribe: {
+        label: "Retranscrire",
+        hint: "Reconvertit l’enregistrement en texte avec un autre modèle ou une autre langue.",
+      },
+      analytics: {
+        label: "Analyse",
+        hint: "Montre qui a parlé combien et l’équilibre de la réunion.",
+      },
+      copy: {
+        label: "Copier",
+        hint: "Copie toute la transcription dans le presse-papiers.",
+      },
+      copied: {
+        label: "Copié",
+        hint: "La transcription est dans le presse-papiers.",
+      },
+      followUp: {
+        label: "Suivi",
+        hint: "Prépare l’e-mail de suivi, la liste des tâches et l’invitation.",
+      },
+      export: {
+        label: "Exporter",
+        hint: "Enregistre ou partage le rapport en PDF, Markdown, résumé Slack/Teams ou JSON.",
+      },
+    },
     tabs: {
       stream: "Flux de Dialogue",
       report: "Rapport de Réunion",
@@ -133,7 +159,7 @@ export const fr: TranslationKeys = {
     speaker: "Intervenant",
     confidence: "Précision",
     noRecordings: "Aucun enregistrement de conversation pour le moment.",
-    smartRedaction: "✍️ Rédaction & Correction Intelligente",
+    smartRedaction: "Rédaction & Correction Intelligente",
     redacting: "Rédaction en cours...",
     noSearchResults: "Aucune conversation trouvée pour cette recherche.",
     listeningLive: "Écoute en direct en cours...",
@@ -152,7 +178,7 @@ export const fr: TranslationKeys = {
       stop: "Arrêter",
       play: "Écouter",
     },
-    rebuildReport: "✨ Recréer le Rapport",
+    rebuildReport: "Recréer le Rapport",
     rebuilding: "Génération du rapport...",
     rebuildTooltip: "Générer un nouveau résumé IA à partir des dialogues",
     changeModelAndRetranscribe: "Changer de Modèle & Retranscrire",
@@ -451,6 +477,7 @@ export const fr: TranslationKeys = {
     },
   },
   followUp: {
+    shortLabel: "Suivi",
     modalTitle: "One-Click Follow-up Engine",
     modalSubtitle:
       "Générez instantanément des e-mails de suivi, des tableaux d'actions et des invitations calendrier",
