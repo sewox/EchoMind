@@ -162,6 +162,7 @@ export const SummaryCardsView: React.FC<SummaryCardsViewProps> = ({
       {/* 🎙️ AI Sesli Bülten (Audio Memo Podcast) */}
       {richSummary && (
         <AudioMemoPlayer
+          key={selectedPastMeeting?.id ?? "live"}
           summary={richSummary}
           meetingTitle={selectedPastMeeting?.title}
           langCode={summaryLang}

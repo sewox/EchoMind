@@ -25,6 +25,7 @@ pub mod summarizer;
 pub mod system_audio;
 pub mod transcriber;
 pub mod transcription_queue;
+pub mod tts;
 pub mod updater;
 
 use asr_engine::{get_asr_engine, set_asr_engine};
@@ -84,6 +85,11 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![
+            tts::tts_availability,
+            tts::tts_speak,
+            tts::tts_stop,
+            tts::tts_pause,
+            tts::tts_resume,
             get_hardware_info,
             get_asr_engine,
             is_import_running,
