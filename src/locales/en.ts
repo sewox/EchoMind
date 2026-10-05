@@ -27,6 +27,9 @@ export const en: TranslationKeys = {
     storageUnlocking: "Opening secure storage…",
     storageUnlockHint:
       "Waiting for Keychain access. The window stays responsive; your history loads after you allow access.",
+    storageLocked: "Couldn't open secure storage",
+    storageLockedHint: "Keychain access was not allowed. Your meeting history was not deleted; it opens once you allow access.",
+    retry: "Try again",
     historyRecoveryNotice:
       "Previous encrypted history could not be opened in this version; backups were kept. New recordings are now protected with Keychain.",
   },
@@ -39,6 +42,15 @@ export const en: TranslationKeys = {
     settings: "Settings",
     modelHub: "Models",
     language: "Language",
+  },
+  glossary: {
+    title: "Custom Terms",
+    desc: "List company, product and people names or technical terms that transcription should recognize, one per line. Short, specific lists work best (up to 100 terms).",
+    placeholder: "SonicWall\nAcme Software\nJane Doe",
+    count: "{count} terms",
+    saved: "Saved",
+    error: "Could not save",
+    save: "Save",
   },
   importProgress: {
     decoding: "Reading the audio file…",

@@ -442,6 +442,9 @@ impl GlobalTranscriberEngine {
                 .collect()
         };
 
+        // The user's glossary (names, products) biases Whisper towards them;
+        // kept short because the prompt shares Whisper's small context.
+        let glossary_hint = crate::glossary::whisper_hint(160);
         let prompt_for = |lang: Option<&str>| -> &'static str {
             match lang.unwrap_or("") {
                 "tr" => "Bu bir Türkçe iş toplantısı ve diyalog ses kaydı dökümüdür. Lütfen Türkçe imla kurallarına, noktalama işaretlerine ve tam cümle yapılarına uygun olarak döküm yapınız.",
@@ -482,7 +485,10 @@ impl GlobalTranscriberEngine {
             let chunk_samples = &chunk.samples;
             let lang_confidence_factor = chunk.lang_confidence;
             let chunk_whisper_lang = chunk.forced_lang.as_deref();
-            let prompt = prompt_for(chunk_whisper_lang);
+            let prompt = match &glossary_hint {
+                Some(terms) => format!("{} {}", prompt_for(chunk_whisper_lang), terms),
+                None => prompt_for(chunk_whisper_lang).to_string(),
+            };
 
             let mut state_ctx = ctx
                 .create_state()
@@ -490,7 +496,7 @@ impl GlobalTranscriberEngine {
             let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 5 });
             params.set_n_threads(n_threads);
             params.set_language(chunk_whisper_lang);
-            params.set_initial_prompt(prompt);
+            params.set_initial_prompt(&prompt);
             params.set_no_context(true); // Isolate chunks from previous hallucination loops
             params.set_single_segment(false);
             params.set_temperature(0.0);

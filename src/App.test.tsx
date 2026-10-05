@@ -22,13 +22,16 @@ vi.mock("./hooks/useFirstRunModelSetup", () => ({
 
 // Storage unlock is covered by useStorageReady.test.ts; App integration tests
 // assume secure storage is already ready so history fetch proceeds normally.
+const storageState = vi.hoisted(() => ({
+  ready: true,
+  usedFallback: false,
+  keySource: "keychain",
+  showHistoryRecoveryNotice: false,
+  locked: false,
+  retry: () => {},
+}));
 vi.mock("./hooks/useStorageReady", () => ({
-  useStorageReady: () => ({
-    ready: true,
-    usedFallback: false,
-    keySource: "keychain",
-    showHistoryRecoveryNotice: false,
-  }),
+  useStorageReady: () => storageState,
 }));
 
 vi.mock("./hooks/useHistoryRecoveryNotice", () => ({
@@ -183,6 +186,30 @@ describe("App Top-Level Integration", () => {
       return Promise.resolve();
     });
   };
+
+  it("explains a refused Keychain and retries from the unlock screen", async () => {
+    const retry = vi.fn();
+    Object.assign(storageState, { ready: false, locked: true, retry });
+    (invoke as any).mockImplementation(() => Promise.resolve([]));
+    try {
+      render(
+        <I18nProvider>
+          <App />
+        </I18nProvider>,
+      );
+      const overlay = screen.getByTestId("storage-unlock-overlay");
+      expect(overlay).toHaveTextContent("Güvenli depolama açılamadı");
+      expect(overlay).toHaveTextContent("silinmedi");
+      fireEvent.click(screen.getByRole("button", { name: "Tekrar dene" }));
+      expect(retry).toHaveBeenCalled();
+    } finally {
+      Object.assign(storageState, {
+        ready: true,
+        locked: false,
+        retry: () => {},
+      });
+    }
+  });
 
   it("renders top navigation, sidebar with meetings, and toggles recording", async () => {
     setupDefaultInvoke();

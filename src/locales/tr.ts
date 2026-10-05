@@ -27,6 +27,10 @@ export const tr: TranslationKeys = {
     storageUnlocking: "Güvenli depolama açılıyor…",
     storageUnlockHint:
       "Anahtarlık erişimi bekleniyor. Pencere yanıt vermeye devam eder; izin verdikten sonra geçmişiniz yüklenir.",
+    storageLocked: "Güvenli depolama açılamadı",
+    storageLockedHint:
+      "Anahtarlık erişimine izin verilmedi. Toplantı geçmişiniz silinmedi; erişime izin verdiğinizde açılacak.",
+    retry: "Tekrar dene",
     historyRecoveryNotice:
       "Önceki şifreli geçmiş bu sürümde açılamadı; yedekler saklandı. Yeni kayıtlar artık Keychain ile korunuyor.",
   },
@@ -39,6 +43,15 @@ export const tr: TranslationKeys = {
     settings: "Ayarlar",
     modelHub: "Modeller",
     language: "Dil Seçimi",
+  },
+  glossary: {
+    title: "Özel Terimler",
+    desc: "Yazıya dökmenin tanıması gereken şirket, ürün ve kişi adlarını veya teknik terimleri her satıra bir tane yazın. Kısa ve isabetli liste en iyi sonucu verir (en fazla 100 terim).",
+    placeholder: "SonicWall\nAcme Yazılım\nAyşe Yılmaz",
+    count: "{count} terim",
+    saved: "Kaydedildi",
+    error: "Kaydedilemedi",
+    save: "Kaydet",
   },
   importProgress: {
     decoding: "Ses dosyası okunuyor…",

@@ -40,6 +40,7 @@ import { useI18n, SUPPORTED_LANGUAGES } from "../locales/i18nContext";
 
 import { UpdateCheckResult } from "./UpdateModal";
 import { ModalShell } from "./ui/ModalShell";
+import { GlossaryCard } from "./GlossaryCard";
 
 export interface AudioDeviceInfo {
   name: string;
@@ -786,6 +787,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
             );
           })()}
+          <GlossaryCard />
         </div>
       )}
 
