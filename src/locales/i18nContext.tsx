@@ -52,6 +52,65 @@ const I18nContext = createContext<I18nContextProps | undefined>(undefined);
 
 const STORAGE_KEY = "echomind_app_language";
 
+type Translator = (
+  path: string,
+  params?: Record<string, string | number>,
+) => string;
+
+/** Looks keys up in `dict`, falling back to Turkish, then to the key itself. */
+const makeTranslator =
+  (dict: TranslationKeys): Translator =>
+  (path: string, params?: Record<string, string | number>): string => {
+    const parts = path.split(".");
+
+    // Try active language first
+    let current: any = dict;
+    for (const part of parts) {
+      if (current && typeof current === "object" && part in current) {
+        current = current[part];
+      } else {
+        current = undefined;
+        break;
+      }
+    }
+
+    // Fallback to Turkish if not found
+    if (current === undefined) {
+      let fallback: any = tr;
+      for (const part of parts) {
+        if (fallback && typeof fallback === "object" && part in fallback) {
+          fallback = fallback[part];
+        } else {
+          fallback = undefined;
+          break;
+        }
+      }
+      current = fallback !== undefined ? fallback : path;
+    }
+
+    if (typeof current !== "string") {
+      return String(current ?? path);
+    }
+
+    // Parameter replacement ({count}, {name}, etc.)
+    if (params) {
+      return Object.entries(params).reduce((str, [k, v]) => {
+        return str.replace(new RegExp(`\\{${k}\\}`, "g"), String(v));
+      }, current);
+    }
+
+    return current;
+  };
+
+/**
+ * A translator for a given language regardless of the interface language
+ * (e.g. text read aloud in the report's language).
+ */
+export const translatorFor = (code: string): Translator =>
+  makeTranslator(
+    dictionaries[code.split(/[-_]/)[0] as SupportedLanguage] || tr,
+  );
+
 export const I18nProvider: React.FC<{ children: ReactNode }> = ({
   children,
 }) => {
@@ -100,49 +159,7 @@ export const I18nProvider: React.FC<{ children: ReactNode }> = ({
     return dictionaries[language] || tr;
   }, [language]);
 
-  const t = useMemo(() => {
-    return (path: string, params?: Record<string, string | number>): string => {
-      const parts = path.split(".");
-
-      // Try active language first
-      let current: any = currentDict;
-      for (const part of parts) {
-        if (current && typeof current === "object" && part in current) {
-          current = current[part];
-        } else {
-          current = undefined;
-          break;
-        }
-      }
-
-      // Fallback to Turkish if not found
-      if (current === undefined) {
-        let fallback: any = tr;
-        for (const part of parts) {
-          if (fallback && typeof fallback === "object" && part in fallback) {
-            fallback = fallback[part];
-          } else {
-            fallback = undefined;
-            break;
-          }
-        }
-        current = fallback !== undefined ? fallback : path;
-      }
-
-      if (typeof current !== "string") {
-        return String(current ?? path);
-      }
-
-      // Parameter replacement ({count}, {name}, etc.)
-      if (params) {
-        return Object.entries(params).reduce((str, [k, v]) => {
-          return str.replace(new RegExp(`\\{${k}\\}`, "g"), String(v));
-        }, current);
-      }
-
-      return current;
-    };
-  }, [currentDict]);
+  const t = useMemo(() => makeTranslator(currentDict), [currentDict]);
 
   const currentLanguageOption = useMemo(() => {
     return (

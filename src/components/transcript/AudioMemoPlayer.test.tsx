@@ -1,22 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, act } from "@testing-library/react";
-import { AudioMemoPlayer } from "./AudioMemoPlayer";
+import {
+  render,
+  screen,
+  fireEvent,
+  act,
+  waitFor,
+} from "@testing-library/react";
+import { invoke } from "@tauri-apps/api/core";
+import { AudioMemoPlayer, buildMemoText } from "./AudioMemoPlayer";
 import { SummaryResult } from "../TranscriptViewer";
 import { I18nProvider } from "../../locales/i18nContext";
-
-class MockSpeechSynthesisUtterance {
-  text: string;
-  lang: string = "";
-  rate: number = 1;
-  onend: (() => void) | null = null;
-  onerror: (() => void) | null = null;
-  constructor(text: string) {
-    this.text = text;
-  }
-}
+import { globalTestEventListeners } from "../../test/setup";
 
 const mockSummary: SummaryResult = {
-  meeting_goal: "Yeni özellikleri canlıya almak ve sprinti kapatmak",
+  meeting_goal: "Yeni özellikleri canlıya almak.",
   key_highlights: ["CI/CD hızı 2 dakikanın altına indirildi"],
   action_items: [
     {
@@ -36,203 +33,242 @@ const mockSummary: SummaryResult = {
   phase2_deferred: [],
   detailed_topics: [],
   participants: ["Sercan", "Burak"],
-  summary: "Toplantı çok verimli geçti.",
+  summary: "Toplantı verimli geçti.",
   key_decisions: ["v0.1.0 bu hafta yayınlanacak"],
   agenda_topics: [],
   provider_used: "EchoMind",
   generation_time_ms: 120,
 };
 
-describe("AudioMemoPlayer Component", () => {
-  let mockUtteranceInstance: MockSpeechSynthesisUtterance | null = null;
+const emptySummary: SummaryResult = {
+  ...mockSummary,
+  meeting_goal: " ",
+  action_items: [],
+  key_decisions: [],
+  summary: "",
+};
 
+type Backend = {
+  supported?: boolean;
+  voice?: string | null;
+  speak?: () => Promise<unknown>;
+};
+
+const mockBackend = ({
+  supported = true,
+  voice = "Yelda",
+  speak = () => Promise.resolve("Yelda"),
+}: Backend = {}) =>
+  (invoke as any).mockImplementation((cmd: string) => {
+    if (cmd === "tts_availability")
+      return Promise.resolve({ supported, voice });
+    if (cmd === "tts_speak") return speak();
+    if (cmd === "tts_pause") return Promise.resolve("paused");
+    if (cmd === "tts_resume") return Promise.resolve("speaking");
+    return Promise.resolve("idle");
+  });
+
+const renderPlayer = (
+  props: Partial<React.ComponentProps<typeof AudioMemoPlayer>> = {},
+) =>
+  render(
+    <I18nProvider>
+      <AudioMemoPlayer
+        summary={mockSummary}
+        meetingTitle="Sprint Planlama"
+        langCode="tr"
+        {...props}
+      />
+    </I18nProvider>,
+  );
+
+const click = (el: HTMLElement) =>
+  act(async () => {
+    fireEvent.click(el);
+  });
+
+describe("buildMemoText", () => {
+  it("reads goal, decisions, tasks and the summary in the report language", () => {
+    expect(buildMemoText(mockSummary, "Sprint Planlama", "tr")).toBe(
+      "Sprint Planlama toplantısının sesli bülteni. " +
+        "Toplantının amacı: Yeni özellikleri canlıya almak. " +
+        "Alınan kararlar: v0.1.0 bu hafta yayınlanacak. " +
+        "Görevler: Sercan: Sürüm notlarını hazırla; Genel görev. " +
+        "Genel özet: Toplantı verimli geçti.",
+    );
+    const en = buildMemoText(mockSummary, undefined, "en");
+    expect(en).toMatch(/^Audio briefing for this meeting\./);
+    expect(en).toContain("Summary: Toplantı verimli geçti.");
+    expect(buildMemoText(mockSummary, "X", "de")).toContain("Entscheidungen:");
+    expect(buildMemoText(mockSummary, "X", "fr-FR")).toContain("Décisions");
+    expect(buildMemoText(mockSummary, "X", "es")).toContain("Decisiones");
+  });
+
+  it("skips missing parts and is empty without any", () => {
+    expect(
+      buildMemoText({ ...emptySummary, summary: "Kısa." }, "T", "tr"),
+    ).toBe("T toplantısının sesli bülteni. Genel özet: Kısa.");
+    expect(buildMemoText(emptySummary, "T", "tr")).toBe("");
+    expect(buildMemoText(null, "T", "tr")).toBe("");
+    expect(
+      buildMemoText(
+        { ...emptySummary, key_decisions: undefined as any },
+        "T",
+        "tr",
+      ),
+    ).toBe("");
+  });
+});
+
+describe("AudioMemoPlayer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    (global as any).SpeechSynthesisUtterance = class extends (
-      MockSpeechSynthesisUtterance
-    ) {
-      constructor(text: string) {
-        super(text);
-        mockUtteranceInstance = this;
-      }
-    };
-    (window as any).speechSynthesis = {
-      speak: vi.fn(),
-      pause: vi.fn(),
-      resume: vi.fn(),
-      cancel: vi.fn(),
-    };
+    delete globalTestEventListeners["tts-state"];
   });
 
-  it("renders null when summary is not provided", () => {
-    const { container } = render(
-      <I18nProvider>
-        <AudioMemoPlayer summary={null} />
-      </I18nProvider>,
-    );
-    expect(container.firstChild).toBeNull();
+  it("is hidden where the system offers no voices", async () => {
+    mockBackend({ supported: false, voice: null });
+    const { container } = renderPlayer();
+    await act(async () => {});
+    expect(container).toBeEmptyDOMElement();
   });
 
-  it("renders audio memo bar and controls correctly", () => {
-    render(
-      <I18nProvider>
-        <AudioMemoPlayer
-          summary={mockSummary}
-          meetingTitle="Sprint Demo"
-          langCode="tr"
-        />
-      </I18nProvider>,
-    );
-
-    expect(screen.getByText(/Sesli Bülteni Dinle/i)).toBeInTheDocument();
-    expect(screen.getByText("1x")).toBeInTheDocument();
+  it("is hidden when the backend cannot be reached", async () => {
+    (invoke as any).mockRejectedValue(new Error("no backend"));
+    const { container } = renderPlayer();
+    await act(async () => {});
+    expect(container).toBeEmptyDOMElement();
   });
 
-  it("triggers play, pause, resume, speed toggle and stop with speechSynthesis", () => {
-    render(
-      <I18nProvider>
-        <AudioMemoPlayer
-          summary={mockSummary}
-          meetingTitle="Sprint Demo"
-          langCode="tr"
-        />
-      </I18nProvider>,
-    );
+  it("reads the summary with the native voice, pauses, resumes and stops", async () => {
+    mockBackend();
+    renderPlayer();
+    await click(await screen.findByRole("button", { name: /Dinle/ }));
+    expect(invoke).toHaveBeenCalledWith("tts_speak", {
+      text: buildMemoText(mockSummary, "Sprint Planlama", "tr"),
+      lang: "tr",
+      rate: 1,
+    });
+    expect(screen.getByText("Okunuyor…")).toBeInTheDocument();
+    expect(screen.getByText(/Ses: Yelda/)).toBeInTheDocument();
 
-    const playBtn = screen.getByRole("button", { name: /Dinle/i });
-    fireEvent.click(playBtn);
+    await click(screen.getByRole("button", { name: /Duraklat/ }));
+    expect(invoke).toHaveBeenCalledWith("tts_pause");
+    expect(screen.getByText("Duraklatıldı")).toBeInTheDocument();
 
-    expect(window.speechSynthesis.speak).toHaveBeenCalled();
+    await click(screen.getByRole("button", { name: /Devam et/ }));
+    expect(invoke).toHaveBeenCalledWith("tts_resume");
 
-    // Speed toggle while playing
-    const speedBtn = screen.getByRole("button", { name: /1x/i });
-    fireEvent.click(speedBtn);
-    expect(screen.getByText("1.25x")).toBeInTheDocument();
-
-    // Pause toggle
-    const pauseBtn = screen.getByRole("button", { name: /Duraklatıldı/i });
-    fireEvent.click(pauseBtn);
-    expect(window.speechSynthesis.pause).toHaveBeenCalled();
-
-    // Resume toggle
-    fireEvent.click(pauseBtn);
-    expect(window.speechSynthesis.resume).toHaveBeenCalled();
-
-    // Trigger onend
-    if (mockUtteranceInstance?.onend) {
-      act(() => {
-        mockUtteranceInstance?.onend?.();
-      });
-    }
-
-    // Now it should show Dinle again
-    const restartPlayBtn = screen.getByRole("button", { name: /Dinle/i });
-    fireEvent.click(restartPlayBtn);
-
-    // Stop
-    const stopBtn = screen.getByTitle(/Durdur/i);
-    fireEvent.click(stopBtn);
-    expect(window.speechSynthesis.cancel).toHaveBeenCalled();
+    await click(screen.getByRole("button", { name: "Durdur" }));
+    expect(invoke).toHaveBeenCalledWith("tts_stop");
+    expect(
+      screen.queryByRole("button", { name: "Durdur" }),
+    ).not.toBeInTheDocument();
   });
 
-  it("handles english summary narrative properly and empty fields", () => {
-    const fullEnglishSummary: SummaryResult = {
-      ...mockSummary,
-      meeting_goal: "Launch Q3 Features",
-      key_decisions: ["Adopt Next.js", "Deploy to Vercel"],
-      action_items: [
-        {
-          task: "Write docs",
-          assignee: "Alice",
-          source_citations: [],
-          is_completed: false,
-        },
-        {
-          task: "Run QA",
-          assignee: undefined,
-          source_citations: [],
-          is_completed: false,
-        },
-      ],
-      summary: "Great progress achieved.",
-    };
-
-    render(
-      <I18nProvider>
-        <AudioMemoPlayer
-          summary={fullEnglishSummary}
-          meetingTitle="Q3 Planning"
-          langCode="en"
-        />
-      </I18nProvider>,
+  it("returns to idle when the engine finishes on its own", async () => {
+    mockBackend();
+    renderPlayer();
+    await click(await screen.findByRole("button", { name: /Dinle/ }));
+    await waitFor(() =>
+      expect(globalTestEventListeners["tts-state"]?.length).toBe(1),
     );
-
-    const playBtn = screen.getByRole("button", { name: /Dinle/i });
-    fireEvent.click(playBtn);
-    expect(window.speechSynthesis.speak).toHaveBeenCalled();
-
-    // Speed toggle through all cycles while playing: 1 -> 1.25 -> 1.5 -> 2 -> 1
-    const speedBtn = screen.getByRole("button", { name: /1x/i });
-    fireEvent.click(speedBtn); // 1.25x
-    fireEvent.click(speedBtn); // 1.5x
-    fireEvent.click(speedBtn); // 2x
-    fireEvent.click(speedBtn); // 1x
-
-    if (mockUtteranceInstance?.onend) {
-      act(() => {
-        mockUtteranceInstance?.onend?.();
-      });
-    }
-
-    // Toggle speed when not playing
-    fireEvent.click(speedBtn);
-    expect(screen.getByText("1.25x")).toBeInTheDocument();
-
-    // Trigger error when playing
-    fireEvent.click(playBtn);
-    if (mockUtteranceInstance?.onerror) {
-      act(() => {
-        mockUtteranceInstance?.onerror?.();
-      });
-    }
+    act(() => {
+      globalTestEventListeners["tts-state"].forEach((cb) =>
+        cb({ payload: { state: "idle" } }),
+      );
+    });
+    expect(screen.getByText(/Rapor özetini/)).toBeInTheDocument();
   });
 
-  it("handles empty fields in summary properly", () => {
-    const emptySummary: SummaryResult = {
-      ...mockSummary,
-      meeting_goal: "",
-      key_decisions: [],
-      action_items: [],
-      summary: "",
-    };
-
-    render(
-      <I18nProvider>
-        <AudioMemoPlayer summary={emptySummary} langCode="tr" />
-      </I18nProvider>,
-    );
-
-    const playBtn = screen.getByRole("button", { name: /Dinle/i });
-    fireEvent.click(playBtn);
-    expect(window.speechSynthesis.speak).toHaveBeenCalled();
+  it("restarts at the new speed while reading", async () => {
+    mockBackend();
+    renderPlayer();
+    await click(await screen.findByRole("button", { name: "Hız: 1x" }));
+    expect(invoke).not.toHaveBeenCalledWith("tts_speak", expect.anything());
+    await click(screen.getByRole("button", { name: /Dinle/ }));
+    await click(screen.getByRole("button", { name: "Hız: 1.25x" }));
+    expect(invoke).toHaveBeenLastCalledWith("tts_speak", {
+      text: expect.any(String),
+      lang: "tr",
+      rate: 1.5,
+    });
   });
 
-  it("handles browser unsupported alert gracefully", () => {
-    const originalSynthesis = (window as any).speechSynthesis;
-    delete (window as any).speechSynthesis;
-    const alertSpy = vi.spyOn(window, "alert").mockImplementation(() => {});
+  it("explains an empty report instead of pretending to play", async () => {
+    mockBackend();
+    renderPlayer({ summary: emptySummary });
+    expect(
+      await screen.findByText("Dinlenecek özet yok. Önce raporu oluşturun."),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Dinle/ })).toBeDisabled();
+  });
 
-    render(
-      <I18nProvider>
-        <AudioMemoPlayer summary={mockSummary} langCode="tr" />
-      </I18nProvider>,
+  it("explains a missing voice for the language", async () => {
+    mockBackend({ voice: null });
+    renderPlayer();
+    expect(
+      await screen.findByText(/Bu dil için yüklü bir sistem sesi yok/),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Dinle/ })).toBeDisabled();
+  });
+
+  it("shows why reading failed", async () => {
+    mockBackend({ speak: () => Promise.reject("audio device busy") });
+    renderPlayer();
+    await click(await screen.findByRole("button", { name: /Dinle/ }));
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Seslendirme başlatılamadı: audio device busy",
     );
+    expect(
+      screen.queryByRole("button", { name: "Durdur" }),
+    ).not.toBeInTheDocument();
+  });
 
-    const playBtn = screen.getByRole("button", { name: /Dinle/i });
-    fireEvent.click(playBtn);
-    expect(alertSpy).toHaveBeenCalled();
+  it("maps engine error codes to clear messages", async () => {
+    mockBackend({ speak: () => Promise.reject(new Error("no_voice")) });
+    const { unmount } = renderPlayer();
+    await click(await screen.findByRole("button", { name: /Dinle/ }));
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      /Bu dil için yüklü bir sistem sesi yok/,
+    );
+    unmount();
 
-    alertSpy.mockRestore();
-    (window as any).speechSynthesis = originalSynthesis;
+    mockBackend({ speak: () => Promise.reject("empty_text") });
+    renderPlayer();
+    await click(await screen.findByRole("button", { name: /Dinle/ }));
+    expect(screen.getByRole("alert")).toHaveTextContent("Dinlenecek özet yok");
+  });
+
+  it("stops reading when it goes away", async () => {
+    mockBackend();
+    const { unmount } = renderPlayer();
+    await click(await screen.findByRole("button", { name: /Dinle/ }));
+    (invoke as any).mockClear();
+    unmount();
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith("tts_stop"));
+  });
+
+  it("does not call stop on unmount when nothing was read", async () => {
+    mockBackend();
+    const { unmount } = renderPlayer();
+    await screen.findByRole("button", { name: /Dinle/ });
+    (invoke as any).mockClear();
+    unmount();
+    await act(async () => {});
+    expect(invoke).not.toHaveBeenCalledWith("tts_stop");
+  });
+
+  it("surfaces a failed pause", async () => {
+    (invoke as any).mockImplementation((cmd: string) => {
+      if (cmd === "tts_availability")
+        return Promise.resolve({ supported: true, voice: "Yelda" });
+      if (cmd === "tts_speak") return Promise.resolve("Yelda");
+      return Promise.reject("engine gone");
+    });
+    renderPlayer();
+    await click(await screen.findByRole("button", { name: /Dinle/ }));
+    await click(screen.getByRole("button", { name: /Duraklat/ }));
+    expect(screen.getByRole("alert")).toHaveTextContent("engine gone");
   });
 });

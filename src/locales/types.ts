@@ -139,11 +139,25 @@ export interface TranslationKeys {
   summary: {
     audioMemo?: {
       button: string;
+      subtitle: string;
       playing: string;
       paused: string;
       speed: string;
       stop: string;
       play: string;
+      pause: string;
+      resume: string;
+      voice: string;
+      noReport: string;
+      noVoice: string;
+      error: string;
+      intro: string;
+      untitled: string;
+      goal: string;
+      decisions: string;
+      actions: string;
+      assigned: string;
+      overview: string;
     };
     rebuildReport: string;
     rebuilding: string;
