@@ -43,7 +43,7 @@ private func resolveLocale(_ requested: String) async -> Locale? {
 }
 
 @available(macOS 26.0, *)
-private func transcribe(path: String, locale requested: String) async -> [String: Any] {
+private func transcribe(path: String, locale requested: String, terms: [String]) async -> [String: Any] {
     guard let locale = await resolveLocale(requested) else {
         return ["ok": false, "error": "unsupported_locale"]
     }
@@ -58,6 +58,14 @@ private func transcribe(path: String, locale requested: String) async -> [String
             try await request.downloadAndInstall()
         }
         let analyzer = SpeechAnalyzer(modules: [transcriber])
+        // Words the recognizer should expect (technical terms, names): on a
+        // real Turkish meeting this fixed "net work in interfere is" →
+        // "network interface" and "Sonic Ball" → "SonicWall".
+        if !terms.isEmpty {
+            let context = AnalysisContext()
+            context.contextualStrings[.general] = terms
+            try await analyzer.setContext(context)
+        }
         let collector = Task { () throws -> [[String: Any]] in
             var segments: [[String: Any]] = []
             for try await result in transcriber.results where result.isFinal {
@@ -111,18 +119,23 @@ private func transcribe(path: String, locale requested: String) async -> [String
     }
 }
 
-/// Transcribes an audio file. Returns a JSON C string (free with
-/// `echomind_free_cstring`). Must not be called on the main thread.
+/// Transcribes an audio file. `terms`: newline-separated words to expect.
+/// Returns a JSON C string (free with `echomind_free_cstring`). Must not be
+/// called on the main thread.
 @_cdecl("echomind_dictate_file")
 public func echomind_dictate_file(
-    _ path: UnsafePointer<CChar>, _ locale: UnsafePointer<CChar>
+    _ path: UnsafePointer<CChar>, _ locale: UnsafePointer<CChar>, _ terms: UnsafePointer<CChar>
 ) -> UnsafeMutablePointer<CChar>? {
     let filePath = String(cString: path)
     let localeId = String(cString: locale)
+    let termList = String(cString: terms)
+        .split(separator: "\n")
+        .map { $0.trimmingCharacters(in: .whitespaces) }
+        .filter { !$0.isEmpty }
     guard #available(macOS 26.0, *) else {
         return jsonString(["ok": false, "error": "requires_macos_26"])
     }
-    return jsonString(blocking { await transcribe(path: filePath, locale: localeId) })
+    return jsonString(blocking { await transcribe(path: filePath, locale: localeId, terms: termList) })
 }
 
 /// 1 when on-device dictation can transcribe `locale` on this Mac.

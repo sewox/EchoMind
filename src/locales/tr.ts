@@ -27,6 +27,10 @@ export const tr: TranslationKeys = {
     storageUnlocking: "Güvenli depolama açılıyor…",
     storageUnlockHint:
       "Anahtarlık erişimi bekleniyor. Pencere yanıt vermeye devam eder; izin verdikten sonra geçmişiniz yüklenir.",
+    storageLocked: "Güvenli depolama açılamadı",
+    storageLockedHint:
+      "Anahtarlık erişimine izin verilmedi. Toplantı geçmişiniz silinmedi; erişime izin verdiğinizde açılacak.",
+    retry: "Tekrar dene",
     historyRecoveryNotice:
       "Önceki şifreli geçmiş bu sürümde açılamadı; yedekler saklandı. Yeni kayıtlar artık Keychain ile korunuyor.",
   },
@@ -52,6 +56,15 @@ export const tr: TranslationKeys = {
     error: "İndirilemedi: {error}",
     hint: "Raporlar şu an basit özetleyiciyle hazırlanıyor. Daha doğru rapor için cihaz içi rapor modelini indirin ({size} GB).",
     openModelHub: "Modeli indir",
+  },
+  glossary: {
+    title: "Özel Terimler",
+    desc: "Yazıya dökmenin tanıması gereken şirket, ürün ve kişi adlarını veya teknik terimleri her satıra bir tane yazın. Kısa ve isabetli liste en iyi sonucu verir (en fazla 100 terim).",
+    placeholder: "SonicWall\nAcme Yazılım\nAyşe Yılmaz",
+    count: "{count} terim",
+    saved: "Kaydedildi",
+    error: "Kaydedilemedi",
+    save: "Kaydet",
   },
   importProgress: {
     decoding: "Ses dosyası okunuyor…",
@@ -86,6 +99,32 @@ export const tr: TranslationKeys = {
     backToLive: "Canlı Akışa Dön",
   },
   transcript: {
+    bar: {
+      retranscribe: {
+        label: "Yeniden Yazıya Dök",
+        hint: "Kaydı farklı bir model veya dille baştan metne çevirir.",
+      },
+      analytics: {
+        label: "Analitik",
+        hint: "Kimin ne kadar konuştuğunu ve toplantının dengesini gösterir.",
+      },
+      copy: {
+        label: "Kopyala",
+        hint: "Tüm konuşma metnini panoya kopyalar.",
+      },
+      copied: {
+        label: "Kopyalandı",
+        hint: "Konuşma metni panoda.",
+      },
+      followUp: {
+        label: "Takip",
+        hint: "Toplantı sonrası e-posta, görev listesi ve takvim davetini hazırlar.",
+      },
+      export: {
+        label: "Dışa Aktar",
+        hint: "Raporu PDF, Markdown, Slack/Teams özeti veya JSON olarak kaydeder ya da paylaşır.",
+      },
+    },
     tabs: {
       stream: "Konuşma Akışı",
       report: "Toplantı Raporu",
@@ -137,7 +176,7 @@ export const tr: TranslationKeys = {
     speaker: "Konuşmacı",
     confidence: "Doğruluk",
     noRecordings: "Henüz bir konuşma kaydı bulunmuyor.",
-    smartRedaction: "✍️ Akıllı Redaksiyon & Düzeltme",
+    smartRedaction: "Akıllı Redaksiyon & Düzeltme",
     redacting: "Redakte Ediliyor...",
     noSearchResults: "Aramanızla eşleşen konuşma bulunamadı.",
     listeningLive: "Konuşmalar dinleniyor, anlık yazıya dökülecek...",
@@ -149,14 +188,29 @@ export const tr: TranslationKeys = {
   },
   summary: {
     audioMemo: {
-      button: "🎙️ Sesli Bülteni Dinle (AI Podcast)",
-      playing: "Sesli Özet Dinleniyor...",
+      button: "Sesli Bülten",
+      subtitle: "Rapor özetini sistem sesiyle dinleyin",
+      playing: "Okunuyor…",
       paused: "Duraklatıldı",
       speed: "Hız",
       stop: "Durdur",
       play: "Dinle",
+      pause: "Duraklat",
+      resume: "Devam et",
+      voice: "Ses: {voice}",
+      noReport: "Dinlenecek özet yok. Önce raporu oluşturun.",
+      noVoice:
+        "Bu dil için yüklü bir sistem sesi yok. İşletim sisteminin konuşma ayarlarından bir ses ekleyebilirsiniz.",
+      error: "Seslendirme başlatılamadı: {error}",
+      intro: "{title} toplantısının sesli bülteni.",
+      untitled: "Bu toplantının sesli bülteni.",
+      goal: "Toplantının amacı: {text}.",
+      decisions: "Alınan kararlar: {text}.",
+      actions: "Görevler: {text}.",
+      assigned: "{assignee}: {task}",
+      overview: "Genel özet: {text}.",
     },
-    rebuildReport: "✨ Raporu Yeniden Oluştur",
+    rebuildReport: "Raporu Yeniden Oluştur",
     rebuilding: "Rapor Hazırlanıyor...",
     rebuildTooltip: "Mevcut konuşmalardan yeni bir yapay zeka özeti çıkarın",
     changeModelAndRetranscribe: "Zeka Modunu Değiştir & Yeniden Yazıya Dök",
@@ -460,6 +514,7 @@ export const tr: TranslationKeys = {
     },
   },
   followUp: {
+    shortLabel: "Takip",
     modalTitle: "One-Click Follow-up Engine",
     modalSubtitle:
       "Toplantı sonrası profesyonel e-posta, görev tablosu ve takvim davetiyesini tek tıkla oluşturun",

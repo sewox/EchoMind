@@ -885,6 +885,7 @@ body {
         record: &MeetingRecord,
         custom_summary: Option<&SummaryResult>,
         lang_code: Option<&str>,
+        tone: Option<&str>,
     ) -> (String, String) {
         let labels = ReportLabels::for_lang(lang_code);
         let goal_opt = custom_summary
@@ -902,86 +903,75 @@ body {
 
         let code = lang_code.unwrap_or("tr").to_lowercase();
         let prefix = if code.len() >= 2 { &code[..2] } else { "tr" };
-
-        let (subject_prefix, greeting, intro_template, pending_label, done_label, closing, signoff) = match prefix {
-            "en" => (
-                "Follow-up & Meeting Notes",
-                "Hi Team,",
-                format!("Thank you for attending our meeting on \"{}\" ({}). Here is the consolidated summary and actionable items:", record.title, record.date_formatted),
-                "[PENDING]",
-                "[DONE]",
-                "Please let me know if you have any questions or additional points to cover.",
-                "Best regards,"
-            ),
-            "de" => (
-                "Follow-up & Meeting-Notizen",
-                "Hallo Team,",
-                format!("Vielen Dank für Ihre Teilnahme am Meeting \"{}\" ({}). Hier ist die Zusammenfassung der wichtigsten Punkte und Aufgaben:", record.title, record.date_formatted),
-                "[OFFEN]",
-                "[ERLEDIGT]",
-                "Bei Fragen oder Ergänzungen stehen wir Ihnen gerne zur Verfügung.",
-                "Mit freundlichen Grüßen,"
-            ),
-            "fr" => (
-                "Suivi & Notes de Réunion",
-                "Bonjour l'équipe,",
-                format!("Merci pour votre participation à la réunion \"{}\" ({}). Voici le compte-rendu consolidé et les actions retenues :", record.title, record.date_formatted),
-                "[À FAIRE]",
-                "[TERMINÉ]",
-                "N'hésitez pas à revenir vers moi pour toute question ou remarque.",
-                "Cordialement,"
-            ),
-            "es" => (
-                "Seguimiento y Notas de Reunión",
-                "Hola a todos,",
-                format!("Gracias por asistir a la reunión \"{}\" ({}). A continuación les comparto el resumen y las tareas asignadas:", record.title, record.date_formatted),
-                "[PENDIENTE]",
-                "[COMPLETADO]",
-                "Quedo a su disposición para cualquier duda o comentario.",
-                "Saludos cordiales,"
-            ),
-            _ => (
-                "Takip & Toplantı Notları",
-                "Merhaba Ekip,",
-                format!("{} tarihinde gerçekleştirdiğimiz \"{}\" konulu toplantımızın özet notları ve belirlenen aksiyon maddeleri aşağıda bilginize sunulmuştur:", record.date_formatted, record.title),
-                "[YAPILACAK]",
-                "[TAMAMLANDI]",
-                "Sorularınız veya eklemek istedikleriniz olursa lütfen iletiniz.",
-                "İyi çalışmalar dilerim."
-            ),
-        };
+        let tone = FollowupTone::parse(tone);
+        let text = followup_tone_text(prefix, tone, &record.title, &record.date_formatted);
 
         let subject = format!(
             "{}: {} ({})",
-            subject_prefix, record.title, record.date_formatted
+            text.subject_prefix, record.title, record.date_formatted
         );
 
         let mut body = String::new();
-        body.push_str(&format!("{}\n\n", greeting));
-        body.push_str(&format!("{}\n\n", intro_template));
+        body.push_str(&format!("{}\n\n", text.greeting));
+        body.push_str(&format!("{}\n\n", text.intro));
 
         if let Some(goal) = goal_opt {
-            body.push_str(&format!("📌 {}:\n{}\n\n", labels.meeting_goal_title, goal));
+            body.push_str(&format!(
+                "{}:\n{}\n\n",
+                with_icon("📌", &labels.meeting_goal_title),
+                goal
+            ));
         }
 
-        if let Some(highlights) = highlights_opt {
-            if !highlights.is_empty() {
-                body.push_str(&format!("💡 {}:\n", labels.highlights_title));
-                for h in highlights {
-                    body.push_str(&format!("• {}\n", h));
+        // Executives and customers get the outcome, not the discussion notes.
+        if matches!(tone, FollowupTone::Standard | FollowupTone::Casual) {
+            if let Some(highlights) = highlights_opt {
+                if !highlights.is_empty() {
+                    body.push_str(&format!("{}:\n", with_icon("💡", &labels.highlights_title)));
+                    for h in highlights {
+                        body.push_str(&format!("• {}\n", h));
+                    }
+                    body.push('\n');
                 }
-                body.push('\n');
             }
         }
 
+        // Customers see agreements before next steps.
+        let agreed_first = tone == FollowupTone::Sales;
+        let push_agreed = |body: &mut String| {
+            if let Some(phase1) = phase1_opt {
+                if !phase1.is_empty() {
+                    let title = text.agreed_title.unwrap_or(&labels.phase1_title);
+                    body.push_str(&format!("{}:\n", with_icon("⚡", title)));
+                    for p in phase1 {
+                        body.push_str(&format!("• {}\n", p));
+                    }
+                    body.push('\n');
+                }
+            }
+        };
+        if agreed_first {
+            push_agreed(&mut body);
+        }
+
         if let Some(actions) = actions_opt {
+            // Executives: the three most important (first) tasks only.
+            let limit = if tone == FollowupTone::Executive {
+                3
+            } else {
+                usize::MAX
+            };
             if !actions.is_empty() {
-                body.push_str(&format!("🎯 {}:\n", labels.action_items_title));
-                for a in actions {
-                    let status = if a.is_completed {
-                        done_label
+                let title = text.actions_title.unwrap_or(&labels.action_items_title);
+                body.push_str(&format!("{}:\n", with_icon("🎯", title)));
+                for a in actions.iter().take(limit) {
+                    // Internal status tags make no sense to a customer.
+                    let status = if tone == FollowupTone::Sales {
+                        String::new()
+                    } else if a.is_completed {
+                        format!("{} ", text.done_label)
                     } else {
-                        pending_label
+                        format!("{} ", text.pending_label)
                     };
                     let clean_ass = a.assignee.as_deref().and_then(|p| {
                         crate::summarizer::local_extractor::LocalSummaryExtractor::clean_assignee(
@@ -992,23 +982,17 @@ body {
                     let assignee_str = clean_ass
                         .map(|p| format!(" - {}: @{}", labels.assignee_label, p))
                         .unwrap_or_default();
-                    body.push_str(&format!("• {} {}{}\n", status, a.task, assignee_str));
+                    body.push_str(&format!("• {}{}{}\n", status, a.task, assignee_str));
                 }
                 body.push('\n');
             }
         }
 
-        if let Some(phase1) = phase1_opt {
-            if !phase1.is_empty() {
-                body.push_str(&format!("⚡ {}:\n", labels.phase1_title));
-                for p in phase1 {
-                    body.push_str(&format!("• {}\n", p));
-                }
-                body.push('\n');
-            }
+        if !agreed_first {
+            push_agreed(&mut body);
         }
 
-        body.push_str(&format!("{}\n{}\n\n", closing, signoff));
+        body.push_str(&format!("{}\n{}\n\n", text.closing, text.signoff));
         body.push_str(&format!("---\n{}\n", labels.footer_text));
 
         (subject, body)
@@ -1204,6 +1188,94 @@ pub struct FollowUpBundle {
     pub action_items_csv: String,
     pub slack_md: String,
     pub ics_content: String,
+}
+
+/// `icon title`, unless the title already starts with its own icon (the
+/// report labels carry one: "💡 Alınan Dersler…" must not become "💡 💡 …").
+fn with_icon(icon: &str, title: &str) -> String {
+    match title.chars().next() {
+        Some(c) if !c.is_alphanumeric() => title.to_string(),
+        _ => format!("{icon} {title}"),
+    }
+}
+
+/// Tone of the follow-up email, as chosen in the follow-up view.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FollowupTone {
+    Standard,
+    Executive,
+    Sales,
+    Casual,
+}
+
+impl FollowupTone {
+    pub fn parse(tone: Option<&str>) -> Self {
+        match tone.unwrap_or("standard") {
+            "executive" => Self::Executive,
+            "sales" => Self::Sales,
+            "casual" => Self::Casual,
+            _ => Self::Standard,
+        }
+    }
+}
+
+struct FollowupToneText {
+    subject_prefix: &'static str,
+    greeting: &'static str,
+    intro: String,
+    pending_label: &'static str,
+    done_label: &'static str,
+    closing: &'static str,
+    signoff: &'static str,
+    /// Section titles that replace the report labels for this tone.
+    agreed_title: Option<&'static str>,
+    actions_title: Option<&'static str>,
+}
+
+fn followup_tone_text(lang: &str, tone: FollowupTone, title: &str, date: &str) -> FollowupToneText {
+    use FollowupTone::*;
+    let (pending, done) = match lang {
+        "en" => ("[PENDING]", "[DONE]"),
+        "de" => ("[OFFEN]", "[ERLEDIGT]"),
+        "fr" => ("[À FAIRE]", "[TERMINÉ]"),
+        "es" => ("[PENDIENTE]", "[COMPLETADO]"),
+        _ => ("[YAPILACAK]", "[TAMAMLANDI]"),
+    };
+    let t = |subject_prefix, greeting, intro: String, closing, signoff, agreed, actions| {
+        FollowupToneText {
+            subject_prefix,
+            greeting,
+            intro,
+            pending_label: pending,
+            done_label: done,
+            closing,
+            signoff,
+            agreed_title: agreed,
+            actions_title: actions,
+        }
+    };
+    match (lang, tone) {
+        ("en", Standard) => t("Follow-up & Meeting Notes", "Hi Team,", format!("Thank you for attending our meeting on \"{title}\" ({date}). Here is the consolidated summary and actionable items:"), "Please let me know if you have any questions or additional points to cover.", "Best regards,", None, None),
+        ("en", Executive) => t("Executive Summary", "Dear all,", format!("A brief summary of the \"{title}\" meeting ({date}): the outcome and the key actions."), "I would appreciate your approval.", "Kind regards,", Some("Decisions"), Some("Key actions")),
+        ("en", Sales) => t("Our Meeting", "Hello,", format!("Thank you for your time in our meeting on \"{title}\" ({date}). Below are the points we agreed on and the next steps:"), "We are happy to help with any questions.", "Best regards,", Some("What we agreed"), Some("Next steps")),
+        ("en", Casual) => t("Quick meeting notes", "Hi everyone! 👋", format!("Here's a quick recap of \"{title}\" ({date}):"), "Shout if I missed anything 🙌", "Cheers,", None, None),
+        ("de", Standard) => t("Follow-up & Meeting-Notizen", "Hallo Team,", format!("Vielen Dank für Ihre Teilnahme am Meeting \"{title}\" ({date}). Hier ist die Zusammenfassung der wichtigsten Punkte und Aufgaben:"), "Bei Fragen oder Ergänzungen stehen wir Ihnen gerne zur Verfügung.", "Mit freundlichen Grüßen,", None, None),
+        ("de", Executive) => t("Management-Zusammenfassung", "Sehr geehrte Damen und Herren,", format!("Kurzfassung des Meetings \"{title}\" ({date}): Ergebnis und wichtigste Maßnahmen."), "Ich bitte um Ihre Freigabe.", "Mit freundlichen Grüßen,", Some("Entscheidungen"), Some("Wichtigste Maßnahmen")),
+        ("de", Sales) => t("Unser Gespräch", "Guten Tag,", format!("Vielen Dank für Ihre Zeit im Gespräch \"{title}\" ({date}). Hier sind die vereinbarten Punkte und die nächsten Schritte:"), "Bei Fragen helfen wir Ihnen gerne weiter.", "Mit freundlichen Grüßen,", Some("Vereinbart"), Some("Nächste Schritte")),
+        ("de", Casual) => t("Kurze Meeting-Notizen", "Hallo zusammen! 👋", format!("Hier eine kurze Zusammenfassung von \"{title}\" ({date}):"), "Meldet euch, falls etwas fehlt 🙌", "Viele Grüße,", None, None),
+        ("fr", Standard) => t("Suivi & Notes de Réunion", "Bonjour l'équipe,", format!("Merci pour votre participation à la réunion \"{title}\" ({date}). Voici le compte-rendu consolidé et les actions retenues :"), "N'hésitez pas à revenir vers moi pour toute question ou remarque.", "Cordialement,", None, None),
+        ("fr", Executive) => t("Synthèse pour la direction", "Madame, Monsieur,", format!("Synthèse de la réunion \"{title}\" ({date}) : résultat et actions principales."), "Je vous remercie de votre validation.", "Bien cordialement,", Some("Décisions"), Some("Actions principales")),
+        ("fr", Sales) => t("Notre rendez-vous", "Bonjour,", format!("Merci pour le temps accordé lors de notre réunion \"{title}\" ({date}). Voici les points convenus et les prochaines étapes :"), "Nous restons à votre disposition pour toute question.", "Cordialement,", Some("Points convenus"), Some("Prochaines étapes")),
+        ("fr", Casual) => t("Notes rapides de réunion", "Salut tout le monde ! 👋", format!("Petit récap de \"{title}\" ({date}) :"), "Dites-moi si j'ai oublié quelque chose 🙌", "À bientôt,", None, None),
+        ("es", Standard) => t("Seguimiento y Notas de Reunión", "Hola a todos,", format!("Gracias por asistir a la reunión \"{title}\" ({date}). A continuación les comparto el resumen y las tareas asignadas:"), "Quedo a su disposición para cualquier duda o comentario.", "Saludos cordiales,", None, None),
+        ("es", Executive) => t("Resumen ejecutivo", "Estimados,", format!("Resumen de la reunión \"{title}\" ({date}): resultado y acciones principales."), "Quedo a la espera de su aprobación.", "Atentamente,", Some("Decisiones"), Some("Acciones principales")),
+        ("es", Sales) => t("Nuestra reunión", "Hola,", format!("Gracias por su tiempo en nuestra reunión \"{title}\" ({date}). Estos son los puntos acordados y los próximos pasos:"), "Estaremos encantados de ayudarle con cualquier duda.", "Saludos cordiales,", Some("Lo acordado"), Some("Próximos pasos")),
+        ("es", Casual) => t("Notas rápidas de la reunión", "¡Hola a todos! 👋", format!("Un resumen rápido de \"{title}\" ({date}):"), "Avisad si se me pasó algo 🙌", "¡Saludos!", None, None),
+        (_, Executive) => t("Yönetici Özeti", "Sayın Yöneticiler,", format!("{date} tarihli \"{title}\" toplantısının kısa özeti: sonuç ve öne çıkan aksiyonlar."), "Onayınıza sunarım.", "Saygılarımla,", Some("Alınan Kararlar"), Some("Öne Çıkan Aksiyonlar")),
+        (_, Sales) => t("Görüşmemiz Hakkında", "Merhaba,", format!("{date} tarihli \"{title}\" görüşmemiz için zaman ayırdığınız için teşekkür ederiz. Mutabık kaldığımız konular ve sonraki adımlar aşağıdadır:"), "Herhangi bir sorunuz olursa memnuniyetle yardımcı oluruz.", "Saygılarımızla,", Some("Mutabık Kalınan Konular"), Some("Sonraki Adımlar")),
+        (_, Casual) => t("Kısa toplantı notları", "Selam ekip! 👋", format!("\"{title}\" toplantısının ({date}) kısa özeti:"), "Eksik bir şey varsa yazın 🙌", "Görüşmek üzere,", None, None),
+        (_, Standard) => t("Takip & Toplantı Notları", "Merhaba Ekip,", format!("{date} tarihinde gerçekleştirdiğimiz \"{title}\" konulu toplantımızın özet notları ve belirlenen aksiyon maddeleri aşağıda bilginize sunulmuştur:"), "Sorularınız veya eklemek istedikleriniz olursa lütfen iletiniz.", "İyi çalışmalar dilerim.", None, None),
+    }
 }
 
 #[cfg(test)]

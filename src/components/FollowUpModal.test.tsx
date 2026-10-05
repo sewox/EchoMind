@@ -128,6 +128,34 @@ describe("FollowUpModal Component", () => {
     );
   });
 
+  it("shows the four tabs without duplicated emoji, in one row", () => {
+    renderComponent();
+    const tabs = screen.getAllByRole("tab");
+    expect(tabs).toHaveLength(4);
+    expect(tabs[0]).toHaveTextContent(/^Takip E-Postası$/);
+    expect(tabs[0]).toHaveAttribute("aria-selected", "true");
+    expect(tabs[0].parentElement).toHaveClass("grid-cols-4");
+  });
+
+  it("asks the backend for the chosen tone", async () => {
+    renderComponent();
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith(
+        "export_followup_bundle",
+        expect.objectContaining({ tone: "standard" }),
+      ),
+    );
+    await act(async () => {
+      fireEvent.click(screen.getByText(/Yönetici/i));
+    });
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith(
+        "export_followup_bundle",
+        expect.objectContaining({ tone: "executive" }),
+      ),
+    );
+  });
+
   it("loads and renders email draft", async () => {
     renderComponent();
 
@@ -214,7 +242,7 @@ describe("FollowUpModal Component", () => {
     renderComponent();
 
     // Click on Actions tab
-    const actionsTab = screen.getByRole("button", {
+    const actionsTab = screen.getByRole("tab", {
       name: /Görevler & Sorumlular/i,
     });
     await act(async () => {
@@ -254,7 +282,7 @@ describe("FollowUpModal Component", () => {
     };
     renderComponent({ meeting: emptyMeeting });
 
-    const actionsTab = screen.getByRole("button", {
+    const actionsTab = screen.getByRole("tab", {
       name: /Görevler & Sorumlular/i,
     });
     await act(async () => {
@@ -271,7 +299,7 @@ describe("FollowUpModal Component", () => {
   it("switches to Calendar (.ics) tab, changes event title, date, duration and downloads ics", async () => {
     renderComponent();
 
-    const calendarTab = screen.getByRole("button", { name: /Takvim Daveti/i });
+    const calendarTab = screen.getByRole("tab", { name: /Takvim Daveti/i });
     await act(async () => {
       fireEvent.click(calendarTab);
     });
@@ -316,7 +344,7 @@ describe("FollowUpModal Component", () => {
   it("switches to Slack / Teams tab and copies formatted text", async () => {
     renderComponent();
 
-    const slackTab = screen.getByRole("button", { name: /Slack & Teams/i });
+    const slackTab = screen.getByRole("tab", { name: /Slack & Teams/i });
     await act(async () => {
       fireEvent.click(slackTab);
     });
@@ -376,7 +404,7 @@ describe("FollowUpModal Component", () => {
     renderComponent();
 
     // Click Calendar tab and try download
-    const calendarTab = screen.getByRole("button", { name: /Takvim Daveti/i });
+    const calendarTab = screen.getByRole("tab", { name: /Takvim Daveti/i });
     await act(async () => {
       fireEvent.click(calendarTab);
     });

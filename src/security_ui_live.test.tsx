@@ -56,7 +56,7 @@ describe("Live UI Security & Adversarial Injection Suite", () => {
     );
 
     // Click on API Keys tab
-    const apiTabBtn = screen.getByRole("button", {
+    const apiTabBtn = screen.getByRole("tab", {
       name: /Yapay Zeka Servisleri/i,
     });
     fireEvent.click(apiTabBtn);

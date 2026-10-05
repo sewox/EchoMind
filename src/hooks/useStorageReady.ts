@@ -7,6 +7,9 @@ export interface StorageReadyStatus {
   used_fallback: boolean;
   key_source?: string | null;
   show_history_recovery_notice?: boolean;
+  /** Keychain refused access: history stays closed until retried. */
+  locked?: boolean;
+  error?: string | null;
 }
 
 /**
@@ -19,8 +22,10 @@ export function useStorageReady() {
   const [keySource, setKeySource] = useState<string | null>(null);
   const [showHistoryRecoveryNotice, setShowHistoryRecoveryNotice] =
     useState(false);
+  const [locked, setLocked] = useState(false);
 
   const applyStatus = useCallback((status: StorageReadyStatus) => {
+    setLocked(Boolean(status.locked) && !status.ready);
     if (status.ready) {
       setReady(true);
       setUsedFallback(Boolean(status.used_fallback));
@@ -57,5 +62,18 @@ export function useStorageReady() {
     };
   }, [applyStatus]);
 
-  return { ready, usedFallback, keySource, showHistoryRecoveryNotice };
+  /** Asks the Keychain again (macOS shows its prompt again). */
+  const retry = useCallback(() => {
+    setLocked(false);
+    invoke("retry_storage_unlock").catch(() => setLocked(true));
+  }, []);
+
+  return {
+    ready,
+    usedFallback,
+    keySource,
+    showHistoryRecoveryNotice,
+    locked,
+    retry,
+  };
 }
