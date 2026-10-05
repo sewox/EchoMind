@@ -40,6 +40,15 @@ export const es: TranslationKeys = {
     modelHub: "Modelos",
     language: "Idioma",
   },
+  glossary: {
+    title: "Términos personalizados",
+    desc: "Nombres de empresas, productos y personas o términos técnicos que la transcripción debe reconocer, uno por línea. Las listas cortas y precisas funcionan mejor (hasta 100 términos).",
+    placeholder: "SonicWall\nAcme Software\nAna García",
+    count: "{count} términos",
+    saved: "Guardado",
+    error: "No se pudo guardar",
+    save: "Guardar",
+  },
   importProgress: {
     decoding: "Leyendo el archivo de audio…",
     transcribing: "Transcribiendo…",

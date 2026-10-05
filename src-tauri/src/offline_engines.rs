@@ -59,7 +59,7 @@ pub fn transcribe_apple_pcm(pcm: &[f32], language: &str) -> Result<Vec<Transcrip
             .unwrap_or(0)
     ));
     write_wav_16k_mono(&wav, pcm)?;
-    let result = apple::dictate(&wav, apple_locale(language));
+    let result = apple::dictate(&wav, apple_locale(language), &crate::glossary::terms());
     let _ = std::fs::remove_file(&wav);
     parse_dictation_json(&result?, language)
 }
@@ -149,18 +149,23 @@ mod apple {
     use std::path::Path;
 
     extern "C" {
-        fn echomind_dictate_file(path: *const c_char, locale: *const c_char) -> *mut c_char;
+        fn echomind_dictate_file(
+            path: *const c_char,
+            locale: *const c_char,
+            terms: *const c_char,
+        ) -> *mut c_char;
         fn echomind_dictation_supported(locale: *const c_char) -> i32;
         fn echomind_free_cstring(ptr: *mut c_char);
     }
 
-    pub fn dictate(path: &Path, locale: &str) -> Result<String, String> {
+    pub fn dictate(path: &Path, locale: &str, terms: &[String]) -> Result<String, String> {
         let path = CString::new(path.to_string_lossy().as_bytes()).map_err(|e| e.to_string())?;
         let locale = CString::new(locale).map_err(|e| e.to_string())?;
+        let terms = CString::new(terms.join("\n").replace('\0', "")).map_err(|e| e.to_string())?;
         // SAFETY: both pointers are valid NUL-terminated strings for the call;
         // the returned string is owned by us until echomind_free_cstring.
         unsafe {
-            let raw = echomind_dictate_file(path.as_ptr(), locale.as_ptr());
+            let raw = echomind_dictate_file(path.as_ptr(), locale.as_ptr(), terms.as_ptr());
             if raw.is_null() {
                 return Err("Apple dictation: no response".into());
             }
@@ -182,7 +187,7 @@ mod apple {
 #[cfg(not(target_os = "macos"))]
 mod apple {
     use std::path::Path;
-    pub fn dictate(_path: &Path, _locale: &str) -> Result<String, String> {
+    pub fn dictate(_path: &Path, _locale: &str, _terms: &[String]) -> Result<String, String> {
         Err("Apple dictation is only available on macOS".into())
     }
     pub fn supported(_locale: &str) -> bool {
