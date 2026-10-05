@@ -70,12 +70,9 @@ pub struct StorageEngine {
     pub meetings: Arc<Mutex<Vec<MeetingRecord>>>,
 }
 
-// These helpers back the release-build branch of `resolve_persistent_dir` below
-// (excluded from dev/`debug_assertions` builds, since those keep the old
-// CWD-relative behavior) but are directly unit-tested, hence `any(test, ...)`.
-#[cfg(any(test, not(debug_assertions)))]
+// These helpers back `resolve_persistent_dir` below: release builds use the
+// OS app directory, dev builds a `.dev` sibling of it for their data.
 const APP_DIR_NAME: &str = "echomind";
-#[cfg(any(test, not(debug_assertions)))]
 const APP_BUNDLE_ID: &str = "com.echomind.assistant";
 
 /// Computes the OS-standard, per-user, CWD-independent app data root for the given
@@ -85,7 +82,6 @@ const APP_BUNDLE_ID: &str = "com.echomind.assistant";
 /// Rust's parallel test runner). Returns None if the platform's expected env var
 /// isn't set (essentially never on a real desktop install) or the platform isn't
 /// one of the three we ship to — callers fall back to legacy CWD-relative behavior.
-#[cfg(any(test, not(debug_assertions)))]
 fn os_standard_app_root_for(
     target_os: &str,
     get_env: &dyn Fn(&str) -> Option<String>,
@@ -113,7 +109,7 @@ fn os_standard_app_root_for(
     }
 }
 
-#[cfg(all(not(test), not(debug_assertions)))]
+#[cfg(not(test))]
 fn os_standard_app_root() -> Option<PathBuf> {
     let target_os = std::env::consts::OS;
     os_standard_app_root_for(target_os, &|key| std::env::var(key).ok())
@@ -135,7 +131,6 @@ fn legacy_cwd_relative_dir(subdir: &str) -> PathBuf {
     PathBuf::from(subdir)
 }
 
-#[cfg(any(test, not(debug_assertions)))]
 fn copy_dir_recursive(src: &std::path::Path, dst: &std::path::Path) -> std::io::Result<()> {
     fs::create_dir_all(dst)?;
     for entry in fs::read_dir(src)? {
@@ -157,7 +152,6 @@ fn copy_dir_recursive(src: &std::path::Path, dst: &std::path::Path) -> std::io::
 /// never deleted or modified — so a bug here can never lose data, at worst it
 /// leaves the user exactly where they'd be without migration (a fresh, empty
 /// `new_dir`).
-#[cfg(any(test, not(debug_assertions)))]
 fn migrate_legacy_dir_if_present(new_dir: &std::path::Path, candidates: Vec<PathBuf>) {
     if new_dir.exists() {
         return;
@@ -189,9 +183,9 @@ fn migrate_legacy_dir_if_present(new_dir: &std::path::Path, candidates: Vec<Path
 /// `cargo run` / `cargo tauri dev`) and the candidate legacy locations to try
 /// migrating from on a release build's first run. Strategy per build context:
 /// - test: an isolated temp directory — tests must never touch real user/dev state.
-/// - dev: `dev_dir()`, unchanged from the previous CWD-relative behavior — keeps
-///   the existing developer workflow (e.g. the committed demo `data/` fixture, or
-///   models already sitting in `src-tauri/models/`) working exactly as before.
+/// - dev: `dev_dir()` — for data a `.dev` sibling of the OS app directory
+///   (outside the repository, see `dev_data_dir`); models stay in
+///   `src-tauri/models/`, which git never tracks.
 /// - release (what actually ships to users): a stable, OS-standard, per-user
 ///   directory instead of the process's CWD, which is unpredictable for a
 ///   packaged app (desktop icon vs terminal vs launcher) and can be entirely
@@ -236,10 +230,43 @@ fn exe_relative_candidate(subdir: &str) -> Option<PathBuf> {
         .and_then(|exe| exe.parent().map(|dir| dir.join(subdir)))
 }
 
+/// `<app root>.dev` next to the release app's directory: dev builds get their
+/// own data, apart from the installed app's.
+fn dev_variant_of(app_root: &std::path::Path) -> PathBuf {
+    let name = app_root
+        .file_name()
+        .map(|n| format!("{}.dev", n.to_string_lossy()))
+        .unwrap_or_else(|| "echomind.dev".to_string());
+    app_root.with_file_name(name)
+}
+
+/// Dev builds keep their data OUTSIDE the repository. It used to live in the
+/// repo's `data/`: checking out an old commit that still tracked
+/// `data/meetings_history.json` silently overwrote a developer's history, and
+/// moving back to a newer commit then deleted it. The first dev run copies the
+/// old `data/` over (copy only; nothing is deleted).
+#[cfg(all(not(test), debug_assertions))]
+fn dev_data_dir() -> PathBuf {
+    let legacy = legacy_cwd_relative_dir("data");
+    match os_standard_app_root() {
+        Some(root) => {
+            let dir = dev_variant_of(&root).join("data");
+            migrate_legacy_dir_if_present(&dir, vec![legacy]);
+            dir
+        }
+        None => legacy,
+    }
+}
+
+#[cfg(any(test, not(debug_assertions)))]
+fn dev_data_dir() -> PathBuf {
+    legacy_cwd_relative_dir("data")
+}
+
 pub fn get_storage_dir() -> PathBuf {
     resolve_persistent_dir(
         "data",
-        || legacy_cwd_relative_dir("data"),
+        dev_data_dir,
         || {
             let mut candidates = vec![legacy_cwd_relative_dir("data")];
             candidates.extend(exe_relative_candidate("data"));
@@ -629,6 +656,12 @@ pub struct StorageReadyStatus {
     /// undecryptable `.corrupt*` history backup exists — UI should explain once.
     #[serde(default)]
     pub show_history_recovery_notice: bool,
+    /// The keystore refused access (prompt denied or dismissed, keychain
+    /// locked). History stays closed — and untouched — until retried.
+    #[serde(default)]
+    pub locked: bool,
+    #[serde(default)]
+    pub error: Option<String>,
 }
 
 /// Durable dismiss marker for the one-time history-recovery notice.
@@ -695,6 +728,8 @@ fn last_storage_ready_status() -> &'static Mutex<StorageReadyStatus> {
             used_fallback: false,
             key_source: None,
             show_history_recovery_notice: false,
+            locked: false,
+            error: None,
         })
     })
 }
@@ -713,6 +748,9 @@ pub fn require_storage_ready() -> Result<(), String> {
     }
     if is_key_unlock_in_progress() {
         return Err(STORAGE_NOT_READY.to_string());
+    }
+    if crate::secure_key::is_key_unlock_locked() {
+        return Err(crate::secure_key::STORAGE_LOCKED.to_string());
     }
     // Unlock never started (unit tests, or a path before setup): allow sync key resolve.
     Ok(())
@@ -735,6 +773,8 @@ pub fn start_storage_unlock(app: tauri::AppHandle) {
                     used_fallback: false,
                     key_source: None,
                     show_history_recovery_notice: false,
+                    locked: false,
+                    error: None,
                 });
             let _ = app.emit("storage-unlocked", status);
         }
@@ -746,7 +786,27 @@ pub fn start_storage_unlock(app: tauri::AppHandle) {
         .spawn(move || {
             // May block on macOS Keychain Access prompt — must stay off the main thread.
             // Single master_key keystore item → at most one prompt for both encryption keys.
-            let data_source = prime_encryption_keys();
+            let data_source = match prime_encryption_keys() {
+                Ok(source) => source,
+                Err(reason) => {
+                    // No key was created and nothing is loaded or written: the
+                    // history file keeps its real contents for a retry.
+                    crate::secure_key::mark_keys_locked();
+                    let status = StorageReadyStatus {
+                        ready: false,
+                        used_fallback: false,
+                        key_source: None,
+                        show_history_recovery_notice: false,
+                        locked: true,
+                        error: Some(reason),
+                    };
+                    if let Ok(mut g) = last_storage_ready_status().lock() {
+                        *g = status.clone();
+                    }
+                    let _ = app.emit("storage-unlocked", status);
+                    return;
+                }
+            };
 
             if quit_abort_requested() {
                 // Quit while the prompt was open: do not load/emit; process is exiting.
@@ -792,6 +852,8 @@ pub fn start_storage_unlock(app: tauri::AppHandle) {
                 used_fallback: data_source.used_fallback(),
                 key_source: Some(data_source.as_log_label().to_string()),
                 show_history_recovery_notice: show_notice,
+                locked: false,
+                error: None,
             };
             store_storage_ready_status(status.clone());
             let _ = app.emit("storage-unlocked", &status);
@@ -816,13 +878,31 @@ pub fn get_storage_ready() -> StorageReadyStatus {
             used_fallback: false,
             key_source: None,
             show_history_recovery_notice: false,
+            locked: false,
+            error: None,
         };
+    }
+    if crate::secure_key::is_key_unlock_locked() {
+        if let Ok(guard) = last_storage_ready_status().lock() {
+            return guard.clone();
+        }
     }
     StorageReadyStatus {
         ready: false,
         used_fallback: false,
         key_source: None,
         show_history_recovery_notice: false,
+        locked: false,
+        error: None,
+    }
+}
+
+/// Asks the keystore again after access was refused (the Keychain prompt
+/// shows again on macOS). Progress and result arrive as `storage-unlocked`.
+#[tauri::command]
+pub fn retry_storage_unlock(app: tauri::AppHandle) {
+    if crate::secure_key::is_key_unlock_locked() {
+        start_storage_unlock(app);
     }
 }
 
@@ -1600,6 +1680,17 @@ pub fn get_all_tags() -> Result<Vec<String>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn dev_data_lives_next_to_the_app_directory() {
+        let mac = PathBuf::from("/Users/u/Library/Application Support/com.echomind.assistant");
+        assert_eq!(
+            dev_variant_of(&mac),
+            PathBuf::from("/Users/u/Library/Application Support/com.echomind.assistant.dev")
+        );
+        let win = PathBuf::from("C:/Users/u/AppData/Roaming/echomind");
+        assert_eq!(dev_variant_of(&win), PathBuf::from("C:/Users/u/AppData/Roaming/echomind.dev"));
+    }
 
     fn env_map(pairs: &[(&str, &str)]) -> impl Fn(&str) -> Option<String> {
         let pairs: Vec<(String, String)> = pairs

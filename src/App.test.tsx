@@ -22,13 +22,16 @@ vi.mock("./hooks/useFirstRunModelSetup", () => ({
 
 // Storage unlock is covered by useStorageReady.test.ts; App integration tests
 // assume secure storage is already ready so history fetch proceeds normally.
+const storageState = vi.hoisted(() => ({
+  ready: true,
+  usedFallback: false,
+  keySource: "keychain",
+  showHistoryRecoveryNotice: false,
+  locked: false,
+  retry: () => {},
+}));
 vi.mock("./hooks/useStorageReady", () => ({
-  useStorageReady: () => ({
-    ready: true,
-    usedFallback: false,
-    keySource: "keychain",
-    showHistoryRecoveryNotice: false,
-  }),
+  useStorageReady: () => storageState,
 }));
 
 vi.mock("./hooks/useHistoryRecoveryNotice", () => ({
@@ -183,6 +186,30 @@ describe("App Top-Level Integration", () => {
       return Promise.resolve();
     });
   };
+
+  it("explains a refused Keychain and retries from the unlock screen", async () => {
+    const retry = vi.fn();
+    Object.assign(storageState, { ready: false, locked: true, retry });
+    (invoke as any).mockImplementation(() => Promise.resolve([]));
+    try {
+      render(
+        <I18nProvider>
+          <App />
+        </I18nProvider>,
+      );
+      const overlay = screen.getByTestId("storage-unlock-overlay");
+      expect(overlay).toHaveTextContent("Güvenli depolama açılamadı");
+      expect(overlay).toHaveTextContent("silinmedi");
+      fireEvent.click(screen.getByRole("button", { name: "Tekrar dene" }));
+      expect(retry).toHaveBeenCalled();
+    } finally {
+      Object.assign(storageState, {
+        ready: true,
+        locked: false,
+        retry: () => {},
+      });
+    }
+  });
 
   it("renders top navigation, sidebar with meetings, and toggles recording", async () => {
     setupDefaultInvoke();
@@ -491,7 +518,7 @@ describe("App Top-Level Integration", () => {
     expect(await screen.findByText("Ayarlar ve Tercihler")).toBeInTheDocument();
 
     // Close Settings Modal
-    const closeSettings = screen.getByRole("button", { name: /Kapat/i });
+    const closeSettings = screen.getAllByRole("button", { name: /Kapat/i })[0];
     await act(async () => {
       fireEvent.click(closeSettings);
     });
@@ -1223,7 +1250,7 @@ describe("App Top-Level Integration", () => {
 
     // Open export modal
     const exportBtn = await screen.findByRole("button", {
-      name: /Raporu Paylaş/i,
+      name: /^Dışa Aktar$/,
     });
     await act(async () => {
       fireEvent.click(exportBtn);
@@ -1288,7 +1315,7 @@ describe("App Top-Level Integration", () => {
     ).toBeInTheDocument();
 
     // Switch to search tab
-    const searchTab = screen.getByRole("button", { name: /Ara\.\.\./i });
+    const searchTab = screen.getByRole("tab", { name: /^Ara$/i });
     fireEvent.click(searchTab);
 
     // Search query
@@ -2817,6 +2844,37 @@ describe("App Top-Level Integration", () => {
 
     expect(screen.getByText("Finans Raporu Toplantısı")).toBeInTheDocument();
     expect(screen.getByText("Tasarım Toplantısı")).toBeInTheDocument();
+  });
+
+  it("wraps sidebar tags and keeps the extra ones behind +N", async () => {
+    const tags = ["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8"];
+    const orig = (invoke as any).getMockImplementation();
+    (invoke as any).mockImplementation((cmd: string, args: any) => {
+      if (cmd === "get_all_meetings") {
+        return Promise.resolve([
+          { ...mockPastMeetings[0], id: "m-many-tags", tags },
+        ]);
+      }
+      return orig ? orig(cmd, args) : Promise.resolve();
+    });
+
+    render(
+      <I18nProvider>
+        <App />
+      </I18nProvider>,
+    );
+
+    const more = await screen.findByRole("button", {
+      name: "Tüm etiketleri göster",
+    });
+    expect(more).toHaveTextContent("+2");
+    await act(async () => {
+      fireEvent.click(more);
+    });
+    expect(
+      screen.getByRole("button", { name: "Etiketleri daralt" }),
+    ).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getAllByText("T8").length).toBeGreaterThan(0);
   });
 
   it("auto-starts recording on meeting-detected and auto-stops on meeting-ended when enabled", async () => {

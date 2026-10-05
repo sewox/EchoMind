@@ -292,9 +292,10 @@ impl SummarizerEngine {
         record: &MeetingRecord,
         custom_summary: Option<&SummaryResult>,
         lang_code: Option<&str>,
+        tone: Option<&str>,
     ) -> FollowupEmailResult {
         let (subject, body) =
-            MeetingExporter::export_followup_email(record, custom_summary, lang_code);
+            MeetingExporter::export_followup_email(record, custom_summary, lang_code, tone);
         let encoded_subject = urlencoding::encode(&subject);
         let encoded_body = urlencoding::encode(&body);
         let mailto_url = format!("mailto:?subject={}&body={}", encoded_subject, encoded_body);
@@ -529,6 +530,7 @@ pub fn export_meeting_followup_email(
     meeting_id: String,
     custom_summary: Option<SummaryResult>,
     lang_code: Option<String>,
+    tone: Option<String>,
 ) -> Result<FollowupEmailResult, String> {
     let storage = get_global_storage();
     let meetings_lock = storage.meetings.lock().unwrap();
@@ -542,6 +544,7 @@ pub fn export_meeting_followup_email(
         target_meeting,
         custom_summary.as_ref(),
         lang_code.as_deref(),
+        tone.as_deref(),
     ))
 }
 
@@ -779,6 +782,7 @@ pub fn export_followup_bundle(
     meeting_id: String,
     custom_summary: Option<SummaryResult>,
     lang_code: Option<String>,
+    tone: Option<String>,
 ) -> Result<FollowUpBundle, String> {
     let storage = get_global_storage();
     let meetings_lock = storage.meetings.lock().unwrap();
@@ -790,7 +794,8 @@ pub fn export_followup_bundle(
     let lang_ref = lang_code.as_deref();
     let summary_ref = custom_summary.as_ref();
 
-    let email_res = SummarizerEngine::export_followup_email(target, summary_ref, lang_ref);
+    let email_res =
+        SummarizerEngine::export_followup_email(target, summary_ref, lang_ref, tone.as_deref());
     let email_subject = email_res.subject;
     let email_body = email_res.body;
     let email_html = SummarizerEngine::export_notes_html(target, summary_ref, lang_ref);
@@ -1453,6 +1458,76 @@ mod tests {
     }
 
     #[test]
+    fn test_followup_tones_change_the_email() {
+        let task = |t: &str, done: bool| ActionItem {
+            task: t.to_string(),
+            assignee: None,
+            source_citations: vec![],
+            is_completed: done,
+        };
+        let record = MeetingRecord {
+            id: "mtg-tone".to_string(),
+            title: "Pilot Planı".to_string(),
+            date_formatted: "04.10.2026".to_string(),
+            duration_seconds: 600,
+            duration_formatted: "10:00".to_string(),
+            audio_file_path: None,
+            segments: vec![],
+            summary: "Özet".to_string(),
+            key_decisions: vec![],
+            meeting_goal: Some("Pilot kapsamını netleştirmek".to_string()),
+            key_highlights: Some(vec!["Güvenlik modülü öncelikli".to_string()]),
+            action_items: Some(vec![
+                task("Teklif gönder", false),
+                task("Demo ortamı kur", true),
+                task("Eğitim planla", false),
+                task("Fatura bilgisini al", false),
+            ]),
+            phase1_agreed: Some(vec!["Pilot kasımda başlar".to_string()]),
+            phase2_deferred: None,
+            detailed_topics: None,
+            participants: None,
+            engine_used: None,
+            summary_provider: None,
+            tags: None,
+            transcript_pending: false,
+        };
+        let email = |tone: &str| SummarizerEngine::export_followup_email(&record, None, Some("tr"), Some(tone));
+
+        let standard = email("standard");
+        let executive = email("executive");
+        let sales = email("sales");
+        let casual = email("casual");
+        let subjects: std::collections::HashSet<_> =
+            [&standard, &executive, &sales, &casual].iter().map(|e| e.subject.clone()).collect();
+        assert_eq!(subjects.len(), 4, "every tone has its own subject");
+        assert!(standard.body.starts_with("Merhaba Ekip,"));
+        assert!(executive.body.starts_with("Sayın Yöneticiler,"));
+        assert!(sales.body.starts_with("Merhaba,"));
+        assert!(casual.body.starts_with("Selam ekip! 👋"));
+
+        // Executive: outcome only, top three tasks.
+        assert!(!executive.body.contains("Güvenlik modülü öncelikli"));
+        assert!(executive.body.contains("Eğitim planla"));
+        assert!(!executive.body.contains("Fatura bilgisini al"));
+
+        // Customer: no internal status tags; agreements before next steps.
+        assert!(!sales.body.contains("[YAPILACAK]") && !sales.body.contains("[TAMAMLANDI]"));
+        let agreed = sales.body.find("Mutabık Kalınan Konular").unwrap();
+        let steps = sales.body.find("Sonraki Adımlar").unwrap();
+        assert!(agreed < steps);
+
+        // Standard keeps everything; an unknown tone falls back to it.
+        assert!(standard.body.contains("[YAPILACAK] Teklif gönder"));
+        assert!(standard.body.contains("Fatura bilgisini al"));
+        assert_eq!(email("unknown").body, standard.body);
+        assert_eq!(
+            SummarizerEngine::export_followup_email(&record, None, Some("en"), Some("sales")).subject,
+            "Our Meeting: Pilot Planı (04.10.2026)"
+        );
+    }
+
+    #[test]
     fn test_export_followup_email() {
         let record = MeetingRecord {
             id: "mtg-email".to_string(),
@@ -1482,14 +1557,15 @@ mod tests {
             transcript_pending: false,
         };
 
-        let email_res = SummarizerEngine::export_followup_email(&record, None, Some("tr"));
+        let email_res = SummarizerEngine::export_followup_email(&record, None, Some("tr"), None);
         assert!(email_res
             .subject
             .contains("Takip & Toplantı Notları: Client Sync & Demo"));
         assert!(email_res.body.contains("🎯 Toplantı Amacı:"));
         assert!(email_res
             .body
-            .contains("🎯 ✅ Eylem Maddeleri & Sorumlular:"));
+            .contains("✅ Eylem Maddeleri & Sorumlular:"));
+        assert!(!email_res.body.contains("🎯 ✅"), "no doubled section icons");
         assert!(email_res.body.contains("Sözleşme taslağını ilet"));
         assert!(email_res.mailto_url.starts_with("mailto:?subject="));
         assert!(email_res.mailto_url.contains("&body="));
@@ -1535,7 +1611,7 @@ mod tests {
         get_global_storage().meetings.lock().unwrap().push(record);
 
         let analytics = get_meeting_analytics_by_id(id.to_string());
-        let bundle = export_followup_bundle(id.to_string(), None, Some("tr".to_string()));
+        let bundle = export_followup_bundle(id.to_string(), None, Some("tr".to_string()), None);
         let notes = export_meeting_notes(id.to_string(), None, None);
         let search = RAGEngine::global_search("bütçe");
 

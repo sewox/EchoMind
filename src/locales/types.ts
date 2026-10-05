@@ -24,6 +24,9 @@ export interface TranslationKeys {
     hours: string;
     storageUnlocking: string;
     storageUnlockHint: string;
+    storageLocked: string;
+    storageLockedHint: string;
+    retry: string;
     historyRecoveryNotice: string;
   };
   nav: {
@@ -49,6 +52,15 @@ export interface TranslationKeys {
     hint: string;
     openModelHub: string;
     generating: string;
+  };
+  glossary: {
+    title: string;
+    desc: string;
+    placeholder: string;
+    count: string;
+    saved: string;
+    error: string;
+    save: string;
   };
   importProgress: {
     decoding: string;
@@ -81,6 +93,10 @@ export interface TranslationKeys {
     backToLive: string;
   };
   transcript: {
+    bar: Record<
+      "retranscribe" | "analytics" | "copy" | "copied" | "followUp" | "export",
+      { label: string; hint: string }
+    >;
     tabs: {
       stream: string;
       report: string;
@@ -138,11 +154,25 @@ export interface TranslationKeys {
   summary: {
     audioMemo?: {
       button: string;
+      subtitle: string;
       playing: string;
       paused: string;
       speed: string;
       stop: string;
       play: string;
+      pause: string;
+      resume: string;
+      voice: string;
+      noReport: string;
+      noVoice: string;
+      error: string;
+      intro: string;
+      untitled: string;
+      goal: string;
+      decisions: string;
+      actions: string;
+      assigned: string;
+      overview: string;
     };
     rebuildReport: string;
     rebuilding: string;
@@ -408,6 +438,7 @@ export interface TranslationKeys {
   };
   followUp?: {
     modalTitle: string;
+    shortLabel: string;
     modalSubtitle: string;
     tabs: {
       email: string;

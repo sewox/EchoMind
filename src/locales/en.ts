@@ -27,6 +27,10 @@ export const en: TranslationKeys = {
     storageUnlocking: "Opening secure storage…",
     storageUnlockHint:
       "Waiting for Keychain access. The window stays responsive; your history loads after you allow access.",
+    storageLocked: "Couldn't open secure storage",
+    storageLockedHint:
+      "Keychain access was not allowed. Your meeting history was not deleted; it opens once you allow access.",
+    retry: "Try again",
     historyRecoveryNotice:
       "Previous encrypted history could not be opened in this version; backups were kept. New recordings are now protected with Keychain.",
   },
@@ -53,6 +57,15 @@ export const en: TranslationKeys = {
     hint: "Reports currently come from the simple summarizer. Download the on-device report model for accurate reports ({size} GB).",
     openModelHub: "Download model",
     generating: "Writing the report on this device… {percent}%",
+  },
+  glossary: {
+    title: "Custom Terms",
+    desc: "List company, product and people names or technical terms that transcription should recognize, one per line. Short, specific lists work best (up to 100 terms).",
+    placeholder: "SonicWall\nAcme Software\nJane Doe",
+    count: "{count} terms",
+    saved: "Saved",
+    error: "Could not save",
+    save: "Save",
   },
   importProgress: {
     decoding: "Reading the audio file…",
@@ -87,6 +100,32 @@ export const en: TranslationKeys = {
     backToLive: "Back to Live Session",
   },
   transcript: {
+    bar: {
+      retranscribe: {
+        label: "Re-transcribe",
+        hint: "Converts the recording to text again with another model or language.",
+      },
+      analytics: {
+        label: "Analytics",
+        hint: "Shows who spoke how much and how balanced the meeting was.",
+      },
+      copy: {
+        label: "Copy",
+        hint: "Copies the whole transcript to the clipboard.",
+      },
+      copied: {
+        label: "Copied",
+        hint: "The transcript is on the clipboard.",
+      },
+      followUp: {
+        label: "Follow-up",
+        hint: "Prepares the follow-up email, task list and calendar invite.",
+      },
+      export: {
+        label: "Export",
+        hint: "Saves or shares the report as PDF, Markdown, a Slack/Teams summary or JSON.",
+      },
+    },
     tabs: {
       stream: "Dialogue Stream",
       report: "Meeting Report",
@@ -138,7 +177,7 @@ export const en: TranslationKeys = {
     speaker: "Speaker",
     confidence: "Confidence",
     noRecordings: "No transcript recordings yet.",
-    smartRedaction: "✍️ Smart Redaction & Cleanup",
+    smartRedaction: "Smart Redaction & Cleanup",
     redacting: "Redacting...",
     noSearchResults: "No speech matches found for your search.",
     listeningLive: "Listening to speech, streaming live...",
@@ -150,14 +189,29 @@ export const en: TranslationKeys = {
   },
   summary: {
     audioMemo: {
-      button: "🎙️ Listen Audio Memo (AI Podcast)",
-      playing: "Playing Audio Memo...",
+      button: "Audio Briefing",
+      subtitle: "Listen to the report summary in a system voice",
+      playing: "Reading…",
       paused: "Paused",
       speed: "Speed",
       stop: "Stop",
-      play: "Play",
+      play: "Listen",
+      pause: "Pause",
+      resume: "Resume",
+      voice: "Voice: {voice}",
+      noReport: "There is no summary to read yet. Generate the report first.",
+      noVoice:
+        "No system voice is installed for this language. You can add one in your operating system's speech settings.",
+      error: "Couldn't start reading: {error}",
+      intro: "Audio briefing for {title}.",
+      untitled: "Audio briefing for this meeting.",
+      goal: "Meeting goal: {text}.",
+      decisions: "Decisions: {text}.",
+      actions: "Tasks: {text}.",
+      assigned: "{assignee}: {task}",
+      overview: "Summary: {text}.",
     },
-    rebuildReport: "✨ Rebuild Report",
+    rebuildReport: "Rebuild Report",
     rebuilding: "Generating Report...",
     rebuildTooltip:
       "Generate a fresh AI executive summary from current dialogue",
@@ -401,7 +455,8 @@ export const en: TranslationKeys = {
     ignoreListPlaceholder: "com.example.App",
     ignoreListAdd: "Add",
     ignoreListRemove: "Remove",
-    ignoreListEmpty: "No ignored apps — defaults will be restored on next launch.",
+    ignoreListEmpty:
+      "No ignored apps — defaults will be restored on next launch.",
   },
   updater: {
     modalTitle: "New Update Available!",
@@ -456,6 +511,7 @@ export const en: TranslationKeys = {
     },
   },
   followUp: {
+    shortLabel: "Follow-up",
     modalTitle: "One-Click Follow-up Engine",
     modalSubtitle:
       "Instantly create professional follow-up emails, action item tables, and calendar invitations",
