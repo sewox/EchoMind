@@ -26,6 +26,7 @@ import { RetranscribeModal } from "./RetranscribeModal";
 import { AudioPlayerBar } from "./transcript/AudioPlayerBar";
 import { TasksDecisionsView } from "./transcript/TasksDecisionsView";
 import { SummaryCardsView } from "./transcript/SummaryCardsView";
+import { LocalLlmHint } from "./LocalLlmSection";
 import { LiveFeedView } from "./transcript/LiveFeedView";
 import { CustomTemplateModal } from "./transcript/CustomTemplateModal";
 import { MeetingAnalyticsModal } from "./transcript/MeetingAnalyticsModal";
@@ -92,6 +93,8 @@ interface TranscriptViewerProps {
   onSelectMeeting?: (meetingId: string) => void;
   onAddTag?: (meetingId: string, tag: string) => void;
   onRemoveTag?: (meetingId: string, tag: string) => void;
+  /** Opens the Model Hub (e.g. to download the on-device report model). */
+  onOpenModelHub?: () => void;
 }
 
 export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
@@ -105,6 +108,7 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
   onSelectMeeting,
   onAddTag,
   onRemoveTag,
+  onOpenModelHub,
 }) => {
   const { t } = useI18n();
   const [segments, setSegments] = useState<TranscriptSegment[]>([]);
@@ -1102,6 +1106,10 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
               <span>{soundbiteToast}</span>
             </div>
           </div>
+        )}
+
+        {activeTab === "summary" && (
+          <LocalLlmHint onOpenModelHub={onOpenModelHub} />
         )}
 
         {activeTab === "summary" && (

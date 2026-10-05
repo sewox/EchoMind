@@ -39,6 +39,19 @@ export interface TranslationKeys {
     modelHub: string;
     language: string;
   };
+  localLlm: {
+    title: string;
+    desc: string;
+    recommended: string;
+    active: string;
+    installed: string;
+    download: string;
+    downloading: string;
+    delete: string;
+    error: string;
+    hint: string;
+    openModelHub: string;
+  };
   glossary: {
     title: string;
     desc: string;
@@ -53,6 +66,7 @@ export interface TranslationKeys {
     transcribing: string;
     diarizing: string;
     saving: string;
+    summarizing: string;
     remainingMinutes: string;
     remainingSeconds: string;
   };

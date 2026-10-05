@@ -33,12 +33,15 @@ pub struct ImportProgress {
     pub percent: Option<f32>,
 }
 
-// Overall share of each stage; transcription dominates the run time.
+// Overall share of each stage. The report from the on-device model takes
+// about as long as transcription, so the two split most of the bar.
 const DECODE_PCT: f32 = 2.0;
 const TRANSCRIBE_START: f32 = 5.0;
-const TRANSCRIBE_END: f32 = 90.0;
-const DIARIZE_PCT: f32 = 92.0;
-const SAVE_PCT: f32 = 97.0;
+const TRANSCRIBE_END: f32 = 65.0;
+const DIARIZE_PCT: f32 = 67.0;
+const SUMMARIZE_START: f32 = 70.0;
+const SUMMARIZE_END: f32 = 97.0;
+const SAVE_PCT: f32 = 98.0;
 
 fn emit(progress: ImportProgress) {
     if let Some(app) = APP.get() {
@@ -68,6 +71,14 @@ pub fn transcribing_unmeasured() {
 
 pub fn diarizing() {
     report("diarizing", Some(DIARIZE_PCT));
+}
+
+/// Report generation with `fraction` (0.0–1.0) done.
+pub fn summarizing(fraction: f32) {
+    report(
+        "summarizing",
+        Some(SUMMARIZE_START + (SUMMARIZE_END - SUMMARIZE_START) * fraction.clamp(0.0, 1.0)),
+    );
 }
 
 pub fn saving() {

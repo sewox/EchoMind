@@ -13,6 +13,7 @@ pub mod glossary;
 pub mod hardware;
 pub mod import_progress;
 pub mod importer;
+pub mod local_llm;
 pub mod mic_activity;
 pub mod offline_engines;
 pub mod player;
@@ -49,6 +50,7 @@ use detector::{
 use glossary::{get_glossary, set_glossary};
 use hardware::get_hardware_info;
 use import_progress::is_import_running;
+use local_llm::download::{delete_llm_model, download_llm_model, get_llm_models};
 use importer::{
     import_audio_file, pick_and_import_audio_file, pick_audio_file_dialog, process_audio_file_path,
     retranscribe_meeting, save_uploaded_audio_bytes,
@@ -97,6 +99,9 @@ pub fn run() {
             get_glossary,
             set_glossary,
             is_import_running,
+            get_llm_models,
+            download_llm_model,
+            delete_llm_model,
             set_asr_engine,
             start_audio_capture,
             start_meeting_recording,
@@ -211,6 +216,11 @@ pub fn run() {
                     match exit_mode {
                         storage::QuitExitMode::Normal => {
                             transcriber::get_global_transcriber().cleanup_context();
+                            // A report still generating would keep GPU buffers
+                            // alive into ggml's static destructors (abort).
+                            if !local_llm::engine::shutdown(std::time::Duration::from_secs(2)) {
+                                storage::hard_exit_after_quit();
+                            }
                         }
                         storage::QuitExitMode::HardExit => {
                             storage::hard_exit_after_quit();

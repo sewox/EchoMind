@@ -28,7 +28,8 @@ export const en: TranslationKeys = {
     storageUnlockHint:
       "Waiting for Keychain access. The window stays responsive; your history loads after you allow access.",
     storageLocked: "Couldn't open secure storage",
-    storageLockedHint: "Keychain access was not allowed. Your meeting history was not deleted; it opens once you allow access.",
+    storageLockedHint:
+      "Keychain access was not allowed. Your meeting history was not deleted; it opens once you allow access.",
     retry: "Try again",
     historyRecoveryNotice:
       "Previous encrypted history could not be opened in this version; backups were kept. New recordings are now protected with Keychain.",
@@ -42,6 +43,19 @@ export const en: TranslationKeys = {
     settings: "Settings",
     modelHub: "Models",
     language: "Language",
+  },
+  localLlm: {
+    title: "Report Model (On-Device)",
+    desc: "Meeting reports, tasks, decisions and follow-up emails are written by this model on your computer; data never leaves the device.",
+    recommended: "Recommended",
+    active: "In use",
+    installed: "Downloaded",
+    download: "Download ({size} GB)",
+    downloading: "Downloading… {percent}%",
+    delete: "Delete model",
+    error: "Download failed: {error}",
+    hint: "Reports currently come from the simple summarizer. Download the on-device report model for accurate reports ({size} GB).",
+    openModelHub: "Download model",
   },
   glossary: {
     title: "Custom Terms",
@@ -57,6 +71,7 @@ export const en: TranslationKeys = {
     transcribing: "Transcribing…",
     diarizing: "Separating speakers…",
     saving: "Saving…",
+    summarizing: "Writing the report…",
     remainingMinutes: "~{n} min left",
     remainingSeconds: "~{n} s left",
   },

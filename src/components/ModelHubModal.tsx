@@ -25,6 +25,7 @@ import {
 } from "./ModelHubModalConstants";
 import { useI18n } from "../locales/i18nContext";
 import { getActiveEngine, storeActiveEngine } from "../services/activeEngine";
+import { LocalLlmSection } from "./LocalLlmSection";
 import { CredentialStore } from "../services/credentialStore";
 
 export interface ModelInfo {
@@ -451,6 +452,8 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
               );
             })
           )}
+
+          <LocalLlmSection />
         </div>
       )}
 

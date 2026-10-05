@@ -46,6 +46,31 @@ impl SummarizerEngine {
         template_id: Option<&str>,
         custom_prompt: Option<&str>,
     ) -> SummaryResult {
+        Self::generate_summary_with_progress(
+            segments,
+            provider,
+            api_key,
+            custom_endpoint,
+            custom_model,
+            template_id,
+            custom_prompt,
+            &|_| {},
+        )
+    }
+
+    /// [`Self::generate_summary`] reporting the on-device model's progress
+    /// (0.0–1.0) to `on_progress`.
+    #[allow(clippy::too_many_arguments)]
+    pub fn generate_summary_with_progress(
+        segments: &[TranscriptSegment],
+        provider: &str,
+        api_key: Option<&str>,
+        custom_endpoint: Option<&str>,
+        custom_model: Option<&str>,
+        template_id: Option<&str>,
+        custom_prompt: Option<&str>,
+        on_progress: &(dyn Fn(f32) + Sync),
+    ) -> SummaryResult {
         let start_time = Instant::now();
 
         if segments.is_empty() {
@@ -140,7 +165,33 @@ impl SummarizerEngine {
             }
         }
 
-        // 2. Try Local LLM Server (Ollama / Local Server)
+        // 2. On-device model inside the app (llama.cpp), unless the user asked
+        //    for their own Ollama server.
+        if prov_norm != "ollama" {
+            if let Some(model) = crate::local_llm::catalog::installed() {
+                match crate::local_llm::report::generate(
+                    segments,
+                    model,
+                    template_id,
+                    custom_prompt,
+                    None,
+                    on_progress,
+                ) {
+                    Ok(mut res) => {
+                        if paranoid_blocked {
+                            res.provider_used = format!(
+                                "🔒 Paranoid Mod — Bulut İsteği Engellendi ({})",
+                                res.provider_used
+                            );
+                        }
+                        return res;
+                    }
+                    Err(e) => eprintln!("⚠️ Cihaz içi rapor üretilemedi: {e}"),
+                }
+            }
+        }
+
+        // 3. Try Local LLM Server (Ollama / Local Server)
         if let Ok(mut ollama_res) = LLMClient::generate_ollama_summary(
             segments,
             custom_endpoint,
@@ -158,7 +209,7 @@ impl SummarizerEngine {
             return ollama_res;
         }
 
-        // 3. Fallback to Multi-lingual Smart Heuristic Extractor (Zero-RAM, Offline)
+        // 4. Fallback to Multi-lingual Smart Heuristic Extractor (Zero-RAM, Offline)
         let mut result =
             LocalSummaryExtractor::generate_local_heuristic_summary(segments, start_time);
         if paranoid_blocked {

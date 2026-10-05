@@ -10,6 +10,8 @@ use llama_cpp_2::llama_batch::LlamaBatch;
 use llama_cpp_2::model::params::LlamaModelParams;
 use llama_cpp_2::model::{LlamaChatMessage, LlamaModel};
 use llama_cpp_2::sampling::LlamaSampler;
+use llama_cpp_2::token::data::LlamaTokenData;
+use llama_cpp_2::token::data_array::LlamaTokenDataArray;
 use std::num::NonZeroU32;
 use std::time::Instant;
 
@@ -113,9 +115,10 @@ DÖKÜM:\n{transcript}"
     }
     let prompt_s = t.elapsed().as_secs_f32();
 
-    let grammar = llama_cpp_2::json_schema_to_grammar(SCHEMA).expect("schema→grammar");
-    let mut sampler = LlamaSampler::chain_simple([
-        LlamaSampler::grammar(&model, &grammar, "root").expect("grammar"),
+    let grammar_str = llama_cpp_2::json_schema_to_grammar(SCHEMA).expect("schema→grammar");
+    let mut grammar = LlamaSampler::grammar(&model, &grammar_str, "root").expect("grammar");
+    let mut chain = LlamaSampler::chain_simple([
+        LlamaSampler::top_k(40),
         LlamaSampler::temp(0.2),
         LlamaSampler::dist(42),
     ]);
@@ -123,10 +126,26 @@ DÖKÜM:\n{transcript}"
     let t = Instant::now();
     let mut out_bytes: Vec<u8> = Vec::new();
     let mut n_gen = 0;
+    let mut resampled = 0;
     let mut idx = batch.n_tokens() - 1;
     while n_gen < 3000 {
-        // sample() also accepts the token (grammar state advances once).
-        let tok = sampler.sample(&ctx, idx);
+        // Lazy grammar (as llama.cpp's common sampler does): sample freely,
+        // check only the chosen token, and constrain the full vocabulary only
+        // when that token would break the schema.
+        let mut cur = ctx.token_data_array_ith(idx);
+        cur.apply_sampler(&chain);
+        let mut tok = cur.selected_token().expect("token");
+        let mut probe = LlamaTokenDataArray::new(vec![LlamaTokenData::new(tok, 1.0, 0.0)], false);
+        probe.apply_sampler(&grammar);
+        if !probe.data[0].logit().is_finite() {
+            resampled += 1;
+            let mut cur = ctx.token_data_array_ith(idx);
+            cur.apply_sampler(&grammar);
+            cur.apply_sampler(&chain);
+            tok = cur.selected_token().expect("token");
+        }
+        grammar.accept(tok);
+        chain.accept(tok);
         if vocab.is_eog(tok) {
             break;
         }
@@ -138,6 +157,7 @@ DÖKÜM:\n{transcript}"
         n_gen += 1;
         idx = 0;
     }
+    eprintln!("grammar resampled {resampled} of {n_gen} tokens");
     let gen_s = t.elapsed().as_secs_f32();
     let text = String::from_utf8_lossy(&out_bytes).to_string();
     let valid = serde_json::from_str::<serde_json::Value>(&text).is_ok();

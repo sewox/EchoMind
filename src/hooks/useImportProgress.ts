@@ -3,7 +3,12 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
 export type ImportStage =
-  "decoding" | "transcribing" | "diarizing" | "saving" | "finished";
+  | "decoding"
+  | "transcribing"
+  | "diarizing"
+  | "summarizing"
+  | "saving"
+  | "finished";
 
 interface ImportProgressEvent {
   stage: ImportStage;
