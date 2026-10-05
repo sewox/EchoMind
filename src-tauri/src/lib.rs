@@ -18,6 +18,7 @@ pub mod mic_activity;
 pub mod offline_engines;
 pub mod player;
 pub mod qa_e2e_tests;
+pub mod report_queue;
 pub mod resample;
 pub mod secure_key;
 pub mod security;

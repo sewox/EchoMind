@@ -534,6 +534,55 @@ impl StorageEngine {
         Ok(updated)
     }
 
+    /// Stores a report generated in the background — only over a summary that
+    /// was produced automatically (keyword extractor / save-time summary),
+    /// never over one the user wrote or an AI report they asked for. An auto
+    /// title is replaced by the report's title. `Ok(None)`: left unchanged.
+    pub fn apply_background_report(
+        &self,
+        meeting_id: &str,
+        report: &crate::summarizer::SummaryResult,
+    ) -> Result<Option<MeetingRecord>, String> {
+        let mut lock = self.meetings.lock().unwrap();
+        let Some(mtg) = lock.iter_mut().find(|m| m.id == meeting_id) else {
+            return Ok(None);
+        };
+        if !is_auto_summary(mtg.summary_provider.as_deref()) {
+            return Ok(None);
+        }
+        mtg.summary = report.summary.clone();
+        mtg.key_decisions = report.key_decisions.clone();
+        mtg.meeting_goal = Some(report.meeting_goal.clone());
+        mtg.key_highlights = Some(report.key_highlights.clone());
+        // Keep "done" ticks on tasks that come back with the same text.
+        let done: std::collections::HashSet<String> = mtg
+            .action_items
+            .iter()
+            .flatten()
+            .filter(|a| a.is_completed)
+            .map(|a| a.task.trim().to_lowercase())
+            .collect();
+        let mut items = report.action_items.clone();
+        for item in &mut items {
+            item.is_completed |= done.contains(&item.task.trim().to_lowercase());
+        }
+        mtg.action_items = Some(items);
+        mtg.phase1_agreed = Some(report.phase1_agreed.clone());
+        mtg.phase2_deferred = Some(report.phase2_deferred.clone());
+        mtg.detailed_topics = Some(report.detailed_topics.clone());
+        mtg.participants = Some(report.participants.clone());
+        mtg.summary_provider = Some(report.provider_used.clone());
+        if let Some(title) = report.smart_title.as_deref().map(str::trim) {
+            if !title.is_empty() && crate::importer::is_auto_generated_title(&mtg.title) {
+                mtg.title = title.to_string();
+            }
+        }
+        let updated = mtg.clone();
+        drop(lock);
+        self.save_to_disk()?;
+        Ok(Some(updated))
+    }
+
     pub fn get_all(&self) -> Vec<MeetingRecord> {
         let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
         let lock = self.meetings.lock().unwrap();
@@ -928,6 +977,21 @@ pub fn needs_full_transcription(
         || total_samples.saturating_sub(live_covered_samples) >= PARTIAL_TRANSCRIPT_REQUEUE_SAMPLES
 }
 
+/// Summaries EchoMind made on its own (save-time summary, keyword extractor),
+/// which a better background report may replace.
+pub fn is_auto_summary(provider: Option<&str>) -> bool {
+    match provider {
+        None => true,
+        Some(p) => {
+            let p = p.trim();
+            p.is_empty()
+                || p == "EchoMind Akıllı Özet"
+                || p.contains("Hızlı Özet")
+                || p.contains("Yerel Özet Kullanıldı")
+        }
+    }
+}
+
 /// Helper function to generate an intelligent summary from meeting transcript segments
 pub fn generate_summary_from_segments(segments: &[TranscriptSegment]) -> String {
     if segments.is_empty() {
@@ -1043,6 +1107,9 @@ pub async fn save_current_meeting(
         if let Err(e) = crate::transcription_queue::enqueue_meeting(&meeting.id, &flac_path) {
             eprintln!("Transcription enqueue failed ({}): {}", meeting.id, e);
         }
+    } else if !meeting.transcript_pending {
+        // Final transcript already: write the report in the background.
+        crate::report_queue::request_report(&app, &meeting.id);
     }
 
     Ok(meeting)
@@ -2368,6 +2435,105 @@ mod tests {
 
         let _ = get_global_storage().delete_meeting(&saved.id);
         let _ = fs::remove_file(flac);
+    }
+
+    #[test]
+    fn test_auto_summary_labels() {
+        assert!(is_auto_summary(None));
+        assert!(is_auto_summary(Some("EchoMind Akıllı Özet")));
+        assert!(is_auto_summary(Some("🔒 Cihaz İçi Hızlı Özet (Çevrimdışı)")));
+        assert!(is_auto_summary(Some(
+            "🔒 Paranoid Mod Aktif — Bulut Özeti Engellendi, Yerel Özet Kullanıldı"
+        )));
+        assert!(!is_auto_summary(Some("⚡ Google Gemini 2.0 Flash")));
+        assert!(!is_auto_summary(Some("🔒 Cihazda (Qwen 3.5 4B)")));
+    }
+
+    #[test]
+    fn test_background_report_replaces_only_auto_summaries() {
+        let _unlock = crate::secure_key::key_unlock_test_lock()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let storage = StorageEngine::new();
+        let meeting = |id: &str, title: &str, provider: Option<&str>| MeetingRecord {
+            id: id.into(),
+            title: title.into(),
+            date_formatted: "1".into(),
+            duration_seconds: 60,
+            duration_formatted: "01:00".into(),
+            audio_file_path: None,
+            segments: vec![live_seg(1, "Bütçe cuma onaylanacak.")],
+            summary: "eski".into(),
+            key_decisions: Vec::new(),
+            meeting_goal: None,
+            key_highlights: None,
+            action_items: None,
+            phase1_agreed: None,
+            phase2_deferred: None,
+            detailed_topics: None,
+            participants: None,
+            engine_used: None,
+            summary_provider: provider.map(String::from),
+            tags: None,
+            transcript_pending: false,
+        };
+        let report = crate::summarizer::SummaryResult {
+            meeting_goal: "Bütçe".into(),
+            key_highlights: vec!["Cuma".into()],
+            action_items: vec![
+                ActionItem {
+                    task: " teklifi gönder ".into(),
+                    assignee: None,
+                    source_citations: vec![1],
+                    is_completed: false,
+                },
+                ActionItem {
+                    task: "Bütçeyi paylaş".into(),
+                    assignee: None,
+                    source_citations: vec![1],
+                    is_completed: false,
+                },
+            ],
+            phase1_agreed: vec!["Onay".into()],
+            phase2_deferred: Vec::new(),
+            detailed_topics: Vec::new(),
+            participants: vec!["Konuşmacı 1".into()],
+            summary: "yeni".into(),
+            key_decisions: vec!["Onay".into()],
+            agenda_topics: Vec::new(),
+            smart_title: Some("Bütçe Onayı".into()),
+            provider_used: "🔒 Cihazda (Qwen 3.5 4B)".into(),
+            generation_time_ms: 1,
+        };
+        let mut auto = meeting("auto", "Toplantı - 1 Ekim", Some("EchoMind Akıllı Özet"));
+        auto.action_items = Some(vec![ActionItem {
+            task: "Teklifi gönder".into(),
+            assignee: None,
+            source_citations: vec![],
+            is_completed: true,
+        }]);
+        storage.add_meeting(auto).unwrap();
+        storage.add_meeting(meeting("mine", "Benim başlığım", None)).unwrap();
+        storage.add_meeting(meeting("cloud", "Toplantı - 2 Ekim", Some("⚡ Google Gemini"))).unwrap();
+
+        let updated = storage.apply_background_report("auto", &report).unwrap().unwrap();
+        assert_eq!(updated.summary, "yeni");
+        assert_eq!(updated.key_decisions, vec!["Onay"]);
+        assert_eq!(updated.title, "Bütçe Onayı");
+        let items = updated.action_items.unwrap();
+        assert!(items[0].is_completed, "same task keeps its tick");
+        assert!(!items[1].is_completed);
+        assert_eq!(updated.summary_provider.as_deref(), Some("🔒 Cihazda (Qwen 3.5 4B)"));
+
+        // A user-typed title stays; the summary was auto, so it is replaced.
+        let mine = storage.apply_background_report("mine", &report).unwrap().unwrap();
+        assert_eq!(mine.title, "Benim başlığım");
+        assert_eq!(mine.summary, "yeni");
+
+        // An AI report the user asked for is never overwritten.
+        assert!(storage.apply_background_report("cloud", &report).unwrap().is_none());
+        // Deleted meeting: nothing to do.
+        assert!(storage.apply_background_report("missing", &report).unwrap().is_none());
     }
 
     #[test]

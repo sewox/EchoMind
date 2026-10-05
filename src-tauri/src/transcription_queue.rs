@@ -399,6 +399,23 @@ pub fn ensure_worker_started(app: tauri::AppHandle) {
         .ok();
 }
 
+/// True while a transcription job is queued or running (the report queue
+/// waits so the two models don't compete for the GPU/CPU).
+pub fn has_active_work() -> bool {
+    global_queue()
+        .inner
+        .lock()
+        .map(|g| {
+            g.state.jobs().iter().any(|j| {
+                matches!(
+                    j.state,
+                    TranscriptionJobState::Queued | TranscriptionJobState::Running
+                )
+            })
+        })
+        .unwrap_or(false)
+}
+
 /// After Keychain unlock: recover queue, auto-enqueue pending, start worker.
 pub fn bootstrap_after_storage_unlock(app: tauri::AppHandle) {
     recover_from_disk();
@@ -709,6 +726,7 @@ fn worker_loop(app: tauri::AppHandle) {
                             drop(guard);
                         }
                         let _ = app.emit("meeting-transcript-ready", &updated_meeting);
+                        crate::report_queue::request_report(&app, &job.meeting_id);
                         println!(
                             "✅ Queue transcription done: {} ({} segments)",
                             job.meeting_id,
@@ -746,6 +764,7 @@ fn worker_loop(app: tauri::AppHandle) {
                             drop(guard);
                         }
                         let _ = app.emit("meeting-transcript-ready", &updated_meeting);
+                        crate::report_queue::request_report(&app, &job.meeting_id);
                     }
                     Err(_) if !meeting_exists(&job.meeting_id) => {
                         // Deleted while Whisper ran — nothing to retry.

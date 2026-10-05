@@ -56,6 +56,7 @@ export const tr: TranslationKeys = {
     error: "İndirilemedi: {error}",
     hint: "Raporlar şu an basit özetleyiciyle hazırlanıyor. Daha doğru rapor için cihaz içi rapor modelini indirin ({size} GB).",
     openModelHub: "Modeli indir",
+    generating: "Rapor cihazda hazırlanıyor… %{percent}",
   },
   glossary: {
     title: "Özel Terimler",

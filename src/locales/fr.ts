@@ -56,6 +56,7 @@ export const fr: TranslationKeys = {
     error: "Échec du téléchargement : {error}",
     hint: "Les comptes rendus viennent pour l'instant du résumeur simple. Téléchargez le modèle de rapport pour des comptes rendus précis ({size} Go).",
     openModelHub: "Télécharger le modèle",
+    generating: "Rédaction du compte rendu sur l'appareil… {percent} %",
   },
   glossary: {
     title: "Termes personnalisés",

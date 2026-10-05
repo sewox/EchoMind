@@ -51,6 +51,7 @@ export interface TranslationKeys {
     error: string;
     hint: string;
     openModelHub: string;
+    generating: string;
   };
   glossary: {
     title: string;
