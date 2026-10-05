@@ -144,6 +144,8 @@ export interface RelatedMeetingItem {
 
 import { getTagColorClass } from "./components/transcript/MeetingTagsBar";
 
+const SIDEBAR_TAG_LIMIT = 6;
+
 export function App() {
   const { t, language, setLanguage } = useI18n();
   const { isParanoid } = usePrivacyMode();
@@ -199,6 +201,17 @@ export function App() {
   } = useMeetingManager(storageReady);
 
   const { getJob, enqueueRetranscribe } = useTranscriptionJobs(storageReady);
+
+  // The sidebar shows a few tags; the rest wait behind "+N" so the row
+  // wraps instead of scrolling sideways.
+  const [showAllTags, setShowAllTags] = useState(false);
+  const shownTags =
+    showAllTags || allAvailableTags.length <= SIDEBAR_TAG_LIMIT
+      ? allAvailableTags
+      : allAvailableTags.filter(
+          (tag, i) => i < SIDEBAR_TAG_LIMIT || tag === selectedTag,
+        );
+  const hiddenTagCount = allAvailableTags.length - shownTags.length;
 
   const jobStateLabel = useCallback(
     (state: TranscriptionJobState | undefined, error?: string | null) => {
@@ -1360,7 +1373,7 @@ export function App() {
 
             {/* Tag Filter Pills */}
             {allAvailableTags.length > 0 && (
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+              <div className="flex flex-wrap items-center gap-1.5">
                 <button
                   type="button"
                   onClick={() => setSelectedTag(null)}
@@ -1372,7 +1385,7 @@ export function App() {
                 >
                   {t("tags.allTags") || "Tümü"}
                 </button>
-                {allAvailableTags.map((tName) => {
+                {shownTags.map((tName) => {
                   const isSelected = selectedTag === tName;
                   const colors = getTagColorClass(tName);
                   return (
@@ -1390,6 +1403,22 @@ export function App() {
                     </button>
                   );
                 })}
+                {(hiddenTagCount > 0 || showAllTags) &&
+                  allAvailableTags.length > SIDEBAR_TAG_LIMIT && (
+                    <button
+                      type="button"
+                      onClick={() => setShowAllTags((v) => !v)}
+                      aria-expanded={showAllTags}
+                      aria-label={
+                        showAllTags
+                          ? "Etiketleri daralt"
+                          : "Tüm etiketleri göster"
+                      }
+                      className="shrink-0 px-2 py-1 rounded-lg text-[11px] font-medium text-slate-400 hover:text-slate-200 border border-transparent hover:border-slate-800 transition"
+                    >
+                      {showAllTags ? "−" : `+${hiddenTagCount}`}
+                    </button>
+                  )}
               </div>
             )}
 

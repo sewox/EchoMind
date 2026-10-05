@@ -11,7 +11,6 @@ import {
   Eye,
   EyeOff,
   Sparkles,
-  X,
   Mic,
   Volume2,
   RefreshCw,
@@ -40,6 +39,7 @@ import {
 import { useI18n, SUPPORTED_LANGUAGES } from "../locales/i18nContext";
 
 import { UpdateCheckResult } from "./UpdateModal";
+import { ModalShell } from "./ui/ModalShell";
 import { GlossaryCard } from "./GlossaryCard";
 
 export interface AudioDeviceInfo {
@@ -466,706 +466,639 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         : "Sistem";
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200 cursor-pointer"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) {
-          onClose();
-        }
-      }}
-    >
-      <div
-        className="w-full max-w-xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-6 relative overflow-hidden flex flex-col gap-5 text-slate-100 max-h-[90vh] overflow-y-auto cursor-default"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-start justify-between border-b border-slate-800 pb-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400">
-              <Settings className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-white text-base">
-                {t("settings.title")}
-              </h3>
-              <p className="text-xs text-slate-400">{t("settings.subtitle")}</p>
-            </div>
+    <ModalShell
+      onClose={handleCloseAndSave}
+      icon={Settings}
+      title={t("settings.title")}
+      subtitle={t("settings.subtitle")}
+      closeLabel={t("common.close")}
+      size="lg"
+      height="fixed"
+      tabs={[
+        { id: "audio", label: t("settings.tabAudio"), icon: Mic },
+        { id: "system", label: t("settings.tabSystem"), icon: Cpu },
+        {
+          id: "apiKeys",
+          label: t("settings.tabApiKeys"),
+          icon: Key,
+          badge: isParanoid ? (
+            <Lock
+              className="w-3 h-3 shrink-0 text-purple-300"
+              aria-label="Kilitli"
+            />
+          ) : undefined,
+        },
+        { id: "language", label: t("settings.tabLanguage"), icon: Globe },
+      ]}
+      activeTab={activeTab}
+      onTabChange={setActiveTab}
+      footer={
+        <>
+          <div className="flex items-center gap-1.5 text-[11px] text-slate-400 min-w-0">
+            <ShieldCheck className="w-4 h-4 shrink-0 text-emerald-400" />
+            <span>{t("settings.privacyDesc")}</span>
           </div>
           <button
             onClick={handleCloseAndSave}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+            className="shrink-0 px-4 py-2 text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl border border-slate-700 transition"
           >
-            <X className="w-5 h-5" />
+            {t("common.close")}
           </button>
-        </div>
-
-        {/* Tab Navigation */}
-        <div className="flex gap-2 border-b border-slate-800/80">
-          <button
-            onClick={() => setActiveTab("audio")}
-            className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-t-xl border-b-2 transition ${
-              activeTab === "audio"
-                ? "border-cyan-500 text-cyan-400 bg-slate-800/40"
-                : "border-transparent text-slate-400 hover:text-slate-200"
-            }`}
-          >
-            <Mic className="w-4 h-4" />
-            {t("settings.tabAudio")}
-          </button>
-          <button
-            onClick={() => setActiveTab("system")}
-            className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-t-xl border-b-2 transition ${
-              activeTab === "system"
-                ? "border-blue-500 text-blue-400 bg-slate-800/40"
-                : "border-transparent text-slate-400 hover:text-slate-200"
-            }`}
-          >
-            <Cpu className="w-4 h-4" />
-            {t("settings.tabSystem")}
-          </button>
-          <button
-            onClick={() => setActiveTab("apiKeys")}
-            className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-t-xl border-b-2 transition ${
-              activeTab === "apiKeys"
-                ? "border-amber-500 text-amber-400 bg-slate-800/40"
-                : "border-transparent text-slate-400 hover:text-slate-200"
-            }`}
-          >
-            <Key className="w-4 h-4" />
-            <span>{t("settings.tabApiKeys")}</span>
-            {isParanoid && (
-              <span className="flex items-center gap-1 text-[9px] bg-purple-950/80 border border-purple-500/40 text-purple-300 px-1.5 py-0.5 rounded-full font-mono">
-                <Lock className="w-2.5 h-2.5" />
-                <span>Kilitli</span>
-              </span>
-            )}
-          </button>
-          <button
-            onClick={() => setActiveTab("language")}
-            className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-t-xl border-b-2 transition ${
-              activeTab === "language"
-                ? "border-emerald-500 text-emerald-400 bg-slate-800/40"
-                : "border-transparent text-slate-400 hover:text-slate-200"
-            }`}
-          >
-            <Globe className="w-4 h-4" />
-            {t("settings.tabLanguage")}
-          </button>
-        </div>
-
-        {/* Tab 0: Audio & Loopback (System Audio) */}
-        {activeTab === "audio" && (
-          <div className="space-y-4 text-xs">
-            {/* Input Device Selection */}
-            <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-3">
-              <div className="flex items-center justify-between">
-                <label className="text-slate-200 font-semibold flex items-center gap-2">
-                  <Mic className="w-4 h-4 text-cyan-400" />
-                  <span>{t("settings.micLabel")}</span>
-                </label>
-                <button
-                  onClick={fetchAudioDevices}
-                  disabled={isLoadingDevices}
-                  className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-medium flex items-center gap-1.5 transition"
-                  title={t("ui.settings.rescanDevices")}
-                >
-                  <RefreshCw
-                    className={`w-3 h-3 ${isLoadingDevices ? "animate-spin" : ""}`}
-                  />
-                  <span>{t("settings.refreshMics")}</span>
-                </button>
-              </div>
-
-              <select
-                value={selectedAudioDevice}
-                onChange={(e) => handleDeviceChange(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-700 text-slate-100 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:border-cyan-500 font-medium"
+        </>
+      }
+    >
+      {/* Tab 0: Audio & Loopback (System Audio) */}
+      {activeTab === "audio" && (
+        <div className="space-y-4 text-xs">
+          {/* Input Device Selection */}
+          <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-slate-200 font-semibold flex items-center gap-2">
+                <Mic className="w-4 h-4 text-cyan-400" />
+                <span>{t("settings.micLabel")}</span>
+              </label>
+              <button
+                onClick={fetchAudioDevices}
+                disabled={isLoadingDevices}
+                className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-medium flex items-center gap-1.5 transition"
+                title={t("ui.settings.rescanDevices")}
               >
-                <option value="default">
-                  {t("ui.settings.defaultMic", { os: osLabel })}
+                <RefreshCw
+                  className={`w-3 h-3 ${isLoadingDevices ? "animate-spin" : ""}`}
+                />
+                <span>{t("settings.refreshMics")}</span>
+              </button>
+            </div>
+
+            <select
+              value={selectedAudioDevice}
+              onChange={(e) => handleDeviceChange(e.target.value)}
+              className="w-full bg-slate-900 border border-slate-700 text-slate-100 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:border-cyan-500 font-medium"
+            >
+              <option value="default">
+                {t("ui.settings.defaultMic", { os: osLabel })}
+              </option>
+              {(audioDevices || []).map((dev) => (
+                <option key={dev.name} value={dev.name}>
+                  {dev.is_loopback ? t("ui.settings.loopbackPrefix") : "🎙️ "}
+                  {dev.name}{" "}
+                  {dev.is_default
+                    ? t("ui.settings.defaultSuffix", { os: osLabel })
+                    : ""}
                 </option>
-                {(audioDevices || []).map((dev) => (
-                  <option key={dev.name} value={dev.name}>
-                    {dev.is_loopback ? t("ui.settings.loopbackPrefix") : "🎙️ "}
-                    {dev.name}{" "}
-                    {dev.is_default
-                      ? t("ui.settings.defaultSuffix", { os: osLabel })
-                      : ""}
-                  </option>
-                ))}
-              </select>
+              ))}
+            </select>
 
-              {/* Live Signal VU Meter */}
-              <div className="p-3 rounded-lg bg-slate-900/90 border border-slate-800 space-y-2">
-                <div className="flex items-center justify-between text-[11px]">
-                  <span className="text-slate-400 flex items-center gap-1.5">
-                    <Radio className="w-3.5 h-3.5 text-cyan-400" />
-                    <span>{t("ui.settings.vuMeter")}</span>
-                  </span>
-                  <span
-                    className={`font-semibold ${isSpeaking ? "text-emerald-400" : "text-slate-400"}`}
-                  >
-                    {isSpeaking
-                      ? t("ui.settings.speechDetected")
-                      : t("ui.settings.silentWaiting")}
-                  </span>
-                </div>
-                <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden p-0.5 border border-slate-700">
-                  <div
-                    className="h-full bg-gradient-to-r from-cyan-500 via-emerald-400 to-amber-400 rounded-full transition-all duration-100"
-                    style={{
-                      width: `${Math.min(100, Math.max(4, liveMicLevel * 100))}%`,
-                    }}
-                  />
-                </div>
-                <div className="flex items-center justify-between text-[10px] text-slate-400">
-                  <span>{t("ui.settings.sampling")}</span>
-                  <span>{t("ui.settings.filter")}</span>
-                </div>
+            {/* Live Signal VU Meter */}
+            <div className="p-3 rounded-lg bg-slate-900/90 border border-slate-800 space-y-2">
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="text-slate-400 flex items-center gap-1.5">
+                  <Radio className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>{t("ui.settings.vuMeter")}</span>
+                </span>
+                <span
+                  className={`font-semibold ${isSpeaking ? "text-emerald-400" : "text-slate-400"}`}
+                >
+                  {isSpeaking
+                    ? t("ui.settings.speechDetected")
+                    : t("ui.settings.silentWaiting")}
+                </span>
+              </div>
+              <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden p-0.5 border border-slate-700">
+                <div
+                  className="h-full bg-gradient-to-r from-cyan-500 via-emerald-400 to-amber-400 rounded-full transition-all duration-100"
+                  style={{
+                    width: `${Math.min(100, Math.max(4, liveMicLevel * 100))}%`,
+                  }}
+                />
+              </div>
+              <div className="flex items-center justify-between text-[10px] text-slate-400">
+                <span>{t("ui.settings.sampling")}</span>
+                <span>{t("ui.settings.filter")}</span>
               </div>
             </div>
+          </div>
 
-            {/* Native system-audio capture (macOS process tap) */}
-            <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/80 flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <label className="text-slate-200 font-medium flex items-center gap-1.5">
-                  <Volume2 className="w-4 h-4 text-cyan-400 shrink-0" />
-                  {t("ui.settings.systemAudioCaptureToggle")}
-                </label>
-                <p className="text-slate-400 text-[11px] mt-0.5">
-                  {t("ui.settings.systemAudioCaptureDesc")}
+          {/* Native system-audio capture (macOS process tap) */}
+          <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/80 flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <label className="text-slate-200 font-medium flex items-center gap-1.5">
+                <Volume2 className="w-4 h-4 text-cyan-400 shrink-0" />
+                {t("ui.settings.systemAudioCaptureToggle")}
+              </label>
+              <p className="text-slate-400 text-[11px] mt-0.5">
+                {t("ui.settings.systemAudioCaptureDesc")}
+              </p>
+              {!systemAudioSupported && (
+                <p
+                  className="text-amber-300/90 text-[10.5px] mt-1.5 leading-relaxed"
+                  data-testid="system-audio-unsupported"
+                >
+                  {t("ui.settings.systemAudioUnsupported")}
                 </p>
-                {!systemAudioSupported && (
-                  <p
-                    className="text-amber-300/90 text-[10.5px] mt-1.5 leading-relaxed"
-                    data-testid="system-audio-unsupported"
-                  >
-                    {t("ui.settings.systemAudioUnsupported")}
-                  </p>
-                )}
-              </div>
-              <input
-                type="checkbox"
-                checked={systemAudioEnabled}
-                onChange={(e) => handleSystemAudioToggle(e.target.checked)}
-                data-testid="system-audio-toggle"
-                className="w-4 h-4 rounded border-slate-700 bg-slate-800 text-cyan-600 focus:ring-0 cursor-pointer shrink-0"
-              />
+              )}
             </div>
+            <input
+              type="checkbox"
+              checked={systemAudioEnabled}
+              onChange={(e) => handleSystemAudioToggle(e.target.checked)}
+              data-testid="system-audio-toggle"
+              className="w-4 h-4 rounded border-slate-700 bg-slate-800 text-cyan-600 focus:ring-0 cursor-pointer shrink-0"
+            />
+          </div>
 
-            {/* Dynamic System Audio & Loopback Status Card */}
-            {(() => {
-              const selectedDev = (audioDevices || []).find(
-                (d) => d.name === selectedAudioDevice,
-              );
-              const isLoopbackActive = selectedDev?.is_loopback ?? false;
-              const hasAnyLoopback = (audioDevices || []).some(
-                (d) => d.is_loopback,
-              );
+          {/* Dynamic System Audio & Loopback Status Card */}
+          {(() => {
+            const selectedDev = (audioDevices || []).find(
+              (d) => d.name === selectedAudioDevice,
+            );
+            const isLoopbackActive = selectedDev?.is_loopback ?? false;
+            const hasAnyLoopback = (audioDevices || []).some(
+              (d) => d.is_loopback,
+            );
 
-              return (
-                <div className="p-4 rounded-xl bg-gradient-to-b from-slate-900/90 to-slate-950/80 border border-slate-800 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div
-                        className={`p-1.5 rounded-lg border ${
-                          isLoopbackActive
-                            ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
-                            : "bg-cyan-500/10 border-cyan-500/20 text-cyan-400"
-                        }`}
-                      >
-                        {isLoopbackActive ? (
-                          <Volume2 className="w-4 h-4" />
-                        ) : (
-                          <Mic className="w-4 h-4" />
-                        )}
-                      </div>
-                      <div>
-                        <h4 className="font-semibold text-white text-xs">
-                          {isLoopbackActive
-                            ? t("ui.settings.dualCaptureTitle")
-                            : t("ui.settings.micCaptureTitle")}
-                        </h4>
-                        <p className="text-[10px] text-slate-400">
-                          {isLoopbackActive
-                            ? t("ui.settings.dualCaptureDesc")
-                            : t("ui.settings.micCaptureDesc")}
-                        </p>
-                      </div>
-                    </div>
-                    <span
-                      className={`px-2 py-0.5 rounded-full font-medium text-[10px] flex items-center gap-1.5 ${
+            return (
+              <div className="p-4 rounded-xl bg-gradient-to-b from-slate-900/90 to-slate-950/80 border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div
+                      className={`p-1.5 rounded-lg border ${
                         isLoopbackActive
-                          ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400"
-                          : "bg-amber-500/10 border border-amber-500/20 text-amber-400"
+                          ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+                          : "bg-cyan-500/10 border-cyan-500/20 text-cyan-400"
                       }`}
                     >
-                      <span
-                        className={`w-1.5 h-1.5 rounded-full ${
-                          isLoopbackActive ? "bg-emerald-400" : "bg-amber-400"
-                        }`}
-                      />
-                      {isLoopbackActive
-                        ? t("ui.settings.loopbackActive")
-                        : t("ui.settings.micOnly")}
-                    </span>
-                  </div>
-
-                  {!isLoopbackActive && (
-                    <div className="p-3 rounded-lg bg-amber-950/20 border border-amber-500/20 text-amber-300 text-[11px] space-y-1.5 leading-relaxed">
-                      <p className="font-medium text-amber-200 flex items-center gap-1.5">
-                        <span>💡</span> {t("ui.settings.remoteTipTitle")}
-                      </p>
-                      <p className="text-[10.5px] text-amber-300/90">
-                        {t("ui.settings.remoteTipBefore")}
-                        <strong>BlackHole (macOS)</strong>,{" "}
-                        <strong>VB-Cable</strong>
-                        {t("ui.settings.remoteTipOr")}
-                        <strong>Stereo Mix</strong>
-                        {t("ui.settings.remoteTipAfter")}
-                      </p>
-                      {hasAnyLoopback && (
-                        <p className="text-[10px] text-emerald-300 font-semibold pt-0.5">
-                          {t("ui.settings.loopbackFound")}
-                        </p>
+                      {isLoopbackActive ? (
+                        <Volume2 className="w-4 h-4" />
+                      ) : (
+                        <Mic className="w-4 h-4" />
                       )}
                     </div>
-                  )}
-
-                  <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-400 pt-1">
-                    <div className="p-2 rounded-lg bg-slate-900/60 border border-slate-800 flex items-center gap-2">
-                      <Mic className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                      <span>{t("ui.settings.yourVoice")}</span>
-                    </div>
-                    <div className="p-2 rounded-lg bg-slate-900/60 border border-slate-800 flex items-center gap-2">
-                      <Volume2 className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                      <span>
+                    <div>
+                      <h4 className="font-semibold text-white text-xs">
                         {isLoopbackActive
-                          ? t("ui.settings.systemAudioLoopback")
-                          : t("ui.settings.systemAudioSpeaker")}
-                      </span>
+                          ? t("ui.settings.dualCaptureTitle")
+                          : t("ui.settings.micCaptureTitle")}
+                      </h4>
+                      <p className="text-[10px] text-slate-400">
+                        {isLoopbackActive
+                          ? t("ui.settings.dualCaptureDesc")
+                          : t("ui.settings.micCaptureDesc")}
+                      </p>
                     </div>
                   </div>
+                  <span
+                    className={`px-2 py-0.5 rounded-full font-medium text-[10px] flex items-center gap-1.5 ${
+                      isLoopbackActive
+                        ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400"
+                        : "bg-amber-500/10 border border-amber-500/20 text-amber-400"
+                    }`}
+                  >
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full ${
+                        isLoopbackActive ? "bg-emerald-400" : "bg-amber-400"
+                      }`}
+                    />
+                    {isLoopbackActive
+                      ? t("ui.settings.loopbackActive")
+                      : t("ui.settings.micOnly")}
+                  </span>
+                </div>
 
-                  {/* Loopback Actions and Controls */}
-                  <div className="pt-2 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={handleTestAudio}
-                        disabled={isAudioTesting}
-                        data-testid="settings-audio-test-btn"
-                        className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition ${
-                          isAudioTesting
-                            ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 animate-pulse"
-                            : "bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700"
-                        }`}
-                      >
-                        <Radio
-                          className={`w-3.5 h-3.5 ${isAudioTesting ? "text-cyan-400 animate-spin" : "text-slate-400"}`}
-                        />
-                        <span>
-                          {isAudioTesting
-                            ? t("ui.settings.testingAudio")
-                            : t("ui.settings.testInput")}
-                        </span>
-                      </button>
+                {!isLoopbackActive && (
+                  <div className="p-3 rounded-lg bg-amber-950/20 border border-amber-500/20 text-amber-300 text-[11px] space-y-1.5 leading-relaxed">
+                    <p className="font-medium text-amber-200 flex items-center gap-1.5">
+                      <span>💡</span> {t("ui.settings.remoteTipTitle")}
+                    </p>
+                    <p className="text-[10.5px] text-amber-300/90">
+                      {t("ui.settings.remoteTipBefore")}
+                      <strong>BlackHole (macOS)</strong>,{" "}
+                      <strong>VB-Cable</strong>
+                      {t("ui.settings.remoteTipOr")}
+                      <strong>Stereo Mix</strong>
+                      {t("ui.settings.remoteTipAfter")}
+                    </p>
+                    {hasAnyLoopback && (
+                      <p className="text-[10px] text-emerald-300 font-semibold pt-0.5">
+                        {t("ui.settings.loopbackFound")}
+                      </p>
+                    )}
+                  </div>
+                )}
 
-                      <button
-                        type="button"
-                        onClick={handleOpenAudioMidiSetup}
-                        className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-medium flex items-center gap-1.5 transition"
-                        title={t("ui.settings.openSoundPanelTitle")}
-                      >
-                        <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
-                        <span>{t("ui.settings.openSoundPanel")}</span>
-                      </button>
-                    </div>
+                <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-400 pt-1">
+                  <div className="p-2 rounded-lg bg-slate-900/60 border border-slate-800 flex items-center gap-2">
+                    <Mic className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                    <span>{t("ui.settings.yourVoice")}</span>
+                  </div>
+                  <div className="p-2 rounded-lg bg-slate-900/60 border border-slate-800 flex items-center gap-2">
+                    <Volume2 className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                    <span>
+                      {isLoopbackActive
+                        ? t("ui.settings.systemAudioLoopback")
+                        : t("ui.settings.systemAudioSpeaker")}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Loopback Actions and Controls */}
+                <div className="pt-2 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleTestAudio}
+                      disabled={isAudioTesting}
+                      data-testid="settings-audio-test-btn"
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition ${
+                        isAudioTesting
+                          ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 animate-pulse"
+                          : "bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700"
+                      }`}
+                    >
+                      <Radio
+                        className={`w-3.5 h-3.5 ${isAudioTesting ? "text-cyan-400 animate-spin" : "text-slate-400"}`}
+                      />
+                      <span>
+                        {isAudioTesting
+                          ? t("ui.settings.testingAudio")
+                          : t("ui.settings.testInput")}
+                      </span>
+                    </button>
 
                     <button
                       type="button"
-                      onClick={() => setShowLoopbackGuide(!showLoopbackGuide)}
-                      className="text-[11px] text-cyan-400 hover:text-cyan-300 underline underline-offset-2 transition"
+                      onClick={handleOpenAudioMidiSetup}
+                      className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-medium flex items-center gap-1.5 transition"
+                      title={t("ui.settings.openSoundPanelTitle")}
                     >
-                      {showLoopbackGuide
-                        ? t("ui.settings.hideGuide")
-                        : t("ui.settings.showGuide")}
+                      <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
+                      <span>{t("ui.settings.openSoundPanel")}</span>
                     </button>
                   </div>
 
-                  {showLoopbackGuide && (
-                    <div className="p-3 rounded-lg bg-slate-950 border border-slate-800 text-[11px] text-slate-300 space-y-2 leading-relaxed">
-                      <h5 className="font-semibold text-white flex items-center gap-1.5">
-                        <Volume2 className="w-3.5 h-3.5 text-cyan-400" />
-                        <span>
-                          Sistem Sesi ve Karşı Taraf Sesini Yakalama Rehberi
-                        </span>
-                      </h5>
-                      <ul className="list-disc list-inside space-y-1 text-slate-400">
-                        <li>
-                          <strong className="text-slate-200">macOS:</strong>{" "}
-                          <code className="px-1 py-0.5 rounded bg-slate-900 text-cyan-300">
-                            brew install blackhole-2ch
-                          </code>{" "}
-                          kurup, <em>Audio MIDI Setup</em> üzerinden hem
-                          kulaklığınızı hem de BlackHole'u içeren bir{" "}
-                          <em>"Çoklu Çıkış Aygıtı (Multi-Output Device)"</em>{" "}
-                          oluşturun.
-                        </li>
-                        <li>
-                          <strong className="text-slate-200">Windows:</strong>{" "}
-                          Denetim Masası &gt; Ses &gt; Kayıt sekmesinde{" "}
-                          <em>Stereo Karışımı (Stereo Mix)</em> veya{" "}
-                          <em>VB-Audio Cable</em> sanal kablosunu
-                          varsayılan/seçili yapın.
-                        </li>
-                        <li>
-                          <strong className="text-slate-200">Linux:</strong>{" "}
-                          <code className="px-1 py-0.5 rounded bg-slate-900 text-cyan-300">
-                            pavucontrol
-                          </code>{" "}
-                          açarak EchoMind giriş aygıtını "Monitor of Built-in
-                          Audio" olarak yönlendirin.
-                        </li>
-                      </ul>
+                  <button
+                    type="button"
+                    onClick={() => setShowLoopbackGuide(!showLoopbackGuide)}
+                    className="text-[11px] text-cyan-400 hover:text-cyan-300 underline underline-offset-2 transition"
+                  >
+                    {showLoopbackGuide
+                      ? t("ui.settings.hideGuide")
+                      : t("ui.settings.showGuide")}
+                  </button>
+                </div>
+
+                {showLoopbackGuide && (
+                  <div className="p-3 rounded-lg bg-slate-950 border border-slate-800 text-[11px] text-slate-300 space-y-2 leading-relaxed">
+                    <h5 className="font-semibold text-white flex items-center gap-1.5">
+                      <Volume2 className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>
+                        Sistem Sesi ve Karşı Taraf Sesini Yakalama Rehberi
+                      </span>
+                    </h5>
+                    <ul className="list-disc list-inside space-y-1 text-slate-400">
+                      <li>
+                        <strong className="text-slate-200">macOS:</strong>{" "}
+                        <code className="px-1 py-0.5 rounded bg-slate-900 text-cyan-300">
+                          brew install blackhole-2ch
+                        </code>{" "}
+                        kurup, <em>Audio MIDI Setup</em> üzerinden hem
+                        kulaklığınızı hem de BlackHole'u içeren bir{" "}
+                        <em>"Çoklu Çıkış Aygıtı (Multi-Output Device)"</em>{" "}
+                        oluşturun.
+                      </li>
+                      <li>
+                        <strong className="text-slate-200">Windows:</strong>{" "}
+                        Denetim Masası &gt; Ses &gt; Kayıt sekmesinde{" "}
+                        <em>Stereo Karışımı (Stereo Mix)</em> veya{" "}
+                        <em>VB-Audio Cable</em> sanal kablosunu
+                        varsayılan/seçili yapın.
+                      </li>
+                      <li>
+                        <strong className="text-slate-200">Linux:</strong>{" "}
+                        <code className="px-1 py-0.5 rounded bg-slate-900 text-cyan-300">
+                          pavucontrol
+                        </code>{" "}
+                        açarak EchoMind giriş aygıtını "Monitor of Built-in
+                        Audio" olarak yönlendirin.
+                      </li>
+                    </ul>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+          <GlossaryCard />
+        </div>
+      )}
+
+      {/* Tab 1: System Info & Privacy */}
+      {activeTab === "system" && (
+        <div className="space-y-4 text-xs">
+          {/* Privacy Mode Profiles Selector */}
+          <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800 space-y-3">
+            <div className="flex items-center justify-between pb-1 border-b border-slate-800/80">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                <span className="text-white font-semibold text-xs">
+                  {t("privacyModes.title") || "Gizlilik ve Güvenlik Profili"}
+                </span>
+              </div>
+              <span className="text-[10px] text-slate-400">
+                {t("privacyModes.subtitle") ||
+                  "Tek tıkla veri izolasyon seviyesini belirleyin"}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 pt-1">
+              {/* 1. Paranoid Mode */}
+              <div
+                onClick={() => setPrivacyMode("paranoid")}
+                data-testid="settings-privacy-paranoid"
+                className={`p-3 rounded-xl border transition-all cursor-pointer relative flex flex-col justify-between gap-2 ${
+                  isParanoid
+                    ? "bg-purple-950/40 border-purple-500 shadow-md shadow-purple-950/40 text-white"
+                    : "bg-slate-900/60 border-slate-800 hover:border-slate-700 text-slate-300"
+                }`}
+              >
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <ShieldAlert className="w-4 h-4 text-purple-400" />
+                      <span className="font-bold text-xs">
+                        {t("privacyModes.paranoid.name") || "Paranoid Mod"}
+                      </span>
                     </div>
+                    <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                      Air-Gapped
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-slate-400 leading-relaxed">
+                    {t("privacyModes.paranoid.desc") ||
+                      "Sıfır Bulut. Yalnızca yerel modeller ve ultra katı DLP."}
+                  </p>
+                </div>
+                <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[9px] font-medium text-purple-300/80">
+                  <span>
+                    {t("privacyModes.paranoid.features") ||
+                      "%100 Çevrimdışı • Ağ İzolasyonu"}
+                  </span>
+                  {isParanoid && (
+                    <Check className="w-3.5 h-3.5 text-purple-400" />
                   )}
                 </div>
-              );
-            })()}
-            <GlossaryCard />
+              </div>
+
+              {/* 2. Balanced Mode */}
+              <div
+                onClick={() => setPrivacyMode("balanced")}
+                data-testid="settings-privacy-balanced"
+                className={`p-3 rounded-xl border transition-all cursor-pointer relative flex flex-col justify-between gap-2 ${
+                  isBalanced
+                    ? "bg-emerald-950/40 border-emerald-500 shadow-md shadow-emerald-950/40 text-white"
+                    : "bg-slate-900/60 border-slate-800 hover:border-slate-700 text-slate-300"
+                }`}
+              >
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                      <span className="font-bold text-xs">
+                        {t("privacyModes.balanced.name") || "Dengeli Mod"}
+                      </span>
+                    </div>
+                    <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                      {t("ui.settings.recommended")}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-slate-400 leading-relaxed">
+                    {t("privacyModes.balanced.desc") ||
+                      "Yerel öncelikli. Bulut sadece DLP maskelemesi sonrası."}
+                  </p>
+                </div>
+                <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[9px] font-medium text-emerald-300/80">
+                  <span>
+                    {t("privacyModes.balanced.features") ||
+                      "Yerel Öncelikli • DLP BYOK"}
+                  </span>
+                  {isBalanced && (
+                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                  )}
+                </div>
+              </div>
+
+              {/* 3. Max Intelligence Mode */}
+              <div
+                onClick={() => setPrivacyMode("max_intelligence")}
+                data-testid="settings-privacy-max"
+                className={`p-3 rounded-xl border transition-all cursor-pointer relative flex flex-col justify-between gap-2 ${
+                  isMaxIntelligence
+                    ? "bg-cyan-950/40 border-cyan-500 shadow-md shadow-cyan-950/40 text-white"
+                    : "bg-slate-900/60 border-slate-800 hover:border-slate-700 text-slate-300"
+                }`}
+              >
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <Zap className="w-4 h-4 text-cyan-400" />
+                      <span className="font-bold text-xs">
+                        {t("privacyModes.maxIntelligence.name") ||
+                          "Maksimum Zeka"}
+                      </span>
+                    </div>
+                    <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                      {t("ui.settings.highSpeed")}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-slate-400 leading-relaxed">
+                    {t("privacyModes.maxIntelligence.desc") ||
+                      "En iyi modeller serbest. Zorunlu DLP denetimi."}
+                  </p>
+                </div>
+                <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[9px] font-medium text-cyan-300/80">
+                  <span>
+                    {t("privacyModes.maxIntelligence.features") ||
+                      "Gemini / GPT-4o • Zorunlu DLP"}
+                  </span>
+                  {isMaxIntelligence && (
+                    <Check className="w-3.5 h-3.5 text-cyan-400" />
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
-        )}
 
-        {/* Tab 1: System Info & Privacy */}
-        {activeTab === "system" && (
-          <div className="space-y-4 text-xs">
-            {/* Privacy Mode Profiles Selector */}
-            <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800 space-y-3">
-              <div className="flex items-center justify-between pb-1 border-b border-slate-800/80">
-                <div className="flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                  <span className="text-white font-semibold text-xs">
-                    {t("privacyModes.title") || "Gizlilik ve Güvenlik Profili"}
-                  </span>
-                </div>
-                <span className="text-[10px] text-slate-400">
-                  {t("privacyModes.subtitle") ||
-                    "Tek tıkla veri izolasyon seviyesini belirleyin"}
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 pt-1">
-                {/* 1. Paranoid Mode */}
-                <div
-                  onClick={() => setPrivacyMode("paranoid")}
-                  data-testid="settings-privacy-paranoid"
-                  className={`p-3 rounded-xl border transition-all cursor-pointer relative flex flex-col justify-between gap-2 ${
-                    isParanoid
-                      ? "bg-purple-950/40 border-purple-500 shadow-md shadow-purple-950/40 text-white"
-                      : "bg-slate-900/60 border-slate-800 hover:border-slate-700 text-slate-300"
-                  }`}
-                >
-                  <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <div className="flex items-center gap-1.5">
-                        <ShieldAlert className="w-4 h-4 text-purple-400" />
-                        <span className="font-bold text-xs">
-                          {t("privacyModes.paranoid.name") || "Paranoid Mod"}
-                        </span>
-                      </div>
-                      <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
-                        Air-Gapped
-                      </span>
-                    </div>
-                    <p className="text-[10px] text-slate-400 leading-relaxed">
-                      {t("privacyModes.paranoid.desc") ||
-                        "Sıfır Bulut. Yalnızca yerel modeller ve ultra katı DLP."}
-                    </p>
-                  </div>
-                  <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[9px] font-medium text-purple-300/80">
-                    <span>
-                      {t("privacyModes.paranoid.features") ||
-                        "%100 Çevrimdışı • Ağ İzolasyonu"}
-                    </span>
-                    {isParanoid && (
-                      <Check className="w-3.5 h-3.5 text-purple-400" />
-                    )}
-                  </div>
-                </div>
-
-                {/* 2. Balanced Mode */}
-                <div
-                  onClick={() => setPrivacyMode("balanced")}
-                  data-testid="settings-privacy-balanced"
-                  className={`p-3 rounded-xl border transition-all cursor-pointer relative flex flex-col justify-between gap-2 ${
-                    isBalanced
-                      ? "bg-emerald-950/40 border-emerald-500 shadow-md shadow-emerald-950/40 text-white"
-                      : "bg-slate-900/60 border-slate-800 hover:border-slate-700 text-slate-300"
-                  }`}
-                >
-                  <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <div className="flex items-center gap-1.5">
-                        <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                        <span className="font-bold text-xs">
-                          {t("privacyModes.balanced.name") || "Dengeli Mod"}
-                        </span>
-                      </div>
-                      <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                        {t("ui.settings.recommended")}
-                      </span>
-                    </div>
-                    <p className="text-[10px] text-slate-400 leading-relaxed">
-                      {t("privacyModes.balanced.desc") ||
-                        "Yerel öncelikli. Bulut sadece DLP maskelemesi sonrası."}
-                    </p>
-                  </div>
-                  <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[9px] font-medium text-emerald-300/80">
-                    <span>
-                      {t("privacyModes.balanced.features") ||
-                        "Yerel Öncelikli • DLP BYOK"}
-                    </span>
-                    {isBalanced && (
-                      <Check className="w-3.5 h-3.5 text-emerald-400" />
-                    )}
-                  </div>
-                </div>
-
-                {/* 3. Max Intelligence Mode */}
-                <div
-                  onClick={() => setPrivacyMode("max_intelligence")}
-                  data-testid="settings-privacy-max"
-                  className={`p-3 rounded-xl border transition-all cursor-pointer relative flex flex-col justify-between gap-2 ${
-                    isMaxIntelligence
-                      ? "bg-cyan-950/40 border-cyan-500 shadow-md shadow-cyan-950/40 text-white"
-                      : "bg-slate-900/60 border-slate-800 hover:border-slate-700 text-slate-300"
-                  }`}
-                >
-                  <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <div className="flex items-center gap-1.5">
-                        <Zap className="w-4 h-4 text-cyan-400" />
-                        <span className="font-bold text-xs">
-                          {t("privacyModes.maxIntelligence.name") ||
-                            "Maksimum Zeka"}
-                        </span>
-                      </div>
-                      <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
-                        {t("ui.settings.highSpeed")}
-                      </span>
-                    </div>
-                    <p className="text-[10px] text-slate-400 leading-relaxed">
-                      {t("privacyModes.maxIntelligence.desc") ||
-                        "En iyi modeller serbest. Zorunlu DLP denetimi."}
-                    </p>
-                  </div>
-                  <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[9px] font-medium text-cyan-300/80">
-                    <span>
-                      {t("privacyModes.maxIntelligence.features") ||
-                        "Gemini / GPT-4o • Zorunlu DLP"}
-                    </span>
-                    {isMaxIntelligence && (
-                      <Check className="w-3.5 h-3.5 text-cyan-400" />
-                    )}
-                  </div>
-                </div>
-              </div>
+          {/* Hardware summary */}
+          <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400 flex items-center gap-1.5 font-medium">
+                <Cpu className="w-4 h-4 text-cyan-400" /> {t("ui.settings.cpu")}
+              </span>
+              <span className="text-slate-200 font-semibold">
+                {hardware ? hardware.cpu_brand : t("ui.settings.detecting")}
+              </span>
             </div>
-
-            {/* Hardware summary */}
-            <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-slate-400 flex items-center gap-1.5 font-medium">
-                  <Cpu className="w-4 h-4 text-cyan-400" />{" "}
-                  {t("ui.settings.cpu")}
-                </span>
-                <span className="text-slate-200 font-semibold">
-                  {hardware ? hardware.cpu_brand : t("ui.settings.detecting")}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-slate-400 flex items-center gap-1.5 font-medium">
-                  <Zap className="w-4 h-4 text-amber-400" />{" "}
-                  {t("ui.settings.gpu")}
-                </span>
-                <span className="text-emerald-400 font-medium">
-                  {hardware?.metal_supported
-                    ? t("ui.settings.appleAccel")
-                    : hardware?.gpu_name || t("ui.settings.standardGpu")}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-slate-400 flex items-center gap-1.5 font-medium">
-                  <HardDrive className="w-4 h-4 text-indigo-400" />{" "}
-                  {t("ui.settings.ram")}
-                </span>
-                <span className="text-slate-200 font-semibold">
-                  {hardware ? `${hardware.total_ram_gb} GB` : "-"}
-                </span>
-              </div>
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400 flex items-center gap-1.5 font-medium">
+                <Zap className="w-4 h-4 text-amber-400" />{" "}
+                {t("ui.settings.gpu")}
+              </span>
+              <span className="text-emerald-400 font-medium">
+                {hardware?.metal_supported
+                  ? t("ui.settings.appleAccel")
+                  : hardware?.gpu_name || t("ui.settings.standardGpu")}
+              </span>
             </div>
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400 flex items-center gap-1.5 font-medium">
+                <HardDrive className="w-4 h-4 text-indigo-400" />{" "}
+                {t("ui.settings.ram")}
+              </span>
+              <span className="text-slate-200 font-semibold">
+                {hardware ? `${hardware.total_ram_gb} GB` : "-"}
+              </span>
+            </div>
+          </div>
 
-            {/* Privacy Guarantee Card */}
-            <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-2.5">
-              <div className="flex items-center justify-between">
-                <span className="text-slate-400 flex items-center gap-1.5 font-medium">
-                  <ShieldCheck className="w-4 h-4 text-emerald-400" />{" "}
-                  {t("ui.settings.offlineMode")}
-                </span>
-                <span className="text-emerald-400 font-medium">
-                  {t("ui.settings.privateOnDevice")}
-                </span>
-              </div>
+          {/* Privacy Guarantee Card */}
+          <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400 flex items-center gap-1.5 font-medium">
+                <ShieldCheck className="w-4 h-4 text-emerald-400" />{" "}
+                {t("ui.settings.offlineMode")}
+              </span>
+              <span className="text-emerald-400 font-medium">
+                {t("ui.settings.privateOnDevice")}
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-slate-400">
+              <span>{t("ui.settings.dataSecurity")}</span>
+              <span className="text-slate-200">
+                {isParanoid
+                  ? t("ui.settings.dataSecurityParanoid")
+                  : t("ui.settings.dataSecurityDefault")}
+              </span>
+            </div>
+            {modelStatus && (
               <div className="flex items-center justify-between text-slate-400">
-                <span>{t("ui.settings.dataSecurity")}</span>
+                <span>{t("ui.settings.aiStatus")}</span>
                 <span className="text-slate-200">
-                  {isParanoid
-                    ? t("ui.settings.dataSecurityParanoid")
-                    : t("ui.settings.dataSecurityDefault")}
+                  {modelStatus.is_loaded
+                    ? t("ui.settings.aiReady")
+                    : t("ui.settings.aiOnDemand")}
                 </span>
               </div>
-              {modelStatus && (
-                <div className="flex items-center justify-between text-slate-400">
-                  <span>{t("ui.settings.aiStatus")}</span>
-                  <span className="text-slate-200">
-                    {modelStatus.is_loaded
-                      ? t("ui.settings.aiReady")
-                      : t("ui.settings.aiOnDemand")}
-                  </span>
-                </div>
-              )}
-            </div>
+            )}
+          </div>
 
-            {/* Cloud Privacy Confirmation Preference Toggle */}
-            <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/80 flex items-center justify-between">
+          {/* Cloud Privacy Confirmation Preference Toggle */}
+          <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/80 flex items-center justify-between">
+            <div>
+              <label className="text-slate-200 font-medium flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-amber-400" />{" "}
+                {t("ui.settings.cloudWarnToggle")}
+              </label>
+              <p className="text-slate-400 text-[11px] mt-0.5">
+                {t("ui.settings.cloudWarnToggleDesc")}
+              </p>
+            </div>
+            <input
+              type="checkbox"
+              checked={askCloudConfirm}
+              onChange={(e) => setAskCloudConfirm(e.target.checked)}
+              className="w-4 h-4 rounded border-slate-700 bg-slate-800 text-cyan-600 focus:ring-0 cursor-pointer"
+            />
+          </div>
+
+          {/* Automatic Meeting Detection Settings Card */}
+          <div className="p-3.5 rounded-xl bg-slate-950/60 border border-cyan-500/30 space-y-3 shadow-inner">
+            <div className="flex items-center justify-between">
               <div>
-                <label className="text-slate-200 font-medium flex items-center gap-1.5">
-                  <ShieldCheck className="w-4 h-4 text-amber-400" />{" "}
-                  {t("ui.settings.cloudWarnToggle")}
+                <label className="text-white font-semibold flex items-center gap-2 text-xs">
+                  <Radio className="w-4 h-4 text-cyan-400" />
+                  {t("detector.settingsTitle")}
                 </label>
                 <p className="text-slate-400 text-[11px] mt-0.5">
-                  {t("ui.settings.cloudWarnToggleDesc")}
+                  {t("detector.settingsDesc")}
                 </p>
               </div>
               <input
                 type="checkbox"
-                checked={askCloudConfirm}
-                onChange={(e) => setAskCloudConfirm(e.target.checked)}
+                checked={detectorSettings.enabled}
+                onChange={(e) =>
+                  handleUpdateDetector({ enabled: e.target.checked })
+                }
                 className="w-4 h-4 rounded border-slate-700 bg-slate-800 text-cyan-600 focus:ring-0 cursor-pointer"
               />
             </div>
 
-            {/* Automatic Meeting Detection Settings Card */}
-            <div className="p-3.5 rounded-xl bg-slate-950/60 border border-cyan-500/30 space-y-3 shadow-inner">
-              <div className="flex items-center justify-between">
-                <div>
-                  <label className="text-white font-semibold flex items-center gap-2 text-xs">
-                    <Radio className="w-4 h-4 text-cyan-400" />
-                    {t("detector.settingsTitle")}
-                  </label>
-                  <p className="text-slate-400 text-[11px] mt-0.5">
-                    {t("detector.settingsDesc")}
-                  </p>
+            {detectorSettings.enabled && (
+              <div className="pt-2 border-t border-slate-800/80 space-y-2.5 pl-1">
+                {/* Auto-Start Toggle */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-slate-200 font-medium text-[11px] flex items-center gap-1.5">
+                      <Zap className="w-3.5 h-3.5 text-amber-400" />
+                      {t("detector.autoStartToggle")}
+                    </span>
+                    <p className="text-slate-400 text-[10px]">
+                      {t("detector.autoStartToggleDesc")}
+                    </p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={detectorSettings.auto_start_record}
+                    onChange={(e) =>
+                      handleUpdateDetector({
+                        auto_start_record: e.target.checked,
+                      })
+                    }
+                    className="w-4 h-4 rounded border-slate-700 bg-slate-800 text-cyan-600 focus:ring-0 cursor-pointer"
+                  />
                 </div>
-                <input
-                  type="checkbox"
-                  checked={detectorSettings.enabled}
-                  onChange={(e) =>
-                    handleUpdateDetector({ enabled: e.target.checked })
-                  }
-                  className="w-4 h-4 rounded border-slate-700 bg-slate-800 text-cyan-600 focus:ring-0 cursor-pointer"
-                />
-              </div>
 
-              {detectorSettings.enabled && (
-                <div className="pt-2 border-t border-slate-800/80 space-y-2.5 pl-1">
-                  {/* Auto-Start Toggle */}
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-slate-200 font-medium text-[11px] flex items-center gap-1.5">
-                        <Zap className="w-3.5 h-3.5 text-amber-400" />
-                        {t("detector.autoStartToggle")}
-                      </span>
-                      <p className="text-slate-400 text-[10px]">
-                        {t("detector.autoStartToggleDesc")}
-                      </p>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={detectorSettings.auto_start_record}
-                      onChange={(e) =>
-                        handleUpdateDetector({
-                          auto_start_record: e.target.checked,
-                        })
-                      }
-                      className="w-4 h-4 rounded border-slate-700 bg-slate-800 text-cyan-600 focus:ring-0 cursor-pointer"
-                    />
+                {/* Auto-Stop Toggle */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-slate-200 font-medium text-[11px] flex items-center gap-1.5">
+                      <Activity className="w-3.5 h-3.5 text-rose-400" />
+                      {t("detector.autoStopToggle")}
+                    </span>
+                    <p className="text-slate-400 text-[10px]">
+                      {t("detector.autoStopToggleDesc")}
+                    </p>
                   </div>
+                  <input
+                    type="checkbox"
+                    checked={detectorSettings.auto_stop_on_app_close}
+                    onChange={(e) =>
+                      handleUpdateDetector({
+                        auto_stop_on_app_close: e.target.checked,
+                      })
+                    }
+                    className="w-4 h-4 rounded border-slate-700 bg-slate-800 text-cyan-600 focus:ring-0 cursor-pointer"
+                  />
+                </div>
 
-                  {/* Auto-Stop Toggle */}
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-slate-200 font-medium text-[11px] flex items-center gap-1.5">
-                        <Activity className="w-3.5 h-3.5 text-rose-400" />
-                        {t("detector.autoStopToggle")}
-                      </span>
-                      <p className="text-slate-400 text-[10px]">
-                        {t("detector.autoStopToggleDesc")}
-                      </p>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={detectorSettings.auto_stop_on_app_close}
-                      onChange={(e) =>
-                        handleUpdateDetector({
-                          auto_stop_on_app_close: e.target.checked,
-                        })
-                      }
-                      className="w-4 h-4 rounded border-slate-700 bg-slate-800 text-cyan-600 focus:ring-0 cursor-pointer"
-                    />
+                {/* Ignore list (bundle IDs) */}
+                <div className="pt-2 border-t border-slate-800/80 space-y-2">
+                  <div>
+                    <span className="text-slate-200 font-medium text-[11px]">
+                      {t("detector.ignoreListTitle")}
+                    </span>
+                    <p className="text-slate-400 text-[10px]">
+                      {t("detector.ignoreListDesc")}
+                    </p>
                   </div>
-
-                  {/* Ignore list (bundle IDs) */}
-                  <div className="pt-2 border-t border-slate-800/80 space-y-2">
-                    <div>
-                      <span className="text-slate-200 font-medium text-[11px]">
-                        {t("detector.ignoreListTitle")}
-                      </span>
-                      <p className="text-slate-400 text-[10px]">
-                        {t("detector.ignoreListDesc")}
-                      </p>
-                    </div>
-                    <div className="flex gap-1.5">
-                      <input
-                        type="text"
-                        value={ignoreBundleDraft}
-                        onChange={(e) => setIgnoreBundleDraft(e.target.value)}
-                        placeholder={t("detector.ignoreListPlaceholder")}
-                        className="flex-1 min-w-0 rounded-lg bg-slate-900 border border-slate-700 px-2 py-1 text-[11px] text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-cyan-500/50"
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            const id = ignoreBundleDraft.trim();
-                            if (
-                              id &&
-                              !detectorSettings.ignored_apps.includes(id)
-                            ) {
-                              handleUpdateDetector({
-                                ignored_apps: [
-                                  ...detectorSettings.ignored_apps,
-                                  id,
-                                ],
-                              });
-                              setIgnoreBundleDraft("");
-                            }
-                          }
-                        }}
-                      />
-                      <button
-                        type="button"
-                        title={t("detector.ignoreListAdd")}
-                        onClick={() => {
+                  <div className="flex gap-1.5">
+                    <input
+                      type="text"
+                      value={ignoreBundleDraft}
+                      onChange={(e) => setIgnoreBundleDraft(e.target.value)}
+                      placeholder={t("detector.ignoreListPlaceholder")}
+                      className="flex-1 min-w-0 rounded-lg bg-slate-900 border border-slate-700 px-2 py-1 text-[11px] text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-cyan-500/50"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
                           const id = ignoreBundleDraft.trim();
                           if (
                             id &&
@@ -1179,616 +1112,618 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             });
                             setIgnoreBundleDraft("");
                           }
-                        }}
-                        className="shrink-0 px-2 py-1 rounded-lg bg-slate-800 border border-slate-700 text-cyan-400 text-[11px] hover:bg-slate-700 flex items-center gap-1"
-                      >
-                        <Plus className="w-3 h-3" />
-                        {t("detector.ignoreListAdd")}
-                      </button>
-                    </div>
-                    {detectorSettings.ignored_apps.length === 0 ? (
-                      <p className="text-slate-500 text-[10px]">
-                        {t("detector.ignoreListEmpty")}
-                      </p>
-                    ) : (
-                      <ul className="max-h-28 overflow-y-auto space-y-1">
-                        {detectorSettings.ignored_apps.map((id) => (
-                          <li
-                            key={id}
-                            className="flex items-center justify-between gap-2 rounded-md bg-slate-900/80 px-2 py-1"
-                          >
-                            <span className="text-[10px] text-slate-300 font-mono truncate">
-                              {id}
-                            </span>
-                            <button
-                              type="button"
-                              title={t("detector.ignoreListRemove")}
-                              onClick={() =>
-                                handleUpdateDetector({
-                                  ignored_apps:
-                                    detectorSettings.ignored_apps.filter(
-                                      (x) => x !== id,
-                                    ),
-                                })
-                              }
-                              className="shrink-0 text-rose-400/80 hover:text-rose-300 p-0.5"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      title={t("detector.ignoreListAdd")}
+                      onClick={() => {
+                        const id = ignoreBundleDraft.trim();
+                        if (id && !detectorSettings.ignored_apps.includes(id)) {
+                          handleUpdateDetector({
+                            ignored_apps: [
+                              ...detectorSettings.ignored_apps,
+                              id,
+                            ],
+                          });
+                          setIgnoreBundleDraft("");
+                        }
+                      }}
+                      className="shrink-0 px-2 py-1 rounded-lg bg-slate-800 border border-slate-700 text-cyan-400 text-[11px] hover:bg-slate-700 flex items-center gap-1"
+                    >
+                      <Plus className="w-3 h-3" />
+                      {t("detector.ignoreListAdd")}
+                    </button>
                   </div>
-                </div>
-              )}
-            </div>
-
-            {/* Audio Engine Info */}
-            <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-slate-400 flex items-center gap-1.5 font-medium">
-                  <Mic className="w-4 h-4 text-purple-400" /> Akıllı Ses
-                  İyileştirme:
-                </span>
-                <span className="text-emerald-400 font-medium">
-                  Otomatik Gürültü Temizleme Aktif
-                </span>
-              </div>
-              <div className="flex items-center justify-between text-slate-400">
-                <span>Ses Kalitesi:</span>
-                <span className="text-slate-200">
-                  Kristal Netliğinde Stüdyo Sesi
-                </span>
-              </div>
-            </div>
-
-            {/* Software Updates Section */}
-            <div className="p-3.5 rounded-xl bg-slate-950/60 border border-cyan-500/30 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-white flex items-center gap-1.5 font-semibold text-xs">
-                  <Sparkles className="w-4 h-4 text-cyan-400" />
-                  {t("updater.checkNowButton") || "Uygulama Güncellemeleri"}
-                </span>
-                <span className="text-[10px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 px-2 py-0.5 rounded-full font-bold">
-                  v0.2.7
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between text-[11px] pt-1 border-t border-slate-800/80">
-                <div>
-                  <span className="text-slate-200 font-medium block">
-                    {t("updater.autoCheckToggle") ||
-                      "Açılışta Güncellemeleri Otomatik Denetle"}
-                  </span>
-                  <span className="text-slate-400 text-[10px]">
-                    {t("updater.autoCheckToggleDesc") ||
-                      "Yeni bir EchoMind sürümü yayınlandığında açılışta bilgilendirir."}
-                  </span>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={autoCheckUpdates}
-                  onChange={(e) => {
-                    const val = e.target.checked;
-                    setAutoCheckUpdates(val);
-                    localStorage.setItem(
-                      "echomind_auto_check_updates",
-                      val ? "true" : "false",
-                    );
-                  }}
-                  className="rounded border-slate-700 bg-slate-900 text-cyan-500 focus:ring-cyan-500/50 w-4 h-4 cursor-pointer"
-                  data-testid="settings-auto-update-toggle"
-                />
-              </div>
-
-              {/* Check for Updates Action & Feedback */}
-              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800/80">
-                <div>
-                  {updateStatus.state === "upToDate" && (
-                    <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400 font-medium">
-                      <Check className="w-3.5 h-3.5" />
-                      {t("updater.upToDateDesc", {
-                        version: updateStatus.version || "v0.2.7",
-                      }) || "EchoMind güncel (v0.2.7)."}
-                    </span>
-                  )}
-                  {updateStatus.state === "updateAvailable" && (
-                    <span className="inline-flex items-center gap-1 text-[11px] text-cyan-300 font-bold animate-pulse">
-                      <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-                      {t("updater.updateAvailable", {
-                        version: updateStatus.version || "",
-                      }) || `Yeni sürüm mevcut (v${updateStatus.version})`}
-                    </span>
-                  )}
-                  {updateStatus.state === "error" && (
-                    <span className="inline-flex items-center gap-1 text-[11px] text-rose-400 font-medium">
-                      <AlertTriangle className="w-3.5 h-3.5" />
-                      {updateStatus.message ||
-                        t("updater.updateError") ||
-                        "Güncelleme denetlenemedi."}
-                    </span>
-                  )}
-                  {updateStatus.state === "idle" && (
-                    <span className="text-[10px] text-slate-500">
-                      GitHub Releases üzerinden kontrol edilir.
-                    </span>
-                  )}
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleCheckUpdates}
-                  disabled={updateStatus.state === "checking"}
-                  className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 hover:border-cyan-500/50 text-[11px] font-medium transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                  data-testid="settings-check-updates-btn"
-                >
-                  <RefreshCw
-                    className={`w-3.5 h-3.5 ${
-                      updateStatus.state === "checking"
-                        ? "animate-spin text-cyan-400"
-                        : "text-slate-400"
-                    }`}
-                  />
-                  <span>
-                    {updateStatus.state === "checking"
-                      ? t("updater.checking") || "Denetleniyor..."
-                      : t("updater.checkNowButton") || "Güncellemeleri Denetle"}
-                  </span>
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Tab 2: API Keys & Model Versions */}
-        {activeTab === "apiKeys" && (
-          <div className="space-y-4 text-xs">
-            {/* Custom Local LLM / Ollama Server */}
-            <div className="p-3.5 rounded-xl bg-slate-950/60 border border-purple-500/30 space-y-2.5">
-              <div className="flex items-center justify-between">
-                <label className="font-semibold text-white flex items-center gap-1.5">
-                  <Server className="w-4 h-4 text-purple-400" />{" "}
-                  {t("ui.settings.localLlmTitle")}
-                </label>
-                <span className="text-[10px] bg-purple-500/20 text-purple-300 border border-purple-500/30 px-1.5 py-0.5 rounded font-medium">
-                  {t("ui.settings.localOffline")}
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-400">
-                {t("ui.settings.localLlmDesc")}
-              </p>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                <div className="space-y-1">
-                  <span className="text-[10px] text-slate-400 font-medium">
-                    {t("ui.settings.endpointUrl")}
-                  </span>
-                  <input
-                    type="text"
-                    value={ollamaEndpoint}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setOllamaEndpoint(val);
-                      localStorage.setItem(
-                        "echomind_ollama_endpoint",
-                        val.trim(),
-                      );
-                    }}
-                    placeholder="http://127.0.0.1:11434"
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-mono text-slate-200 focus:outline-none focus:border-purple-500"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <span className="text-[10px] text-slate-400 font-medium">
-                    {t("ui.settings.modelName")}
-                  </span>
-                  <input
-                    type="text"
-                    value={ollamaModel}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setOllamaModel(val);
-                      localStorage.setItem("echomind_ollama_model", val.trim());
-                    }}
-                    placeholder="llama3.2, qwen2.5:7b, mistral..."
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-mono text-slate-200 focus:outline-none focus:border-purple-500"
-                  />
-                </div>
-              </div>
-
-              {/* Test Connection Button & Status */}
-              <div className="flex items-center justify-between pt-1">
-                <button
-                  type="button"
-                  onClick={testOllamaServer}
-                  disabled={ollamaTestStatus.state === "testing"}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-600/20 hover:bg-purple-600/40 border border-purple-500/30 text-purple-200 font-medium text-[11px] transition active:scale-95 disabled:opacity-50"
-                >
-                  {ollamaTestStatus.state === "testing" ? (
-                    <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-300" />
-                      {t("ui.settings.testingServer")}
-                    </>
+                  {detectorSettings.ignored_apps.length === 0 ? (
+                    <p className="text-slate-500 text-[10px]">
+                      {t("detector.ignoreListEmpty")}
+                    </p>
                   ) : (
-                    <>
-                      <Activity className="w-3.5 h-3.5 text-purple-400" />
-                      {t("ui.settings.testServer")}
-                    </>
+                    <ul className="max-h-28 overflow-y-auto space-y-1">
+                      {detectorSettings.ignored_apps.map((id) => (
+                        <li
+                          key={id}
+                          className="flex items-center justify-between gap-2 rounded-md bg-slate-900/80 px-2 py-1"
+                        >
+                          <span className="text-[10px] text-slate-300 font-mono truncate">
+                            {id}
+                          </span>
+                          <button
+                            type="button"
+                            title={t("detector.ignoreListRemove")}
+                            onClick={() =>
+                              handleUpdateDetector({
+                                ignored_apps:
+                                  detectorSettings.ignored_apps.filter(
+                                    (x) => x !== id,
+                                  ),
+                              })
+                            }
+                            className="shrink-0 text-rose-400/80 hover:text-rose-300 p-0.5"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
                   )}
-                </button>
-              </div>
-
-              {ollamaTestStatus.state === "success" && (
-                <div className="p-2 rounded-lg bg-emerald-950/40 border border-emerald-500/30 text-[11px] text-emerald-300 flex items-center gap-1.5 animate-in fade-in">
-                  <Check className="w-3.5 h-3.5 shrink-0 text-emerald-400" />
-                  <span>{ollamaTestStatus.message}</span>
-                </div>
-              )}
-
-              {ollamaTestStatus.state === "error" && (
-                <div className="p-2 rounded-lg bg-red-950/40 border border-red-500/30 text-[11px] text-red-300 flex items-center gap-1.5 animate-in fade-in">
-                  <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-red-400" />
-                  <span>{ollamaTestStatus.message}</span>
-                </div>
-              )}
-            </div>
-
-            {isParanoid && (
-              <div
-                data-testid="settings-paranoid-cloud-banner"
-                className="p-3.5 rounded-xl bg-purple-950/60 border border-purple-500/40 text-purple-200 text-xs flex items-start gap-2.5 animate-in fade-in"
-              >
-                <ShieldAlert className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
-                <div>
-                  <div className="font-semibold text-purple-300">
-                    {t("ui.settings.paranoidActiveTitle")}
-                  </div>
-                  <div className="text-[11px] text-purple-300/80 mt-0.5">
-                    {t("ui.settings.paranoidActiveDesc")}
-                  </div>
                 </div>
               </div>
             )}
+          </div>
 
-            {/* Groq Cloud */}
-            <div
-              className={`p-3.5 rounded-xl bg-slate-950/60 space-y-2.5 border transition ${
-                isParanoid
-                  ? "opacity-50 pointer-events-none filter grayscale select-none border-purple-900/30"
-                  : "border-slate-800/80"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <label className="font-semibold text-white flex items-center gap-1.5">
-                  <Zap className="w-4 h-4 text-amber-400" />{" "}
-                  {t("ui.settings.groqTitle")}
-                </label>
-                <div className="flex items-center gap-1.5">
-                  {isParanoid && (
-                    <span className="text-[10px] bg-purple-950/80 text-purple-300 border border-purple-500/40 px-1.5 py-0.5 rounded font-mono flex items-center gap-1">
-                      <Lock className="w-2.5 h-2.5" /> {t("ui.settings.locked")}
-                    </span>
-                  )}
-                  <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded">
-                    {t("ui.settings.groqBadge")}
-                  </span>
-                </div>
-              </div>
-              <div className="relative">
-                <input
-                  type={showKeys["groq"] ? "text" : "password"}
-                  value={groqKey}
-                  autoComplete="off"
-                  spellCheck={false}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setGroqKey(val);
-                  }}
-                  placeholder="gsk_..."
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs font-mono text-slate-200 pr-10 focus:outline-none focus:border-amber-500"
-                />
-                <button
-                  type="button"
-                  onClick={() => toggleShowKey("groq")}
-                  className="absolute right-2.5 top-2.5 text-slate-400 hover:text-white"
-                >
-                  {showKeys["groq"] ? (
-                    <EyeOff className="w-4 h-4" />
-                  ) : (
-                    <Eye className="w-4 h-4" />
-                  )}
-                </button>
-              </div>
-
-              {/* Version Select */}
-              <div className="space-y-2 pt-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400 text-[11px]">
-                    {t("ui.settings.preferredModel")}
-                  </span>
-                  <select
-                    value={groqModel}
-                    onChange={(e) => setGroqModel(e.target.value)}
-                    className="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-amber-500"
-                  >
-                    {GROQ_MODELS.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {modelLabel(m, t)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                {groqModel === "custom" && (
-                  <div className="flex items-center gap-2">
-                    <Edit3 className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                    <input
-                      type="text"
-                      value={customGroq}
-                      onChange={(e) => setCustomGroq(e.target.value)}
-                      placeholder={t("ui.settings.customModelPlaceholder", {
-                        example: "whisper-large-v3-turbo",
-                      })}
-                      className="flex-1 px-2.5 py-1 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white focus:outline-none font-mono"
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Google Gemini */}
-            <div
-              className={`p-3.5 rounded-xl bg-slate-950/60 space-y-2.5 border transition ${
-                isParanoid
-                  ? "opacity-50 pointer-events-none filter grayscale select-none border-purple-900/30"
-                  : "border-slate-800/80"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <label className="font-semibold text-white flex items-center gap-1.5">
-                  <Sparkles className="w-4 h-4 text-cyan-400" />{" "}
-                  {t("ui.settings.geminiTitle")}
-                </label>
-                <div className="flex items-center gap-1.5">
-                  {isParanoid && (
-                    <span className="text-[10px] bg-purple-950/80 text-purple-300 border border-purple-500/40 px-1.5 py-0.5 rounded font-mono flex items-center gap-1">
-                      <Lock className="w-2.5 h-2.5" /> {t("ui.settings.locked")}
-                    </span>
-                  )}
-                  <span className="text-[10px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 px-1.5 py-0.5 rounded">
-                    {t("ui.settings.geminiBadge")}
-                  </span>
-                </div>
-              </div>
-              <div className="relative">
-                <input
-                  type={showKeys["gemini"] ? "text" : "password"}
-                  value={geminiKey}
-                  autoComplete="off"
-                  spellCheck={false}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setGeminiKey(val);
-                  }}
-                  placeholder="AIzaSy..."
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs font-mono text-slate-200 pr-10 focus:outline-none focus:border-cyan-500"
-                />
-                <button
-                  type="button"
-                  onClick={() => toggleShowKey("gemini")}
-                  className="absolute right-2.5 top-2.5 text-slate-400 hover:text-white"
-                >
-                  {showKeys["gemini"] ? (
-                    <EyeOff className="w-4 h-4" />
-                  ) : (
-                    <Eye className="w-4 h-4" />
-                  )}
-                </button>
-              </div>
-
-              {/* Version Select */}
-              <div className="space-y-2 pt-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400 text-[11px]">
-                    {t("ui.settings.preferredModel")}
-                  </span>
-                  <select
-                    value={geminiModel}
-                    onChange={(e) => setGeminiModel(e.target.value)}
-                    className="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
-                  >
-                    {GEMINI_MODELS.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {modelLabel(m, t)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                {geminiModel === "custom" && (
-                  <div className="flex items-center gap-2">
-                    <Edit3 className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                    <input
-                      type="text"
-                      value={customGemini}
-                      onChange={(e) => setCustomGemini(e.target.value)}
-                      placeholder={t("ui.settings.customModelPlaceholder", {
-                        example: "gemini-2.0-flash",
-                      })}
-                      className="flex-1 px-2.5 py-1 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white focus:outline-none font-mono"
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* OpenAI */}
-            <div
-              className={`p-3.5 rounded-xl bg-slate-950/60 space-y-2.5 border transition ${
-                isParanoid
-                  ? "opacity-50 pointer-events-none filter grayscale select-none border-purple-900/30"
-                  : "border-slate-800/80"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <label className="font-semibold text-white flex items-center gap-1.5">
-                  <Cpu className="w-4 h-4 text-emerald-400" /> OpenAI (Whisper &
-                  GPT-4o Audio)
-                </label>
-                <div className="flex items-center gap-1.5">
-                  {isParanoid && (
-                    <span className="text-[10px] bg-purple-950/80 text-purple-300 border border-purple-500/40 px-1.5 py-0.5 rounded font-mono flex items-center gap-1">
-                      <Lock className="w-2.5 h-2.5" /> {t("ui.settings.locked")}
-                    </span>
-                  )}
-                  <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-1.5 py-0.5 rounded">
-                    {t("ui.settings.openaiBadge")}
-                  </span>
-                </div>
-              </div>
-              <div className="relative">
-                <input
-                  type={showKeys["openai"] ? "text" : "password"}
-                  value={openaiKey}
-                  autoComplete="off"
-                  spellCheck={false}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setOpenaiKey(val);
-                  }}
-                  placeholder="sk-proj-..."
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs font-mono text-slate-200 pr-10 focus:outline-none focus:border-emerald-500"
-                />
-                <button
-                  type="button"
-                  onClick={() => toggleShowKey("openai")}
-                  className="absolute right-2.5 top-2.5 text-slate-400 hover:text-white"
-                >
-                  {showKeys["openai"] ? (
-                    <EyeOff className="w-4 h-4" />
-                  ) : (
-                    <Eye className="w-4 h-4" />
-                  )}
-                </button>
-              </div>
-
-              {/* Version Select */}
-              <div className="space-y-2 pt-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400 text-[11px]">
-                    {t("ui.settings.preferredModel")}
-                  </span>
-                  <select
-                    value={openaiModel}
-                    onChange={(e) => setOpenaiModel(e.target.value)}
-                    className="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-emerald-500"
-                  >
-                    {OPENAI_MODELS.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {modelLabel(m, t)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                {openaiModel === "custom" && (
-                  <div className="flex items-center gap-2">
-                    <Edit3 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                    <input
-                      type="text"
-                      value={customOpenai}
-                      onChange={(e) => setCustomOpenai(e.target.value)}
-                      placeholder={t("ui.settings.customModelPlaceholder", {
-                        example: "whisper-1",
-                      })}
-                      className="flex-1 px-2.5 py-1 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white focus:outline-none font-mono"
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Save Buttons */}
-            <div className="flex items-center justify-between pt-2">
-              <span className="text-[11px] text-slate-400">
-                {t("ui.settings.keysFootnote")}
+          {/* Audio Engine Info */}
+          <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400 flex items-center gap-1.5 font-medium">
+                <Mic className="w-4 h-4 text-purple-400" /> Akıllı Ses
+                İyileştirme:
               </span>
-              <button
-                onClick={handleSaveKeys}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-medium text-xs shadow-md shadow-cyan-600/20 transition active:scale-95"
-              >
-                {savedSuccess ? (
-                  <>
-                    <Check className="w-4 h-4 text-emerald-300" />
-                    {t("common.saved")}
-                  </>
-                ) : (
-                  t("common.save")
+              <span className="text-emerald-400 font-medium">
+                Otomatik Gürültü Temizleme Aktif
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-slate-400">
+              <span>Ses Kalitesi:</span>
+              <span className="text-slate-200">
+                Kristal Netliğinde Stüdyo Sesi
+              </span>
+            </div>
+          </div>
+
+          {/* Software Updates Section */}
+          <div className="p-3.5 rounded-xl bg-slate-950/60 border border-cyan-500/30 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-white flex items-center gap-1.5 font-semibold text-xs">
+                <Sparkles className="w-4 h-4 text-cyan-400" />
+                {t("updater.checkNowButton") || "Uygulama Güncellemeleri"}
+              </span>
+              <span className="text-[10px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 px-2 py-0.5 rounded-full font-bold">
+                v0.2.7
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between text-[11px] pt-1 border-t border-slate-800/80">
+              <div>
+                <span className="text-slate-200 font-medium block">
+                  {t("updater.autoCheckToggle") ||
+                    "Açılışta Güncellemeleri Otomatik Denetle"}
+                </span>
+                <span className="text-slate-400 text-[10px]">
+                  {t("updater.autoCheckToggleDesc") ||
+                    "Yeni bir EchoMind sürümü yayınlandığında açılışta bilgilendirir."}
+                </span>
+              </div>
+              <input
+                type="checkbox"
+                checked={autoCheckUpdates}
+                onChange={(e) => {
+                  const val = e.target.checked;
+                  setAutoCheckUpdates(val);
+                  localStorage.setItem(
+                    "echomind_auto_check_updates",
+                    val ? "true" : "false",
+                  );
+                }}
+                className="rounded border-slate-700 bg-slate-900 text-cyan-500 focus:ring-cyan-500/50 w-4 h-4 cursor-pointer"
+                data-testid="settings-auto-update-toggle"
+              />
+            </div>
+
+            {/* Check for Updates Action & Feedback */}
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800/80">
+              <div>
+                {updateStatus.state === "upToDate" && (
+                  <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400 font-medium">
+                    <Check className="w-3.5 h-3.5" />
+                    {t("updater.upToDateDesc", {
+                      version: updateStatus.version || "v0.2.7",
+                    }) || "EchoMind güncel (v0.2.7)."}
+                  </span>
                 )}
+                {updateStatus.state === "updateAvailable" && (
+                  <span className="inline-flex items-center gap-1 text-[11px] text-cyan-300 font-bold animate-pulse">
+                    <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                    {t("updater.updateAvailable", {
+                      version: updateStatus.version || "",
+                    }) || `Yeni sürüm mevcut (v${updateStatus.version})`}
+                  </span>
+                )}
+                {updateStatus.state === "error" && (
+                  <span className="inline-flex items-center gap-1 text-[11px] text-rose-400 font-medium">
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                    {updateStatus.message ||
+                      t("updater.updateError") ||
+                      "Güncelleme denetlenemedi."}
+                  </span>
+                )}
+                {updateStatus.state === "idle" && (
+                  <span className="text-[10px] text-slate-500">
+                    GitHub Releases üzerinden kontrol edilir.
+                  </span>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={handleCheckUpdates}
+                disabled={updateStatus.state === "checking"}
+                className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 hover:border-cyan-500/50 text-[11px] font-medium transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                data-testid="settings-check-updates-btn"
+              >
+                <RefreshCw
+                  className={`w-3.5 h-3.5 ${
+                    updateStatus.state === "checking"
+                      ? "animate-spin text-cyan-400"
+                      : "text-slate-400"
+                  }`}
+                />
+                <span>
+                  {updateStatus.state === "checking"
+                    ? t("updater.checking") || "Denetleniyor..."
+                    : t("updater.checkNowButton") || "Güncellemeleri Denetle"}
+                </span>
               </button>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Tab 3: Language Selection */}
-        {activeTab === "language" && (
-          <div className="space-y-4 text-xs">
-            <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-3">
-              <label className="text-slate-200 font-semibold flex items-center gap-2">
-                <Globe className="w-4 h-4 text-emerald-400" />
-                <span>{t("settings.tabLanguage")}</span>
+      {/* Tab 2: API Keys & Model Versions */}
+      {activeTab === "apiKeys" && (
+        <div className="space-y-4 text-xs">
+          {/* Custom Local LLM / Ollama Server */}
+          <div className="p-3.5 rounded-xl bg-slate-950/60 border border-purple-500/30 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <label className="font-semibold text-white flex items-center gap-1.5">
+                <Server className="w-4 h-4 text-purple-400" />{" "}
+                {t("ui.settings.localLlmTitle")}
               </label>
-              <p className="text-slate-400 text-xs leading-relaxed">
-                {t("ui.settings.languageDesc")}
-              </p>
+              <span className="text-[10px] bg-purple-500/20 text-purple-300 border border-purple-500/30 px-1.5 py-0.5 rounded font-medium">
+                {t("ui.settings.localOffline")}
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-400">
+              {t("ui.settings.localLlmDesc")}
+            </p>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-                {SUPPORTED_LANGUAGES.map((lang) => (
-                  <button
-                    key={lang.code}
-                    type="button"
-                    onClick={() => setLanguage(lang.code)}
-                    className={`p-3.5 rounded-xl border text-left transition flex items-center justify-between ${
-                      language === lang.code
-                        ? "bg-emerald-500/15 border-emerald-500/60 text-emerald-200 shadow-md shadow-emerald-950/30"
-                        : "bg-slate-900/60 border-slate-800 hover:border-slate-700 text-slate-300"
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="text-2xl">{lang.flag}</span>
-                      <div>
-                        <div className="font-semibold text-white text-xs">
-                          {lang.nativeName}
-                        </div>
-                        <div className="text-[11px] text-slate-400">
-                          {lang.name}
-                        </div>
-                      </div>
-                    </div>
-                    {language === lang.code && (
-                      <div className="w-5 h-5 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center">
-                        <Check className="w-3.5 h-3.5 stroke-[3]" />
-                      </div>
-                    )}
-                  </button>
-                ))}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <div className="space-y-1">
+                <span className="text-[10px] text-slate-400 font-medium">
+                  {t("ui.settings.endpointUrl")}
+                </span>
+                <input
+                  type="text"
+                  value={ollamaEndpoint}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setOllamaEndpoint(val);
+                    localStorage.setItem(
+                      "echomind_ollama_endpoint",
+                      val.trim(),
+                    );
+                  }}
+                  placeholder="http://127.0.0.1:11434"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-mono text-slate-200 focus:outline-none focus:border-purple-500"
+                />
+              </div>
+              <div className="space-y-1">
+                <span className="text-[10px] text-slate-400 font-medium">
+                  {t("ui.settings.modelName")}
+                </span>
+                <input
+                  type="text"
+                  value={ollamaModel}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setOllamaModel(val);
+                    localStorage.setItem("echomind_ollama_model", val.trim());
+                  }}
+                  placeholder="llama3.2, qwen2.5:7b, mistral..."
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-mono text-slate-200 focus:outline-none focus:border-purple-500"
+                />
               </div>
             </div>
-          </div>
-        )}
 
-        {/* Footer */}
-        <div className="flex justify-between items-center pt-2 border-t border-slate-800 text-xs">
-          <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
-            <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span>{t("settings.privacyDesc")}</span>
+            {/* Test Connection Button & Status */}
+            <div className="flex items-center justify-between pt-1">
+              <button
+                type="button"
+                onClick={testOllamaServer}
+                disabled={ollamaTestStatus.state === "testing"}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-600/20 hover:bg-purple-600/40 border border-purple-500/30 text-purple-200 font-medium text-[11px] transition active:scale-95 disabled:opacity-50"
+              >
+                {ollamaTestStatus.state === "testing" ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-300" />
+                    {t("ui.settings.testingServer")}
+                  </>
+                ) : (
+                  <>
+                    <Activity className="w-3.5 h-3.5 text-purple-400" />
+                    {t("ui.settings.testServer")}
+                  </>
+                )}
+              </button>
+            </div>
+
+            {ollamaTestStatus.state === "success" && (
+              <div className="p-2 rounded-lg bg-emerald-950/40 border border-emerald-500/30 text-[11px] text-emerald-300 flex items-center gap-1.5 animate-in fade-in">
+                <Check className="w-3.5 h-3.5 shrink-0 text-emerald-400" />
+                <span>{ollamaTestStatus.message}</span>
+              </div>
+            )}
+
+            {ollamaTestStatus.state === "error" && (
+              <div className="p-2 rounded-lg bg-red-950/40 border border-red-500/30 text-[11px] text-red-300 flex items-center gap-1.5 animate-in fade-in">
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-red-400" />
+                <span>{ollamaTestStatus.message}</span>
+              </div>
+            )}
           </div>
-          <button
-            onClick={handleCloseAndSave}
-            className="px-4 py-1.5 text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl transition"
+
+          {isParanoid && (
+            <div
+              data-testid="settings-paranoid-cloud-banner"
+              className="p-3.5 rounded-xl bg-purple-950/60 border border-purple-500/40 text-purple-200 text-xs flex items-start gap-2.5 animate-in fade-in"
+            >
+              <ShieldAlert className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
+              <div>
+                <div className="font-semibold text-purple-300">
+                  {t("ui.settings.paranoidActiveTitle")}
+                </div>
+                <div className="text-[11px] text-purple-300/80 mt-0.5">
+                  {t("ui.settings.paranoidActiveDesc")}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Groq Cloud */}
+          <div
+            className={`p-3.5 rounded-xl bg-slate-950/60 space-y-2.5 border transition ${
+              isParanoid
+                ? "opacity-50 pointer-events-none filter grayscale select-none border-purple-900/30"
+                : "border-slate-800/80"
+            }`}
           >
-            {t("common.close")}
-          </button>
+            <div className="flex items-center justify-between">
+              <label className="font-semibold text-white flex items-center gap-1.5">
+                <Zap className="w-4 h-4 text-amber-400" />{" "}
+                {t("ui.settings.groqTitle")}
+              </label>
+              <div className="flex items-center gap-1.5">
+                {isParanoid && (
+                  <span className="text-[10px] bg-purple-950/80 text-purple-300 border border-purple-500/40 px-1.5 py-0.5 rounded font-mono flex items-center gap-1">
+                    <Lock className="w-2.5 h-2.5" /> {t("ui.settings.locked")}
+                  </span>
+                )}
+                <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded">
+                  {t("ui.settings.groqBadge")}
+                </span>
+              </div>
+            </div>
+            <div className="relative">
+              <input
+                type={showKeys["groq"] ? "text" : "password"}
+                value={groqKey}
+                autoComplete="off"
+                spellCheck={false}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setGroqKey(val);
+                }}
+                placeholder="gsk_..."
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs font-mono text-slate-200 pr-10 focus:outline-none focus:border-amber-500"
+              />
+              <button
+                type="button"
+                onClick={() => toggleShowKey("groq")}
+                className="absolute right-2.5 top-2.5 text-slate-400 hover:text-white"
+              >
+                {showKeys["groq"] ? (
+                  <EyeOff className="w-4 h-4" />
+                ) : (
+                  <Eye className="w-4 h-4" />
+                )}
+              </button>
+            </div>
+
+            {/* Version Select */}
+            <div className="space-y-2 pt-1">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400 text-[11px]">
+                  {t("ui.settings.preferredModel")}
+                </span>
+                <select
+                  value={groqModel}
+                  onChange={(e) => setGroqModel(e.target.value)}
+                  className="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-amber-500"
+                >
+                  {GROQ_MODELS.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {modelLabel(m, t)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {groqModel === "custom" && (
+                <div className="flex items-center gap-2">
+                  <Edit3 className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                  <input
+                    type="text"
+                    value={customGroq}
+                    onChange={(e) => setCustomGroq(e.target.value)}
+                    placeholder={t("ui.settings.customModelPlaceholder", {
+                      example: "whisper-large-v3-turbo",
+                    })}
+                    className="flex-1 px-2.5 py-1 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white focus:outline-none font-mono"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Google Gemini */}
+          <div
+            className={`p-3.5 rounded-xl bg-slate-950/60 space-y-2.5 border transition ${
+              isParanoid
+                ? "opacity-50 pointer-events-none filter grayscale select-none border-purple-900/30"
+                : "border-slate-800/80"
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <label className="font-semibold text-white flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4 text-cyan-400" />{" "}
+                {t("ui.settings.geminiTitle")}
+              </label>
+              <div className="flex items-center gap-1.5">
+                {isParanoid && (
+                  <span className="text-[10px] bg-purple-950/80 text-purple-300 border border-purple-500/40 px-1.5 py-0.5 rounded font-mono flex items-center gap-1">
+                    <Lock className="w-2.5 h-2.5" /> {t("ui.settings.locked")}
+                  </span>
+                )}
+                <span className="text-[10px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 px-1.5 py-0.5 rounded">
+                  {t("ui.settings.geminiBadge")}
+                </span>
+              </div>
+            </div>
+            <div className="relative">
+              <input
+                type={showKeys["gemini"] ? "text" : "password"}
+                value={geminiKey}
+                autoComplete="off"
+                spellCheck={false}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setGeminiKey(val);
+                }}
+                placeholder="AIzaSy..."
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs font-mono text-slate-200 pr-10 focus:outline-none focus:border-cyan-500"
+              />
+              <button
+                type="button"
+                onClick={() => toggleShowKey("gemini")}
+                className="absolute right-2.5 top-2.5 text-slate-400 hover:text-white"
+              >
+                {showKeys["gemini"] ? (
+                  <EyeOff className="w-4 h-4" />
+                ) : (
+                  <Eye className="w-4 h-4" />
+                )}
+              </button>
+            </div>
+
+            {/* Version Select */}
+            <div className="space-y-2 pt-1">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400 text-[11px]">
+                  {t("ui.settings.preferredModel")}
+                </span>
+                <select
+                  value={geminiModel}
+                  onChange={(e) => setGeminiModel(e.target.value)}
+                  className="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
+                >
+                  {GEMINI_MODELS.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {modelLabel(m, t)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {geminiModel === "custom" && (
+                <div className="flex items-center gap-2">
+                  <Edit3 className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                  <input
+                    type="text"
+                    value={customGemini}
+                    onChange={(e) => setCustomGemini(e.target.value)}
+                    placeholder={t("ui.settings.customModelPlaceholder", {
+                      example: "gemini-2.0-flash",
+                    })}
+                    className="flex-1 px-2.5 py-1 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white focus:outline-none font-mono"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* OpenAI */}
+          <div
+            className={`p-3.5 rounded-xl bg-slate-950/60 space-y-2.5 border transition ${
+              isParanoid
+                ? "opacity-50 pointer-events-none filter grayscale select-none border-purple-900/30"
+                : "border-slate-800/80"
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <label className="font-semibold text-white flex items-center gap-1.5">
+                <Cpu className="w-4 h-4 text-emerald-400" /> OpenAI (Whisper &
+                GPT-4o Audio)
+              </label>
+              <div className="flex items-center gap-1.5">
+                {isParanoid && (
+                  <span className="text-[10px] bg-purple-950/80 text-purple-300 border border-purple-500/40 px-1.5 py-0.5 rounded font-mono flex items-center gap-1">
+                    <Lock className="w-2.5 h-2.5" /> {t("ui.settings.locked")}
+                  </span>
+                )}
+                <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-1.5 py-0.5 rounded">
+                  {t("ui.settings.openaiBadge")}
+                </span>
+              </div>
+            </div>
+            <div className="relative">
+              <input
+                type={showKeys["openai"] ? "text" : "password"}
+                value={openaiKey}
+                autoComplete="off"
+                spellCheck={false}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setOpenaiKey(val);
+                }}
+                placeholder="sk-proj-..."
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs font-mono text-slate-200 pr-10 focus:outline-none focus:border-emerald-500"
+              />
+              <button
+                type="button"
+                onClick={() => toggleShowKey("openai")}
+                className="absolute right-2.5 top-2.5 text-slate-400 hover:text-white"
+              >
+                {showKeys["openai"] ? (
+                  <EyeOff className="w-4 h-4" />
+                ) : (
+                  <Eye className="w-4 h-4" />
+                )}
+              </button>
+            </div>
+
+            {/* Version Select */}
+            <div className="space-y-2 pt-1">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400 text-[11px]">
+                  {t("ui.settings.preferredModel")}
+                </span>
+                <select
+                  value={openaiModel}
+                  onChange={(e) => setOpenaiModel(e.target.value)}
+                  className="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-emerald-500"
+                >
+                  {OPENAI_MODELS.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {modelLabel(m, t)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {openaiModel === "custom" && (
+                <div className="flex items-center gap-2">
+                  <Edit3 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <input
+                    type="text"
+                    value={customOpenai}
+                    onChange={(e) => setCustomOpenai(e.target.value)}
+                    placeholder={t("ui.settings.customModelPlaceholder", {
+                      example: "whisper-1",
+                    })}
+                    className="flex-1 px-2.5 py-1 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white focus:outline-none font-mono"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Save Buttons */}
+          <div className="flex items-center justify-between pt-2">
+            <span className="text-[11px] text-slate-400">
+              {t("ui.settings.keysFootnote")}
+            </span>
+            <button
+              onClick={handleSaveKeys}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-medium text-xs shadow-md shadow-cyan-600/20 transition active:scale-95"
+            >
+              {savedSuccess ? (
+                <>
+                  <Check className="w-4 h-4 text-emerald-300" />
+                  {t("common.saved")}
+                </>
+              ) : (
+                t("common.save")
+              )}
+            </button>
+          </div>
         </div>
-      </div>
-    </div>
+      )}
+
+      {/* Tab 3: Language Selection */}
+      {activeTab === "language" && (
+        <div className="space-y-4 text-xs">
+          <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-3">
+            <label className="text-slate-200 font-semibold flex items-center gap-2">
+              <Globe className="w-4 h-4 text-emerald-400" />
+              <span>{t("settings.tabLanguage")}</span>
+            </label>
+            <p className="text-slate-400 text-xs leading-relaxed">
+              {t("ui.settings.languageDesc")}
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+              {SUPPORTED_LANGUAGES.map((lang) => (
+                <button
+                  key={lang.code}
+                  type="button"
+                  onClick={() => setLanguage(lang.code)}
+                  className={`p-3.5 rounded-xl border text-left transition flex items-center justify-between ${
+                    language === lang.code
+                      ? "bg-emerald-500/15 border-emerald-500/60 text-emerald-200 shadow-md shadow-emerald-950/30"
+                      : "bg-slate-900/60 border-slate-800 hover:border-slate-700 text-slate-300"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">{lang.flag}</span>
+                    <div>
+                      <div className="font-semibold text-white text-xs">
+                        {lang.nativeName}
+                      </div>
+                      <div className="text-[11px] text-slate-400">
+                        {lang.name}
+                      </div>
+                    </div>
+                  </div>
+                  {language === lang.code && (
+                    <div className="w-5 h-5 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center">
+                      <Check className="w-3.5 h-3.5 stroke-[3]" />
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </ModalShell>
   );
 };

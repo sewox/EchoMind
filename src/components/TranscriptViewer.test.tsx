@@ -485,7 +485,7 @@ describe("TranscriptViewer Component", () => {
     expect(screen.getByText(/Raporu Dışa Aktar & Paylaş/i)).toBeInTheDocument();
 
     // Close export modal
-    const closeExportBtn = screen.getByRole("button", { name: /Kapat/i });
+    const closeExportBtn = screen.getAllByRole("button", { name: /Kapat/i })[0];
     fireEvent.click(closeExportBtn);
 
     // Switch to Summary Tab & Test Language translation

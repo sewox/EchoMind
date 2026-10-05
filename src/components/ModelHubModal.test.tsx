@@ -106,8 +106,8 @@ describe("ModelHubModal Component", () => {
     );
 
     // Switch to Cloud Engines Tab
-    const cloudTab = screen.getByRole("button", {
-      name: /⚡ Yüksek Hızlı Bulut Zekası/i,
+    const cloudTab = screen.getByRole("tab", {
+      name: /Yüksek Hızlı Bulut Zekası/i,
     });
     await act(async () => {
       fireEvent.click(cloudTab);
@@ -273,7 +273,7 @@ describe("ModelHubModal Component", () => {
     );
 
     // Switch to Cloud Tab
-    const cloudTab = screen.getByRole("button", {
+    const cloudTab = screen.getByRole("tab", {
       name: /Yüksek Hızlı Bulut Zekası/i,
     });
     fireEvent.click(cloudTab);
@@ -366,7 +366,7 @@ describe("ModelHubModal Component", () => {
     );
 
     // Switch to Cloud Tab
-    const cloudTab = screen.getByRole("button", {
+    const cloudTab = screen.getByRole("tab", {
       name: /Yüksek Hızlı Bulut Zekası/i,
     });
     fireEvent.click(cloudTab);
@@ -488,7 +488,7 @@ describe("ModelHubModal Component", () => {
     );
 
     // Switch to Cloud Tab
-    const cloudTab = screen.getByRole("button", {
+    const cloudTab = screen.getByRole("tab", {
       name: /Yüksek Hızlı Bulut Zekası/i,
     });
     fireEvent.click(cloudTab);

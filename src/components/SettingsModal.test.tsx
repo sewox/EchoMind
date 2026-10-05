@@ -84,7 +84,7 @@ describe("SettingsModal Component", () => {
     );
 
     // Switch to Device & Privacy Tab
-    const deviceTab = screen.getByRole("button", { name: /Cihaz & Gizlilik/i });
+    const deviceTab = screen.getByRole("tab", { name: /Cihaz & Gizlilik/i });
     fireEvent.click(deviceTab);
 
     expect(screen.getByText("Apple M3 Max")).toBeInTheDocument();
@@ -128,7 +128,7 @@ describe("SettingsModal Component", () => {
     });
 
     // Switch to AI Services tab
-    const apiKeysTab = screen.getByRole("button", {
+    const apiKeysTab = screen.getByRole("tab", {
       name: /Yapay Zeka Servisleri/i,
     });
     fireEvent.click(apiKeysTab);
@@ -203,7 +203,7 @@ describe("SettingsModal Component", () => {
     );
 
     // Language Tab
-    const langTab = screen.getByRole("button", { name: /Arayüz Dili/i });
+    const langTab = screen.getByRole("tab", { name: /Arayüz Dili/i });
     fireEvent.click(langTab);
 
     const englishBtns = screen.getAllByText("English");
@@ -266,7 +266,7 @@ describe("SettingsModal Component", () => {
     );
 
     // Click Cihaz & Gizlilik tab
-    const privacyTab = screen.getByRole("button", {
+    const privacyTab = screen.getByRole("tab", {
       name: /Cihaz & Gizlilik/i,
     });
     fireEvent.click(privacyTab);
@@ -294,7 +294,7 @@ describe("SettingsModal Component", () => {
     });
 
     // AI Services tab
-    const aiServicesTab = screen.getByRole("button", {
+    const aiServicesTab = screen.getByRole("tab", {
       name: /Yapay Zeka Servisleri/i,
     });
     fireEvent.click(aiServicesTab);
@@ -360,7 +360,7 @@ describe("SettingsModal Component", () => {
     );
 
     // AI Services tab
-    const aiServicesTab = screen.getByRole("button", {
+    const aiServicesTab = screen.getByRole("tab", {
       name: /Yapay Zeka Servisleri/i,
     });
     fireEvent.click(aiServicesTab);
@@ -423,7 +423,7 @@ describe("SettingsModal Component", () => {
     );
 
     // AI Services tab
-    const aiServicesTab = screen.getByRole("button", {
+    const aiServicesTab = screen.getByRole("tab", {
       name: /Yapay Zeka Servisleri/i,
     });
     fireEvent.click(aiServicesTab);
@@ -480,7 +480,7 @@ describe("SettingsModal Component", () => {
     );
 
     // AI Services tab
-    const aiServicesTab = screen.getByRole("button", {
+    const aiServicesTab = screen.getByRole("tab", {
       name: /Yapay Zeka Servisleri/i,
     });
     fireEvent.click(aiServicesTab);
@@ -538,7 +538,7 @@ describe("SettingsModal Component", () => {
     );
 
     // General / Hardware & Privacy tab
-    const generalTab = screen.getByRole("button", {
+    const generalTab = screen.getByRole("tab", {
       name: /Cihaz & Gizlilik/i,
     });
     await act(async () => {
@@ -584,7 +584,7 @@ describe("SettingsModal Component", () => {
       </I18nProvider>,
     );
 
-    const systemTab = screen.getByRole("button", {
+    const systemTab = screen.getByRole("tab", {
       name: /Cihaz & Gizlilik/i,
     });
     await act(async () => {
@@ -666,7 +666,7 @@ describe("SettingsModal Component", () => {
     );
 
     // Switch to system / device tab
-    const systemTab = screen.getByRole("button", {
+    const systemTab = screen.getByRole("tab", {
       name: /Cihaz & Gizlilik/i,
     });
     fireEvent.click(systemTab);
@@ -736,7 +736,7 @@ describe("SettingsModal Component", () => {
     );
 
     // Switch to language tab
-    const langTab = screen.getByRole("button", { name: /Arayüz Dili/i });
+    const langTab = screen.getByRole("tab", { name: /Arayüz Dili/i });
     fireEvent.click(langTab);
     expect(
       screen.getByText(/Tüm menüler, butonlar ve rapor şablonları/i),
@@ -747,7 +747,7 @@ describe("SettingsModal Component", () => {
     fireEvent.click(enBtn);
 
     // Switch to API Keys tab
-    const apiTab = screen.getByRole("button", {
+    const apiTab = screen.getByRole("tab", {
       name: /AI Services|Yapay Zeka Servisleri/i,
     });
     fireEvent.click(apiTab);
@@ -763,7 +763,7 @@ describe("SettingsModal Component", () => {
     );
 
     // Switch to Device & Privacy tab
-    const systemTab = screen.getByRole("button", {
+    const systemTab = screen.getByRole("tab", {
       name: /Cihaz & Gizlilik|Donanım & Model/i,
     });
     fireEvent.click(systemTab);
