@@ -191,6 +191,13 @@ export const tr: TranslationKeys = {
   },
   summary: {
     audioMemo: {
+      preparing: "Bülten hazırlanıyor… %{percent}",
+      length: "Bülten uzunluğu",
+      short: "Kısa bülten (yaklaşık 1 dakika)",
+      standard: "Standart bülten (yaklaşık 3 dakika)",
+      shortDuration: "~1 dk",
+      standardDuration: "~3 dk",
+      templateNote: "Rapor modeli yüklü olmadığı için rapor özeti okunuyor.",
       button: "Sesli Bülten",
       subtitle: "Rapor özetini sistem sesiyle dinleyin",
       playing: "Okunuyor…",

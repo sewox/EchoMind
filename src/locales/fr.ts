@@ -188,6 +188,14 @@ export const fr: TranslationKeys = {
   },
   summary: {
     audioMemo: {
+      preparing: "Préparation du briefing… {percent} %",
+      length: "Durée du briefing",
+      short: "Briefing court (environ 1 minute)",
+      standard: "Briefing standard (environ 3 minutes)",
+      shortDuration: "~1 min",
+      standardDuration: "~3 min",
+      templateNote:
+        "Aucun modèle de rapport n’est installé : le résumé du rapport est lu.",
       button: "Briefing audio",
       subtitle: "Écoutez le résumé du rapport avec une voix système",
       playing: "Lecture…",

@@ -191,6 +191,14 @@ export const es: TranslationKeys = {
   },
   summary: {
     audioMemo: {
+      preparing: "Preparando el resumen… {percent} %",
+      length: "Duración del resumen",
+      short: "Resumen corto (alrededor de 1 minuto)",
+      standard: "Resumen estándar (alrededor de 3 minutos)",
+      shortDuration: "~1 min",
+      standardDuration: "~3 min",
+      templateNote:
+        "No hay un modelo de informe instalado, así que se lee el resumen del informe.",
       button: "Resumen en audio",
       subtitle: "Escucha el resumen del informe con una voz del sistema",
       playing: "Leyendo…",
