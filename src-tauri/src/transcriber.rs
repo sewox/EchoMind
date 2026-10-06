@@ -1049,6 +1049,13 @@ pub fn get_available_models() -> Vec<ModelInfo> {
     ]
 }
 
+/// Whether the Whisper model `key` ("small", "large-v3-turbo"…) is on disk.
+pub fn is_model_downloaded(key: &str) -> bool {
+    get_available_models()
+        .iter()
+        .any(|m| m.key == key && m.is_downloaded)
+}
+
 #[tauri::command]
 pub fn switch_transcription_model(model_key: String) -> Result<ModelStatus, String> {
     let filename = match model_key.as_str() {

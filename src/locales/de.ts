@@ -249,6 +249,9 @@ export const de: TranslationKeys = {
     templatePromptRequired: "Bitte geben Sie einen System-Prompt ein.",
   },
   retranscribe: {
+    notDownloaded: "Nicht geladen",
+    notDownloadedHint:
+      "Ausgegraute Modelle sind nicht auf diesem Computer. Sie können sie im Fenster „Modelle“ herunterladen.",
     title: "Audio Neu Transkribieren",
     subtitle:
       "Wählen Sie einen anderen Modus für eine erneute Verarbeitung der Aufnahme",

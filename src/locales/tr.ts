@@ -251,6 +251,9 @@ export const tr: TranslationKeys = {
       "Lütfen yapay zekaya verilecek sistem promptunu girin.",
   },
   retranscribe: {
+    notDownloaded: "İndirilmedi",
+    notDownloadedHint:
+      "Soluk görünen modeller bu bilgisayarda yok. Modeller penceresinden indirebilirsiniz.",
     title: "Konuşmaları Yeniden Yazıya Dök",
     subtitle:
       "Farklı bir netlik seviyesi veya dil seçerek ses kaydını sıfırdan çözümleyin",

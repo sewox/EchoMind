@@ -16,6 +16,31 @@ use crate::storage::MeetingRecord;
 /// Appends a visible warning when the local Whisper engine silently fell back to a
 /// smaller/lower-quality model because the selected one failed to load (e.g. not
 /// yet downloaded) — otherwise this only shows up if the user checks Settings.
+const WHISPER_MODEL_KEYS: [&str; 5] = ["tiny", "base", "small", "medium", "large-v3-turbo"];
+
+fn model_missing_message(key: &str) -> String {
+    format!(
+        "Seçilen konuşma tanıma modeli ({}) bu bilgisayarda yüklü değil. Modeller penceresinden indirip yeniden deneyin.",
+        local_model_label(Some(key))
+    )
+}
+
+fn model_unusable_message(key: &str) -> String {
+    format!(
+        "Seçilen konuşma tanıma modeli ({}) yüklenemedi; dosya bozuk olabilir. Modeller penceresinden silip yeniden indirin.",
+        local_model_label(Some(key))
+    )
+}
+
+/// Refuses a Whisper model that is not on disk instead of silently using another one.
+fn check_requested_model(key: &str, downloaded: impl Fn(&str) -> bool) -> Result<(), String> {
+    if downloaded(key) {
+        Ok(())
+    } else {
+        Err(model_missing_message(key))
+    }
+}
+
 fn with_model_fallback_warning(label: String) -> String {
     if crate::transcriber::get_global_transcriber()
         .get_model_status()
@@ -122,12 +147,18 @@ fn run_asr_engine(
         }
     }
 
-    if let Some(local_model_key) = model_version {
-        if ["tiny", "base", "small", "medium", "large-v3-turbo"].contains(&local_model_key) {
-            let _ = crate::transcriber::switch_transcription_model(local_model_key.to_string());
+    let transcriber = crate::transcriber::get_global_transcriber();
+    // A model the user picked is used or the job stops: hours of transcription
+    // with a weaker model they didn't choose is worse than an error.
+    if let Some(key) = model_version.filter(|k| WHISPER_MODEL_KEYS.contains(k)) {
+        check_requested_model(key, crate::transcriber::is_model_downloaded)?;
+        crate::transcriber::switch_transcription_model(key.to_string())?;
+        transcriber.ensure_model_loaded()?;
+        if transcriber.get_model_status().used_fallback_model {
+            transcriber.cleanup_context();
+            return Err(model_unusable_message(key));
         }
     }
-    let transcriber = crate::transcriber::get_global_transcriber();
     let not_cancelled = std::sync::atomic::AtomicBool::new(false);
     let segs = transcriber.transcribe_pcm_batch(pcm_16k, lang, &not_cancelled)?;
     // Auto-cleanup local context memory after heavy batch transcription
@@ -909,6 +940,15 @@ pub async fn pick_and_import_audio_file(
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn a_missing_model_is_refused_not_replaced() {
+        let err = check_requested_model("large-v3-turbo", |_| false).unwrap_err();
+        assert!(err.contains("Zirve Netlik"), "{err}");
+        assert!(err.contains("Modeller penceresinden indirip"), "{err}");
+        assert!(check_requested_model("small", |k| k == "small").is_ok());
+        assert!(model_unusable_message("medium").contains("Gelişmiş Mod"));
+    }
     #[test]
     fn test_retranscribe_never_overwrites_user_titles() {
         assert!(is_auto_generated_title(

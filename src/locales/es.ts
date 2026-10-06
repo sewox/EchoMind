@@ -252,6 +252,9 @@ export const es: TranslationKeys = {
     templatePromptRequired: "Por favor, introduzca un prompt de sistema.",
   },
   retranscribe: {
+    notDownloaded: "No descargado",
+    notDownloadedHint:
+      "Los modelos atenuados no están en este equipo. Puedes descargarlos en la ventana Modelos.",
     title: "Retranscribir Audio de la Reunión",
     subtitle:
       "Seleccione otro modo o idioma para reprocesar la grabación desde cero",

@@ -210,6 +210,8 @@ export interface TranslationKeys {
     templatePromptRequired?: string;
   };
   retranscribe: {
+    notDownloaded: string;
+    notDownloadedHint: string;
     title: string;
     subtitle: string;
     methodStep: string;
