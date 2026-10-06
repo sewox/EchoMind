@@ -95,6 +95,7 @@ pub fn run() {
             tts::tts_speak,
             tts::tts_stop,
             tts::tts_pause,
+            tts::tts_progress,
             tts::tts_resume,
             get_hardware_info,
             get_asr_engine,

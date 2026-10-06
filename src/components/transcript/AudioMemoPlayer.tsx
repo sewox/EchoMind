@@ -111,6 +111,8 @@ export const AudioMemoPlayer: React.FC<AudioMemoPlayerProps> = ({
   const [sections, setSections] = useState<BriefingSection[] | null>(null);
   const [fromTemplate, setFromTemplate] = useState(false);
   const [current, setCurrent] = useState(0);
+  // Share of the current section read so far (0…1).
+  const [sectionProgress, setSectionProgress] = useState(0);
   const [prepPercent, setPrepPercent] = useState(0);
   const [voice, setVoice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -161,6 +163,7 @@ export const AudioMemoPlayer: React.FC<AudioMemoPlayerProps> = ({
       started.current = true;
       setVoice(used);
       setCurrent(index);
+      setSectionProgress(0);
       setStatus("speaking");
     } catch (err) {
       started.current = false;
@@ -209,6 +212,19 @@ export const AudioMemoPlayer: React.FC<AudioMemoPlayerProps> = ({
       if (unlisten) unlisten();
     };
   }, []);
+
+  // Where the voice is in the current section, for the progress bar.
+  useEffect(() => {
+    if (status !== "speaking") return;
+    const timer = setInterval(() => {
+      call<number>("tts_progress")
+        .then((p) => {
+          if (typeof p === "number") setSectionProgress(p);
+        })
+        .catch(() => {});
+    }, 300);
+    return () => clearInterval(timer);
+  }, [status, current]);
 
   // A new report, language or length needs a new script; never keep reading
   // the old one.
@@ -299,6 +315,15 @@ export const AudioMemoPlayer: React.FC<AudioMemoPlayerProps> = ({
       : error;
   const canPlay = Boolean(template) && !noVoice;
   const busy = status === "preparing";
+  const reading = status === "speaking" || status === "paused";
+
+  // Overall position across sections, weighted by their length.
+  const lengths = (sections || []).map((s) => Math.max(1, s.text.length));
+  const totalChars = lengths.reduce((a, b) => a + b, 0) || 1;
+  const doneChars =
+    lengths.slice(0, current).reduce((a, b) => a + b, 0) +
+    (lengths[current] || 0) * sectionProgress;
+  const overall = Math.round((doneChars / totalChars) * 100);
 
   const statusLine =
     status === "preparing"
@@ -428,6 +453,47 @@ export const AudioMemoPlayer: React.FC<AudioMemoPlayerProps> = ({
             className="h-full bg-indigo-500 transition-all"
             style={{ width: `${Math.max(3, prepPercent)}%` }}
           />
+        </div>
+      )}
+
+      {sections && reading && (
+        <div className="space-y-2" data-testid="audio-memo-progress">
+          <div
+            className="relative h-1.5 rounded-full bg-slate-800 overflow-hidden"
+            role="progressbar"
+            aria-label={t("summary.audioMemo.progress")}
+            aria-valuenow={overall}
+            aria-valuemin={0}
+            aria-valuemax={100}
+          >
+            <div
+              className="h-full bg-indigo-400 transition-[width] duration-300"
+              style={{ width: `${overall}%` }}
+            />
+            {lengths.slice(0, -1).map((_, i) => (
+              <span
+                key={i}
+                aria-hidden="true"
+                className="absolute top-0 h-full w-0.5 bg-slate-900"
+                style={{
+                  left: `${(lengths.slice(0, i + 1).reduce((a, b) => a + b, 0) / totalChars) * 100}%`,
+                }}
+              />
+            ))}
+          </div>
+          <div className="rounded-xl bg-slate-950/60 border border-slate-800 px-3 py-2">
+            <div className="text-[11px] font-semibold text-indigo-200">
+              {t("summary.audioMemo.section", {
+                current: current + 1,
+                total: sections.length,
+              })}
+              {" · "}
+              {sections[current]?.title}
+            </div>
+            <p className="mt-1 text-xs leading-relaxed text-slate-300">
+              {sections[current]?.text}
+            </p>
+          </div>
         </div>
       )}
 

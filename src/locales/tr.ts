@@ -191,6 +191,8 @@ export const tr: TranslationKeys = {
   },
   summary: {
     audioMemo: {
+      progress: "Bültenin okunan kısmı",
+      section: "Bölüm {current}/{total}",
       preparing: "Bülten hazırlanıyor… %{percent}",
       length: "Bülten uzunluğu",
       short: "Kısa bülten (yaklaşık 1 dakika)",

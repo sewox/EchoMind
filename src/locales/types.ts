@@ -155,6 +155,8 @@ export interface TranslationKeys {
   };
   summary: {
     audioMemo?: {
+      progress: string;
+      section: string;
       preparing: string;
       length: string;
       short: string;

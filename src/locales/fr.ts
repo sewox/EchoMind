@@ -188,6 +188,8 @@ export const fr: TranslationKeys = {
   },
   summary: {
     audioMemo: {
+      progress: "Progression du briefing",
+      section: "Section {current}/{total}",
       preparing: "Préparation du briefing… {percent} %",
       length: "Durée du briefing",
       short: "Briefing court (environ 1 minute)",

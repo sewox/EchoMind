@@ -74,6 +74,7 @@ const mockBackend = ({
     if (cmd === "tts_speak") return speak();
     if (cmd === "tts_pause") return Promise.resolve("paused");
     if (cmd === "tts_resume") return Promise.resolve("speaking");
+    if (cmd === "tts_progress") return Promise.resolve(0.5);
     return Promise.resolve("idle");
   });
 
@@ -407,5 +408,22 @@ describe("AudioMemoPlayer", () => {
     expect(
       screen.getByText(/Rapor modeli yüklü olmadığı için/),
     ).toBeInTheDocument();
+  });
+
+  it("shows where the reading is and the text being read", async () => {
+    mockBackend({ briefing: () => Promise.resolve(SCRIPT) });
+    renderPlayer();
+    await click(await screen.findByRole("button", { name: /Dinle/ }));
+    const panel = screen.getByTestId("audio-memo-progress");
+    expect(panel).toHaveTextContent("Bölüm 1/2 · Amaç");
+    expect(panel).toHaveTextContent("Sürüm planlandı.");
+    // Half of the first section (16 of 39 characters) read.
+    await waitFor(() =>
+      expect(
+        screen.getByRole("progressbar", { name: "Bültenin okunan kısmı" }),
+      ).toHaveAttribute("aria-valuenow", "21"),
+    );
+    await click(screen.getByRole("button", { name: "Durdur" }));
+    expect(screen.queryByTestId("audio-memo-progress")).not.toBeInTheDocument();
   });
 });
