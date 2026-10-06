@@ -6,6 +6,10 @@ import { invoke } from "@tauri-apps/api/core";
 import { MeetingRecord } from "../App";
 import { CredentialStore } from "../services/credentialStore";
 
+const ALL_MODELS = ["tiny", "base", "small", "medium", "large-v3-turbo"].map(
+  (key) => ({ key, is_downloaded: true }),
+);
+
 describe("RetranscribeModal Component", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -34,7 +38,7 @@ describe("RetranscribeModal Component", () => {
 
   it("renders retranscribe options, selects local models, and triggers local re-transcription", async () => {
     (invoke as any).mockImplementation((cmd: string) => {
-      if (cmd === "get_available_models") return Promise.resolve([]);
+      if (cmd === "get_available_models") return Promise.resolve(ALL_MODELS);
       if (cmd === "get_stored_api_keys")
         return Promise.resolve({ groq: "", gemini: "", openai: "" });
       if (cmd === "get_ollama_config")
@@ -94,7 +98,7 @@ describe("RetranscribeModal Component", () => {
     await CredentialStore.set("echomind_openai_key", "sk-proj_stored_key");
 
     (invoke as any).mockImplementation((cmd: string) => {
-      if (cmd === "get_available_models") return Promise.resolve([]);
+      if (cmd === "get_available_models") return Promise.resolve(ALL_MODELS);
       if (cmd === "get_stored_api_keys")
         return Promise.resolve({
           groq: "",
@@ -188,7 +192,7 @@ describe("RetranscribeModal Component", () => {
   it("handles Groq and OpenAI cloud providers with API keys and retranscribe error", async () => {
     await CredentialStore.set("echomind_groq_key", "gsk_groq_retranscribe_key");
     (invoke as any).mockImplementation((cmd: string) => {
-      if (cmd === "get_available_models") return Promise.resolve([]);
+      if (cmd === "get_available_models") return Promise.resolve(ALL_MODELS);
       if (cmd === "get_stored_api_keys")
         return Promise.resolve({
           groq: "gsk_groq_retranscribe_key",
@@ -328,5 +332,66 @@ describe("RetranscribeModal Component", () => {
     expect(
       screen.getByText(/Paranoid Modda bulut motoru kilitlenmiştir/i),
     ).toBeInTheDocument();
+  });
+
+  it("dims models that are not downloaded and never preselects one", async () => {
+    localStorage.setItem("echomind_active_model", "large-v3-turbo");
+    (invoke as any).mockImplementation((cmd: string) => {
+      if (cmd === "get_available_models")
+        return Promise.resolve([
+          { key: "small", is_downloaded: true },
+          { key: "large-v3-turbo", is_downloaded: false },
+        ]);
+      if (cmd === "retranscribe_meeting") return Promise.resolve(mockMeeting);
+      return Promise.resolve();
+    });
+    render(
+      <I18nProvider>
+        <RetranscribeModal {...defaultProps} />
+      </I18nProvider>,
+    );
+    await act(async () => {});
+
+    const large = screen
+      .getByText(/Zirve Netlik \(Whisper Large-v3\)/i)
+      .closest("button")!;
+    expect(large).toBeDisabled();
+    expect(large).toHaveTextContent("İndirilmedi");
+    expect(
+      screen.getByText(/Soluk görünen modeller bu bilgisayarda yok/),
+    ).toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /^Yeniden Yazıya Dök$/i }),
+      );
+    });
+    expect(invoke).toHaveBeenCalledWith(
+      "retranscribe_meeting",
+      expect.objectContaining({ modelVersion: "small" }),
+    );
+  });
+
+  it("falls back to Apple dictation when no Whisper model is on disk", async () => {
+    (invoke as any).mockImplementation((cmd: string) => {
+      if (cmd === "get_available_models") return Promise.resolve([]);
+      if (cmd === "retranscribe_meeting") return Promise.resolve(mockMeeting);
+      return Promise.resolve();
+    });
+    render(
+      <I18nProvider>
+        <RetranscribeModal {...defaultProps} />
+      </I18nProvider>,
+    );
+    await act(async () => {});
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /^Yeniden Yazıya Dök$/i }),
+      );
+    });
+    expect(invoke).toHaveBeenCalledWith(
+      "retranscribe_meeting",
+      expect.objectContaining({ cloudProvider: "apple_speech" }),
+    );
   });
 });

@@ -26,6 +26,10 @@ interface RetranscribeModalProps {
   onRetranscribeSuccess: (updatedMeeting: MeetingRecord) => void;
 }
 
+/** Apple dictation needs no download; Whisper sizes must be on disk. */
+const isUsable = (model: string, onDisk: Set<string> | null) =>
+  model === "apple_speech" || onDisk === null || onDisk.has(model);
+
 export const RetranscribeModal: React.FC<RetranscribeModalProps> = ({
   isOpen,
   onClose,
@@ -45,6 +49,9 @@ export const RetranscribeModal: React.FC<RetranscribeModalProps> = ({
   const [summaryEngine, setSummaryEngine] = useState<
     "ollama" | "gemini" | "openai" | "groq" | "heuristic"
   >("ollama");
+
+  // Whisper models on disk; null until known (then nothing is blocked).
+  const [downloaded, setDownloaded] = useState<Set<string> | null>(null);
 
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -110,6 +117,36 @@ export const RetranscribeModal: React.FC<RetranscribeModalProps> = ({
     }
   }, [isOpen, isParanoid]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    Promise.resolve()
+      .then(() =>
+        invoke<{ key: string; is_downloaded: boolean }[]>(
+          "get_available_models",
+        ),
+      )
+      .then((models) => {
+        if (cancelled || !Array.isArray(models)) return;
+        const onDisk = new Set(
+          models.filter((m) => m.is_downloaded).map((m) => m.key),
+        );
+        setDownloaded(onDisk);
+        // Never preselect a model that isn't there.
+        setLocalModel((current) =>
+          isUsable(current, onDisk)
+            ? current
+            : (["small", "medium", "large-v3-turbo", "base", "tiny"].find((k) =>
+                onDisk.has(k),
+              ) ?? "apple_speech"),
+        );
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const handleStartRetranscribe = async () => {
@@ -151,6 +188,9 @@ export const RetranscribeModal: React.FC<RetranscribeModalProps> = ({
           );
         }
       } else {
+        if (!isUsable(localModel, downloaded)) {
+          throw new Error(t("retranscribe.notDownloadedHint"));
+        }
         if (localModel === "apple_speech") {
           cloudProv = localModel;
         } else {
@@ -430,31 +470,48 @@ export const RetranscribeModal: React.FC<RetranscribeModalProps> = ({
                       name: t("retranscribe.baseName"),
                       desc: t("retranscribe.baseDesc"),
                     },
-                  ].map((m) => (
-                    <button
-                      key={m.id}
-                      type="button"
-                      onClick={() => setLocalModel(m.id)}
-                      className={`p-3 rounded-xl border text-left transition flex items-center justify-between ${
-                        localModel === m.id
-                          ? "bg-cyan-500/20 border-cyan-500 text-cyan-200"
-                          : "bg-slate-950/60 border-slate-800 hover:border-slate-700 text-slate-300"
-                      }`}
-                    >
-                      <div>
-                        <div className="text-xs font-bold text-white">
-                          {m.name}
+                  ].map((m) => {
+                    const missing = !isUsable(m.id, downloaded);
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => setLocalModel(m.id)}
+                        disabled={missing}
+                        className={`p-3 rounded-xl border text-left transition flex items-center justify-between disabled:opacity-40 disabled:cursor-not-allowed ${
+                          localModel === m.id
+                            ? "bg-cyan-500/20 border-cyan-500 text-cyan-200"
+                            : "bg-slate-950/60 border-slate-800 hover:border-slate-700 text-slate-300"
+                        }`}
+                      >
+                        <div>
+                          <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                            {m.name}
+                            {missing && (
+                              <span className="text-[10px] font-semibold text-amber-300 px-1.5 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/30">
+                                {t("retranscribe.notDownloaded")}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[11px] text-slate-400">
+                            {m.desc}
+                          </div>
                         </div>
-                        <div className="text-[11px] text-slate-400">
-                          {m.desc}
-                        </div>
-                      </div>
-                      {localModel === m.id && (
-                        <Check className="w-4 h-4 text-cyan-400 shrink-0 ml-2" />
-                      )}
-                    </button>
-                  ))}
+                        {localModel === m.id && (
+                          <Check className="w-4 h-4 text-cyan-400 shrink-0 ml-2" />
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
+                {downloaded !== null &&
+                  ["small", "medium", "large-v3-turbo", "base"].some(
+                    (k) => !downloaded.has(k),
+                  ) && (
+                    <p className="text-[11px] text-slate-400">
+                      {t("retranscribe.notDownloadedHint")}
+                    </p>
+                  )}
               </div>
             ) : (
               <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800/80 space-y-3">

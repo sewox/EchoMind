@@ -251,6 +251,9 @@ export const en: TranslationKeys = {
     templatePromptRequired: "Please enter a system prompt.",
   },
   retranscribe: {
+    notDownloaded: "Not downloaded",
+    notDownloadedHint:
+      "Dimmed models are not on this computer. You can download them in the Models window.",
     title: "Re-transcribe Meeting Audio",
     subtitle:
       "Select a different precision mode or language to reprocess the recording from scratch",

@@ -248,6 +248,9 @@ export const fr: TranslationKeys = {
     templatePromptRequired: "Veuillez entrer un prompt système.",
   },
   retranscribe: {
+    notDownloaded: "Non téléchargé",
+    notDownloadedHint:
+      "Les modèles grisés ne sont pas sur cet ordinateur. Vous pouvez les télécharger dans la fenêtre Modèles.",
     title: "Retranscrire l'Audio de la Réunion",
     subtitle: "Sélectionnez un autre mode pour retraiter l'enregistrement",
     methodStep: "1. Méthode de Traitement",
