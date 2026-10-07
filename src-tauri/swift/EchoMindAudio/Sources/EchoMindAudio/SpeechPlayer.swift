@@ -2,6 +2,8 @@
 // Offline, no extra install: macOS ships voices for every app language.
 //
 // State codes shared with Rust (src/tts.rs): 0 idle, 1 speaking, 2 paused.
+// Progress is the share of the text read so far (0…1), from the word the
+// voice is about to say.
 import AVFoundation
 import Foundation
 
@@ -11,6 +13,7 @@ private final class SpeechPlayer: NSObject, AVSpeechSynthesizerDelegate {
     private let synthesizer = AVSpeechSynthesizer()
     private let lock = NSLock()
     private var current: Int32 = 0
+    private var spoken: Float = 0
 
     override init() {
         super.init()
@@ -29,9 +32,22 @@ private final class SpeechPlayer: NSObject, AVSpeechSynthesizerDelegate {
         lock.unlock()
     }
 
+    var progress: Float {
+        lock.lock()
+        defer { lock.unlock() }
+        return spoken
+    }
+
+    func setProgress(_ value: Float) {
+        lock.lock()
+        spoken = value
+        lock.unlock()
+    }
+
     func speak(_ utterance: AVSpeechUtterance) {
         // Callers see "speaking" right away; the delegate moves it to idle at the end.
         setState(1)
+        setProgress(0)
         DispatchQueue.main.async {
             self.synthesizer.stopSpeaking(at: .immediate)
             self.setState(1)
@@ -54,7 +70,18 @@ private final class SpeechPlayer: NSObject, AVSpeechSynthesizerDelegate {
         DispatchQueue.main.async { _ = self.synthesizer.continueSpeaking() }
     }
 
-    func speechSynthesizer(_: AVSpeechSynthesizer, didFinish _: AVSpeechUtterance) { setState(0) }
+    func speechSynthesizer(_: AVSpeechSynthesizer, didFinish _: AVSpeechUtterance) {
+        setProgress(1)
+        setState(0)
+    }
+
+    func speechSynthesizer(
+        _: AVSpeechSynthesizer, willSpeakRangeOfSpeechString range: NSRange,
+        utterance: AVSpeechUtterance
+    ) {
+        let total = (utterance.speechString as NSString).length
+        if total > 0 { setProgress(Float(range.location) / Float(total)) }
+    }
     func speechSynthesizer(_: AVSpeechSynthesizer, didCancel _: AVSpeechUtterance) { setState(0) }
     func speechSynthesizer(_: AVSpeechSynthesizer, didPause _: AVSpeechUtterance) { setState(2) }
     func speechSynthesizer(_: AVSpeechSynthesizer, didContinue _: AVSpeechUtterance) { setState(1) }
@@ -114,6 +141,9 @@ public func echomind_tts_pause() { SpeechPlayer.shared.pause() }
 
 @_cdecl("echomind_tts_resume")
 public func echomind_tts_resume() { SpeechPlayer.shared.resume() }
+
+@_cdecl("echomind_tts_progress")
+public func echomind_tts_progress() -> Float { SpeechPlayer.shared.progress }
 
 @_cdecl("echomind_tts_state")
 public func echomind_tts_state() -> Int32 { SpeechPlayer.shared.state }

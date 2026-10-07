@@ -113,6 +113,17 @@ pub fn tts_stop() -> TtsState {
     TtsState::Idle
 }
 
+/// Share of the current text read so far (0…1).
+#[tauri::command]
+pub fn tts_progress() -> f32 {
+    let p = backend::progress();
+    if p.is_finite() {
+        p.clamp(0.0, 1.0)
+    } else {
+        0.0
+    }
+}
+
 #[tauri::command]
 pub fn tts_pause() -> TtsState {
     backend::pause();
@@ -160,6 +171,7 @@ mod backend {
         fn echomind_tts_pause();
         fn echomind_tts_resume();
         fn echomind_tts_state() -> i32;
+        fn echomind_tts_progress() -> f32;
         fn echomind_free_cstring(ptr: *mut c_char);
     }
 
@@ -211,6 +223,11 @@ mod backend {
         // SAFETY: reads a lock-protected integer.
         unsafe { echomind_tts_state() }
     }
+
+    pub fn progress() -> f32 {
+        // SAFETY: reads a lock-protected float.
+        unsafe { echomind_tts_progress() }
+    }
 }
 
 #[cfg(target_os = "windows")]
@@ -239,6 +256,7 @@ mod backend {
         Pause,
         Resume,
         State(Sender<i32>),
+        Progress(Sender<f32>),
     }
 
     fn sender() -> &'static Mutex<Sender<Command>> {
@@ -318,6 +336,8 @@ mod backend {
         }
         let voice: Option<ISpVoice> = unsafe { CoCreateInstance(&SpVoice, None, CLSCTX_ALL).ok() };
         let mut paused = false;
+        // Length of the text being read (UTF-16 units, as SAPI counts).
+        let mut total: u32 = 0;
         for command in rx {
             // SAFETY: every call goes through the voice owned by this thread.
             unsafe {
@@ -335,6 +355,7 @@ mod backend {
                                     paused = false;
                                 }
                                 let name = token_name(&token);
+                                total = text.encode_utf16().count() as u32;
                                 v.SetVoice(&token)
                                     .and_then(|_| v.SetRate(sapi_rate(rate)))
                                     .and_then(|_| {
@@ -379,6 +400,24 @@ mod backend {
                                 paused = false;
                             }
                         }
+                    }
+                    Command::Progress(reply) => {
+                        let mut status = SPVOICESTATUS::default();
+                        let fraction = match &voice {
+                            Some(v) if total > 0 => {
+                                if v.GetStatus(&mut status, std::ptr::null_mut()).is_ok() {
+                                    if status.dwRunningState & (SPRS_IS_SPEAKING.0 as u32) != 0 {
+                                        status.ulInputWordPos as f32 / total as f32
+                                    } else {
+                                        1.0
+                                    }
+                                } else {
+                                    0.0
+                                }
+                            }
+                            _ => 0.0,
+                        };
+                        let _ = reply.send(fraction);
                     }
                     Command::State(reply) => {
                         let code = match &voice {
@@ -432,6 +471,12 @@ mod backend {
         rx.recv().unwrap_or(0)
     }
 
+    pub fn progress() -> f32 {
+        let (tx, rx) = channel();
+        send(Command::Progress(tx));
+        rx.recv().unwrap_or(0.0)
+    }
+
     #[cfg(test)]
     mod tests {
         use super::*;
@@ -461,6 +506,9 @@ mod backend {
     pub fn resume() {}
     pub fn state() -> i32 {
         0
+    }
+    pub fn progress() -> f32 {
+        0.0
     }
 }
 
@@ -499,6 +547,7 @@ mod tests {
         // No main run loop in tests, so nothing is spoken; these must not hang.
         assert_eq!(tts_stop(), TtsState::Idle);
         let _ = backend::state();
+        assert!((0.0..=1.0).contains(&tts_progress()));
     }
 
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]

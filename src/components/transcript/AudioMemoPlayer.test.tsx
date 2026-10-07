@@ -52,19 +52,29 @@ type Backend = {
   supported?: boolean;
   voice?: string | null;
   speak?: () => Promise<unknown>;
+  /** Default: no on-device model, so the report template is read. */
+  briefing?: () => Promise<unknown>;
 };
+
+const SCRIPT = [
+  { title: "Amaç", text: "Sürüm planlandı." },
+  { title: "Görevler", text: "Sercan notları yazacak." },
+];
 
 const mockBackend = ({
   supported = true,
   voice = "Yelda",
   speak = () => Promise.resolve("Yelda"),
+  briefing = () => Promise.reject("no_model"),
 }: Backend = {}) =>
   (invoke as any).mockImplementation((cmd: string) => {
     if (cmd === "tts_availability")
       return Promise.resolve({ supported, voice });
+    if (cmd === "generate_briefing") return briefing();
     if (cmd === "tts_speak") return speak();
     if (cmd === "tts_pause") return Promise.resolve("paused");
     if (cmd === "tts_resume") return Promise.resolve("speaking");
+    if (cmd === "tts_progress") return Promise.resolve(0.5);
     return Promise.resolve("idle");
   });
 
@@ -81,6 +91,13 @@ const renderPlayer = (
       />
     </I18nProvider>,
   );
+
+const endReading = () =>
+  act(async () => {
+    globalTestEventListeners["tts-state"].forEach((cb) =>
+      cb({ payload: { state: "idle" } }),
+    );
+  });
 
 const click = (el: HTMLElement) =>
   act(async () => {
@@ -270,5 +287,143 @@ describe("AudioMemoPlayer", () => {
     await click(await screen.findByRole("button", { name: /Dinle/ }));
     await click(screen.getByRole("button", { name: /Duraklat/ }));
     expect(screen.getByRole("alert")).toHaveTextContent("engine gone");
+  });
+
+  it("reads the model's script section by section", async () => {
+    mockBackend({ briefing: () => Promise.resolve(SCRIPT) });
+    renderPlayer();
+    await click(await screen.findByRole("button", { name: /Dinle/ }));
+    expect(invoke).toHaveBeenCalledWith("generate_briefing", {
+      title: "Sprint Planlama",
+      report: mockSummary,
+      lang: "tr",
+      length: "short",
+    });
+    expect(invoke).toHaveBeenLastCalledWith("tts_speak", {
+      text: "Sürüm planlandı.",
+      lang: "tr",
+      rate: 1,
+    });
+    expect(screen.getByRole("button", { name: /1\.\s*Amaç/ })).toHaveAttribute(
+      "aria-current",
+      "step",
+    );
+    expect(
+      screen.queryByText(/Rapor modeli yüklü olmadığı/),
+    ).not.toBeInTheDocument();
+
+    await waitFor(() =>
+      expect(globalTestEventListeners["tts-state"]?.length).toBe(1),
+    );
+    await endReading();
+    expect(invoke).toHaveBeenLastCalledWith("tts_speak", {
+      text: "Sercan notları yazacak.",
+      lang: "tr",
+      rate: 1,
+    });
+    expect(
+      screen.getByRole("button", { name: /2\.\s*Görevler/ }),
+    ).toHaveAttribute("aria-current", "step");
+
+    await endReading();
+    expect(screen.getByText(/Rapor özetini/)).toBeInTheDocument();
+
+    // Played again: the script is reused, not written again.
+    (invoke as any).mockClear();
+    await click(screen.getByRole("button", { name: /Dinle/ }));
+    expect(invoke).not.toHaveBeenCalledWith(
+      "generate_briefing",
+      expect.anything(),
+    );
+  });
+
+  it("jumps to a section", async () => {
+    mockBackend({ briefing: () => Promise.resolve(SCRIPT) });
+    renderPlayer();
+    await click(await screen.findByRole("button", { name: /Dinle/ }));
+    await click(screen.getByRole("button", { name: /2\.\s*Görevler/ }));
+    expect(invoke).toHaveBeenLastCalledWith("tts_speak", {
+      text: "Sercan notları yazacak.",
+      lang: "tr",
+      rate: 1,
+    });
+  });
+
+  it("shows progress while the script is written", async () => {
+    let finish: (v: unknown) => void = () => {};
+    mockBackend({
+      briefing: () => new Promise((resolve) => (finish = resolve)),
+    });
+    renderPlayer();
+    await click(await screen.findByRole("button", { name: /Dinle/ }));
+    await waitFor(() =>
+      expect(globalTestEventListeners["briefing-progress"]?.length).toBe(1),
+    );
+    act(() => {
+      globalTestEventListeners["briefing-progress"].forEach((cb) =>
+        cb({ payload: { percent: 41.6 } }),
+      );
+    });
+    expect(screen.getByText("Bülten hazırlanıyor… %42")).toBeInTheDocument();
+    expect(screen.getByRole("progressbar")).toHaveAttribute(
+      "aria-valuenow",
+      "42",
+    );
+    expect(screen.getByRole("button", { name: /Dinle/ })).toBeDisabled();
+    await act(async () => finish(SCRIPT));
+    expect(screen.getByText("Okunuyor…")).toBeInTheDocument();
+  });
+
+  it("asks for a longer script when the length changes", async () => {
+    mockBackend({ briefing: () => Promise.resolve(SCRIPT) });
+    renderPlayer();
+    await click(await screen.findByRole("radio", { name: /~3 dk/ }));
+    expect(screen.getByRole("radio", { name: /~3 dk/ })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    await click(screen.getByRole("button", { name: /Dinle/ }));
+    expect(invoke).toHaveBeenCalledWith(
+      "generate_briefing",
+      expect.objectContaining({ length: "standard" }),
+    );
+  });
+
+  it("reads the report and says why when the model fails", async () => {
+    mockBackend({ briefing: () => Promise.reject("model crashed") });
+    renderPlayer();
+    await click(await screen.findByRole("button", { name: /Dinle/ }));
+    expect(invoke).toHaveBeenLastCalledWith("tts_speak", {
+      text: buildMemoText(mockSummary, "Sprint Planlama", "tr"),
+      lang: "tr",
+      rate: 1,
+    });
+    expect(screen.getByRole("alert")).toHaveTextContent("model crashed");
+  });
+
+  it("notes that the report is read when no model is installed", async () => {
+    mockBackend();
+    renderPlayer();
+    await click(await screen.findByRole("button", { name: /Dinle/ }));
+    expect(
+      screen.getByText(/Rapor modeli yüklü olmadığı için/),
+    ).toBeInTheDocument();
+  });
+
+  it("shows where the reading is and the text being read", async () => {
+    mockBackend({ briefing: () => Promise.resolve(SCRIPT) });
+    renderPlayer();
+    await click(await screen.findByRole("button", { name: /Dinle/ }));
+    const panel = screen.getByTestId("audio-memo-progress");
+    expect(panel).toHaveTextContent("Bölüm 1/2 · Amaç");
+    expect(panel).toHaveTextContent("Sürüm planlandı.");
+    // Half of the first section (16 of 39 characters) read.
+    await waitFor(() =>
+      expect(
+        screen.getByRole("progressbar", { name: "Bültenin okunan kısmı" }),
+      ).toHaveAttribute("aria-valuenow", "21"),
+    );
+    await click(screen.getByRole("button", { name: "Durdur" }));
+    expect(screen.queryByTestId("audio-memo-progress")).not.toBeInTheDocument();
   });
 });
