@@ -175,6 +175,8 @@ export interface TranslationKeys {
       progress: string;
       section: string;
       preparing: string;
+      stepScript: string;
+      stepVoice: string;
       length: string;
       short: string;
       standard: string;

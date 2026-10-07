@@ -211,6 +211,8 @@ export const tr: TranslationKeys = {
       progress: "Bültenin okunan kısmı",
       section: "Bölüm {current}/{total}",
       preparing: "Bülten hazırlanıyor… %{percent}",
+      stepScript: "Metin yazılıyor",
+      stepVoice: "Ses oluşturuluyor",
       length: "Bülten uzunluğu",
       short: "Kısa bülten (yaklaşık 1 dakika)",
       standard: "Standart bülten (yaklaşık 3 dakika)",

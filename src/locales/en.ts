@@ -212,6 +212,8 @@ export const en: TranslationKeys = {
       progress: "Briefing progress",
       section: "Section {current}/{total}",
       preparing: "Preparing the briefing… {percent}%",
+      stepScript: "Writing the script",
+      stepVoice: "Creating the audio",
       length: "Briefing length",
       short: "Short briefing (about 1 minute)",
       standard: "Standard briefing (about 3 minutes)",

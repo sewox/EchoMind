@@ -67,6 +67,10 @@ impl BriefingLength {
 /// here is trimmed back to its last full sentence.
 const SECTION_CHAR_CAP: usize = 2400;
 
+/// Share of the progress for writing the script when the foreign-word pass
+/// follows it.
+const WRITING_SHARE: f32 = 0.85;
+
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct BriefingSection {
     pub title: String,
@@ -267,7 +271,11 @@ const FOREIGN_SCHEMA: &str = r#"{"type":"object","properties":{"words":{"type":"
 /// Marks the words of each section that the Turkish voice should read the
 /// English way. One extra short pass; a failure just leaves the lists empty
 /// (CamelCase and w/q/x words are still caught by the voice's own rules).
-fn mark_foreign(model: &LlmModel, sections: &mut [BriefingSection]) {
+fn mark_foreign(
+    model: &LlmModel,
+    sections: &mut [BriefingSection],
+    on_progress: &(dyn Fn(f32) + Sync),
+) {
     let text = sections
         .iter()
         .map(|s| s.text.as_str())
@@ -282,7 +290,7 @@ fn mark_foreign(model: &LlmModel, sections: &mut [BriefingSection]) {
             max_tokens: 500,
             expected_tokens: 80,
             cancel: None,
-            on_progress: &|_| {},
+            on_progress,
         },
     ) else {
         return;
@@ -328,6 +336,9 @@ pub fn generate(
     let schema = schema(length);
     // Room for the whole schema; a guide length is not a token budget.
     let max_tokens = length.max_sections() * (SECTION_CHAR_CAP / 2 + 40) + 200;
+    // The foreign-word pass (Turkish voice) takes the last part of the progress.
+    let marks = crate::neural_tts::speaks(lang);
+    let share = if marks { WRITING_SHARE } else { 1.0 };
     let raw = engine::generate_json(
         model,
         &GenRequest {
@@ -337,7 +348,7 @@ pub fn generate(
             max_tokens,
             expected_tokens: length.words() * 2,
             cancel: None,
-            on_progress,
+            on_progress: &|f| on_progress(f * share),
         },
     )?;
     let answer: Answer = serde_json::from_str(&raw).map_err(|e| format!("briefing JSON: {e}"))?;
@@ -345,9 +356,13 @@ pub fn generate(
     if sections.is_empty() {
         return Err("empty_briefing".into());
     }
-    if crate::neural_tts::speaks(lang) {
-        mark_foreign(model, &mut sections);
+    if marks {
+        on_progress(WRITING_SHARE);
+        mark_foreign(model, &mut sections, &|f| {
+            on_progress(WRITING_SHARE + f * (1.0 - WRITING_SHARE))
+        });
     }
+    on_progress(1.0);
     Ok(sections)
 }
 
@@ -564,7 +579,7 @@ Notion'a yazılacak; maliyet yüzde yirmi düşecek."
             foreign: vec![],
         }];
         let t = std::time::Instant::now();
-        mark_foreign(model, &mut sections);
+        mark_foreign(model, &mut sections, &|_| {});
         eprintln!(
             "FOREIGN ({:.1}s): {:?}",
             t.elapsed().as_secs_f32(),

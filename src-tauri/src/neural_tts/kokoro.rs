@@ -269,14 +269,24 @@ impl Kokoro {
     }
 
     /// Speech for English text with `voice` (one of [`VOICES`]).
-    pub fn synthesize(&mut self, text: &str, voice: &str, speed: f32) -> Result<Vec<f32>, String> {
+    /// `on_progress` gets 0..1 per finished sentence, weighted by its length.
+    pub fn synthesize(
+        &mut self,
+        text: &str,
+        voice: &str,
+        speed: f32,
+        on_progress: &dyn Fn(f32),
+    ) -> Result<Vec<f32>, String> {
         let speed = if speed.is_finite() {
             speed.clamp(0.5, 2.0)
         } else {
             1.0
         };
+        let list = sentences(text);
+        let total = list.iter().map(String::len).sum::<usize>().max(1) as f32;
+        let mut done = 0;
         let mut audio = Vec::new();
-        for sentence in sentences(text) {
+        for sentence in list {
             let ps = self.lexicon.phonemize(&sentence);
             for piece in pieces(&ids(&ps)) {
                 audio.extend(self.run(&piece, voice, speed)?);
@@ -285,6 +295,8 @@ impl Kokoro {
                 0.0,
                 (SENTENCE_PAUSE * SAMPLE_RATE as f32) as usize,
             ));
+            done += sentence.len();
+            on_progress(done as f32 / total);
         }
         Ok(audio)
     }
@@ -332,11 +344,11 @@ mod tests {
     fn kokoro_real_model() {
         let dir = std::env::var("KOKORO_DIR").expect("set KOKORO_DIR");
         let mut k = Kokoro::load(Path::new(&dir)).unwrap();
-        k.synthesize("Warm up.", "af_heart", 1.0).unwrap();
+        k.synthesize("Warm up.", "af_heart", 1.0, &|_| {}).unwrap();
         let text = "The goal of the meeting was to agree on the release plan. Ayşe will update the Jira \
                     ticket and share the notes with Mehmet before the deadline. Revenue grew 20% this quarter.";
         let t = std::time::Instant::now();
-        let audio = k.synthesize(text, "af_heart", 1.0).unwrap();
+        let audio = k.synthesize(text, "af_heart", 1.0, &|_| {}).unwrap();
         let secs = audio.len() as f32 / SAMPLE_RATE as f32;
         eprintln!("{secs:.1}s audio in {:.2}s", t.elapsed().as_secs_f32());
         std::fs::write(

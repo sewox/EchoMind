@@ -212,6 +212,8 @@ export const es: TranslationKeys = {
       progress: "Progreso del resumen",
       section: "Sección {current}/{total}",
       preparing: "Preparando el resumen… {percent} %",
+      stepScript: "Escribiendo el texto",
+      stepVoice: "Creando el audio",
       length: "Duración del resumen",
       short: "Resumen corto (alrededor de 1 minuto)",
       standard: "Resumen estándar (alrededor de 3 minutos)",

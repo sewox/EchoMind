@@ -37,6 +37,15 @@ type Status = "idle" | "preparing" | "speaking" | "paused";
 type Length = "short" | "standard";
 
 const SPEEDS = [1, 1.25, 1.5];
+/** Share of the preparation bar for writing the script when a neural voice
+ * then renders the first section (the rest is the rendering). */
+const SCRIPT_SHARE = 0.75;
+
+interface Prep {
+  step: "script" | "voice";
+  /** Share of this step done (0..1). */
+  fraction: number;
+}
 
 const filled = (items?: string[]) =>
   (items || []).map((s) => s.trim()).filter(Boolean);
@@ -116,7 +125,7 @@ export const AudioMemoPlayer: React.FC<AudioMemoPlayerProps> = ({
   const [current, setCurrent] = useState(0);
   // Share of the current section read so far (0…1).
   const [sectionProgress, setSectionProgress] = useState(0);
-  const [prepPercent, setPrepPercent] = useState(0);
+  const [prep, setPrep] = useState<Prep>({ step: "script", fraction: 0 });
   const [voice, setVoice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   // The on-device neural Turkish voice is installed (falls back to the
@@ -131,6 +140,10 @@ export const AudioMemoPlayer: React.FC<AudioMemoPlayerProps> = ({
   const voiceEngine = useNeuralVoice(langCode, {
     onEnded: () => advanceRef.current(),
     onProgress: setSectionProgress,
+    onRenderProgress: (fraction) => {
+      if (live.current.status === "preparing")
+        setPrep({ step: "voice", fraction });
+    },
   });
 
   const template = useMemo(
@@ -245,7 +258,8 @@ export const AudioMemoPlayer: React.FC<AudioMemoPlayerProps> = ({
     (async () => {
       unlisten = await listen<{ percent: number }>(
         "briefing-progress",
-        (event) => setPrepPercent(Math.round(event.payload.percent)),
+        (event) =>
+          setPrep({ step: "script", fraction: event.payload.percent / 100 }),
       );
       if (cancelled) unlisten();
     })();
@@ -290,9 +304,6 @@ export const AudioMemoPlayer: React.FC<AudioMemoPlayerProps> = ({
 
   const prepare = async (): Promise<BriefingSection[] | null> => {
     if (sections) return sections;
-    setStatus("preparing");
-    setPrepPercent(0);
-    setError(null);
     let list: BriefingSection[];
     try {
       list = await call<BriefingSection[]>("generate_briefing", {
@@ -316,9 +327,15 @@ export const AudioMemoPlayer: React.FC<AudioMemoPlayerProps> = ({
 
   const handlePlayPause = async () => {
     if (status === "idle") {
+      // One wait, one bar: writing the script, then the first section's audio.
       setError(null);
+      setStatus("preparing");
+      live.current.status = "preparing";
+      setPrep({ step: sections ? "voice" : "script", fraction: 0 });
       const list = await prepare();
-      if (list) await speakSection(list, 0, rate);
+      if (!list) return;
+      if (live.current.neural) setPrep({ step: "voice", fraction: 0 });
+      await speakSection(list, 0, rate);
       return;
     }
     if (status === "preparing") return;
@@ -381,9 +398,23 @@ export const AudioMemoPlayer: React.FC<AudioMemoPlayerProps> = ({
     (lengths[current] || 0) * sectionProgress;
   const overall = Math.round((doneChars / totalChars) * 100);
 
+  // Writing and rendering on one scale; without a neural voice the script is
+  // the whole wait (the system voice starts at once).
+  const scriptShare = neural ? SCRIPT_SHARE : 1;
+  const prepPercent = Math.round(
+    100 *
+      (prep.step === "script"
+        ? prep.fraction * scriptShare
+        : scriptShare + prep.fraction * (1 - scriptShare)),
+  );
+
   const statusLine =
     status === "preparing"
-      ? t("summary.audioMemo.preparing", { percent: prepPercent })
+      ? `${t("summary.audioMemo.preparing", { percent: prepPercent })} · ${t(
+          prep.step === "script"
+            ? "summary.audioMemo.stepScript"
+            : "summary.audioMemo.stepVoice",
+        )}`
       : status === "speaking"
         ? t("summary.audioMemo.playing")
         : status === "paused"
@@ -501,6 +532,9 @@ export const AudioMemoPlayer: React.FC<AudioMemoPlayerProps> = ({
         <div
           className="h-1 rounded-full bg-slate-800 overflow-hidden"
           role="progressbar"
+          aria-label={t("summary.audioMemo.preparing", {
+            percent: prepPercent,
+          })}
           aria-valuenow={prepPercent}
           aria-valuemin={0}
           aria-valuemax={100}

@@ -12,7 +12,18 @@ pub mod frontend;
 pub mod kokoro;
 pub mod pronounce;
 
+use serde::Serialize;
 use std::sync::Mutex;
+use tauri::Emitter;
+
+/// Rendering progress of one section: `job` is the id the page sent.
+pub const RENDER_PROGRESS_EVENT: &str = "neural-voice-progress";
+
+#[derive(Clone, Serialize)]
+struct RenderProgress {
+    job: u32,
+    fraction: f32,
+}
 
 /// Which voice engine reads `lang`, if any.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -92,6 +103,7 @@ fn render(
     text: &str,
     foreign: &[String],
     voice: Option<&str>,
+    on_progress: &dyn Fn(f32),
 ) -> Result<Vec<u8>, String> {
     match engine {
         Engine::Ema => {
@@ -104,7 +116,7 @@ fn render(
                 &hints(foreign),
                 1.0,
                 None,
-                &|_| {},
+                on_progress,
             )?;
             Ok(ema::wav_bytes(&audio))
         }
@@ -118,10 +130,11 @@ fn render(
             let voice = voice
                 .filter(|v| kokoro::VOICES.contains(v))
                 .unwrap_or(kokoro::VOICES[0]);
-            let audio = guard
-                .as_mut()
-                .expect("loaded")
-                .synthesize(text, voice, 1.0)?;
+            let audio =
+                guard
+                    .as_mut()
+                    .expect("loaded")
+                    .synthesize(text, voice, 1.0, on_progress)?;
             Ok(ema::wav_bytes_at(&audio, kokoro::SAMPLE_RATE))
         }
     }
@@ -129,13 +142,16 @@ fn render(
 
 /// One section of the briefing as a WAV (raw bytes to the page).
 /// `foreign`: words the script writer marked as English (Turkish voice);
-/// `voice`: the English voice (`af_heart`, `bf_emma`).
+/// `voice`: the English voice (`af_heart`, `bf_emma`); `job`: an id for the
+/// `neural-voice-progress` events of this render.
 #[tauri::command]
 pub async fn neural_voice_render(
+    app: tauri::AppHandle,
     text: String,
     lang: String,
     foreign: Option<Vec<String>>,
     voice: Option<String>,
+    job: Option<u32>,
 ) -> Result<tauri::ipc::Response, String> {
     let engine = engine_for(&lang).ok_or("unsupported_language")?;
     if !installed(engine) {
@@ -147,6 +163,11 @@ pub async fn neural_voice_render(
             &text,
             &foreign.unwrap_or_default(),
             voice.as_deref(),
+            &|fraction| {
+                if let Some(job) = job {
+                    let _ = app.emit(RENDER_PROGRESS_EVENT, RenderProgress { job, fraction });
+                }
+            },
         )
     })
     .await

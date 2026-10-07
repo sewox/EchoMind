@@ -364,7 +364,9 @@ describe("AudioMemoPlayer", () => {
         cb({ payload: { percent: 41.6 } }),
       );
     });
-    expect(screen.getByText("Bülten hazırlanıyor… %42")).toBeInTheDocument();
+    expect(
+      screen.getByText("Bülten hazırlanıyor… %42 · Metin yazılıyor"),
+    ).toBeInTheDocument();
     expect(screen.getByRole("progressbar")).toHaveAttribute(
       "aria-valuenow",
       "42",
@@ -490,6 +492,7 @@ describe("AudioMemoPlayer with the neural voice", () => {
       lang: "tr",
       foreign: ["deadline"],
       voice: "af_heart",
+      job: expect.any(Number),
     });
     expect(invoke).not.toHaveBeenCalledWith("tts_speak", expect.anything());
     expect(FakeAudio.last!.play).toHaveBeenCalled();
@@ -500,6 +503,55 @@ describe("AudioMemoPlayer with the neural voice", () => {
     await waitFor(() =>
       expect(renders).toEqual(["Sürüm planlandı.", "Sercan notları yazacak."]),
     );
+  });
+
+  it("shows writing and rendering as one progress bar", async () => {
+    let finishScript: (v: unknown) => void = () => {};
+    let finishAudio: (v: unknown) => void = () => {};
+    let job = 0;
+    (invoke as any).mockImplementation((cmd: string, args: any) => {
+      if (cmd === "tts_availability")
+        return Promise.resolve({ supported: true, voice: "Yelda" });
+      if (cmd === "neural_voice_available") return Promise.resolve(true);
+      if (cmd === "generate_briefing")
+        return new Promise((resolve) => (finishScript = resolve));
+      if (cmd === "neural_voice_render") {
+        if (job) return new Promise(() => {}); // the prefetched next section
+        job = args.job;
+        return new Promise((resolve) => (finishAudio = resolve));
+      }
+      return Promise.resolve("idle");
+    });
+    renderPlayer();
+    await click(await screen.findByRole("button", { name: /Dinle/ }));
+    await waitFor(() =>
+      expect(globalTestEventListeners["briefing-progress"]?.length).toBe(1),
+    );
+    const emit = (event: string, payload: unknown) =>
+      act(() => {
+        globalTestEventListeners[event].forEach((cb) => cb({ payload }));
+      });
+    const bar = () => screen.getByRole("progressbar");
+
+    emit("briefing-progress", { percent: 50 });
+    expect(bar()).toHaveAttribute("aria-valuenow", "38");
+    expect(screen.getByText(/· Metin yazılıyor/)).toBeInTheDocument();
+
+    await act(async () => finishScript(SCRIPT));
+    await waitFor(() => expect(job).toBeGreaterThan(0));
+    expect(bar()).toHaveAttribute("aria-valuenow", "75");
+    expect(screen.getByText(/· Ses oluşturuluyor/)).toBeInTheDocument();
+
+    // Another render's progress does not move the bar.
+    emit("neural-voice-progress", { job: job + 99, fraction: 0.9 });
+    expect(bar()).toHaveAttribute("aria-valuenow", "75");
+    emit("neural-voice-progress", { job, fraction: 0.5 });
+    expect(bar()).toHaveAttribute("aria-valuenow", "88");
+    expect(screen.getByRole("button", { name: /Dinle/ })).toBeDisabled();
+
+    await act(async () => finishAudio(new ArrayBuffer(8)));
+    expect(screen.getByText(/Okunuyor…/)).toBeInTheDocument();
+    expect(FakeAudio.last!.play).toHaveBeenCalled();
   });
 
   it("moves on when a section ends and stops after the last", async () => {
