@@ -3,6 +3,9 @@
 //! "Sonic Ball" → "SonicWall" with Apple dictation. A built-in list of 50
 //! generic terms did not help at all (longer lists dilute the bias), so there
 //! is no default list: short and specific works.
+//!
+//! A line may also say how the term is read aloud by the briefing voice:
+//! `SonicWall = Sonik Vol`. The recognizer only sees the term.
 
 use crate::storage::get_storage_dir;
 use std::collections::HashSet;
@@ -16,17 +19,33 @@ fn user_file() -> PathBuf {
     get_storage_dir().join("glossary.txt")
 }
 
-/// One term per line: trimmed, non-empty, de-duplicated (case-insensitive),
-/// length- and count-bounded.
+/// `term` or `term = spoken form`, both trimmed; `None` when unusable.
+fn entry(line: &str) -> Option<(String, Option<String>)> {
+    let (term, spoken) = match line.split_once('=') {
+        Some((t, s)) => (t.trim(), Some(s.trim()).filter(|s| !s.is_empty())),
+        None => (line.trim(), None),
+    };
+    let fits = |s: &str| s.chars().count() <= MAX_TERM_CHARS;
+    if term.is_empty() || !fits(term) || spoken.is_some_and(|s| !fits(s)) {
+        return None;
+    }
+    Some((term.to_string(), spoken.map(String::from)))
+}
+
+/// One entry per line: trimmed, non-empty, de-duplicated by term
+/// (case-insensitive), length- and count-bounded; `term = spoken` lines are
+/// written back as exactly that.
 pub fn normalize(lines: &str) -> Vec<String> {
     let mut seen = HashSet::new();
     lines
         .lines()
-        .map(str::trim)
-        .filter(|t| !t.is_empty() && t.chars().count() <= MAX_TERM_CHARS)
-        .filter(|t| seen.insert(t.to_lowercase()))
+        .filter_map(entry)
+        .filter(|(t, _)| seen.insert(t.to_lowercase()))
         .take(MAX_USER_TERMS)
-        .map(String::from)
+        .map(|(t, s)| match s {
+            Some(s) => format!("{t} = {s}"),
+            None => t,
+        })
         .collect()
 }
 
@@ -36,15 +55,32 @@ fn read_user_terms(path: &Path) -> Vec<String> {
         .unwrap_or_default()
 }
 
-/// All terms to hand to the recognizer.
+/// All terms to hand to the recognizer (without the spoken forms).
 pub fn terms() -> Vec<String> {
+    term_names(read_user_terms(&user_file()))
+}
+
+fn term_names(lines: Vec<String>) -> Vec<String> {
+    lines
+        .iter()
+        .filter_map(|l| entry(l))
+        .map(|(t, _)| t)
+        .collect()
+}
+
+/// (term, spoken form) for the lines that give one, for the briefing voice.
+pub fn pronunciations() -> Vec<(String, String)> {
     read_user_terms(&user_file())
+        .iter()
+        .filter_map(|l| entry(l))
+        .filter_map(|(t, s)| Some((t, s?)))
+        .collect()
 }
 
 /// The user's terms as a short comma list for Whisper's initial prompt
 /// (its context is small, so at most `max_chars`); `None` when empty.
 pub fn whisper_hint(max_chars: usize) -> Option<String> {
-    hint_from(read_user_terms(&user_file()), max_chars)
+    hint_from(terms(), max_chars)
 }
 
 fn hint_from(terms: Vec<String>, max_chars: usize) -> Option<String> {
@@ -100,6 +136,22 @@ mod tests {
             .map(|i| format!("t{i}\n"))
             .collect();
         assert_eq!(normalize(&many).len(), MAX_USER_TERMS);
+    }
+
+    #[test]
+    fn lines_may_carry_a_spoken_form() {
+        let lines =
+            normalize("SonicWall=Sonik Vol\n  Jira =  cira \njira = jira\nAcme =\nx = \n= yok");
+        assert_eq!(
+            lines,
+            vec!["SonicWall = Sonik Vol", "Jira = cira", "Acme", "x"]
+        );
+        assert_eq!(
+            term_names(lines.clone()),
+            vec!["SonicWall", "Jira", "Acme", "x"]
+        );
+        let too_long = format!("Acme = {}", "y".repeat(MAX_TERM_CHARS + 1));
+        assert!(normalize(&too_long).is_empty());
     }
 
     #[test]

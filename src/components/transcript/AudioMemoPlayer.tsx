@@ -11,6 +11,7 @@ import {
   Volume2,
 } from "lucide-react";
 import { useI18n, translatorFor } from "../../locales/i18nContext";
+import { useNeuralVoice } from "../../hooks/useNeuralVoice";
 import { SummaryResult } from "../TranscriptViewer";
 
 interface AudioMemoPlayerProps {
@@ -28,12 +29,23 @@ interface TtsAvailability {
 export interface BriefingSection {
   title: string;
   text: string;
+  /** Words the script writer marked as English (for the Turkish voice). */
+  foreign?: string[];
 }
 
 type Status = "idle" | "preparing" | "speaking" | "paused";
 type Length = "short" | "standard";
 
 const SPEEDS = [1, 1.25, 1.5];
+/** Share of the preparation bar for writing the script when a neural voice
+ * then renders the first section (the rest is the rendering). */
+const SCRIPT_SHARE = 0.75;
+
+interface Prep {
+  step: "script" | "voice";
+  /** Share of this step done (0..1). */
+  fraction: number;
+}
 
 const filled = (items?: string[]) =>
   (items || []).map((s) => s.trim()).filter(Boolean);
@@ -113,14 +125,26 @@ export const AudioMemoPlayer: React.FC<AudioMemoPlayerProps> = ({
   const [current, setCurrent] = useState(0);
   // Share of the current section read so far (0…1).
   const [sectionProgress, setSectionProgress] = useState(0);
-  const [prepPercent, setPrepPercent] = useState(0);
+  const [prep, setPrep] = useState<Prep>({ step: "script", fraction: 0 });
   const [voice, setVoice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // The on-device neural Turkish voice is installed (falls back to the
+  // system voice for other languages or if it fails).
+  const [neural, setNeural] = useState(false);
 
   // The engine's end-of-reading event needs the latest values.
-  const live = useRef({ sections, current, rate, status });
-  live.current = { sections, current, rate, status };
+  const live = useRef({ sections, current, rate, status, neural });
+  live.current = { sections, current, rate, status, neural };
   const started = useRef(false);
+  const advanceRef = useRef<() => void>(() => {});
+  const voiceEngine = useNeuralVoice(langCode, {
+    onEnded: () => advanceRef.current(),
+    onProgress: setSectionProgress,
+    onRenderProgress: (fraction) => {
+      if (live.current.status === "preparing")
+        setPrep({ step: "voice", fraction });
+    },
+  });
 
   const template = useMemo(
     () => buildMemoText(summary, meetingTitle, langCode),
@@ -135,6 +159,13 @@ export const AudioMemoPlayer: React.FC<AudioMemoPlayerProps> = ({
       })
       .catch(() => {
         if (!cancelled) setAvailability({ supported: false, voice: null });
+      });
+    call<boolean>("neural_voice_available", { lang: langCode })
+      .then((ok) => {
+        if (!cancelled) setNeural(ok === true);
+      })
+      .catch(() => {
+        if (!cancelled) setNeural(false);
       });
     return () => {
       cancelled = true;
@@ -153,7 +184,27 @@ export const AudioMemoPlayer: React.FC<AudioMemoPlayerProps> = ({
     list: BriefingSection[],
     index: number,
     speed: number,
-  ) => {
+  ): Promise<void> => {
+    if (live.current.neural) {
+      try {
+        await voiceEngine.play(list, index, speed);
+        started.current = true;
+        setVoice(t("summary.audioMemo.neuralVoice"));
+        setCurrent(index);
+        setSectionProgress(0);
+        setStatus("speaking");
+        return;
+      } catch (err) {
+        // The neural voice failed: say so and use the system voice instead.
+        setNeural(false);
+        live.current.neural = false;
+        setError(
+          t("summary.audioMemo.neuralFailed", {
+            error: err instanceof Error ? err.message : String(err),
+          }),
+        );
+      }
+    }
     try {
       const used = await call<string>("tts_speak", {
         text: list[index].text,
@@ -173,20 +224,24 @@ export const AudioMemoPlayer: React.FC<AudioMemoPlayerProps> = ({
   };
 
   // Next section when one ends on its own; idle after the last.
+  advanceRef.current = () => {
+    const { sections: list, current: index, rate: speed } = live.current;
+    if (list && index + 1 < list.length && started.current) {
+      speakSection(list, index + 1, speed);
+    } else {
+      started.current = false;
+      setStatus("idle");
+      setCurrent(0);
+    }
+  };
+
   useEffect(() => {
     let unlisten: (() => void) | undefined;
     let cancelled = false;
     (async () => {
       unlisten = await listen<{ state: string }>("tts-state", (event) => {
-        if (event.payload.state !== "idle") return;
-        const { sections: list, current: index, rate: speed } = live.current;
-        if (list && index + 1 < list.length && started.current) {
-          speakSection(list, index + 1, speed);
-        } else {
-          started.current = false;
-          setStatus("idle");
-          setCurrent(0);
-        }
+        if (event.payload.state !== "idle" || live.current.neural) return;
+        advanceRef.current();
       });
       if (cancelled) unlisten();
     })();
@@ -203,7 +258,8 @@ export const AudioMemoPlayer: React.FC<AudioMemoPlayerProps> = ({
     (async () => {
       unlisten = await listen<{ percent: number }>(
         "briefing-progress",
-        (event) => setPrepPercent(Math.round(event.payload.percent)),
+        (event) =>
+          setPrep({ step: "script", fraction: event.payload.percent / 100 }),
       );
       if (cancelled) unlisten();
     })();
@@ -213,9 +269,10 @@ export const AudioMemoPlayer: React.FC<AudioMemoPlayerProps> = ({
     };
   }, []);
 
-  // Where the voice is in the current section, for the progress bar.
+  // Where the system voice is in the current section, for the progress bar
+  // (the neural voice reports it from its <audio> element).
   useEffect(() => {
-    if (status !== "speaking") return;
+    if (status !== "speaking" || neural) return;
     const timer = setInterval(() => {
       call<number>("tts_progress")
         .then((p) => {
@@ -224,7 +281,7 @@ export const AudioMemoPlayer: React.FC<AudioMemoPlayerProps> = ({
         .catch(() => {});
     }, 300);
     return () => clearInterval(timer);
-  }, [status, current]);
+  }, [status, current, neural]);
 
   // A new report, language or length needs a new script; never keep reading
   // the old one.
@@ -233,21 +290,20 @@ export const AudioMemoPlayer: React.FC<AudioMemoPlayerProps> = ({
     setFromTemplate(false);
     setCurrent(0);
     return () => {
+      voiceEngine.reset();
       if (started.current) {
         started.current = false;
         setStatus("idle");
         call("tts_stop").catch(() => {});
       }
     };
+    // voiceEngine is stable for a language; this runs for content changes.
   }, [template, langCode, length]);
 
-  if (!availability || !availability.supported) return null;
+  if (!neural && (!availability || !availability.supported)) return null;
 
   const prepare = async (): Promise<BriefingSection[] | null> => {
     if (sections) return sections;
-    setStatus("preparing");
-    setPrepPercent(0);
-    setError(null);
     let list: BriefingSection[];
     try {
       list = await call<BriefingSection[]>("generate_briefing", {
@@ -271,13 +327,25 @@ export const AudioMemoPlayer: React.FC<AudioMemoPlayerProps> = ({
 
   const handlePlayPause = async () => {
     if (status === "idle") {
+      // One wait, one bar: writing the script, then the first section's audio.
       setError(null);
+      setStatus("preparing");
+      live.current.status = "preparing";
+      setPrep({ step: sections ? "voice" : "script", fraction: 0 });
       const list = await prepare();
-      if (list) await speakSection(list, 0, rate);
+      if (!list) return;
+      if (live.current.neural) setPrep({ step: "voice", fraction: 0 });
+      await speakSection(list, 0, rate);
       return;
     }
     if (status === "preparing") return;
     try {
+      if (neural) {
+        if (status === "speaking") voiceEngine.pause();
+        else await voiceEngine.resume();
+        setStatus(status === "speaking" ? "paused" : "speaking");
+        return;
+      }
       const next = await call<Status>(
         status === "speaking" ? "tts_pause" : "tts_resume",
       );
@@ -291,14 +359,19 @@ export const AudioMemoPlayer: React.FC<AudioMemoPlayerProps> = ({
     started.current = false;
     setStatus("idle");
     setCurrent(0);
-    await call("tts_stop").catch(() => {});
+    voiceEngine.stop();
+    if (!neural) await call("tts_stop").catch(() => {});
   };
 
-  // A new speed applies from the start of the current section: the system
-  // voices can't change pace mid-sentence.
+  // The neural voice changes pace at once; the system voices can't change
+  // pace mid-sentence, so their current section starts over.
   const handleSpeed = async () => {
     const next = SPEEDS[(SPEEDS.indexOf(rate) + 1) % SPEEDS.length];
     setRate(next);
+    if (neural) {
+      voiceEngine.setRate(next);
+      return;
+    }
     if ((status === "speaking" || status === "paused") && sections)
       await speakSection(sections, current, next);
   };
@@ -307,7 +380,7 @@ export const AudioMemoPlayer: React.FC<AudioMemoPlayerProps> = ({
     if (sections && status !== "preparing") speakSection(sections, index, rate);
   };
 
-  const noVoice = !availability.voice;
+  const noVoice = !neural && !availability?.voice;
   const notice = !template
     ? t("summary.audioMemo.noReport")
     : noVoice
@@ -325,9 +398,23 @@ export const AudioMemoPlayer: React.FC<AudioMemoPlayerProps> = ({
     (lengths[current] || 0) * sectionProgress;
   const overall = Math.round((doneChars / totalChars) * 100);
 
+  // Writing and rendering on one scale; without a neural voice the script is
+  // the whole wait (the system voice starts at once).
+  const scriptShare = neural ? SCRIPT_SHARE : 1;
+  const prepPercent = Math.round(
+    100 *
+      (prep.step === "script"
+        ? prep.fraction * scriptShare
+        : scriptShare + prep.fraction * (1 - scriptShare)),
+  );
+
   const statusLine =
     status === "preparing"
-      ? t("summary.audioMemo.preparing", { percent: prepPercent })
+      ? `${t("summary.audioMemo.preparing", { percent: prepPercent })} · ${t(
+          prep.step === "script"
+            ? "summary.audioMemo.stepScript"
+            : "summary.audioMemo.stepVoice",
+        )}`
       : status === "speaking"
         ? t("summary.audioMemo.playing")
         : status === "paused"
@@ -445,6 +532,9 @@ export const AudioMemoPlayer: React.FC<AudioMemoPlayerProps> = ({
         <div
           className="h-1 rounded-full bg-slate-800 overflow-hidden"
           role="progressbar"
+          aria-label={t("summary.audioMemo.preparing", {
+            percent: prepPercent,
+          })}
           aria-valuenow={prepPercent}
           aria-valuemin={0}
           aria-valuemax={100}

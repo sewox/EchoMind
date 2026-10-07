@@ -364,7 +364,9 @@ describe("AudioMemoPlayer", () => {
         cb({ payload: { percent: 41.6 } }),
       );
     });
-    expect(screen.getByText("Bülten hazırlanıyor… %42")).toBeInTheDocument();
+    expect(
+      screen.getByText("Bülten hazırlanıyor… %42 · Metin yazılıyor"),
+    ).toBeInTheDocument();
     expect(screen.getByRole("progressbar")).toHaveAttribute(
       "aria-valuenow",
       "42",
@@ -425,5 +427,206 @@ describe("AudioMemoPlayer", () => {
     );
     await click(screen.getByRole("button", { name: "Durdur" }));
     expect(screen.queryByTestId("audio-memo-progress")).not.toBeInTheDocument();
+  });
+});
+
+class FakeAudio {
+  static last: FakeAudio | null = null;
+  src = "";
+  playbackRate = 1;
+  currentTime = 0;
+  duration = 0;
+  play = vi.fn(() => Promise.resolve());
+  pause = vi.fn();
+  private listeners: Record<string, (() => void)[]> = {};
+  constructor() {
+    FakeAudio.last = this;
+  }
+  addEventListener(type: string, cb: () => void) {
+    (this.listeners[type] ||= []).push(cb);
+  }
+  fire(type: string) {
+    (this.listeners[type] || []).forEach((cb) => cb());
+  }
+}
+
+describe("AudioMemoPlayer with the neural voice", () => {
+  const renders: string[] = [];
+
+  const neuralBackend = (
+    render: () => Promise<unknown> = () => Promise.resolve(new ArrayBuffer(8)),
+  ) =>
+    (invoke as any).mockImplementation((cmd: string, args: any) => {
+      if (cmd === "tts_availability")
+        return Promise.resolve({ supported: true, voice: "Yelda" });
+      if (cmd === "neural_voice_available") return Promise.resolve(true);
+      if (cmd === "generate_briefing")
+        return Promise.resolve(
+          SCRIPT.map((s, i) => ({ ...s, foreign: i ? [] : ["deadline"] })),
+        );
+      if (cmd === "neural_voice_render") {
+        renders.push(args.text);
+        return render();
+      }
+      if (cmd === "tts_speak") return Promise.resolve("Yelda");
+      return Promise.resolve("idle");
+    });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    renders.length = 0;
+    FakeAudio.last = null;
+    (globalThis as any).Audio = FakeAudio;
+    let n = 0;
+    (URL as any).createObjectURL = vi.fn(() => `blob:${++n}`);
+    (URL as any).revokeObjectURL = vi.fn();
+    delete globalTestEventListeners["tts-state"];
+  });
+
+  it("plays the script with the neural voice and prepares the next section", async () => {
+    neuralBackend();
+    renderPlayer();
+    await click(await screen.findByRole("button", { name: /Dinle/ }));
+    expect(invoke).toHaveBeenCalledWith("neural_voice_render", {
+      text: "Sürüm planlandı.",
+      lang: "tr",
+      foreign: ["deadline"],
+      voice: "af_heart",
+      job: expect.any(Number),
+    });
+    expect(invoke).not.toHaveBeenCalledWith("tts_speak", expect.anything());
+    expect(FakeAudio.last!.play).toHaveBeenCalled();
+    expect(FakeAudio.last!.src).toBe("blob:1");
+    expect(
+      screen.getByText(/Doğal Türkçe ses \(cihazda\)/),
+    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(renders).toEqual(["Sürüm planlandı.", "Sercan notları yazacak."]),
+    );
+  });
+
+  it("shows writing and rendering as one progress bar", async () => {
+    let finishScript: (v: unknown) => void = () => {};
+    let finishAudio: (v: unknown) => void = () => {};
+    let job = 0;
+    (invoke as any).mockImplementation((cmd: string, args: any) => {
+      if (cmd === "tts_availability")
+        return Promise.resolve({ supported: true, voice: "Yelda" });
+      if (cmd === "neural_voice_available") return Promise.resolve(true);
+      if (cmd === "generate_briefing")
+        return new Promise((resolve) => (finishScript = resolve));
+      if (cmd === "neural_voice_render") {
+        if (job) return new Promise(() => {}); // the prefetched next section
+        job = args.job;
+        return new Promise((resolve) => (finishAudio = resolve));
+      }
+      return Promise.resolve("idle");
+    });
+    renderPlayer();
+    await click(await screen.findByRole("button", { name: /Dinle/ }));
+    await waitFor(() =>
+      expect(globalTestEventListeners["briefing-progress"]?.length).toBe(1),
+    );
+    const emit = (event: string, payload: unknown) =>
+      act(() => {
+        globalTestEventListeners[event].forEach((cb) => cb({ payload }));
+      });
+    const bar = () => screen.getByRole("progressbar");
+
+    emit("briefing-progress", { percent: 50 });
+    expect(bar()).toHaveAttribute("aria-valuenow", "38");
+    expect(screen.getByText(/· Metin yazılıyor/)).toBeInTheDocument();
+
+    await act(async () => finishScript(SCRIPT));
+    await waitFor(() => expect(job).toBeGreaterThan(0));
+    expect(bar()).toHaveAttribute("aria-valuenow", "75");
+    expect(screen.getByText(/· Ses oluşturuluyor/)).toBeInTheDocument();
+
+    // Another render's progress does not move the bar.
+    emit("neural-voice-progress", { job: job + 99, fraction: 0.9 });
+    expect(bar()).toHaveAttribute("aria-valuenow", "75");
+    emit("neural-voice-progress", { job, fraction: 0.5 });
+    expect(bar()).toHaveAttribute("aria-valuenow", "88");
+    expect(screen.getByRole("button", { name: /Dinle/ })).toBeDisabled();
+
+    await act(async () => finishAudio(new ArrayBuffer(8)));
+    expect(screen.getByText(/Okunuyor…/)).toBeInTheDocument();
+    expect(FakeAudio.last!.play).toHaveBeenCalled();
+  });
+
+  it("moves on when a section ends and stops after the last", async () => {
+    neuralBackend();
+    renderPlayer();
+    await click(await screen.findByRole("button", { name: /Dinle/ }));
+    await act(async () => FakeAudio.last!.fire("ended"));
+    expect(FakeAudio.last!.src).toBe("blob:2");
+    expect(
+      screen.getByRole("button", { name: /2\.\s*Görevler/ }),
+    ).toHaveAttribute("aria-current", "step");
+    await act(async () => FakeAudio.last!.fire("ended"));
+    expect(screen.getByText(/Rapor özetini/)).toBeInTheDocument();
+  });
+
+  it("changes speed at once, pauses and resumes the audio", async () => {
+    neuralBackend();
+    renderPlayer();
+    await click(await screen.findByRole("button", { name: /Dinle/ }));
+    await click(screen.getByRole("button", { name: "Hız: 1x" }));
+    expect(FakeAudio.last!.playbackRate).toBe(1.25);
+    expect(renders.filter((r) => r === "Sürüm planlandı.")).toHaveLength(1);
+
+    await click(screen.getByRole("button", { name: /Duraklat/ }));
+    expect(FakeAudio.last!.pause).toHaveBeenCalled();
+    expect(screen.getByText("Duraklatıldı")).toBeInTheDocument();
+    await click(screen.getByRole("button", { name: /Devam et/ }));
+    expect(FakeAudio.last!.play).toHaveBeenCalledTimes(2);
+
+    await click(screen.getByRole("button", { name: "Durdur" }));
+    expect(invoke).not.toHaveBeenCalledWith("tts_stop");
+  });
+
+  it("shows where the audio is", async () => {
+    neuralBackend();
+    renderPlayer();
+    await click(await screen.findByRole("button", { name: /Dinle/ }));
+    const a = FakeAudio.last!;
+    a.duration = 10;
+    a.currentTime = 5;
+    act(() => a.fire("timeupdate"));
+    expect(
+      screen.getByRole("progressbar", { name: "Bültenin okunan kısmı" }),
+    ).toHaveAttribute("aria-valuenow", "21");
+  });
+
+  it("falls back to the system voice when the neural voice fails", async () => {
+    neuralBackend(() => Promise.reject("model missing"));
+    renderPlayer();
+    await click(await screen.findByRole("button", { name: /Dinle/ }));
+    expect(invoke).toHaveBeenCalledWith(
+      "tts_speak",
+      expect.objectContaining({ text: "Sürüm planlandı." }),
+    );
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Doğal ses başlatılamadı, sistem sesine geçildi: model missing",
+    );
+  });
+
+  it("frees the rendered audio when it goes away", async () => {
+    neuralBackend();
+    const { unmount } = renderPlayer();
+    await click(await screen.findByRole("button", { name: /Dinle/ }));
+    unmount();
+    await waitFor(() => expect(URL.revokeObjectURL).toHaveBeenCalled());
+  });
+
+  it("shows on a system without voices when the neural voice is there", async () => {
+    (invoke as any).mockImplementation((cmd: string) => {
+      if (cmd === "tts_availability")
+        return Promise.resolve({ supported: false, voice: null });
+      if (cmd === "neural_voice_available") return Promise.resolve(true);
+      return Promise.resolve("idle");
+    });
+    renderPlayer();
+    expect(await screen.findByRole("button", { name: /Dinle/ })).toBeEnabled();
   });
 });

@@ -15,6 +15,7 @@ pub mod import_progress;
 pub mod importer;
 pub mod local_llm;
 pub mod mic_activity;
+pub mod neural_tts;
 pub mod offline_engines;
 pub mod player;
 pub mod qa_e2e_tests;
@@ -91,6 +92,11 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![
             local_llm::briefing::generate_briefing,
+            neural_tts::neural_voice_available,
+            neural_tts::neural_voice_render,
+            neural_tts::catalog::get_voice_packs,
+            neural_tts::catalog::download_voice_pack,
+            neural_tts::catalog::delete_voice_pack,
             tts::tts_availability,
             tts::tts_speak,
             tts::tts_stop,

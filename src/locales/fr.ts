@@ -44,6 +44,21 @@ export const fr: TranslationKeys = {
     modelHub: "Modèles",
     language: "Langue",
   },
+  voicePacks: {
+    title: "Voix naturelles (briefing audio)",
+    desc: "Lit le briefing sur votre ordinateur, hors ligne, avec une voix naturelle. Des packs existent pour le turc et l’anglais ; les autres langues utilisent la voix du système.",
+    turkish: "Voix turque",
+    english: "Voix anglaise",
+    installed: "Installé",
+    delete: "Supprimer le pack de voix",
+    download: "Télécharger ({size} Mo)",
+    downloading: "Téléchargement… {percent} %",
+    error: "Échec du téléchargement : {error}",
+    soon: "Bientôt disponible",
+    voice: "Voix anglaise",
+    af_heart: "Heart · américaine, féminine",
+    bf_emma: "Emma · britannique, féminine",
+  },
   localLlm: {
     title: "Modèle de rapport (sur l'appareil)",
     desc: "Les comptes rendus, tâches, décisions et e-mails de suivi sont rédigés par ce modèle sur votre ordinateur ; les données ne quittent pas l'appareil.",
@@ -188,9 +203,14 @@ export const fr: TranslationKeys = {
   },
   summary: {
     audioMemo: {
+      neuralVoice: "Voix turque naturelle (sur l’appareil)",
+      neuralFailed:
+        "La voix naturelle n’a pas pu démarrer ; voix du système utilisée : {error}",
       progress: "Progression du briefing",
       section: "Section {current}/{total}",
       preparing: "Préparation du briefing… {percent} %",
+      stepScript: "Rédaction du texte",
+      stepVoice: "Création de l’audio",
       length: "Durée du briefing",
       short: "Briefing court (environ 1 minute)",
       standard: "Briefing standard (environ 3 minutes)",

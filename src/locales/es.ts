@@ -44,6 +44,21 @@ export const es: TranslationKeys = {
     modelHub: "Modelos",
     language: "Idioma",
   },
+  voicePacks: {
+    title: "Voces naturales (resumen en audio)",
+    desc: "Lee el resumen en tu equipo, sin conexión, con una voz natural. Hay paquetes para turco e inglés; los demás idiomas usan la voz del sistema.",
+    turkish: "Voz turca",
+    english: "Voz inglesa",
+    installed: "Instalado",
+    delete: "Eliminar paquete de voz",
+    download: "Descargar ({size} MB)",
+    downloading: "Descargando… {percent} %",
+    error: "No se pudo descargar: {error}",
+    soon: "Disponible pronto",
+    voice: "Voz inglesa",
+    af_heart: "Heart · estadounidense, femenina",
+    bf_emma: "Emma · británica, femenina",
+  },
   localLlm: {
     title: "Modelo de informes (en el dispositivo)",
     desc: "Los informes, tareas, decisiones y correos de seguimiento los redacta este modelo en tu ordenador; los datos no salen del dispositivo.",
@@ -191,9 +206,14 @@ export const es: TranslationKeys = {
   },
   summary: {
     audioMemo: {
+      neuralVoice: "Voz turca natural (en el dispositivo)",
+      neuralFailed:
+        "No se pudo iniciar la voz natural; se usa la voz del sistema: {error}",
       progress: "Progreso del resumen",
       section: "Sección {current}/{total}",
       preparing: "Preparando el resumen… {percent} %",
+      stepScript: "Escribiendo el texto",
+      stepVoice: "Creando el audio",
       length: "Duración del resumen",
       short: "Resumen corto (alrededor de 1 minuto)",
       standard: "Resumen estándar (alrededor de 3 minutos)",
