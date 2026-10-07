@@ -191,6 +191,8 @@ export const tr: TranslationKeys = {
   },
   summary: {
     audioMemo: {
+      neuralVoice: "Doğal Türkçe ses (cihazda)",
+      neuralFailed: "Doğal ses başlatılamadı, sistem sesine geçildi: {error}",
       progress: "Bültenin okunan kısmı",
       section: "Bölüm {current}/{total}",
       preparing: "Bülten hazırlanıyor… %{percent}",

@@ -63,6 +63,10 @@ rfd = "0.15"
 rodio = "0.19"
 reqwest = { version = "0.12", features = ["json", "blocking", "multipart"] }
 regex = "1.10"
+normalizer-tr = "0.4"
+unicode-normalization = "0.1"
+ndarray = "0.17"
+ort = { version = "=2.0.0-rc.13", default-features = false, features = ["ndarray", "download-binaries", "tls-rustls", "std"] }
 urlencoding = "2.1"
 chacha20poly1305 = "0.10"
 # keyring 3.x has NO default features: without an explicit platform backend it

@@ -191,6 +191,9 @@ export const es: TranslationKeys = {
   },
   summary: {
     audioMemo: {
+      neuralVoice: "Voz turca natural (en el dispositivo)",
+      neuralFailed:
+        "No se pudo iniciar la voz natural; se usa la voz del sistema: {error}",
       progress: "Progreso del resumen",
       section: "Sección {current}/{total}",
       preparing: "Preparando el resumen… {percent} %",

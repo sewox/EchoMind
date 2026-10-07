@@ -155,6 +155,8 @@ export interface TranslationKeys {
   };
   summary: {
     audioMemo?: {
+      neuralVoice: string;
+      neuralFailed: string;
       progress: string;
       section: string;
       preparing: string;

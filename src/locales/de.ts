@@ -189,6 +189,9 @@ export const de: TranslationKeys = {
   },
   summary: {
     audioMemo: {
+      neuralVoice: "Natürliche türkische Stimme (auf dem Gerät)",
+      neuralFailed:
+        "Die natürliche Stimme konnte nicht starten; Systemstimme wird verwendet: {error}",
       progress: "Fortschritt des Briefings",
       section: "Abschnitt {current}/{total}",
       preparing: "Briefing wird vorbereitet… {percent} %",
