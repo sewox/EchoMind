@@ -70,9 +70,8 @@ pub const KOKORO_EN: VoicePack = VoicePack {
     ],
 };
 
-/// Turkish: EMA Lightning (Apache-2.0), exported to ONNX by EchoMind. The
-/// exported files are published with the open-source export; until then the
-/// pack can only be installed by hand (download is not offered).
+/// Turkish: EMA Lightning (Apache-2.0), exported to ONNX by EchoMind and
+/// published with the export script in sewox/turkish-neural-tts (v0.1.0).
 pub const EMA_TR: VoicePack = VoicePack {
     key: "ema-tr",
     lang: "tr",
@@ -81,21 +80,21 @@ pub const EMA_TR: VoicePack = VoicePack {
     files: &[
         RemoteFile {
             rel: "text.onnx",
-            url: "",
+            url: "https://github.com/sewox/turkish-neural-tts/releases/download/v0.1.0/text.onnx",
             size: 4_804_278,
-            sha256: "",
+            sha256: "b832ac6d0a54f822a80765797053b315b31d73f8cfbdaf5347dd1865ff3c47a3",
         },
         RemoteFile {
             rel: "sound.onnx",
-            url: "",
+            url: "https://github.com/sewox/turkish-neural-tts/releases/download/v0.1.0/sound.onnx",
             size: 17_927_687,
-            sha256: "",
+            sha256: "679e6c0b35c8407b4c791031aab91383fde03690873f358b1813eee9951d881c",
         },
         RemoteFile {
             rel: "decoder.onnx",
-            url: "",
+            url: "https://github.com/sewox/turkish-neural-tts/releases/download/v0.1.0/decoder.onnx",
             size: 12_031_945,
-            sha256: "",
+            sha256: "396c06a8e5711fd40bfd2c3f4f33851feb2ad07a86485833844e0ae8ff637b17",
         },
     ],
 };
@@ -255,7 +254,7 @@ mod tests {
             }
         }
         assert!(downloadable(&KOKORO_EN));
-        assert!(!downloadable(&EMA_TR));
+        assert!(downloadable(&EMA_TR));
     }
 
     #[test]
@@ -273,8 +272,32 @@ mod tests {
 
     #[test]
     fn unpublished_pack_is_not_downloaded() {
-        assert!(download_pack(&EMA_TR, &|_| {})
+        const UNPUBLISHED: VoicePack = VoicePack {
+            key: "test",
+            lang: "xx",
+            name: "Test",
+            dir: "test-voice",
+            files: &[RemoteFile {
+                rel: "model.onnx",
+                url: "",
+                size: 1,
+                sha256: "",
+            }],
+        };
+        assert!(download_pack(&UNPUBLISHED, &|_| {})
             .unwrap_err()
             .contains("henüz"));
+    }
+
+    /// Network: `cargo test --lib ema_pack_downloads -- --ignored`.
+    #[test]
+    #[ignore]
+    fn ema_pack_downloads_from_the_release() {
+        let dir = std::env::temp_dir().join("echomind_ema_download_check");
+        let _ = std::fs::remove_dir_all(&dir);
+        for f in EMA_TR.files {
+            fetch(f.url, &dir.join(f.rel), f.size, f.sha256, &|_| {}).unwrap();
+        }
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

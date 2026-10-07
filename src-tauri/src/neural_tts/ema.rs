@@ -1,7 +1,7 @@
 //! EMA Lightning (Apache-2.0, 8.6M parameters): Turkish text in, 48 kHz audio out.
 //!
 //! Three ONNX graphs exported from the PyTorch model (see
-//! `docs/neural-tts.md`): the text stage (letters → features and durations),
+//! github.com/sewox/turkish-neural-tts): the text stage (letters → features and durations),
 //! the sound stage (four flow steps to 25 Hz latents) and the decoder
 //! (latents → audio). The bookkeeping between them, the word/frame timeline,
 //! is done here; it is a port of `ema_lightning/engine.py` and the timeline
