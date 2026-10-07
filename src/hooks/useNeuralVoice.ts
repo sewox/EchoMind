@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { englishVoice } from "./useVoicePacks";
 
 export interface NeuralSection {
   text: string;
@@ -29,13 +30,14 @@ export function useNeuralVoice(
 
   const render = useCallback(
     (section: NeuralSection): Promise<string> => {
-      const key = section.text;
+      const key = `${englishVoice()}\u0000${section.text}`;
       let url = urls.current.get(key);
       if (!url) {
         url = invoke<ArrayBuffer>("neural_voice_render", {
           text: section.text,
           lang,
           foreign: section.foreign ?? [],
+          voice: englishVoice(),
         }).then((bytes) =>
           URL.createObjectURL(new Blob([bytes], { type: "audio/wav" })),
         );

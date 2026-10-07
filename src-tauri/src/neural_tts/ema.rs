@@ -306,6 +306,11 @@ pub fn installed(dir: &Path) -> bool {
 
 /// 16-bit PCM WAV of mono 48 kHz samples.
 pub fn wav_bytes(samples: &[f32]) -> Vec<u8> {
+    wav_bytes_at(samples, SAMPLE_RATE)
+}
+
+/// 16-bit PCM WAV of mono samples at `rate`.
+pub fn wav_bytes_at(samples: &[f32], rate: u32) -> Vec<u8> {
     let data_len = (samples.len() * 2) as u32;
     let mut out = Vec::with_capacity(44 + data_len as usize);
     out.extend_from_slice(b"RIFF");
@@ -314,8 +319,8 @@ pub fn wav_bytes(samples: &[f32]) -> Vec<u8> {
     out.extend_from_slice(&16u32.to_le_bytes());
     out.extend_from_slice(&1u16.to_le_bytes());
     out.extend_from_slice(&1u16.to_le_bytes());
-    out.extend_from_slice(&SAMPLE_RATE.to_le_bytes());
-    out.extend_from_slice(&(SAMPLE_RATE * 2).to_le_bytes());
+    out.extend_from_slice(&rate.to_le_bytes());
+    out.extend_from_slice(&(rate * 2).to_le_bytes());
     out.extend_from_slice(&2u16.to_le_bytes());
     out.extend_from_slice(&16u16.to_le_bytes());
     out.extend_from_slice(b"data");

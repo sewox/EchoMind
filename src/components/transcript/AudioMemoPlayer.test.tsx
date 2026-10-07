@@ -489,6 +489,7 @@ describe("AudioMemoPlayer with the neural voice", () => {
       text: "Sürüm planlandı.",
       lang: "tr",
       foreign: ["deadline"],
+      voice: "af_heart",
     });
     expect(invoke).not.toHaveBeenCalledWith("tts_speak", expect.anything());
     expect(FakeAudio.last!.play).toHaveBeenCalled();

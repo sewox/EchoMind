@@ -39,6 +39,21 @@ export interface TranslationKeys {
     modelHub: string;
     language: string;
   };
+  voicePacks: {
+    title: string;
+    desc: string;
+    turkish: string;
+    english: string;
+    installed: string;
+    delete: string;
+    download: string;
+    downloading: string;
+    error: string;
+    soon: string;
+    voice: string;
+    af_heart: string;
+    bf_emma: string;
+  };
   localLlm: {
     title: string;
     desc: string;

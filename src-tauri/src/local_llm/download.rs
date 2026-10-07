@@ -84,11 +84,32 @@ fn download(model: &LlmModel, on_bytes: &dyn Fn(u64)) -> Result<(), String> {
     if catalog::is_installed(model) {
         return Ok(());
     }
-    let target = catalog::path(model);
+    fetch(
+        model.url,
+        &catalog::path(model),
+        model.size_bytes,
+        model.sha256,
+        on_bytes,
+    )
+}
+
+/// Downloads `url` to `target`, resuming a `<target>.part` left by an earlier
+/// try, and keeps it only when its size and SHA-256 match. `on_bytes` gets
+/// the bytes on disk every 8 MB and at the end.
+pub fn fetch(
+    url: &str,
+    target: &std::path::Path,
+    size_bytes: u64,
+    sha256: &str,
+    on_bytes: &dyn Fn(u64),
+) -> Result<(), String> {
     let dir = target.parent().ok_or("Model klasörü yok")?;
     std::fs::create_dir_all(dir).map_err(|e| format!("Model klasörü oluşturulamadı: {e}"))?;
-    let part = dir.join(format!("{}.part", model.filename));
-
+    let filename = target
+        .file_name()
+        .and_then(|f| f.to_str())
+        .ok_or("Dosya adı yok")?;
+    let part = dir.join(format!("{filename}.part"));
     // Resume a partial download; hash what is already there first.
     let mut hasher = Sha256::new();
     let mut have = 0u64;
@@ -103,18 +124,18 @@ fn download(model: &LlmModel, on_bytes: &dyn Fn(u64)) -> Result<(), String> {
             have += n as u64;
         }
     }
-    if have > model.size_bytes {
+    if have > size_bytes {
         let _ = std::fs::remove_file(&part);
         return Err("Yarım kalan indirme bozuk; yeniden deneyin.".into());
     }
 
-    if have < model.size_bytes {
+    if have < size_bytes {
         let client = reqwest::blocking::Client::builder()
             .connect_timeout(std::time::Duration::from_secs(30))
             .timeout(None)
             .build()
             .map_err(|e| e.to_string())?;
-        let mut req = client.get(model.url);
+        let mut req = client.get(url);
         if have > 0 {
             req = req.header(reqwest::header::RANGE, format!("bytes={have}-"));
         }
@@ -156,18 +177,18 @@ fn download(model: &LlmModel, on_bytes: &dyn Fn(u64)) -> Result<(), String> {
         out.flush().map_err(|e| e.to_string())?;
     }
 
-    if have != model.size_bytes {
+    if have != size_bytes {
         return Err(format!(
             "İndirme eksik kaldı ({have}/{} bayt); yeniden deneyin.",
-            model.size_bytes
+            size_bytes
         ));
     }
     let digest = format!("{:x}", hasher.finalize());
-    if digest != model.sha256 {
+    if digest != sha256 {
         let _ = std::fs::remove_file(&part);
         return Err("İndirilen dosya doğrulanamadı (SHA-256 uyuşmuyor).".into());
     }
-    std::fs::rename(&part, &target).map_err(|e| format!("Dosya taşınamadı: {e}"))?;
+    std::fs::rename(&part, target).map_err(|e| format!("Dosya taşınamadı: {e}"))?;
     on_bytes(have);
     Ok(())
 }

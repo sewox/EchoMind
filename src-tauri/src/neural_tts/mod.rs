@@ -1,38 +1,75 @@
-//! Neural Turkish voice (EMA Lightning, in-process via ONNX Runtime) for the
-//! audio briefing. Turkish only; other languages keep the system voices
-//! (src/tts.rs).
+//! Natural on-device voices for the audio briefing, in-process via ONNX
+//! Runtime: EMA Lightning for Turkish, Kokoro-82M for English. Other
+//! languages keep the system voices (src/tts.rs).
 //!
 //! The briefing is rendered one section at a time and played by the page, so
 //! the first section starts while the rest is still being made.
 
+pub mod catalog;
 pub mod ema;
+pub mod english;
 pub mod frontend;
+pub mod kokoro;
 pub mod pronounce;
 
-use std::path::PathBuf;
 use std::sync::Mutex;
 
-/// Where the three ONNX files live: `<models>/ema-lightning/`.
-pub fn model_dir() -> PathBuf {
-    crate::storage::get_models_dir().join("ema-lightning")
+/// Which voice engine reads `lang`, if any.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Engine {
+    Ema,
+    Kokoro,
 }
 
-/// The neural voice reads this language (Turkish only).
-pub fn speaks(lang: &str) -> bool {
-    lang.split(['-', '_'])
+pub fn engine_for(lang: &str) -> Option<Engine> {
+    match lang
+        .split(['-', '_'])
         .next()
-        .is_some_and(|l| l.eq_ignore_ascii_case("tr"))
+        .map(str::to_ascii_lowercase)
+        .as_deref()
+    {
+        Some("tr") => Some(Engine::Ema),
+        Some("en") => Some(Engine::Kokoro),
+        _ => None,
+    }
 }
 
-fn engine() -> &'static Mutex<Option<ema::Ema>> {
-    static ENGINE: Mutex<Option<ema::Ema>> = Mutex::new(None);
-    &ENGINE
+/// The Turkish voice reads this language.
+pub fn speaks(lang: &str) -> bool {
+    engine_for(lang) == Some(Engine::Ema)
 }
 
-/// The neural voice can read `lang` on this machine.
+fn installed(engine: Engine) -> bool {
+    match engine {
+        Engine::Ema => catalog::is_installed(&catalog::EMA_TR),
+        Engine::Kokoro => catalog::is_installed(&catalog::KOKORO_EN),
+    }
+}
+
+fn ema_engine() -> &'static Mutex<Option<ema::Ema>> {
+    static E: Mutex<Option<ema::Ema>> = Mutex::new(None);
+    &E
+}
+
+fn kokoro_engine() -> &'static Mutex<Option<kokoro::Kokoro>> {
+    static K: Mutex<Option<kokoro::Kokoro>> = Mutex::new(None);
+    &K
+}
+
+/// Drops loaded engines (before a pack is deleted).
+pub fn forget_engines() {
+    if let Ok(mut e) = ema_engine().lock() {
+        *e = None;
+    }
+    if let Ok(mut k) = kokoro_engine().lock() {
+        *k = None;
+    }
+}
+
+/// A natural voice can read `lang` on this machine.
 #[tauri::command]
 pub fn neural_voice_available(lang: String) -> bool {
-    speaks(&lang) && ema::installed(&model_dir())
+    engine_for(&lang).is_some_and(installed)
 }
 
 fn hints(foreign: &[String]) -> pronounce::Hints {
@@ -46,41 +83,74 @@ fn hints(foreign: &[String]) -> pronounce::Hints {
     }
 }
 
-fn render(text: &str, foreign: &[String]) -> Result<Vec<u8>, String> {
-    let mut guard = engine()
-        .lock()
-        .map_err(|_| "EMA: engine lock poisoned".to_string())?;
-    if guard.is_none() {
-        *guard = Some(ema::Ema::load(&model_dir())?);
-    }
-    let audio = guard.as_mut().expect("engine loaded").synthesize(
-        text,
-        &hints(foreign),
-        1.0,
-        None,
-        &|_| {},
-    )?;
-    Ok(ema::wav_bytes(&audio))
+fn poisoned<T>(_: T) -> String {
+    "voice engine lock poisoned".to_string()
 }
 
-/// One section of the briefing as a 48 kHz WAV (raw bytes to the page).
-/// `foreign`: words the script writer marked as English.
+fn render(
+    engine: Engine,
+    text: &str,
+    foreign: &[String],
+    voice: Option<&str>,
+) -> Result<Vec<u8>, String> {
+    match engine {
+        Engine::Ema => {
+            let mut guard = ema_engine().lock().map_err(poisoned)?;
+            if guard.is_none() {
+                *guard = Some(ema::Ema::load(&catalog::pack_dir(&catalog::EMA_TR))?);
+            }
+            let audio = guard.as_mut().expect("loaded").synthesize(
+                text,
+                &hints(foreign),
+                1.0,
+                None,
+                &|_| {},
+            )?;
+            Ok(ema::wav_bytes(&audio))
+        }
+        Engine::Kokoro => {
+            let mut guard = kokoro_engine().lock().map_err(poisoned)?;
+            if guard.is_none() {
+                *guard = Some(kokoro::Kokoro::load(&catalog::pack_dir(
+                    &catalog::KOKORO_EN,
+                ))?);
+            }
+            let voice = voice
+                .filter(|v| kokoro::VOICES.contains(v))
+                .unwrap_or(kokoro::VOICES[0]);
+            let audio = guard
+                .as_mut()
+                .expect("loaded")
+                .synthesize(text, voice, 1.0)?;
+            Ok(ema::wav_bytes_at(&audio, kokoro::SAMPLE_RATE))
+        }
+    }
+}
+
+/// One section of the briefing as a WAV (raw bytes to the page).
+/// `foreign`: words the script writer marked as English (Turkish voice);
+/// `voice`: the English voice (`af_heart`, `bf_emma`).
 #[tauri::command]
 pub async fn neural_voice_render(
     text: String,
     lang: String,
     foreign: Option<Vec<String>>,
+    voice: Option<String>,
 ) -> Result<tauri::ipc::Response, String> {
-    if !speaks(&lang) {
-        return Err("unsupported_language".into());
-    }
-    if !ema::installed(&model_dir()) {
+    let engine = engine_for(&lang).ok_or("unsupported_language")?;
+    if !installed(engine) {
         return Err("no_voice_model".into());
     }
-    let wav =
-        tauri::async_runtime::spawn_blocking(move || render(&text, &foreign.unwrap_or_default()))
-            .await
-            .map_err(|e| e.to_string())??;
+    let wav = tauri::async_runtime::spawn_blocking(move || {
+        render(
+            engine,
+            &text,
+            &foreign.unwrap_or_default(),
+            voice.as_deref(),
+        )
+    })
+    .await
+    .map_err(|e| e.to_string())??;
     Ok(tauri::ipc::Response::new(wav))
 }
 
@@ -89,12 +159,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn turkish_only() {
-        assert!(speaks("tr"));
-        assert!(speaks("tr-TR"));
-        assert!(speaks("TR_tr"));
-        assert!(!speaks("en"));
-        assert!(!speaks(""));
+    fn languages_pick_their_engine() {
+        assert_eq!(engine_for("tr"), Some(Engine::Ema));
+        assert_eq!(engine_for("tr-TR"), Some(Engine::Ema));
+        assert_eq!(engine_for("EN_us"), Some(Engine::Kokoro));
+        assert_eq!(engine_for("de"), None);
+        assert_eq!(engine_for(""), None);
+        assert!(speaks("tr") && !speaks("en"));
     }
 
     #[test]
@@ -109,5 +180,6 @@ mod tests {
         // Unit tests use an empty temporary models directory.
         assert!(!neural_voice_available("tr".into()));
         assert!(!neural_voice_available("en".into()));
+        assert!(!neural_voice_available("de".into()));
     }
 }
