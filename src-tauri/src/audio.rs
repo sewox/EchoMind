@@ -29,7 +29,9 @@ pub struct AudioState {
     pub sys_level: f32,
     pub is_speaking: bool,
     pub silence_counter: u32,
-    pub pcm_16k_buffer: Vec<f32>,
+    /// Microphone at 16 kHz, as 16-bit samples (like the FLAC it is saved
+    /// to): half the memory of f32, so long meetings fit in RAM.
+    pub pcm_16k_buffer: Vec<i16>,
     /// Index into `pcm_16k_buffer` of the next sample not yet consumed by live
     /// transcription. Live path advances this cursor; it must never clear or
     /// take the session persist buffer (that is exclusive to `claim_pcm_for_save`).
@@ -44,7 +46,10 @@ pub struct AudioState {
     pub session_saved: bool,
     /// System audio (remote participants) at 16 kHz, sample-aligned with
     /// `pcm_16k_buffer` from the start of the session.
-    pub sys_pcm_16k_buffer: Vec<f32>,
+    pub sys_pcm_16k_buffer: Vec<i16>,
+    /// The session reached [`MAX_RECORDING_SAMPLES`]: nothing more is
+    /// recorded and the recording is being stopped and saved.
+    pub limit_reached: bool,
     /// True once system audio has delivered samples this session.
     pub sys_capture_active: bool,
     /// True when the system-audio tap was successfully started for this
@@ -69,6 +74,7 @@ impl Default for AudioState {
             recording_session_id: 0,
             session_saved: false,
             sys_pcm_16k_buffer: Vec::new(),
+            limit_reached: false,
             sys_capture_active: false,
             sys_capture_started: false,
             mic_resampler: None,
@@ -77,12 +83,41 @@ impl Default for AudioState {
     }
 }
 
+/// Longest recording kept in one session (8 hours). At the limit the
+/// recording is stopped and saved; nothing already recorded is dropped.
+pub const MAX_RECORDING_SAMPLES: usize = 16000 * 3600 * 8;
+
+/// Event sent when a recording stops at [`MAX_RECORDING_SAMPLES`].
+pub const LIMIT_EVENT: &str = "recording-limit-reached";
+
+static APP: OnceLock<tauri::AppHandle> = OnceLock::new();
+
+/// Lets the capture thread stop a recording that reached its limit.
+pub fn init(app: tauri::AppHandle) {
+    let _ = APP.set(app);
+}
+
+/// The same conversion the FLAC encoder used before samples were kept as i16.
+pub fn sample_to_i16(s: f32) -> i16 {
+    (s.clamp(-1.0, 1.0) * 32767.0) as i16
+}
+
+pub fn sample_to_f32(s: i16) -> f32 {
+    s as f32 / 32767.0
+}
+
+pub fn pcm16_to_f32(samples: &[i16]) -> Vec<f32> {
+    samples.iter().map(|&s| sample_to_f32(s)).collect()
+}
+
 /// Microphone + system audio, sample-aligned (the mic is the timeline; system
 /// audio that hasn't arrived yet counts as silence).
-pub fn mix_channels(mic: &[f32], sys: &[f32]) -> Vec<f32> {
+pub fn mix_channels(mic: &[i16], sys: &[i16]) -> Vec<f32> {
     mic.iter()
         .enumerate()
-        .map(|(i, &m)| (m + sys.get(i).copied().unwrap_or(0.0)).clamp(-1.0, 1.0))
+        .map(|(i, &m)| {
+            (sample_to_f32(m) + sys.get(i).copied().map_or(0.0, sample_to_f32)).clamp(-1.0, 1.0)
+        })
         .collect()
 }
 
@@ -93,7 +128,7 @@ pub fn align_sys_buffer_to_mic(state: &mut AudioState) {
     let mic_len = state.pcm_16k_buffer.len();
     let sys_len = state.sys_pcm_16k_buffer.len();
     if sys_len < mic_len {
-        state.sys_pcm_16k_buffer.resize(mic_len, 0.0);
+        state.sys_pcm_16k_buffer.resize(mic_len, 0);
     }
 }
 
@@ -144,28 +179,23 @@ impl Default for GlobalAudioEngine {
 #[derive(Debug)]
 pub enum PcmClaim {
     /// First claim with audio worth persisting. `live_covered_samples` is how
-    /// much of `pcm` (from the start) live transcription already consumed, so
-    /// the save path can tell a partial live transcript from a complete one.
+    /// much of the recording (from the start) live transcription already
+    /// consumed, so the save path can tell a partial live transcript from a
+    /// complete one.
     Claimed {
         session_id: u64,
-        pcm: Vec<f32>,
+        /// Microphone, 16 kHz; the recording's timeline.
+        mic: Vec<i16>,
+        /// System audio (remote participants), sample-aligned with `mic`,
+        /// when it was captured.
+        system: Option<Vec<i16>>,
         live_covered_samples: usize,
-        /// Separate microphone / system-audio tracks when system audio was
-        /// captured (`pcm` is then their mix).
-        channels: Option<SessionChannels>,
     },
     /// First claim but buffer empty / too short — session marked saved so
     /// nothing retries; caller must not create a meeting or FLAC.
     NothingToSave { session_id: u64 },
     /// A prior claim already took this session (idempotent).
     AlreadySaved { session_id: u64 },
-}
-
-/// The two sides of a session, sample-aligned at 16 kHz.
-#[derive(Debug, Clone)]
-pub struct SessionChannels {
-    pub mic: Vec<f32>,
-    pub system: Vec<f32>,
 }
 
 /// Minimum PCM samples (~0.25s at 16 kHz) required to persist a meeting.
@@ -543,6 +573,7 @@ impl GlobalAudioEngine {
             state.recording_session_id = state.recording_session_id.wrapping_add(1).max(1);
             state.session_saved = false;
             state.sys_pcm_16k_buffer.clear();
+            state.limit_reached = false;
             state.sys_capture_active = false;
             state.sys_capture_started = false;
             state.mic_resampler = None;
@@ -876,7 +907,7 @@ impl GlobalAudioEngine {
     /// Persistence must use [`Self::claim_pcm_for_save`] so audio is taken once.
     pub fn get_pcm_buffer(&self) -> Vec<f32> {
         let state = self.state.lock().unwrap();
-        state.pcm_16k_buffer.clone()
+        pcm16_to_f32(&state.pcm_16k_buffer)
     }
 
     /// Minimum unread samples required before live transcription will consume
@@ -936,22 +967,17 @@ impl GlobalAudioEngine {
         if mic.len() < MIN_SAVE_PCM_SAMPLES {
             return PcmClaim::NothingToSave { session_id };
         }
-        let (pcm, channels) = if had_system {
+        let system = had_system.then(|| {
             let mut sys = sys;
             // Mic is the timeline: pad or trim so both tracks share length.
-            sys.resize(mic.len(), 0.0);
-            (
-                mix_channels(&mic, &sys),
-                Some(SessionChannels { mic, system: sys }),
-            )
-        } else {
-            (mic, None)
-        };
+            sys.resize(mic.len(), 0);
+            sys
+        });
         PcmClaim::Claimed {
             session_id,
-            pcm,
+            mic,
+            system,
             live_covered_samples,
-            channels,
         }
     }
 
@@ -959,7 +985,7 @@ impl GlobalAudioEngine {
     #[cfg(test)]
     pub fn inject_pcm_for_test(&self, samples: Vec<f32>, session_id: u64) {
         let mut state = self.state.lock().unwrap();
-        state.pcm_16k_buffer = samples;
+        state.pcm_16k_buffer = samples.into_iter().map(sample_to_i16).collect();
         state.live_transcribe_cursor = 0;
         state.recording_session_id = session_id;
         state.session_saved = false;
@@ -972,7 +998,7 @@ impl GlobalAudioEngine {
     #[cfg(test)]
     pub fn inject_sys_pcm_for_test(&self, samples: Vec<f32>) {
         let mut state = self.state.lock().unwrap();
-        state.sys_pcm_16k_buffer = samples;
+        state.sys_pcm_16k_buffer = samples.into_iter().map(sample_to_i16).collect();
         state.sys_capture_active = true;
         state.sys_capture_started = true;
     }
@@ -987,30 +1013,12 @@ impl GlobalAudioEngine {
     #[cfg(test)]
     pub fn append_pcm_for_test(&self, samples: &[f32]) {
         let mut state = self.state.lock().unwrap();
-        state.pcm_16k_buffer.extend_from_slice(samples);
+        state
+            .pcm_16k_buffer
+            .extend(samples.iter().map(|&s| sample_to_i16(s)));
         if state.sys_capture_started {
             align_sys_buffer_to_mic(&mut state);
         }
-    }
-
-    /// Test helper: simulate the 2-hour front-drain path.
-    #[cfg(test)]
-    pub fn force_front_drain_for_test(&self, overflow: usize) {
-        let mut state = self.state.lock().unwrap();
-        if overflow == 0 || state.pcm_16k_buffer.len() <= overflow {
-            return;
-        }
-        state.pcm_16k_buffer.drain(0..overflow);
-        let sys_overflow = overflow.min(state.sys_pcm_16k_buffer.len());
-        state.sys_pcm_16k_buffer.drain(0..sys_overflow);
-        if state.sys_capture_started {
-            align_sys_buffer_to_mic(&mut state);
-            let mic_len = state.pcm_16k_buffer.len();
-            if state.sys_pcm_16k_buffer.len() > mic_len {
-                state.sys_pcm_16k_buffer.truncate(mic_len);
-            }
-        }
-        state.live_transcribe_cursor = state.live_transcribe_cursor.saturating_sub(overflow);
     }
 }
 
@@ -1095,32 +1103,50 @@ fn process_audio_data(
         .unwrap()
         .process(&filtered_mono);
 
-    // Accumulate in 16kHz PCM buffer ONLY during active recording (up to 2 hours)
-    if state.is_recording {
-        state.pcm_16k_buffer.extend_from_slice(&resampled_pcm);
-        // System taps pause during silence — pad so the two tracks stay aligned.
-        if state.sys_capture_started {
-            align_sys_buffer_to_mic(&mut state);
-        }
-        const MAX_BUFFER_SAMPLES: usize = 16000 * 3600 * 2; // 2 hours buffer (115,200,000 samples)
-        if state.pcm_16k_buffer.len() > MAX_BUFFER_SAMPLES {
-            let overflow = state.pcm_16k_buffer.len() - MAX_BUFFER_SAMPLES;
-            state.pcm_16k_buffer.drain(0..overflow);
-            let sys_overflow = overflow.min(state.sys_pcm_16k_buffer.len());
-            state.sys_pcm_16k_buffer.drain(0..sys_overflow);
-            // Re-align after the shared front-drain so lengths stay matched.
-            if state.sys_capture_started {
-                align_sys_buffer_to_mic(&mut state);
-                let mic_len = state.pcm_16k_buffer.len();
-                if state.sys_pcm_16k_buffer.len() > mic_len {
-                    state.sys_pcm_16k_buffer.truncate(mic_len);
-                }
-            }
-            // Keep the live cursor aligned after a front-drain so it never
-            // points past the buffer or re-feeds already-dropped samples.
-            state.live_transcribe_cursor = state.live_transcribe_cursor.saturating_sub(overflow);
-        }
+    // Accumulate in the 16 kHz buffer only while recording, up to the limit.
+    if state.is_recording && !state.limit_reached {
+        append_recorded(&mut state, &resampled_pcm);
     }
+}
+
+/// Appends microphone samples to the session; at [`MAX_RECORDING_SAMPLES`]
+/// the recording is stopped and saved instead of dropping older audio.
+fn append_recorded(state: &mut AudioState, samples: &[f32]) {
+    append_up_to(state, samples, MAX_RECORDING_SAMPLES);
+}
+
+fn append_up_to(state: &mut AudioState, samples: &[f32], limit: usize) {
+    let room = limit.saturating_sub(state.pcm_16k_buffer.len());
+    let take = samples.len().min(room);
+    state
+        .pcm_16k_buffer
+        .extend(samples[..take].iter().map(|&s| sample_to_i16(s)));
+    // System taps pause during silence — pad so the two tracks stay aligned.
+    if state.sys_capture_started {
+        align_sys_buffer_to_mic(state);
+    }
+    if state.pcm_16k_buffer.len() >= limit {
+        state.limit_reached = true;
+        stop_at_limit();
+    }
+}
+
+/// Stops the recording from another thread (the capture callback holds the
+/// state lock) and asks the page to save it, as when a meeting app closes.
+fn stop_at_limit() {
+    eprintln!(
+        "⏹️ Kayıt {} saat sınırına ulaştı; durdurulup kaydediliyor.",
+        MAX_RECORDING_SAMPLES / 16000 / 3600
+    );
+    #[cfg(not(test))]
+    thread::spawn(|| {
+        use tauri::Emitter;
+        let _ = get_global_audio_engine().stop();
+        if let Some(app) = APP.get() {
+            let _ = app.emit(LIMIT_EVENT, MAX_RECORDING_SAMPLES / 16000);
+            let _ = app.emit("trigger-stop-recording", ());
+        }
+    });
 }
 
 // Audio Normalization & DSP Speech Enhancement:
@@ -1739,10 +1765,10 @@ mod tests {
 
         match engine.claim_pcm_for_save() {
             PcmClaim::Claimed {
-                session_id, pcm, ..
+                session_id, mic, ..
             } => {
                 assert_eq!(session_id, 7);
-                assert_eq!(pcm.len(), samples.len());
+                assert_eq!(mic.len(), samples.len());
             }
             other => panic!("expected Claimed, got {:?}", other),
         }
@@ -1779,15 +1805,15 @@ mod tests {
             let mut state = engine.state.lock().unwrap();
             state.recording_session_id = 2;
             state.session_saved = false;
-            state.pcm_16k_buffer = vec![0.3; 5000];
+            state.pcm_16k_buffer = vec![9830; 5000];
             state.live_transcribe_cursor = 0;
         }
         match engine.claim_pcm_for_save() {
             PcmClaim::Claimed {
-                session_id, pcm, ..
+                session_id, mic, ..
             } => {
                 assert_eq!(session_id, 2);
-                assert_eq!(pcm.len(), 5000);
+                assert_eq!(mic.len(), 5000);
             }
             other => panic!("expected Claimed, got {:?}", other),
         }
@@ -1816,11 +1842,11 @@ mod tests {
 
         match engine.claim_pcm_for_save() {
             PcmClaim::Claimed {
-                session_id, pcm, ..
+                session_id, mic, ..
             } => {
                 assert_eq!(session_id, 42);
                 assert_eq!(
-                    pcm.len(),
+                    mic.len(),
                     total_captured,
                     "claimed PCM must equal all captured samples after {N} live chunks"
                 );
@@ -1862,13 +1888,13 @@ mod tests {
         assert_eq!(engine.get_pcm_buffer().len(), total_samples);
 
         match engine.claim_pcm_for_save() {
-            PcmClaim::Claimed { pcm, .. } => {
-                let claimed_secs = pcm.len() as f64 / SAMPLE_RATE as f64;
+            PcmClaim::Claimed { mic, .. } => {
+                let claimed_secs = mic.len() as f64 / SAMPLE_RATE as f64;
                 assert!(
                     (claimed_secs - SESSION_SECS as f64).abs() < 1.0,
                     "claimed duration {claimed_secs:.2}s must be within 1s of {SESSION_SECS}s \
                      (got {} samples)",
-                    pcm.len()
+                    mic.len()
                 );
             }
             other => panic!("expected Claimed full session, got {:?}", other),
@@ -1902,19 +1928,30 @@ mod tests {
 
     #[test]
     fn test_mix_channels_pads_missing_sys_with_silence() {
-        let mic = vec![0.5, -0.5, 0.25];
-        let sys = vec![0.25];
-        let mixed = mix_channels(&mic, &sys);
+        let pcm = |v: &[f32]| v.iter().map(|&s| sample_to_i16(s)).collect::<Vec<_>>();
+        let mixed = mix_channels(&pcm(&[0.5, -0.5, 0.25]), &pcm(&[0.25]));
         assert_eq!(mixed.len(), 3);
-        assert!((mixed[0] - 0.75).abs() < 1e-6);
-        assert!((mixed[1] - (-0.5)).abs() < 1e-6);
-        assert!((mixed[2] - 0.25).abs() < 1e-6);
+        assert!((mixed[0] - 0.75).abs() < 1e-4);
+        assert!((mixed[1] - (-0.5)).abs() < 1e-4);
+        assert!((mixed[2] - 0.25).abs() < 1e-4);
     }
 
     #[test]
     fn test_mix_channels_clamps_to_unit_range() {
-        let mixed = mix_channels(&[0.8], &[0.8]);
+        let loud = sample_to_i16(0.8);
+        let mixed = mix_channels(&[loud], &[loud]);
         assert!((mixed[0] - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_samples_are_kept_as_16_bit_like_the_flac() {
+        assert_eq!(sample_to_i16(1.0), 32767);
+        assert_eq!(sample_to_i16(-2.0), -32767);
+        assert_eq!(sample_to_i16(0.0), 0);
+        for s in [0.5f32, -0.25, 0.0001, -0.9999] {
+            assert!((sample_to_f32(sample_to_i16(s)) - s).abs() < 1.0 / 32767.0);
+        }
+        assert_eq!(pcm16_to_f32(&[32767, 0]), vec![1.0, 0.0]);
     }
 
     #[test]
@@ -1922,9 +1959,9 @@ mod tests {
         let engine = GlobalAudioEngine::new();
         engine.inject_pcm_for_test(vec![0.1; 5000], 11);
         match engine.claim_pcm_for_save() {
-            PcmClaim::Claimed { channels, pcm, .. } => {
-                assert!(channels.is_none());
-                assert_eq!(pcm.len(), 5000);
+            PcmClaim::Claimed { system, mic, .. } => {
+                assert!(system.is_none());
+                assert_eq!(mic.len(), 5000);
             }
             other => panic!("expected Claimed, got {:?}", other),
         }
@@ -1943,36 +1980,52 @@ mod tests {
         engine.inject_sys_pcm_for_test(sys);
         match engine.claim_pcm_for_save() {
             PcmClaim::Claimed {
-                pcm,
-                channels: Some(ch),
+                mic,
+                system: Some(system),
                 ..
             } => {
-                assert_eq!(pcm.len(), 8000);
-                assert_eq!(ch.mic.len(), 8000);
-                assert_eq!(ch.system.len(), 8000, "sys must be padded to mic timeline");
+                assert_eq!(mic.len(), 8000);
+                assert_eq!(system.len(), 8000, "sys must be padded to mic timeline");
                 // Trailing pad is silence.
-                assert!(ch.system[6000..].iter().all(|&s| s == 0.0));
-                // Mix equals sum where both had energy.
-                assert!((pcm[100] - 0.4).abs() < 1e-5);
-                assert!((pcm[5000] - 0.3).abs() < 1e-5);
+                assert!(system[6000..].iter().all(|&s| s == 0));
+                assert_eq!(mic[100], sample_to_i16(0.4));
+                assert_eq!(system[5000], sample_to_i16(0.3));
             }
             other => panic!("expected Claimed with channels, got {:?}", other),
         }
     }
 
     #[test]
-    fn test_front_drain_keeps_sys_aligned_with_mic() {
-        let engine = GlobalAudioEngine::new();
-        engine.inject_pcm_for_test(vec![0.1; 20_000], 13);
-        engine.inject_sys_pcm_for_test(vec![0.2; 18_000]);
-        engine.force_front_drain_for_test(4_000);
-        let state = engine.state.lock().unwrap();
-        assert_eq!(state.pcm_16k_buffer.len(), 16_000);
+    fn test_recording_stops_at_the_limit_without_dropping_audio() {
+        let mut state = AudioState {
+            is_recording: true,
+            pcm_16k_buffer: (0..90).collect(),
+            sys_capture_started: true,
+            ..AudioState::default()
+        };
+        append_up_to(&mut state, &[0.5; 30], 100);
+        assert_eq!(state.pcm_16k_buffer.len(), 100, "filled up to the limit");
+        assert_eq!(state.pcm_16k_buffer[0], 0, "the start is kept");
+        assert_eq!(state.pcm_16k_buffer[99], sample_to_i16(0.5));
+        assert!(state.limit_reached);
         assert_eq!(
             state.sys_pcm_16k_buffer.len(),
-            state.pcm_16k_buffer.len(),
-            "after front-drain both tracks must share length"
+            100,
+            "system audio stays on the mic timeline"
         );
+    }
+
+    #[test]
+    fn test_recording_below_the_limit_keeps_going() {
+        let mut state = AudioState {
+            is_recording: true,
+            ..AudioState::default()
+        };
+        append_up_to(&mut state, &[0.1; 50], 100);
+        assert_eq!(state.pcm_16k_buffer.len(), 50);
+        assert!(!state.limit_reached);
+        // The real limit holds hours of audio (well past the old 2-hour cap).
+        assert_eq!(MAX_RECORDING_SAMPLES / 16000 / 3600, 8);
     }
 
     #[test]
@@ -1984,6 +2037,6 @@ mod tests {
             .take_pcm_for_live_transcribe(16_000)
             .expect("live chunk");
         assert_eq!(chunk.len(), 16_000);
-        assert!((chunk[0] - 0.5).abs() < 1e-5);
+        assert!((chunk[0] - 0.5).abs() < 1e-4);
     }
 }

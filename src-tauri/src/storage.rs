@@ -7,7 +7,6 @@ use std::sync::{Arc, Condvar, Mutex, OnceLock};
 use flacenc::bitsink::ByteSink;
 use flacenc::component::BitRepr;
 use flacenc::error::Verify;
-use flacenc::source::MemSource;
 
 use crate::transcriber::TranscriptSegment;
 
@@ -952,26 +951,91 @@ pub fn compress_audio_to_flac(samples_f32: &[f32], output_path: &PathBuf) -> Res
 
 /// Encodes sample-aligned 16 kHz channels (e.g. microphone + system audio) as
 /// one multi-channel FLAC. Shorter channels are padded with silence.
-pub fn compress_channels_to_flac(channels_f32: &[&[f32]], output_path: &PathBuf) -> Result<(), String> {
-    let frames = channels_f32.iter().map(|c| c.len()).max().unwrap_or(0);
-    if frames == 0 || channels_f32.is_empty() {
+pub fn compress_channels_to_flac(
+    channels_f32: &[&[f32]],
+    output_path: &PathBuf,
+) -> Result<(), String> {
+    write_flac(channels_f32, output_path)
+}
+
+/// Like [`compress_channels_to_flac`] for 16-bit samples (recordings).
+pub fn compress_pcm16_to_flac(channels: &[&[i16]], output_path: &PathBuf) -> Result<(), String> {
+    write_flac(channels, output_path)
+}
+
+/// A sample the FLAC encoder can take as 16-bit.
+trait FlacSample: Copy + Default {
+    fn to_i32(self) -> i32;
+}
+
+impl FlacSample for f32 {
+    fn to_i32(self) -> i32 {
+        crate::audio::sample_to_i16(self) as i32
+    }
+}
+
+impl FlacSample for i16 {
+    fn to_i32(self) -> i32 {
+        self as i32
+    }
+}
+
+/// Feeds channels to the encoder one block at a time, so a long recording
+/// is never copied whole into an interleaved buffer.
+struct ChannelSource<'a, S> {
+    channels: &'a [&'a [S]],
+    frames: usize,
+    pos: usize,
+    block: Vec<i32>,
+}
+
+impl<S: FlacSample> flacenc::source::Source for ChannelSource<'_, S> {
+    fn channels(&self) -> usize {
+        self.channels.len()
+    }
+
+    fn bits_per_sample(&self) -> usize {
+        16
+    }
+
+    fn sample_rate(&self) -> usize {
+        16000
+    }
+
+    fn read_samples<F: flacenc::source::Fill>(
+        &mut self,
+        block_size: usize,
+        dest: &mut F,
+    ) -> Result<usize, flacenc::error::SourceError> {
+        let n = block_size.min(self.frames - self.pos);
+        self.block.clear();
+        for i in self.pos..self.pos + n {
+            for ch in self.channels {
+                self.block
+                    .push(ch.get(i).copied().unwrap_or_default().to_i32());
+            }
+        }
+        dest.fill_interleaved(&self.block)?;
+        self.pos += n;
+        Ok(n)
+    }
+
+    fn len_hint(&self) -> Option<usize> {
+        Some(self.frames)
+    }
+}
+
+fn write_flac<S: FlacSample>(channels: &[&[S]], output_path: &PathBuf) -> Result<(), String> {
+    let frames = channels.iter().map(|c| c.len()).max().unwrap_or(0);
+    if frames == 0 || channels.is_empty() {
         return Ok(());
     }
-
-    // Interleave and convert f32 PCM [-1.0, 1.0] to i32 PCM [-32768, 32767]
-    let mut samples_i32: Vec<i32> = Vec::with_capacity(frames * channels_f32.len());
-    for i in 0..frames {
-        for ch in channels_f32 {
-            let s = ch.get(i).copied().unwrap_or(0.0);
-            samples_i32.push((s.clamp(-1.0, 1.0) * 32767.0) as i32);
-        }
-    }
-
-    let sample_rate = 16000;
-    let channels = channels_f32.len();
-    let bits_per_sample = 16;
-
-    let source = MemSource::from_samples(&samples_i32, channels, bits_per_sample, sample_rate);
+    let source = ChannelSource {
+        channels,
+        frames,
+        pos: 0,
+        block: Vec::new(),
+    };
     let config = flacenc::config::Encoder::default()
         .into_verified()
         .map_err(|e| format!("FLAC config hatası: {:?}", e))?;
@@ -1344,58 +1408,57 @@ fn save_current_meeting_blocking(
     // Explicit order: stop is done by the caller; finalize segments, then claim.
     let segments = transcriber.take_history();
 
-    let (session_id, raw_pcm_buffer, live_covered_samples, session_channels) =
-        match audio_engine.claim_pcm_for_save() {
-            PcmClaim::AlreadySaved { session_id } => {
-                // Wait until the winner publishes Done/Nothing — never bare Err.
-                loop {
-                    match gate.as_ref() {
-                        Some(cache) if cache.session_id == session_id => {
-                            if let Some(ref outcome) = cache.outcome {
-                                return match outcome {
-                                    SessionSaveOutcome::Done(m) => Ok(((**m).clone(), None)),
-                                    SessionSaveOutcome::Nothing => Err(NOTHING_TO_SAVE.to_string()),
-                                };
-                            }
-                            gate = gate_cv.wait(gate).unwrap();
+    let (session_id, mic, system, live_covered_samples) = match audio_engine.claim_pcm_for_save() {
+        PcmClaim::AlreadySaved { session_id } => {
+            // Wait until the winner publishes Done/Nothing — never bare Err.
+            loop {
+                match gate.as_ref() {
+                    Some(cache) if cache.session_id == session_id => {
+                        if let Some(ref outcome) = cache.outcome {
+                            return match outcome {
+                                SessionSaveOutcome::Done(m) => Ok(((**m).clone(), None)),
+                                SessionSaveOutcome::Nothing => Err(NOTHING_TO_SAVE.to_string()),
+                            };
                         }
-                        _ => {
-                            let (g, wait_result) = gate_cv
-                                .wait_timeout(gate, std::time::Duration::from_millis(200))
-                                .unwrap();
-                            gate = g;
-                            if wait_result.timed_out() {
-                                // Winner never published — treat as silent no-op.
-                                return Err(NOTHING_TO_SAVE.to_string());
-                            }
+                        gate = gate_cv.wait(gate).unwrap();
+                    }
+                    _ => {
+                        let (g, wait_result) = gate_cv
+                            .wait_timeout(gate, std::time::Duration::from_millis(200))
+                            .unwrap();
+                        gate = g;
+                        if wait_result.timed_out() {
+                            // Winner never published — treat as silent no-op.
+                            return Err(NOTHING_TO_SAVE.to_string());
                         }
                     }
                 }
             }
-            PcmClaim::NothingToSave { session_id } => {
-                *gate = Some(SessionSaveCache {
-                    session_id,
-                    outcome: Some(SessionSaveOutcome::Nothing),
-                });
-                gate_cv.notify_all();
-                return Err(NOTHING_TO_SAVE.to_string());
-            }
-            PcmClaim::Claimed {
+        }
+        PcmClaim::NothingToSave { session_id } => {
+            *gate = Some(SessionSaveCache {
                 session_id,
-                pcm,
-                live_covered_samples,
-                channels,
-            } => {
-                *gate = Some(SessionSaveCache {
-                    session_id,
-                    outcome: None,
-                });
-                gate_cv.notify_all();
-                // Release gate lock while doing FLAC I/O so waiters can observe Pending.
-                drop(gate);
-                (session_id, pcm, live_covered_samples, channels)
-            }
-        };
+                outcome: Some(SessionSaveOutcome::Nothing),
+            });
+            gate_cv.notify_all();
+            return Err(NOTHING_TO_SAVE.to_string());
+        }
+        PcmClaim::Claimed {
+            session_id,
+            mic,
+            system,
+            live_covered_samples,
+        } => {
+            *gate = Some(SessionSaveCache {
+                session_id,
+                outcome: None,
+            });
+            gate_cv.notify_all();
+            // Release gate lock while doing FLAC I/O so waiters can observe Pending.
+            drop(gate);
+            (session_id, mic, system, live_covered_samples)
+        }
+    };
 
     flac_save_in_flight().store(true, Ordering::SeqCst);
     let save_result = (|| {
@@ -1406,7 +1469,7 @@ fn save_current_meeting_blocking(
         let actual_duration = if duration_seconds > 0 {
             duration_seconds
         } else {
-            (raw_pcm_buffer.len() as u64) / 16000
+            (mic.len() as u64) / 16000
         };
 
         let mins = actual_duration / 60;
@@ -1423,9 +1486,9 @@ fn save_current_meeting_blocking(
         // With system audio, keep both sides: left = microphone, right =
         // system audio, so later re-transcriptions can still tell local from
         // remote speakers. Playback and ASR decode it as their average.
-        let written = match &session_channels {
-            Some(ch) => compress_channels_to_flac(&[&ch.mic, &ch.system], &flac_file_path),
-            None => compress_audio_to_flac(&raw_pcm_buffer, &flac_file_path),
+        let written = match &system {
+            Some(sys) => compress_pcm16_to_flac(&[&mic, sys], &flac_file_path),
+            None => compress_pcm16_to_flac(&[&mic], &flac_file_path),
         };
         let audio_file_path = match written {
             Ok(_) => Some(flac_file_path.to_string_lossy().to_string()),
@@ -1454,29 +1517,29 @@ fn save_current_meeting_blocking(
         // was paused while a past meeting was open, or the app quit mid-meeting.
         // With Apple dictation chosen, the live (Whisper) text is only a
         // preview: the whole recording is re-transcribed by Apple in the queue.
-        let transcript_pending = needs_full_transcription(
-            &deduplicated_segments,
-            raw_pcm_buffer.len(),
-            live_covered_samples,
-        ) || (mode == SaveMode::Normal
-            && audio_file_path.is_some()
-            && raw_pcm_buffer.len() >= 16000
-            && crate::asr_engine::queue_uses_apple());
+        let transcript_pending =
+            needs_full_transcription(&deduplicated_segments, mic.len(), live_covered_samples)
+                || (mode == SaveMode::Normal
+                    && audio_file_path.is_some()
+                    && mic.len() >= 16000
+                    && crate::asr_engine::queue_uses_apple());
         // Live slices aren't diarized (numbering would restart every slice);
         // label speakers once for the whole session now. Skipped on quit (tight
         // time budget) and when a full re-transcription is queued anyway.
         if mode == SaveMode::Normal && !transcript_pending && !deduplicated_segments.is_empty() {
-            if let Some(ref ch) = session_channels {
+            // Float copies only here, and only while speakers are labeled.
+            let mic_f32 = crate::audio::pcm16_to_f32(&mic);
+            if let Some(ref sys) = system {
                 crate::diarization::attribute_speakers_by_channel(
                     &mut deduplicated_segments,
-                    &ch.mic,
-                    &ch.system,
+                    &mic_f32,
+                    &crate::audio::pcm16_to_f32(sys),
                     16000,
                 );
             } else {
                 crate::diarization::cluster_speakers(
                     &mut deduplicated_segments,
-                    &raw_pcm_buffer,
+                    &mic_f32,
                     16000,
                     6,
                 );
@@ -1487,9 +1550,7 @@ fn save_current_meeting_blocking(
         let flac_to_enqueue = match mode {
             SaveMode::QuitNoWhisper => None,
             SaveMode::Normal
-                if transcript_pending
-                    && audio_file_path.is_some()
-                    && raw_pcm_buffer.len() >= 16000 =>
+                if transcript_pending && audio_file_path.is_some() && mic.len() >= 16000 =>
             {
                 audio_file_path.clone()
             }
@@ -1917,6 +1978,64 @@ mod tests {
     }
 
     #[test]
+    fn test_flac_streams_16_bit_channels_losslessly() {
+        let dir = std::env::temp_dir().join("echomind_test_flac_pcm16");
+        let _ = fs::create_dir_all(&dir);
+        // Not a multiple of the block size, and the system track is shorter.
+        let mic: Vec<i16> = (0..10_007)
+            .map(|i| ((i * 37) % 2000 - 1000) as i16)
+            .collect();
+        let sys: Vec<i16> = (0..9_000).map(|i| ((i * 11) % 600 - 300) as i16).collect();
+        let path = dir.join("two.flac");
+        compress_pcm16_to_flac(&[&mic, &sys], &path).unwrap();
+        let decoded = crate::importer::decode_audio_file_channels_16k(&path).unwrap();
+        assert_eq!(decoded.len(), 2);
+        // The encoder pads the last block with silence (as it always has).
+        assert!(decoded[0].len() >= mic.len() && decoded[0].len() < mic.len() + 4096);
+        let back =
+            |ch: &[f32]| -> Vec<i16> { ch.iter().map(|&s| (s * 32768.0).round() as i16).collect() };
+        let mic_back = back(&decoded[0]);
+        let sys_back = back(&decoded[1]);
+        let close = |a: i16, b: i16| (a as i32 - b as i32).abs() <= 1;
+        assert!(mic.iter().zip(&mic_back).all(|(&a, &b)| close(a, b)));
+        assert!(sys.iter().zip(&sys_back).all(|(&a, &b)| close(a, b)));
+        assert!(
+            sys_back[9_000..].iter().all(|&s| s == 0),
+            "short track padded"
+        );
+        assert!(mic_back[mic.len()..].iter().all(|&s| s == 0));
+
+        // Same bytes as encoding the whole interleaved buffer at once (the
+        // previous implementation).
+        let interleaved: Vec<i32> = (0..mic.len())
+            .flat_map(|i| [mic[i] as i32, sys.get(i).copied().unwrap_or(0) as i32])
+            .collect();
+        let config = flacenc::config::Encoder::default().into_verified().unwrap();
+        let whole = flacenc::encode_with_fixed_block_size(
+            &config,
+            flacenc::source::MemSource::from_samples(&interleaved, 2, 16, 16000),
+            config.block_size,
+        )
+        .unwrap();
+        let mut sink = ByteSink::new();
+        whole.write(&mut sink).unwrap();
+        assert_eq!(fs::read(&path).unwrap(), sink.into_inner());
+
+        // Float input gives the same file as its 16-bit samples.
+        let f: Vec<f32> = mic
+            .iter()
+            .map(|&s| crate::audio::sample_to_f32(s))
+            .collect();
+        let from_f32 = dir.join("f32.flac");
+        let from_i16 = dir.join("i16.flac");
+        compress_audio_to_flac(&f, &from_f32).unwrap();
+        let again: Vec<i16> = f.iter().map(|&s| crate::audio::sample_to_i16(s)).collect();
+        compress_pcm16_to_flac(&[&again], &from_i16).unwrap();
+        assert_eq!(fs::read(&from_f32).unwrap(), fs::read(&from_i16).unwrap());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn test_load_from_disk_reencrypts_plaintext_history() {
         // Regression: the re-transcribe path wrote the history as plaintext JSON;
         // the next launch must re-encrypt it instead of leaving it readable.
@@ -2279,7 +2398,7 @@ mod tests {
 
         {
             let mut state = engine.state.lock().unwrap();
-            state.pcm_16k_buffer = vec![0.9; 500];
+            state.pcm_16k_buffer = vec![29490; 500];
         }
         let (third, _) =
             save_current_meeting_blocking("Twice".into(), 1, SaveMode::Normal).unwrap();

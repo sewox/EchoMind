@@ -93,6 +93,10 @@ export const en: TranslationKeys = {
     remainingMinutes: "~{n} min left",
     remainingSeconds: "~{n} s left",
   },
+  recordingLimit: {
+    reached:
+      "The recording reached the {hours}-hour limit, so it was stopped and saved. If the meeting is still going, start a new recording.",
+  },
   sidebar: {
     title: "Meeting History",
     searchPlaceholder: "Search past meetings...",

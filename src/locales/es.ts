@@ -93,6 +93,10 @@ export const es: TranslationKeys = {
     remainingMinutes: "~{n} min restantes",
     remainingSeconds: "~{n} s restantes",
   },
+  recordingLimit: {
+    reached:
+      "La grabación llegó al límite de {hours} horas, así que se detuvo y se guardó. Si la reunión sigue, inicie una nueva grabación.",
+  },
   sidebar: {
     title: "Historial de Reuniones",
     searchPlaceholder: "Buscar reuniones...",

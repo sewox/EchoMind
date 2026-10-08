@@ -93,6 +93,10 @@ export const de: TranslationKeys = {
     remainingMinutes: "~{n} Min. übrig",
     remainingSeconds: "~{n} Sek. übrig",
   },
+  recordingLimit: {
+    reached:
+      "Die Aufnahme hat das Limit von {hours} Stunden erreicht und wurde beendet und gespeichert. Läuft das Meeting noch, starten Sie eine neue Aufnahme.",
+  },
   sidebar: {
     title: "Meeting-Verlauf",
     searchPlaceholder: "Meetings durchsuchen...",
