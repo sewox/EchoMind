@@ -93,6 +93,10 @@ export const tr: TranslationKeys = {
     remainingMinutes: "~{n} dk kaldı",
     remainingSeconds: "~{n} sn kaldı",
   },
+  recordingLimit: {
+    reached:
+      "Kayıt {hours} saat sınırına ulaştığı için durduruldu ve kaydedildi. Toplantı sürüyorsa yeni bir kayıt başlatın.",
+  },
   sidebar: {
     title: "Toplantı Geçmişi",
     searchPlaceholder: "Geçmiş toplantılarda ara...",

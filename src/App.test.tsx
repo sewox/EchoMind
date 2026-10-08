@@ -5,6 +5,7 @@ import {
   fireEvent,
   act,
   waitFor,
+  within,
 } from "@testing-library/react";
 import App, { MeetingRecord } from "./App";
 import { I18nProvider } from "./locales/i18nContext";
@@ -1942,6 +1943,38 @@ describe("App Top-Level Integration", () => {
       "save_current_meeting",
       expect.any(Object),
     );
+  });
+
+  it("explains a recording that stopped at the length limit", async () => {
+    (invoke as any).mockImplementation((cmd: string) => {
+      if (cmd === "get_all_meetings") return Promise.resolve(mockPastMeetings);
+      return Promise.resolve();
+    });
+
+    render(
+      <I18nProvider>
+        <App />
+      </I18nProvider>,
+    );
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 30));
+    });
+
+    const listeners = globalTestEventListeners["recording-limit-reached"] || [];
+    expect(listeners.length).toBe(1);
+    await act(async () => {
+      listeners[0]({ payload: 8 * 3600 });
+    });
+    const notice = screen.getByRole("alert");
+    expect(notice).toHaveTextContent(
+      "Kayıt 8 saat sınırına ulaştığı için durduruldu ve kaydedildi.",
+    );
+    await act(async () => {
+      fireEvent.click(within(notice).getByRole("button", { name: "Kapat" }));
+    });
+    expect(
+      screen.queryByText(/saat sınırına ulaştığı için/),
+    ).not.toBeInTheDocument();
   });
 
   it("applies meeting-transcript-ready updates from detached Whisper", async () => {

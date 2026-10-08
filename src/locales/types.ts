@@ -88,6 +88,9 @@ export interface TranslationKeys {
     remainingMinutes: string;
     remainingSeconds: string;
   };
+  recordingLimit: {
+    reached: string;
+  };
   sidebar: {
     title: string;
     searchPlaceholder: string;

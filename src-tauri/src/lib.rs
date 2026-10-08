@@ -207,6 +207,7 @@ pub fn run() {
             // Resolve Keychain / keystore keys on a background thread so the main
             // window can paint even while macOS shows its Keychain Access prompt.
             import_progress::init(app.handle().clone());
+            audio::init(app.handle().clone());
             storage::start_storage_unlock(app.handle().clone());
             Ok(())
         })

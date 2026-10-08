@@ -763,12 +763,15 @@ pub fn cluster_speakers(
 /// Local-user label when the microphone channel dominates a segment.
 pub const LOCAL_SPEAKER_LABEL: &str = "Siz";
 
-fn peak_normalize(samples: &[f32]) -> Vec<f32> {
+/// The scale that peak-normalizes `samples` (1 for silence). Applied to the
+/// window levels instead of copying the whole track.
+fn peak_scale(samples: &[f32]) -> f32 {
     let peak = samples.iter().map(|s| s.abs()).fold(0.0f32, f32::max);
     if peak < 1e-8 {
-        return samples.to_vec();
+        1.0
+    } else {
+        1.0 / peak
     }
-    samples.iter().map(|s| s / peak).collect()
 }
 
 fn window_rms(pcm: &[f32], start: usize, end: usize) -> f32 {
@@ -840,19 +843,20 @@ pub fn attribute_speakers_by_channel(
     if segments.is_empty() {
         return;
     }
-    let mic_n = peak_normalize(mic);
-    let sys_n = peak_normalize(system);
+    let mic_scale = peak_scale(mic);
+    let sys_scale = peak_scale(system);
 
     let mut remote_indices: Vec<usize> = Vec::new();
     for (i, seg) in segments.iter_mut().enumerate() {
         let start = samples_for_ms(seg.start_time_ms, sample_rate);
         let end = samples_for_ms(seg.end_time_ms, sample_rate).max(start + 1);
-        let mut mic_e = window_rms(&mic_n, start, end);
-        let sys_e = window_rms(&sys_n, start, end);
+        let mut mic_e = window_rms(mic, start, end) * mic_scale;
+        let sys_e = window_rms(system, start, end) * sys_scale;
 
         // Speakers playing remote audio into the mic: mic correlates with
         // system. Discount the correlated portion so dominance is not flipped.
-        let corr = window_correlation(&mic_n, &sys_n, start, end).abs();
+        // (Correlation does not depend on the scale.)
+        let corr = window_correlation(mic, system, start, end).abs();
         if sys_e > 0.02 && corr > 0.35 {
             mic_e = (mic_e - sys_e * corr * corr * 0.85).max(0.0);
         }

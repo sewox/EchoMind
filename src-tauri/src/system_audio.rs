@@ -38,7 +38,7 @@ pub(crate) fn ingest(state: &SharedAudioState, interleaved: &[f32], channels: us
         .map(|c| c.iter().sum::<f32>() / channels as f32)
         .collect();
     let mut st = state.lock().unwrap();
-    if !st.is_recording {
+    if !st.is_recording || st.limit_reached {
         return;
     }
     let rms = (mono.iter().map(|s| s * s).sum::<f32>() / mono.len() as f32).sqrt();
@@ -55,7 +55,8 @@ pub(crate) fn ingest(state: &SharedAudioState, interleaved: &[f32], channels: us
     // Pad for silent gaps where Core Audio skipped callbacks.
     align_sys_buffer_to_mic(&mut st);
     let out = st.sys_resampler.as_mut().unwrap().process(&mono);
-    st.sys_pcm_16k_buffer.extend_from_slice(&out);
+    st.sys_pcm_16k_buffer
+        .extend(out.iter().map(|&s| crate::audio::sample_to_i16(s)));
     st.sys_capture_active = true;
     // If the system clock ran ahead of the mic by more than ~300 ms, trim so
     // the next mic pad keeps the two tracks sample-aligned.
@@ -160,7 +161,7 @@ mod tests {
     fn test_ingest_pads_silence_when_mic_is_ahead() {
         let state = Arc::new(Mutex::new(AudioState {
             is_recording: true,
-            pcm_16k_buffer: vec![0.1; 4800], // 300 ms of mic already buffered
+            pcm_16k_buffer: vec![3277; 4800], // 300 ms of mic already buffered
             sys_capture_started: true,
             ..AudioState::default()
         }));
@@ -176,6 +177,19 @@ mod tests {
             st.sys_pcm_16k_buffer.len()
         );
         // Leading pad is silence.
-        assert!(st.sys_pcm_16k_buffer[..4800].iter().all(|&s| s == 0.0));
+        assert!(st.sys_pcm_16k_buffer[..4800].iter().all(|&s| s == 0));
+    }
+
+    #[test]
+    fn test_ingest_stops_at_the_recording_limit() {
+        let state = Arc::new(Mutex::new(AudioState {
+            is_recording: true,
+            limit_reached: true,
+            pcm_16k_buffer: vec![0; 4800],
+            sys_capture_started: true,
+            ..AudioState::default()
+        }));
+        ingest(&state, &[0.5f32; 48], 1, 48000.0);
+        assert!(state.lock().unwrap().sys_pcm_16k_buffer.is_empty());
     }
 }
