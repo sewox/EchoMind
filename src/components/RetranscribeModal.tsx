@@ -219,7 +219,6 @@ export const RetranscribeModal: React.FC<RetranscribeModalProps> = ({
 
       const updated = await invoke<MeetingRecord>("retranscribe_meeting", {
         meetingId: meeting.id,
-        audioFilePath: meeting.audio_file_path,
         cloudProvider: cloudProv,
         apiKey,
         modelVersion: modelVer,
