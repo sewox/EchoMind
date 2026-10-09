@@ -638,7 +638,7 @@ fn worker_loop(app: tauri::AppHandle) {
         };
 
         // Decode FLAC → PCM on this worker thread (never UI/main).
-        let channels = match crate::importer::decode_audio_file_channels_16k(&path) {
+        let mut channels = match crate::importer::decode_audio_file_channels_16k(&path) {
             Ok(channels) => channels,
             Err(e) => {
                 let msg = format!("FLAC decode failed: {}", e);
@@ -655,6 +655,11 @@ fn worker_loop(app: tauri::AppHandle) {
                 continue;
             }
         };
+        // Mic and system audio recorded over loudspeakers: remove the remote
+        // side's echo from the mic before mixing (it doubles every word).
+        if let Some(lag) = crate::echo::clean_channels(&mut channels) {
+            println!("🔇 Yankı giderildi (sistem sesi {lag:.0} ms kaydırıldı)");
+        }
         let mut pcm = crate::importer::mix_channels(&channels);
         crate::audio::normalize_audio_samples(&mut pcm);
 
