@@ -66,3 +66,23 @@ export async function syncActiveEngine(): Promise<string> {
   }
   return engine;
 }
+
+const MODEL_KEYS: Record<string, string> = {
+  cloud_groq: "echomind_groq_model_version",
+  cloud_gemini: "echomind_gemini_model_version",
+  cloud_openai: "echomind_openai_model_version",
+};
+
+/**
+ * The model picked for a cloud engine, or null for the provider's default
+ * (and for engines on the device).
+ */
+export function cloudModelVersion(engine = getActiveEngine()): string | null {
+  const key = MODEL_KEYS[engine];
+  if (!key) return null;
+  try {
+    return localStorage.getItem(key) || null;
+  } catch {
+    return null;
+  }
+}

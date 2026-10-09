@@ -25,6 +25,7 @@ import {
 } from "./ModelHubModalConstants";
 import { useI18n } from "../locales/i18nContext";
 import { getActiveEngine, storeActiveEngine } from "../services/activeEngine";
+import { CloudRecordingSection } from "./CloudRecordingSection";
 import { LocalLlmSection } from "./LocalLlmSection";
 import { VoicePacksSection } from "./VoicePacksSection";
 import { CredentialStore } from "../services/credentialStore";
@@ -462,6 +463,8 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
       {/* Tab Content: Cloud AI Models */}
       {activeTab === "cloud" && (
         <div className="space-y-4 text-xs">
+          <CloudRecordingSection activeEngine={activeEngine} />
+
           {/* 1. Groq Cloud */}
           <div
             className={`p-4 rounded-xl border transition-all ${

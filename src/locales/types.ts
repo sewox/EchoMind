@@ -88,6 +88,15 @@ export interface TranslationKeys {
     remainingMinutes: string;
     remainingSeconds: string;
   };
+  cloudRecording: {
+    title: string;
+    desc: string;
+    onDevice: string;
+    active: string;
+    noEngine: string;
+    noKey: string;
+    paranoid: string;
+  };
   recordingLimit: {
     reached: string;
   };
