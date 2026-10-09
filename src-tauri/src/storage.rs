@@ -1655,10 +1655,13 @@ pub fn update_meeting_speaker_name(
 }
 
 #[tauri::command]
-pub fn update_meeting_title(id: String, new_title: String) -> Result<Vec<MeetingRecord>, String> {
+pub fn update_meeting_title(
+    meeting_id: String,
+    new_title: String,
+) -> Result<Vec<MeetingRecord>, String> {
     require_storage_ready()?;
     let storage = get_global_storage();
-    storage.update_title(&id, &new_title)
+    storage.update_title(&meeting_id, &new_title)
 }
 
 #[tauri::command]
