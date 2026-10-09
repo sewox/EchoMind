@@ -7,6 +7,7 @@ pub mod credentials;
 pub mod cross_memory;
 pub mod detector;
 pub mod diarization;
+pub mod dual_track;
 pub mod dlp;
 pub mod echo;
 pub mod encrypted_storage;

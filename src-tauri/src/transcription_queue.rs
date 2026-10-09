@@ -554,14 +554,6 @@ fn apply_segments_to_meeting(
     get_global_storage().update_meeting_segments(meeting_id, segments, engine_used)
 }
 
-/// Re-labels speakers from the two FLAC channels (left = microphone, right =
-/// system audio) when the recording has them; the engines only see the mix.
-fn attribute_by_channels(segments: &mut [TranscriptSegment], channels: &[Vec<f32>]) {
-    if let [mic, system] = channels {
-        crate::diarization::attribute_speakers_by_channel(segments, mic, system, 16000);
-    }
-}
-
 /// Apple dictation for the whole recording, speakers clustered on the mix.
 fn transcribe_with_apple(pcm: &[f32]) -> Result<Vec<TranscriptSegment>, String> {
     let mut segs = crate::offline_engines::transcribe_apple_pcm(pcm, "auto")?;
@@ -685,23 +677,45 @@ fn worker_loop(app: tauri::AppHandle) {
         // Apple dictation when chosen (falls back to Whisper if it fails);
         // Whisper in batch mode otherwise: own segments only (never the live
         // history), and a cancel yields BATCH_CANCELLED, not a partial result.
-        let mut engine_label = None;
-        let mut result = Err(String::new());
-        if crate::asr_engine::queue_uses_apple() {
-            result = transcribe_with_apple(&pcm);
-            match &result {
-                Ok(_) => engine_label = Some(crate::asr_engine::APPLE_ENGINE_LABEL.to_string()),
-                Err(e) => eprintln!("⚠️ Apple Dikte başarısız, Whisper'a geçiliyor: {}", e),
+        let asr = |audio: &[f32]| -> Result<(Vec<TranscriptSegment>, String), String> {
+            if crate::asr_engine::queue_uses_apple() {
+                match transcribe_with_apple(audio) {
+                    Ok(segs) => {
+                        return Ok((segs, crate::asr_engine::APPLE_ENGINE_LABEL.to_string()))
+                    }
+                    Err(e) => eprintln!("⚠️ Apple Dikte başarısız, Whisper'a geçiliyor: {}", e),
+                }
             }
-        }
-        if engine_label.is_none() {
-            result = transcriber.transcribe_pcm_batch(&pcm, "auto", &q.cancel_current);
-            engine_label = Some("Cihazda (Whisper)".to_string());
-        }
-        drop(pcm);
-        if let Ok(segs) = result.as_mut() {
-            attribute_by_channels(segs, &channels);
-        }
+            transcriber
+                .transcribe_pcm_batch(audio, "auto", &q.cancel_current)
+                .map(|segs| (segs, "Cihazda (Whisper)".to_string()))
+        };
+        // With system audio, the microphone ("Siz") and the remote side are
+        // transcribed apart and merged by time; mixing them loses words.
+        let mut engine_label = None;
+        let result = if let [mic, system] = channels.as_slice() {
+            drop(pcm);
+            // Apple dictation stays quiet on silence; Whisper does not.
+            let silence = if crate::asr_engine::queue_uses_apple() {
+                crate::dual_track::Silence::Keep
+            } else {
+                crate::dual_track::Silence::Remove
+            };
+            crate::dual_track::transcribe(mic, system, silence, |track| {
+                let mut track = track.to_vec();
+                crate::audio::normalize_audio_samples(&mut track);
+                let (segs, label) = asr(&track)?;
+                engine_label = Some(label);
+                Ok(segs)
+            })
+        } else {
+            let result = asr(&pcm).map(|(segs, label)| {
+                engine_label = Some(label);
+                segs
+            });
+            drop(pcm);
+            result
+        };
         drop(channels);
 
         match result {
@@ -883,43 +897,6 @@ mod tests {
     fn test_lock() -> &'static StdMutex<()> {
         static LOCK: OnceLock<StdMutex<()>> = OnceLock::new();
         LOCK.get_or_init(|| StdMutex::new(()))
-    }
-
-    fn seg(start_ms: u64, end_ms: u64) -> TranscriptSegment {
-        TranscriptSegment {
-            id: 1,
-            speaker_id: "Konuşmacı 1".into(),
-            speaker_name: "Konuşmacı 1".into(),
-            start_time_ms: start_ms,
-            end_time_ms: end_ms,
-            timestamp_formatted: String::new(),
-            text: "merhaba".into(),
-            language: "tr".into(),
-            confidence: 1.0,
-        }
-    }
-
-    fn tone(len: usize, amp: f32) -> Vec<f32> {
-        (0..len).map(|i| amp * (i as f32 * 0.07).sin()).collect()
-    }
-
-    #[test]
-    fn mono_recordings_keep_engine_speaker_labels() {
-        let mut segs = vec![seg(0, 1000)];
-        attribute_by_channels(&mut segs, &[tone(16000, 0.5)]);
-        assert_eq!(segs[0].speaker_name, "Konuşmacı 1");
-    }
-
-    #[test]
-    fn stereo_recordings_label_microphone_speech_as_local_user() {
-        let mut silent_system = vec![0.0; 16000];
-        silent_system[0] = 1.0; // non-silent peak so normalization is defined
-        let mut segs = vec![seg(100, 1000)];
-        attribute_by_channels(&mut segs, &[tone(16000, 0.5), silent_system]);
-        assert_eq!(
-            segs[0].speaker_name,
-            crate::diarization::LOCAL_SPEAKER_LABEL
-        );
     }
 
     fn sample_meeting(id: &str, pending: bool, flac: Option<&str>) -> MeetingRecord {
