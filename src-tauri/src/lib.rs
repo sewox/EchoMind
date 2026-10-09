@@ -8,6 +8,7 @@ pub mod cross_memory;
 pub mod detector;
 pub mod diarization;
 pub mod dlp;
+pub mod echo;
 pub mod encrypted_storage;
 pub mod glossary;
 pub mod hardware;
