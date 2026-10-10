@@ -562,6 +562,26 @@ fn attribute_by_channels(segments: &mut [TranscriptSegment], channels: &[Vec<f32
     }
 }
 
+/// The cloud engine for the whole recording. Speakers come from the two
+/// channels when both were recorded (labeled after this), else from the
+/// provider, else are clustered on the mix.
+fn transcribe_with_cloud(
+    choice: &crate::cloud_recording::CloudChoice,
+    pcm: &[f32],
+    channel_count: usize,
+) -> Result<Vec<TranscriptSegment>, String> {
+    let mut segs = crate::cloud_recording::transcribe_pcm(choice, pcm, "auto")?;
+    if channel_count < 2 {
+        let speakers: std::collections::HashSet<&str> =
+            segs.iter().map(|s| s.speaker_id.as_str()).collect();
+        if speakers.len() <= 1 {
+            crate::diarization::cluster_speakers(&mut segs, pcm, 16000, 6);
+        }
+        crate::diarization::resolve_speaker_names(&mut segs);
+    }
+    Ok(segs)
+}
+
 /// Apple dictation for the whole recording, speakers clustered on the mix.
 fn transcribe_with_apple(pcm: &[f32]) -> Result<Vec<TranscriptSegment>, String> {
     let mut segs = crate::offline_engines::transcribe_apple_pcm(pcm, "auto")?;
@@ -677,12 +697,23 @@ fn worker_loop(app: tauri::AppHandle) {
         }
 
         let transcriber = crate::transcriber::get_global_transcriber();
-        // Apple dictation when chosen (falls back to Whisper if it fails);
-        // Whisper in batch mode otherwise: own segments only (never the live
-        // history), and a cancel yields BATCH_CANCELLED, not a partial result.
+        // The cloud engine when cloud recording is on; then Apple dictation
+        // when chosen; Whisper in batch mode otherwise: own segments only
+        // (never the live history), and a cancel yields BATCH_CANCELLED, not a
+        // partial result. Each falls back to the next if it fails.
         let mut engine_label = None;
         let mut result = Err(String::new());
-        if crate::asr_engine::queue_uses_apple() {
+        if let Some(choice) = crate::cloud_recording::active(None) {
+            match transcribe_with_cloud(&choice, &pcm, channels.len()) {
+                Ok(segs) => {
+                    println!("☁️ Bulutta yazıya döküldü: {}", choice.label());
+                    result = Ok(segs);
+                    engine_label = Some(choice.label());
+                }
+                Err(e) => eprintln!("⚠️ Bulut yazıya dökme başarısız, cihazda devam: {}", e),
+            }
+        }
+        if engine_label.is_none() && crate::asr_engine::queue_uses_apple() {
             result = transcribe_with_apple(&pcm);
             match &result {
                 Ok(_) => engine_label = Some(crate::asr_engine::APPLE_ENGINE_LABEL.to_string()),

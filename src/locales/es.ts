@@ -93,6 +93,18 @@ export const es: TranslationKeys = {
     remainingMinutes: "~{n} min restantes",
     remainingSeconds: "~{n} s restantes",
   },
+  cloudRecording: {
+    title: "Usar la nube para las grabaciones",
+    desc: "Desactivado: la grabación en directo y la transcripción posterior se hacen siempre en este ordenador; el motor en la nube elegido abajo solo se usa al importar y al volver a transcribir. Activado: el audio se envía al proveedor elegido en fragmentos de 15 segundos durante la grabación, y completo después. Si la nube falla, se usa el motor de este ordenador.",
+    onDevice: "Ahora: las grabaciones se transcriben en este ordenador.",
+    active: "Ahora: las grabaciones se transcriben con {provider}.",
+    noEngine:
+      "Elija un motor en la nube abajo; hasta entonces las grabaciones se transcriben en este ordenador.",
+    noKey:
+      "Guarde la clave API de {provider}; hasta entonces las grabaciones se transcriben en este ordenador.",
+    paranoid:
+      "La nube no se puede usar con el Modo Paranoico activado; las grabaciones se transcriben en este ordenador.",
+  },
   recordingLimit: {
     reached:
       "La grabación llegó al límite de {hours} horas, así que se detuvo y se guardó. Si la reunión sigue, inicie una nueva grabación.",

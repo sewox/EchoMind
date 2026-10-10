@@ -1944,14 +1944,19 @@ describe("TranscriptViewer Component", () => {
     await act(async () => {
       fireEvent.click(transcribeBtn);
     });
+    // The chosen model goes with the slice; the API key never does (the
+    // backend reads it from the vault when cloud recording is on).
     expect(invoke).toHaveBeenCalledWith(
       "transcribe_audio_buffer",
-      expect.objectContaining({
-        cloudProvider: "groq",
-        apiKey: "gsk_groq_live_key",
-        modelVersion: "whisper-large-v3",
-      }),
+      expect.objectContaining({ modelVersion: "whisper-large-v3" }),
     );
+    const liveCall = (invoke as any).mock.calls.find(
+      ([cmd]: [string]) => cmd === "transcribe_audio_buffer",
+    );
+    expect(Object.keys(liveCall[1]).sort()).toEqual([
+      "language",
+      "modelVersion",
+    ]);
     unmount();
 
     // 2. Summary generation with Gemini
@@ -2062,14 +2067,12 @@ describe("TranscriptViewer Component", () => {
     await act(async () => {
       fireEvent.click(transcribeBtn);
     });
-    expect(invoke).toHaveBeenCalledWith(
-      "transcribe_audio_buffer",
-      expect.objectContaining({
-        cloudProvider: "openai",
-        apiKey: "sk-openai-key",
-        modelVersion: "whisper-1",
-      }),
-    );
+    // No model picked: the backend uses the provider's default; the key
+    // stays in the backend vault.
+    expect(invoke).toHaveBeenCalledWith("transcribe_audio_buffer", {
+      language: expect.any(String),
+      modelVersion: null,
+    });
 
     // Cloud Gemini Transcribe
     localStorage.setItem("echomind_active_engine", "cloud_gemini");
@@ -2077,14 +2080,12 @@ describe("TranscriptViewer Component", () => {
     await act(async () => {
       fireEvent.click(transcribeBtn);
     });
-    expect(invoke).toHaveBeenCalledWith(
-      "transcribe_audio_buffer",
-      expect.objectContaining({
-        cloudProvider: "gemini",
-        apiKey: "sk-gemini-key",
-        modelVersion: "gemini-1.5-flash",
-      }),
-    );
+    // No model picked: the backend uses the provider's default; the key
+    // stays in the backend vault.
+    expect(invoke).toHaveBeenCalledWith("transcribe_audio_buffer", {
+      language: expect.any(String),
+      modelVersion: null,
+    });
 
     // Transcribe buffer failure
     (invoke as any).mockImplementation((cmd: string) => {

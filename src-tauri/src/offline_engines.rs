@@ -65,7 +65,7 @@ pub fn transcribe_apple_pcm(pcm: &[f32], language: &str) -> Result<Vec<Transcrip
 }
 
 /// Minimal 16-bit PCM WAV writer (16 kHz mono), owner-only permissions.
-fn write_wav_16k_mono(path: &Path, pcm: &[f32]) -> Result<(), String> {
+pub(crate) fn write_wav_16k_mono(path: &Path, pcm: &[f32]) -> Result<(), String> {
     let data_len = (pcm.len() * 2) as u32;
     let mut out = Vec::with_capacity(44 + data_len as usize);
     out.extend_from_slice(b"RIFF");

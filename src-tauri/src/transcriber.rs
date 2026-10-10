@@ -59,6 +59,28 @@ pub struct TranscriberState {
     pub used_fallback_model: bool,
     pub segments: Vec<TranscriptSegment>,
     pub segment_counter: usize,
+    /// Which engines wrote this session's live slices (for the meeting label).
+    pub live_engines: LiveEngines,
+}
+
+/// Engines used for the live slices of the current session.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct LiveEngines {
+    /// Label of the cloud engine, when at least one slice went to the cloud.
+    pub cloud: Option<String>,
+    /// Slices written on the device (cloud off, or a cloud slice that failed).
+    pub device_slices: usize,
+}
+
+impl LiveEngines {
+    /// The meeting's engine label: `device` when nothing went to the cloud.
+    pub fn label(&self, device: &str) -> String {
+        match (&self.cloud, self.device_slices) {
+            (None, _) => device.to_string(),
+            (Some(cloud), 0) => cloud.clone(),
+            (Some(cloud), _) => format!("{cloud} + {device}"),
+        }
+    }
 }
 
 impl Default for TranscriberState {
@@ -71,6 +93,7 @@ impl Default for TranscriberState {
             used_fallback_model: false,
             segments: Vec::new(),
             segment_counter: 0,
+            live_engines: LiveEngines::default(),
         }
     }
 }
@@ -677,16 +700,47 @@ impl GlobalTranscriberEngine {
     /// Take (and clear) live transcript segments — call after stop and before
     /// claiming PCM so save sees a finalized segment snapshot.
     pub fn take_history(&self) -> Vec<TranscriptSegment> {
+        self.take_history_with_engines().0
+    }
+
+    /// Like [`Self::take_history`], with the engines that wrote it.
+    pub fn take_history_with_engines(&self) -> (Vec<TranscriptSegment>, LiveEngines) {
         let mut state = self.state.lock().unwrap();
         let segs = std::mem::take(&mut state.segments);
         state.segment_counter = 0;
-        segs
+        (segs, std::mem::take(&mut state.live_engines))
     }
 
     pub fn clear_history(&self) {
         let mut state = self.state.lock().unwrap();
         state.segments.clear();
         state.segment_counter = 0;
+        state.live_engines = LiveEngines::default();
+    }
+
+    /// Adds a live slice transcribed elsewhere (the cloud) to the history,
+    /// shifted to `offset_ms` into the recording and numbered after it.
+    pub fn append_cloud_slice(
+        &self,
+        segments: Vec<TranscriptSegment>,
+        offset_ms: u64,
+        engine_label: String,
+    ) -> Vec<TranscriptSegment> {
+        let mut state = self.state.lock().unwrap();
+        for mut seg in segments {
+            state.segment_counter += 1;
+            seg.id = state.segment_counter;
+            seg.start_time_ms += offset_ms;
+            seg.end_time_ms += offset_ms;
+            seg.timestamp_formatted = format_span(seg.start_time_ms, seg.end_time_ms);
+            state.segments.push(seg);
+        }
+        state.live_engines.cloud = Some(engine_label);
+        state.segments.clone()
+    }
+
+    fn note_device_slice(&self) {
+        self.state.lock().unwrap().live_engines.device_slices += 1;
     }
 
     pub fn get_model_status(&self) -> ModelStatus {
@@ -865,8 +919,15 @@ pub fn get_global_transcriber() -> &'static GlobalTranscriberEngine {
     ENGINE.get_or_init(GlobalTranscriberEngine::new)
 }
 
+/// Transcribes the audio recorded since the last call. With cloud recording
+/// on (see `cloud_recording`), the slice goes to the chosen cloud engine and
+/// falls back to the device if that fails. `model_version`: the cloud model
+/// the user picked.
 #[tauri::command]
-pub fn transcribe_audio_buffer(language: String) -> Result<Vec<TranscriptSegment>, String> {
+pub fn transcribe_audio_buffer(
+    language: String,
+    model_version: Option<String>,
+) -> Result<Vec<TranscriptSegment>, String> {
     let engine = get_global_transcriber();
     let audio_engine = crate::audio::get_global_audio_engine();
     // Live transcription advances a cursor only — never take/clear the session
@@ -877,8 +938,21 @@ pub fn transcribe_audio_buffer(language: String) -> Result<Vec<TranscriptSegment
         Some(s) => s,
         None => return Ok(engine.get_history()),
     };
+    let offset_ms = (start as u64 * 1000) / 16000;
 
-    engine.transcribe_pcm_live(&samples, &language, (start as u64 * 1000) / 16000)
+    if let Some(choice) = crate::cloud_recording::active(model_version) {
+        match crate::cloud_recording::transcribe_pcm(&choice, &samples, &language) {
+            Ok(segments) => {
+                return Ok(engine.append_cloud_slice(segments, offset_ms, choice.label()))
+            }
+            Err(e) => eprintln!("⚠️ Bulut yazıya dökme başarısız, bu parça cihazda: {e}"),
+        }
+    }
+    let result = engine.transcribe_pcm_live(&samples, &language, offset_ms);
+    if result.is_ok() {
+        engine.note_device_slice();
+    }
+    result
 }
 
 #[tauri::command]
@@ -1293,6 +1367,50 @@ mod tests {
             language: "auto".into(),
             confidence: 1.0,
         }
+    }
+
+    #[test]
+    fn test_cloud_slices_join_the_live_history_in_order() {
+        let engine = GlobalTranscriberEngine::new();
+        engine.state.lock().unwrap().segments = vec![seg(1, "yerel")];
+        engine.state.lock().unwrap().segment_counter = 1;
+        let history = engine.append_cloud_slice(
+            vec![seg(1, "bulut bir"), seg(2, "bulut iki")],
+            15_000,
+            "⚡ Bulut Zekası (GROQ)".into(),
+        );
+        assert_eq!(history.len(), 3);
+        assert_eq!(history[1].id, 2, "numbered after the existing segments");
+        assert_eq!(history[2].id, 3);
+        assert_eq!(history[1].start_time_ms, 15_000, "shifted to its place");
+        assert_eq!(history[1].end_time_ms, 16_000);
+        assert_eq!(history[1].timestamp_formatted, format_span(15_000, 16_000));
+
+        let (taken, engines) = engine.take_history_with_engines();
+        assert_eq!(taken.len(), 3);
+        assert_eq!(engines.label("Cihazda"), "⚡ Bulut Zekası (GROQ)");
+        let (_, after) = engine.take_history_with_engines();
+        assert_eq!(after, LiveEngines::default(), "reset for the next session");
+    }
+
+    #[test]
+    fn test_live_engine_label_is_honest() {
+        let device = "Cihazda (Whisper Small)";
+        assert_eq!(LiveEngines::default().label(device), device);
+        let cloud = LiveEngines {
+            cloud: Some("⚡ Bulut Zekası (GROQ)".into()),
+            device_slices: 0,
+        };
+        assert_eq!(cloud.label(device), "⚡ Bulut Zekası (GROQ)");
+        let mixed = LiveEngines {
+            device_slices: 2,
+            ..cloud
+        };
+        assert_eq!(
+            mixed.label(device),
+            "⚡ Bulut Zekası (GROQ) + Cihazda (Whisper Small)",
+            "a slice that fell back to the device is named too"
+        );
     }
 
     #[test]
