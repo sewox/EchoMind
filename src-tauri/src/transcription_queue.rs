@@ -630,6 +630,7 @@ fn worker_loop(app: tauri::AppHandle) {
         };
 
         // Decode FLAC → PCM on this worker thread (never UI/main).
+        let started = std::time::Instant::now();
         let mut channels = match crate::importer::decode_audio_file_channels_16k(&path) {
             Ok(channels) => channels,
             Err(e) => {
@@ -647,9 +648,16 @@ fn worker_loop(app: tauri::AppHandle) {
                 continue;
             }
         };
+        println!(
+            "⏱️ Ses çözme: {:.1} sn sürdü",
+            started.elapsed().as_secs_f32()
+        );
         // Mic and system audio recorded over loudspeakers: remove the remote
         // side's echo from the mic before mixing (it doubles every word).
-        if let Some(lag) = crate::echo::clean_channels(&mut channels) {
+        let samples = channels.first().map_or(0, Vec::len);
+        if let Some(lag) = crate::dual_track::timed("Yankı giderme", samples, || {
+            crate::echo::clean_channels(&mut channels)
+        }) {
             println!("🔇 Yankı giderildi (sistem sesi {lag:.0} ms kaydırıldı)");
         }
         let mut pcm = crate::importer::mix_channels(&channels);
@@ -747,9 +755,10 @@ fn worker_loop(app: tauri::AppHandle) {
                         let _ = app.emit("meeting-transcript-ready", &updated_meeting);
                         crate::report_queue::request_report(&app, &job.meeting_id);
                         println!(
-                            "✅ Queue transcription done: {} ({} segments)",
+                            "✅ Queue transcription done: {} ({} segments, {:.0} s)",
                             job.meeting_id,
-                            updated_meeting.segments.len()
+                            updated_meeting.segments.len(),
+                            started.elapsed().as_secs_f32()
                         );
                     }
                     Err(_) if !meeting_exists(&job.meeting_id) => {

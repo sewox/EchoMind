@@ -788,10 +788,17 @@ pub async fn retranscribe_meeting(
 
         // 1. Decode audio to 16kHz PCM
         crate::import_progress::decoding();
+        let started = std::time::Instant::now();
         let mut channels = decode_audio_file_channels_16k(&path)?;
+        println!("⏱️ Ses çözme: {:.1} sn sürdü", started.elapsed().as_secs_f32());
         // App recordings keep mic and system audio apart; with loudspeakers
         // the mic also holds the remote side, which doubles it in the mix.
-        if let Some(lag) = crate::echo::clean_channels(&mut channels) {
+        let samples = channels.first().map_or(0, Vec::len);
+        if let Some(lag) =
+            crate::dual_track::timed("Yankı giderme", samples, || {
+                crate::echo::clean_channels(&mut channels)
+            })
+        {
             println!("🔇 Yankı giderildi (sistem sesi {lag:.0} ms kaydırıldı)");
         }
         let mut pcm_16k = mix_channels(&channels);
