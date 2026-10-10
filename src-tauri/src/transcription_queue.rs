@@ -706,6 +706,7 @@ fn worker_loop(app: tauri::AppHandle) {
         if let Some(choice) = crate::cloud_recording::active(None) {
             match transcribe_with_cloud(&choice, &pcm, channels.len()) {
                 Ok(segs) => {
+                    println!("☁️ Bulutta yazıya döküldü: {}", choice.label());
                     result = Ok(segs);
                     engine_label = Some(choice.label());
                 }
