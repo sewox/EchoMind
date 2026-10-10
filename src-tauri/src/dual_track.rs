@@ -169,6 +169,19 @@ pub enum Silence {
 
 /// Transcribes `mic` and `system` separately with `run` (which labels the
 /// speakers of the audio it gets) and merges the results.
+/// Runs one pipeline step and logs how long it took next to the audio length,
+/// so a slow re-transcription shows which step is slow.
+pub fn timed<T>(step: &str, samples: usize, run: impl FnOnce() -> T) -> T {
+    let started = std::time::Instant::now();
+    let result = run();
+    println!(
+        "⏱️ {step}: {:.0} sn ses, {:.1} sn sürdü",
+        samples as f32 / RATE as f32,
+        started.elapsed().as_secs_f32()
+    );
+    result
+}
+
 pub fn transcribe<F>(
     mic: &[f32],
     system: &[f32],
@@ -190,8 +203,8 @@ where
         restore_times(&mut segments, &compacted);
         Ok(segments)
     };
-    let local = part(mic)?;
-    let remote = part(system)?;
+    let local = timed("Mikrofon izi", mic.len(), || part(mic))?;
+    let remote = timed("Karşı taraf izi", system.len(), || part(system))?;
     Ok(merge(local, remote))
 }
 
