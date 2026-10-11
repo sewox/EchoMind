@@ -256,6 +256,60 @@ pub fn transcribe_audio_cloud(
     Ok(segments)
 }
 
+/// Generation settings for a transcript: bare JSON in a fixed shape and room
+/// for long answers. Thinking spends output tokens and adds nothing to a
+/// transcript, so it is kept to the minimum each model family allows.
+fn gemini_generation_config(model: &str) -> Value {
+    let mut config = json!({
+        "temperature": 0.0,
+        "maxOutputTokens": 32768,
+        "responseMimeType": "application/json",
+        "responseSchema": {
+            "type": "ARRAY",
+            "items": {
+                "type": "OBJECT",
+                "properties": {
+                    "start": { "type": "NUMBER" },
+                    "end": { "type": "NUMBER" },
+                    "speaker": { "type": "STRING" },
+                    "text": { "type": "STRING" }
+                },
+                "required": ["start", "end", "text"]
+            }
+        }
+    });
+    if model.starts_with("gemini-2.5-flash") {
+        config["thinkingConfig"] = json!({ "thinkingBudget": 0 });
+    } else if !model.starts_with("gemini-2.") {
+        config["thinkingConfig"] = json!({ "thinkingLevel": "minimal" });
+    }
+    config
+}
+
+/// The answer text of a Gemini response. A cut-off answer (output limit,
+/// safety stop) is an error: half a transcript must not pass for a whole one.
+fn gemini_answer(response: &Value) -> Result<String, String> {
+    let candidate = response
+        .get("candidates")
+        .and_then(|c| c.get(0))
+        .ok_or("Gemini boş yanıt döndürdü")?;
+    let reason = candidate
+        .get("finishReason")
+        .and_then(Value::as_str)
+        .unwrap_or("STOP");
+    if reason != "STOP" {
+        return Err(format!("Gemini yanıtı yarıda kesildi ({reason})"));
+    }
+    Ok(candidate
+        .pointer("/content/parts")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter(|p| !p.get("thought").and_then(Value::as_bool).unwrap_or(false))
+        .filter_map(|p| p.get("text").and_then(Value::as_str))
+        .collect())
+}
+
 fn transcribe_audio_gemini(
     audio_path: &Path,
     api_key: &str,
@@ -281,24 +335,19 @@ fn transcribe_audio_gemini(
         5. SADECE aşağıdaki JSON dizisi formatında yanıt döndür (başka hiçbir açıklama metni ekleme):\n\
         [\n  {\"start\": 0.0, \"end\": 4.2, \"speaker\": \"Konuşmacı 1\", \"text\": \"Söylenen gerçek cümle buraya yazılacak.\"}\n]";
 
-    let body = json!({
-        "contents": [{
-            "parts": [
-                {
-                    "inline_data": {
-                        "mime_type": audio_mime(audio_path),
-                        "data": b64_audio
-                    }
-                },
-                {
-                    "text": prompt
+    let contents = json!([{
+        "parts": [
+            {
+                "inline_data": {
+                    "mime_type": audio_mime(audio_path),
+                    "data": b64_audio
                 }
-            ]
-        }],
-        "generationConfig": {
-            "temperature": 0.0
-        }
-    });
+            },
+            {
+                "text": prompt
+            }
+        ]
+    }]);
 
     // A busy or missing model hands over to the next one; any other error
     // (bad key, bad request) would fail the same way on every model.
@@ -310,6 +359,10 @@ fn transcribe_audio_gemini(
             model,
             api_key.trim()
         );
+        let body = json!({
+            "contents": contents,
+            "generationConfig": gemini_generation_config(model),
+        });
         let resp = send_with_retry(|| {
             client
                 .post(&endpoint)
@@ -343,84 +396,63 @@ fn transcribe_audio_gemini(
         .json()
         .map_err(|e| format!("Gemini JSON yanıtı ayrıştırma hatası: {}", e))?;
 
-    let text_output = json_val
-        .get("candidates")
-        .and_then(|c| c.get(0))
-        .and_then(|c0| c0.get("content"))
-        .and_then(|cnt| cnt.get("parts"))
-        .and_then(|p| p.get(0))
-        .and_then(|p0| p0.get("text"))
-        .and_then(|t| t.as_str())
-        .unwrap_or("");
+    let text_output = gemini_answer(&json_val)?;
 
     let mut segments: Vec<TranscriptSegment> = Vec::new();
 
-    // Clean markdown code blocks if any
+    // The schema asks for bare JSON; older models may still wrap it in a
+    // code block. Anything unparseable is an error, never a transcript line.
     let cleaned_json = text_output
         .trim()
         .trim_start_matches("```json")
         .trim_start_matches("```")
         .trim_end_matches("```")
         .trim();
+    let parsed_segs = serde_json::from_str::<Vec<Value>>(cleaned_json)
+        .map_err(|e| format!("Gemini yanıtı okunamadı: {e}"))?;
+    for (idx, seg) in parsed_segs.iter().enumerate() {
+        let start = seg.get("start").and_then(|v| v.as_f64()).unwrap_or(0.0);
+        let end = seg
+            .get("end")
+            .and_then(|v| v.as_f64())
+            .unwrap_or(start + 5.0);
+        let speaker = seg
+            .get("speaker")
+            .and_then(|v| v.as_str())
+            .unwrap_or("Konuşmacı 1")
+            .to_string();
+        let text = seg
+            .get("text")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .trim()
+            .to_string();
 
-    if let Ok(parsed_segs) = serde_json::from_str::<Vec<Value>>(cleaned_json) {
-        for (idx, seg) in parsed_segs.iter().enumerate() {
-            let start = seg.get("start").and_then(|v| v.as_f64()).unwrap_or(0.0);
-            let end = seg
-                .get("end")
-                .and_then(|v| v.as_f64())
-                .unwrap_or(start + 5.0);
-            let speaker = seg
-                .get("speaker")
-                .and_then(|v| v.as_str())
-                .unwrap_or("Konuşmacı 1")
-                .to_string();
-            let text = seg
-                .get("text")
-                .and_then(|v| v.as_str())
-                .unwrap_or("")
-                .trim()
-                .to_string();
-
-            if text.is_empty() {
-                continue;
-            }
-
-            let start_ms = (start * 1000.0) as u64;
-            let end_ms = (end * 1000.0) as u64;
-
-            let start_min = start_ms / 60000;
-            let start_sec = (start_ms % 60000) / 1000;
-            let end_min = end_ms / 60000;
-            let end_sec = (end_ms % 60000) / 1000;
-
-            let timestamp_formatted = format!(
-                "{:02}:{:02} -> {:02}:{:02}",
-                start_min, start_sec, end_min, end_sec
-            );
-
-            segments.push(TranscriptSegment {
-                id: idx + 1,
-                speaker_id: speaker.clone(),
-                speaker_name: speaker,
-                start_time_ms: start_ms,
-                end_time_ms: end_ms,
-                timestamp_formatted,
-                text,
-                language: language.to_string(),
-                confidence: 0.99,
-            });
+        if text.is_empty() {
+            continue;
         }
-    } else if !text_output.trim().is_empty() {
-        // Fallback if returned as raw formatted text lines
+
+        let start_ms = (start * 1000.0) as u64;
+        let end_ms = (end * 1000.0) as u64;
+
+        let start_min = start_ms / 60000;
+        let start_sec = (start_ms % 60000) / 1000;
+        let end_min = end_ms / 60000;
+        let end_sec = (end_ms % 60000) / 1000;
+
+        let timestamp_formatted = format!(
+            "{:02}:{:02} -> {:02}:{:02}",
+            start_min, start_sec, end_min, end_sec
+        );
+
         segments.push(TranscriptSegment {
-            id: 1,
-            speaker_id: "Konuşmacı 1".to_string(),
-            speaker_name: "Konuşmacı 1".to_string(),
-            start_time_ms: 0,
-            end_time_ms: 10000,
-            timestamp_formatted: "00:00 -> 00:10".to_string(),
-            text: text_output.trim().to_string(),
+            id: idx + 1,
+            speaker_id: speaker.clone(),
+            speaker_name: speaker,
+            start_time_ms: start_ms,
+            end_time_ms: end_ms,
+            timestamp_formatted,
+            text,
             language: language.to_string(),
             confidence: 0.99,
         });
@@ -467,6 +499,33 @@ mod tests {
         assert!(!is_transient(StatusCode::BAD_REQUEST));
         assert!(!is_transient(StatusCode::UNAUTHORIZED));
         assert!(!is_transient(StatusCode::NOT_FOUND));
+    }
+
+    #[test]
+    fn thinking_is_kept_minimal_per_model_family() {
+        let level = |m: &str| gemini_generation_config(m)["thinkingConfig"].clone();
+        assert_eq!(
+            level("gemini-3.6-flash"),
+            json!({ "thinkingLevel": "minimal" })
+        );
+        assert_eq!(level("gemini-2.5-flash"), json!({ "thinkingBudget": 0 }));
+        assert_eq!(level("gemini-2.5-pro"), Value::Null);
+    }
+
+    #[test]
+    fn a_cut_off_gemini_answer_is_an_error() {
+        let answer = |reason: &str| {
+            gemini_answer(&json!({ "candidates": [{
+                "finishReason": reason,
+                "content": { "parts": [
+                    { "text": "plan", "thought": true },
+                    { "text": "[]" }
+                ] }
+            }] }))
+        };
+        assert_eq!(answer("STOP").unwrap(), "[]");
+        assert!(answer("MAX_TOKENS").unwrap_err().contains("MAX_TOKENS"));
+        assert!(gemini_answer(&json!({})).is_err());
     }
 
     #[test]

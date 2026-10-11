@@ -132,6 +132,19 @@ pub fn active(model: Option<String>) -> Option<CloudChoice> {
 /// for the upload limits, cut at natural pauses. Times are relative to the
 /// start of `pcm`. Any failed piece fails the whole call, so the caller can
 /// fall back to the device instead of keeping a transcript with holes.
+/// Keeps segments inside the piece they came from: a model's timestamps can
+/// run past the end of the audio it heard (Gemini's do).
+fn clamp_to_piece(segments: Vec<TranscriptSegment>, piece_ms: u64) -> Vec<TranscriptSegment> {
+    segments
+        .into_iter()
+        .filter(|s| s.start_time_ms < piece_ms)
+        .map(|mut s| {
+            s.end_time_ms = s.end_time_ms.clamp(s.start_time_ms, piece_ms);
+            s
+        })
+        .collect()
+}
+
 pub fn transcribe_pcm(
     choice: &CloudChoice,
     pcm: &[f32],
@@ -161,7 +174,7 @@ pub fn transcribe_pcm(
             choice.model.as_deref(),
         );
         let _ = std::fs::remove_file(&wav);
-        for mut seg in result? {
+        for mut seg in clamp_to_piece(result?, piece.len() as u64 * 1000 / 16000) {
             seg.start_time_ms += offset_ms;
             seg.end_time_ms += offset_ms;
             seg.timestamp_formatted =
@@ -178,6 +191,30 @@ pub fn transcribe_pcm(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn segments_stay_inside_their_piece() {
+        let seg = |start, end| TranscriptSegment {
+            id: 1,
+            speaker_id: String::new(),
+            speaker_name: String::new(),
+            start_time_ms: start,
+            end_time_ms: end,
+            timestamp_formatted: String::new(),
+            text: "x".into(),
+            language: "tr".into(),
+            confidence: 1.0,
+        };
+        let kept = clamp_to_piece(
+            vec![seg(1_000, 4_000), seg(9_000, 12_000), seg(10_000, 11_000)],
+            10_000,
+        );
+        let spans: Vec<_> = kept
+            .iter()
+            .map(|s| (s.start_time_ms, s.end_time_ms))
+            .collect();
+        assert_eq!(spans, [(1_000, 4_000), (9_000, 10_000)]);
+    }
 
     #[test]
     fn engines_map_to_providers() {
