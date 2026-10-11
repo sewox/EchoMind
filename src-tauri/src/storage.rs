@@ -1406,7 +1406,7 @@ fn save_current_meeting_blocking(
     let transcriber = crate::transcriber::get_global_transcriber();
 
     // Explicit order: stop is done by the caller; finalize segments, then claim.
-    let segments = transcriber.take_history();
+    let (segments, live_engines) = transcriber.take_history_with_engines();
 
     let (session_id, mic, system, live_covered_samples) = match audio_engine.claim_pcm_for_save() {
         PcmClaim::AlreadySaved { session_id } => {
@@ -1517,12 +1517,18 @@ fn save_current_meeting_blocking(
         // was paused while a past meeting was open, or the app quit mid-meeting.
         // With Apple dictation chosen, the live (Whisper) text is only a
         // preview: the whole recording is re-transcribed by Apple in the queue.
+        // Likewise when the remote side echoes in the mic (loudspeakers): the
+        // live text heard it twice; the queue transcribes it with the echo
+        // removed.
+        let full_pass_possible =
+            mode == SaveMode::Normal && audio_file_path.is_some() && mic.len() >= 16000;
         let transcript_pending =
             needs_full_transcription(&deduplicated_segments, mic.len(), live_covered_samples)
-                || (mode == SaveMode::Normal
-                    && audio_file_path.is_some()
-                    && mic.len() >= 16000
-                    && crate::asr_engine::queue_uses_apple());
+                || (full_pass_possible && crate::asr_engine::queue_uses_apple())
+                || (full_pass_possible
+                    && system
+                        .as_ref()
+                        .is_some_and(|sys| crate::echo::has_echo_pcm16(&mic, sys)));
         // Live slices aren't diarized (numbering would restart every slice);
         // label speakers once for the whole session now. Skipped on quit (tight
         // time budget) and when a full re-transcription is queued anyway.
@@ -1578,7 +1584,9 @@ fn save_current_meeting_blocking(
             phase2_deferred: None,
             detailed_topics: None,
             participants: None,
-            engine_used: Some("Cihazda (Whisper Small)".to_string()),
+            engine_used: Some(
+                live_engines.label(&crate::transcriber::get_global_transcriber().device_label()),
+            ),
             summary_provider: Some("EchoMind Akıllı Özet".to_string()),
             tags: None,
             transcript_pending,
@@ -1655,10 +1663,13 @@ pub fn update_meeting_speaker_name(
 }
 
 #[tauri::command]
-pub fn update_meeting_title(id: String, new_title: String) -> Result<Vec<MeetingRecord>, String> {
+pub fn update_meeting_title(
+    meeting_id: String,
+    new_title: String,
+) -> Result<Vec<MeetingRecord>, String> {
     require_storage_ready()?;
     let storage = get_global_storage();
-    storage.update_title(&id, &new_title)
+    storage.update_title(&meeting_id, &new_title)
 }
 
 #[tauri::command]

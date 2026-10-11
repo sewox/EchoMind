@@ -18,6 +18,7 @@ import { MeetingRecord } from "../App";
 import { useI18n } from "../locales/i18nContext";
 import { usePrivacyMode } from "../hooks/usePrivacyMode";
 import { CredentialStore } from "../services/credentialStore";
+import { currentGeminiModel } from "./ModelHubModalConstants";
 
 interface RetranscribeModalProps {
   isOpen: boolean;
@@ -177,9 +178,9 @@ export const RetranscribeModal: React.FC<RetranscribeModalProps> = ({
             "whisper-1";
         } else if (cloudProvider === "gemini") {
           apiKey = await CredentialStore.get("echomind_gemini_key");
-          modelVer =
-            localStorage.getItem("echomind_gemini_model_version") ||
-            "gemini-1.5-flash";
+          modelVer = currentGeminiModel(
+            localStorage.getItem("echomind_gemini_model_version"),
+          );
         }
 
         if (!apiKey) {
@@ -219,7 +220,6 @@ export const RetranscribeModal: React.FC<RetranscribeModalProps> = ({
 
       const updated = await invoke<MeetingRecord>("retranscribe_meeting", {
         meetingId: meeting.id,
-        audioFilePath: meeting.audio_file_path,
         cloudProvider: cloudProv,
         apiKey,
         modelVersion: modelVer,

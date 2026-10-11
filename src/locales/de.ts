@@ -93,6 +93,18 @@ export const de: TranslationKeys = {
     remainingMinutes: "~{n} Min. übrig",
     remainingSeconds: "~{n} Sek. übrig",
   },
+  cloudRecording: {
+    title: "Cloud für Aufnahmen verwenden",
+    desc: "Aus: Live-Aufnahme und die Transkription danach laufen immer auf diesem Computer; die unten gewählte Cloud-Engine wird nur für Importe und erneute Transkriptionen verwendet. Ein: Während der Aufnahme wird der Ton in 15-Sekunden-Stücken an den gewählten Anbieter gesendet, danach vollständig. Fällt die Cloud aus, übernimmt die Engine auf diesem Computer.",
+    onDevice: "Aktuell: Aufnahmen werden auf diesem Computer transkribiert.",
+    active: "Aktuell: Aufnahmen werden mit {provider} transkribiert.",
+    noEngine:
+      "Wählen Sie unten eine Cloud-Engine; bis dahin werden Aufnahmen auf diesem Computer transkribiert.",
+    noKey:
+      "Speichern Sie den API-Schlüssel für {provider}; bis dahin werden Aufnahmen auf diesem Computer transkribiert.",
+    paranoid:
+      "Im Paranoid-Modus ist die Cloud gesperrt; Aufnahmen werden auf diesem Computer transkribiert.",
+  },
   recordingLimit: {
     reached:
       "Die Aufnahme hat das Limit von {hours} Stunden erreicht und wurde beendet und gespeichert. Läuft das Meeting noch, starten Sie eine neue Aufnahme.",
@@ -663,7 +675,7 @@ export const de: TranslationKeys = {
       systemAudioSpeaker: "Systemaudio: Lautsprecher/Raum",
       systemAudioCaptureToggle: "Systemaudio aufnehmen (entfernte Teilnehmer)",
       systemAudioCaptureDesc:
-        "Unter macOS 14.2+ wird Meeting-App-Audio zusammen mit dem Mikrofon aufgenommen. Aus = nur Mikrofon.",
+        "Nimmt Meeting-App-Audio zusammen mit dem Mikrofon auf (macOS 14.2+, Windows, Linux mit PulseAudio/PipeWire). Aus = nur Mikrofon.",
       systemAudioUnsupported:
         "Native Systemaudio-Aufnahme wird auf dieser Plattform nicht unterstützt. Nutzen Sie ein virtuelles Loopback-Gerät oder nur das Mikrofon.",
       systemAudioDeniedHint:
@@ -690,6 +702,8 @@ export const de: TranslationKeys = {
       aiStatus: "KI-Status:",
       aiReady: "Bereit",
       aiOnDemand: "Wird bei Bedarf geladen",
+      modelFallback:
+        "{from} konnte nicht geladen werden; für die Transkription wird stattdessen {used} verwendet. Laden Sie {from} im Modellfenster herunter.",
       cloudWarnToggle: "Datenschutzhinweis bei Cloud-Verarbeitung anzeigen",
       cloudWarnToggleDesc:
         "Erinnert vor der Nutzung einer schnellen Cloud-Option daran, dass Ihre Aufnahme über das Internet an einen KI-Server gesendet wird.",

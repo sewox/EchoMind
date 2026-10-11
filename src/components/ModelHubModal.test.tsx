@@ -523,7 +523,7 @@ describe("ModelHubModal Component", () => {
     if (selects.length >= 3) {
       fireEvent.change(selects[1], { target: { value: "custom" } });
       const customGeminiInput = screen.getByPlaceholderText(
-        /Örn: gemini-2.0-flash/i,
+        /Örn: gemini-3.8-flash/i,
       );
       fireEvent.change(customGeminiInput, {
         target: { value: "gemini-2.0-pro-exp" },

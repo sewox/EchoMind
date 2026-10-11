@@ -397,7 +397,8 @@ TOPLANTI ARŞİVİ:\n{}\n\nKULLANICI SORUSU:\n{}",
         };
 
         let url = format!(
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={}",
+            "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent?key={}",
+            crate::cloud_transcriber::GEMINI_DEFAULT_MODEL,
             api_key.trim()
         );
 

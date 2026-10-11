@@ -38,7 +38,7 @@ export const RelatedMeetingsCard: React.FC<RelatedMeetingsCardProps> = ({
       try {
         const res = await invoke<RelatedMeetingItem[]>("get_related_meetings", {
           meetingId,
-          maxResults: 4,
+          limit: 4,
         });
         if (isMounted) {
           setRelatedList(Array.isArray(res) ? res : []);

@@ -88,6 +88,15 @@ export interface TranslationKeys {
     remainingMinutes: string;
     remainingSeconds: string;
   };
+  cloudRecording: {
+    title: string;
+    desc: string;
+    onDevice: string;
+    active: string;
+    noEngine: string;
+    noKey: string;
+    paranoid: string;
+  };
   recordingLimit: {
     reached: string;
   };
@@ -602,6 +611,7 @@ export interface TranslationKeys {
       aiStatus: string;
       aiReady: string;
       aiOnDemand: string;
+      modelFallback: string;
       cloudWarnToggle: string;
       cloudWarnToggleDesc: string;
       localLlmTitle: string;

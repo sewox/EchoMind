@@ -93,6 +93,18 @@ export const en: TranslationKeys = {
     remainingMinutes: "~{n} min left",
     remainingSeconds: "~{n} s left",
   },
+  cloudRecording: {
+    title: "Use the cloud for recordings",
+    desc: "When off, live recording and the transcription after it always run on this computer; the cloud engine chosen below is used only for imports and re-transcriptions. When on, audio is sent to the chosen provider in 15-second pieces while recording, and in full after it. If the cloud fails, the engine on this computer takes over.",
+    onDevice: "Now: recordings are transcribed on this computer.",
+    active: "Now: recordings are transcribed with {provider}.",
+    noEngine:
+      "Choose a cloud engine below; until then recordings are transcribed on this computer.",
+    noKey:
+      "Save the API key for {provider}; until then recordings are transcribed on this computer.",
+    paranoid:
+      "The cloud can't be used while Paranoid Mode is on; recordings are transcribed on this computer.",
+  },
   recordingLimit: {
     reached:
       "The recording reached the {hours}-hour limit, so it was stopped and saved. If the meeting is still going, start a new recording.",
@@ -665,7 +677,7 @@ export const en: TranslationKeys = {
       systemAudioSpeaker: "System Audio: Speaker/Room",
       systemAudioCaptureToggle: "Capture system audio (remote participants)",
       systemAudioCaptureDesc:
-        "On macOS 14.2+, records meeting-app audio alongside the microphone. When off, only the microphone is used.",
+        "Records meeting-app audio alongside the microphone (macOS 14.2+, Windows, Linux with PulseAudio/PipeWire). When off, only the microphone is used.",
       systemAudioUnsupported:
         "Native system-audio capture is not supported on this platform. Use a virtual loopback device or record microphone only.",
       systemAudioDeniedHint:
@@ -692,6 +704,8 @@ export const en: TranslationKeys = {
       aiStatus: "AI Status:",
       aiReady: "Ready",
       aiOnDemand: "Loads On Demand",
+      modelFallback:
+        "{from} could not be loaded; transcription is using {used} instead. Download {from} in the Models window.",
       cloudWarnToggle: "Show Privacy Warning for Cloud Processing",
       cloudWarnToggleDesc:
         "Before a fast cloud option runs, reminds you that your recording will be sent over the internet to an AI server.",

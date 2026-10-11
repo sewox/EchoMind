@@ -48,6 +48,11 @@ fn resolve_engine(stored: Option<String>, apple: bool) -> String {
     }
 }
 
+/// The engine the user saved, if any (e.g. "cloud_groq").
+pub fn stored_engine() -> Option<String> {
+    read_engine(&prefs_path())
+}
+
 /// True when the queue should transcribe with Apple dictation.
 pub fn queue_uses_apple() -> bool {
     resolve_engine(read_engine(&prefs_path()), apple_available()) == ENGINE_APPLE

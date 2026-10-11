@@ -44,7 +44,7 @@ describe("RelatedMeetingsCard Component", () => {
 
     expect(invoke).toHaveBeenCalledWith("get_related_meetings", {
       meetingId: "curr-1",
-      maxResults: 4,
+      limit: 4,
     });
 
     await waitFor(() => {

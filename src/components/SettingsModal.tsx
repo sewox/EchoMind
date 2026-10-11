@@ -32,7 +32,9 @@ import { usePrivacyMode } from "../hooks/usePrivacyMode";
 import { HardwareInfo, ModelStatus } from "../App";
 import {
   GROQ_MODELS,
+  GEMINI_DEFAULT_MODEL,
   GEMINI_MODELS,
+  currentGeminiModel,
   OPENAI_MODELS,
   modelLabel,
 } from "./ModelHubModalConstants";
@@ -62,9 +64,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
   onClose,
   hardware,
-  modelStatus,
+  modelStatus: initialModelStatus,
 }) => {
   const { t, language, setLanguage } = useI18n();
+  // Read again on open: a model that fails to load only shows when it is
+  // first used, long after the app fetched the status at start.
+  const [modelStatus, setModelStatus] = useState(initialModelStatus);
+  useEffect(() => {
+    setModelStatus(initialModelStatus);
+    if (!isOpen) return;
+    invoke<ModelStatus>("get_model_status")
+      .then((status) => status && setModelStatus(status))
+      .catch(() => {});
+  }, [isOpen, initialModelStatus]);
   const { setPrivacyMode, isParanoid, isBalanced, isMaxIntelligence } =
     usePrivacyMode();
   const [activeTab, setActiveTab] = useState<
@@ -85,7 +97,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [openaiKey, setOpenaiKey] = useState<string>("");
 
   const [groqModel, setGroqModel] = useState<string>("whisper-large-v3-turbo");
-  const [geminiModel, setGeminiModel] = useState<string>("gemini-1.5-flash");
+  const [geminiModel, setGeminiModel] = useState<string>(GEMINI_DEFAULT_MODEL);
   const [openaiModel, setOpenaiModel] = useState<string>("whisper-1");
 
   const [customGroq, setCustomGroq] = useState<string>("");
@@ -268,9 +280,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       const storedGroq =
         localStorage.getItem("echomind_groq_model_version") ||
         "whisper-large-v3-turbo";
-      const storedGemini =
-        localStorage.getItem("echomind_gemini_model_version") ||
-        "gemini-1.5-flash";
+      const storedGemini = currentGeminiModel(
+        localStorage.getItem("echomind_gemini_model_version"),
+      );
       const storedOpenai =
         localStorage.getItem("echomind_openai_model_version") || "whisper-1";
 
@@ -398,7 +410,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         : groqModel;
     const finalGemini =
       geminiModel === "custom"
-        ? customGemini.trim() || "gemini-1.5-flash"
+        ? customGemini.trim() || GEMINI_DEFAULT_MODEL
         : geminiModel;
     const finalOpenai =
       openaiModel === "custom"
@@ -579,7 +591,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           </div>
 
-          {/* Native system-audio capture (macOS process tap) */}
+          {/* Native system-audio capture (macOS tap, WASAPI loopback, PulseAudio/PipeWire monitor) */}
           <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/80 flex items-center justify-between gap-3">
             <div className="min-w-0">
               <label className="text-slate-200 font-medium flex items-center gap-1.5">
@@ -987,6 +999,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     : t("ui.settings.aiOnDemand")}
                 </span>
               </div>
+            )}
+            {modelStatus?.used_fallback_model && (
+              <p role="alert" className="text-amber-400 text-[11px]">
+                {t("ui.settings.modelFallback", {
+                  from: modelStatus.fallback_from ?? "",
+                  used: modelStatus.model_name,
+                })}
+              </p>
             )}
           </div>
 
@@ -1562,7 +1582,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     value={customGemini}
                     onChange={(e) => setCustomGemini(e.target.value)}
                     placeholder={t("ui.settings.customModelPlaceholder", {
-                      example: "gemini-2.0-flash",
+                      example: "gemini-3.8-flash",
                     })}
                     className="flex-1 px-2.5 py-1 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white focus:outline-none font-mono"
                   />

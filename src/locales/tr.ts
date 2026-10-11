@@ -93,6 +93,18 @@ export const tr: TranslationKeys = {
     remainingMinutes: "~{n} dk kaldı",
     remainingSeconds: "~{n} sn kaldı",
   },
+  cloudRecording: {
+    title: "Kayıtlarda bulutu kullan",
+    desc: "Kapalıyken canlı kayıt ve kayıttan sonraki yazıya dökme her zaman bu bilgisayarda yapılır; aşağıda seçtiğiniz bulut motoru yalnızca dosya içe aktarırken ve yeniden yazıya dökerken kullanılır. Açarsanız kayıt sırasında ses 15 saniyelik parçalar hâlinde, kayıttan sonra da tamamı seçili sağlayıcıya gönderilir. Bulut hata verirse bilgisayardaki motor devreye girer.",
+    onDevice: "Şu an: kayıtlar bu bilgisayarda yazıya dökülüyor.",
+    active: "Şu an: kayıtlar {provider} ile yazıya dökülüyor.",
+    noEngine:
+      "Aşağıdan bir bulut motoru seçin; seçilene kadar kayıtlar bu bilgisayarda yazıya dökülür.",
+    noKey:
+      "{provider} için API anahtarını kaydedin; kaydedilene kadar kayıtlar bu bilgisayarda yazıya dökülür.",
+    paranoid:
+      "Paranoid Mod açıkken bulut kullanılamaz; kayıtlar bu bilgisayarda yazıya dökülür.",
+  },
   recordingLimit: {
     reached:
       "Kayıt {hours} saat sınırına ulaştığı için durduruldu ve kaydedildi. Toplantı sürüyorsa yeni bir kayıt başlatın.",
@@ -668,7 +680,7 @@ export const tr: TranslationKeys = {
       systemAudioSpeaker: "Sistem Sesi: Hoparlör/Ortam",
       systemAudioCaptureToggle: "Sistem sesini kaydet (uzaktaki katılımcılar)",
       systemAudioCaptureDesc:
-        "macOS 14.2+ üzerinde toplantı uygulamalarının sesini mikrofonla birlikte kaydeder. Kapalıysa yalnızca mikrofon kullanılır.",
+        "Toplantı uygulamalarının sesini mikrofonla birlikte kaydeder (macOS 14.2+, Windows, Linux: PulseAudio/PipeWire). Kapalıysa yalnızca mikrofon kullanılır.",
       systemAudioUnsupported:
         "Bu platformda yerel sistem sesi yakalama desteklenmiyor. Sanal loopback aygıtı kullanabilir veya yalnızca mikrofonla kaydedebilirsiniz.",
       systemAudioDeniedHint:
@@ -696,6 +708,8 @@ export const tr: TranslationKeys = {
       aiStatus: "Yapay Zeka Durumu:",
       aiReady: "Kullanıma Hazır",
       aiOnDemand: "İhtiyaç Anında Açılır",
+      modelFallback:
+        "{from} yüklenemedi; yazıya dökmede şu an {used} kullanılıyor. Modeller penceresinden {from} modelini indirin.",
       cloudWarnToggle: "Bulut İşlemlerinde Gizlilik Uyarısı Göster",
       cloudWarnToggleDesc:
         "Hızlı bulut seçeneği kullanıldığında, ses kaydınızın internet üzerinden yapay zeka sunucusuna gideceğini işlem öncesinde hatırlatır.",

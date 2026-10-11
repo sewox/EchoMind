@@ -2,12 +2,15 @@ pub mod asr_engine;
 pub mod audio;
 pub mod audio_clipper;
 pub mod auto_tagger;
+pub mod cloud_recording;
 pub mod cloud_transcriber;
 pub mod credentials;
 pub mod cross_memory;
 pub mod detector;
 pub mod diarization;
+pub mod dual_track;
 pub mod dlp;
+pub mod echo;
 pub mod encrypted_storage;
 pub mod glossary;
 pub mod hardware;
@@ -33,6 +36,7 @@ pub mod tts;
 pub mod updater;
 
 use asr_engine::{get_asr_engine, set_asr_engine};
+use cloud_recording::{get_cloud_recording, set_cloud_recording};
 use credentials::{delete_secure_credential, get_secure_credential, save_secure_credential};
 use dlp::redact_sensitive_text;
 use security::{get_privacy_mode, set_privacy_mode};
@@ -105,6 +109,8 @@ pub fn run() {
             tts::tts_resume,
             get_hardware_info,
             get_asr_engine,
+            get_cloud_recording,
+            set_cloud_recording,
             get_glossary,
             set_glossary,
             is_import_running,

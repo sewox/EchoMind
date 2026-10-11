@@ -85,6 +85,11 @@ llama-cpp-2 = { version = "=0.1.158", features = ["metal"] }
 whisper-rs = { version = "0.16.0" }
 llama-cpp-2 = { version = "=0.1.158" }
 
+# System audio on Linux: libpulse-simple is loaded at run time, so the app
+# still starts on systems without PulseAudio/PipeWire.
+[target.'cfg(target_os = "linux")'.dependencies]
+libloading = "0.8"
+
 [target.'cfg(target_os = "windows")'.dependencies]
 windows = { version = "0.58", features = ["Win32_System_SystemInformation", "Win32_Graphics_Direct3D11", "Win32_Foundation", "Win32_Media_Speech", "Win32_System_Com"] }
 

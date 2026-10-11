@@ -112,7 +112,8 @@ impl TranscriptRedactor {
                 let prov = provider.unwrap_or("gemini").to_lowercase();
                 if prov.contains("gemini") {
                     let url = format!(
-                        "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={}",
+                        "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent?key={}",
+                        crate::cloud_transcriber::GEMINI_DEFAULT_MODEL,
                         clean_key
                     );
 
