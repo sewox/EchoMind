@@ -727,7 +727,7 @@ fn worker_loop(app: tauri::AppHandle) {
             }
             transcriber
                 .transcribe_pcm_batch(audio, "auto", &q.cancel_current)
-                .map(|segs| (segs, "Cihazda (Whisper)".to_string()))
+                .map(|segs| (segs, transcriber.device_label()))
         };
         // With system audio, the microphone ("Siz") and the remote side are
         // transcribed apart and merged by time; mixing them loses words.

@@ -702,6 +702,8 @@ export const de: TranslationKeys = {
       aiStatus: "KI-Status:",
       aiReady: "Bereit",
       aiOnDemand: "Wird bei Bedarf geladen",
+      modelFallback:
+        "{from} konnte nicht geladen werden; für die Transkription wird stattdessen {used} verwendet. Laden Sie {from} im Modellfenster herunter.",
       cloudWarnToggle: "Datenschutzhinweis bei Cloud-Verarbeitung anzeigen",
       cloudWarnToggleDesc:
         "Erinnert vor der Nutzung einer schnellen Cloud-Option daran, dass Ihre Aufnahme über das Internet an einen KI-Server gesendet wird.",
