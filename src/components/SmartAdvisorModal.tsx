@@ -17,6 +17,7 @@ import { ModalShell } from "./ui/ModalShell";
 import { useI18n } from "../locales/i18nContext";
 import { usePrivacyMode } from "../hooks/usePrivacyMode";
 import { CredentialStore } from "../services/credentialStore";
+import { currentGeminiModel } from "./ModelHubModalConstants";
 
 export interface PickedFileInfo {
   path: string;
@@ -89,9 +90,8 @@ export const SmartAdvisorModal: React.FC<SmartAdvisorModalProps> = ({
       );
     }
     if (selectedCloudProvider === "gemini") {
-      return (
-        localStorage.getItem("echomind_gemini_model_version") ||
-        "gemini-1.5-flash"
+      return currentGeminiModel(
+        localStorage.getItem("echomind_gemini_model_version"),
       );
     }
     return localStorage.getItem("echomind_openai_model_version") || "whisper-1";

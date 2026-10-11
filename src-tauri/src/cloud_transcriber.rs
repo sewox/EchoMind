@@ -6,6 +6,28 @@ use std::fs;
 use std::path::Path;
 use std::time::Duration;
 
+/// Gemini model used when none is chosen.
+pub const GEMINI_DEFAULT_MODEL: &str = "gemini-3.6-flash";
+/// Tried in order where any working Gemini model will do.
+pub const GEMINI_FALLBACK_MODELS: [&str; 3] = [
+    "gemini-3.6-flash",
+    "gemini-3.5-flash-lite",
+    "gemini-2.5-flash",
+];
+
+/// The Gemini model to call. Google shut down Gemini 1.x and 2.0, so a model
+/// saved back then (or none at all) falls back to the default.
+pub fn gemini_model(chosen: Option<&str>) -> &str {
+    match chosen.map(str::trim) {
+        Some(m) if !m.is_empty() && !is_retired_gemini(m) => m,
+        _ => GEMINI_DEFAULT_MODEL,
+    }
+}
+
+fn is_retired_gemini(model: &str) -> bool {
+    model.starts_with("gemini-1.") || model.starts_with("gemini-2.0")
+}
+
 fn base64_encode(data: &[u8]) -> String {
     const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut result = String::with_capacity(data.len().div_ceil(3) * 4);
@@ -191,7 +213,7 @@ fn transcribe_audio_gemini(
         .build()
         .map_err(|e| e.to_string())?;
 
-    let gemini_model = model_version.unwrap_or("gemini-1.5-flash");
+    let gemini_model = gemini_model(model_version);
 
     let endpoint = format!(
         "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent?key={}",
@@ -345,5 +367,19 @@ mod tests {
     fn test_base64_encode() {
         assert_eq!(base64_encode(b"hello"), "aGVsbG8=");
         assert_eq!(base64_encode(b"EchoMind"), "RWNob01pbmQ=");
+    }
+
+    #[test]
+    fn retired_gemini_models_fall_back_to_the_default() {
+        for saved in [
+            None,
+            Some(""),
+            Some("gemini-1.5-flash"),
+            Some("gemini-2.0-flash-lite"),
+        ] {
+            assert_eq!(gemini_model(saved), GEMINI_DEFAULT_MODEL);
+        }
+        assert_eq!(gemini_model(Some(" gemini-3.8-flash ")), "gemini-3.8-flash");
+        assert_eq!(gemini_model(Some("gemini-2.5-pro")), "gemini-2.5-pro");
     }
 }

@@ -32,7 +32,9 @@ import { usePrivacyMode } from "../hooks/usePrivacyMode";
 import { HardwareInfo, ModelStatus } from "../App";
 import {
   GROQ_MODELS,
+  GEMINI_DEFAULT_MODEL,
   GEMINI_MODELS,
+  currentGeminiModel,
   OPENAI_MODELS,
   modelLabel,
 } from "./ModelHubModalConstants";
@@ -85,7 +87,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [openaiKey, setOpenaiKey] = useState<string>("");
 
   const [groqModel, setGroqModel] = useState<string>("whisper-large-v3-turbo");
-  const [geminiModel, setGeminiModel] = useState<string>("gemini-1.5-flash");
+  const [geminiModel, setGeminiModel] = useState<string>(GEMINI_DEFAULT_MODEL);
   const [openaiModel, setOpenaiModel] = useState<string>("whisper-1");
 
   const [customGroq, setCustomGroq] = useState<string>("");
@@ -268,9 +270,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       const storedGroq =
         localStorage.getItem("echomind_groq_model_version") ||
         "whisper-large-v3-turbo";
-      const storedGemini =
-        localStorage.getItem("echomind_gemini_model_version") ||
-        "gemini-1.5-flash";
+      const storedGemini = currentGeminiModel(
+        localStorage.getItem("echomind_gemini_model_version"),
+      );
       const storedOpenai =
         localStorage.getItem("echomind_openai_model_version") || "whisper-1";
 
@@ -398,7 +400,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         : groqModel;
     const finalGemini =
       geminiModel === "custom"
-        ? customGemini.trim() || "gemini-1.5-flash"
+        ? customGemini.trim() || GEMINI_DEFAULT_MODEL
         : geminiModel;
     const finalOpenai =
       openaiModel === "custom"
@@ -1562,7 +1564,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     value={customGemini}
                     onChange={(e) => setCustomGemini(e.target.value)}
                     placeholder={t("ui.settings.customModelPlaceholder", {
-                      example: "gemini-2.0-flash",
+                      example: "gemini-3.8-flash",
                     })}
                     className="flex-1 px-2.5 py-1 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white focus:outline-none font-mono"
                   />
