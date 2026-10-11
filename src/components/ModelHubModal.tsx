@@ -19,12 +19,15 @@ import {
 import { ModalShell } from "./ui/ModalShell";
 import {
   GROQ_MODELS,
+  GEMINI_DEFAULT_MODEL,
   GEMINI_MODELS,
+  currentGeminiModel,
   OPENAI_MODELS,
   modelLabel,
 } from "./ModelHubModalConstants";
 import { useI18n } from "../locales/i18nContext";
 import { getActiveEngine, storeActiveEngine } from "../services/activeEngine";
+import { CloudRecordingSection } from "./CloudRecordingSection";
 import { LocalLlmSection } from "./LocalLlmSection";
 import { VoicePacksSection } from "./VoicePacksSection";
 import { CredentialStore } from "../services/credentialStore";
@@ -67,7 +70,7 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
     "whisper-large-v3-turbo",
   );
   const [geminiModelVersion, setGeminiModelVersion] =
-    useState<string>("gemini-1.5-flash");
+    useState<string>(GEMINI_DEFAULT_MODEL);
   const [openaiModelVersion, setOpenaiModelVersion] =
     useState<string>("whisper-1");
 
@@ -103,9 +106,9 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
       const storedGroq =
         localStorage.getItem("echomind_groq_model_version") ||
         "whisper-large-v3-turbo";
-      const storedGemini =
-        localStorage.getItem("echomind_gemini_model_version") ||
-        "gemini-1.5-flash";
+      const storedGemini = currentGeminiModel(
+        localStorage.getItem("echomind_gemini_model_version"),
+      );
       const storedOpenai =
         localStorage.getItem("echomind_openai_model_version") || "whisper-1";
 
@@ -462,6 +465,8 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
       {/* Tab Content: Cloud AI Models */}
       {activeTab === "cloud" && (
         <div className="space-y-4 text-xs">
+          <CloudRecordingSection activeEngine={activeEngine} />
+
           {/* 1. Groq Cloud */}
           <div
             className={`p-4 rounded-xl border transition-all ${
@@ -691,7 +696,7 @@ export const ModelHubModal: React.FC<ModelHubModalProps> = ({
                           );
                         }}
                         placeholder={t("ui.modelHub.examplePlaceholder", {
-                          example: "gemini-2.0-flash / gemini-1.5-pro",
+                          example: "gemini-3.8-flash / gemini-2.5-pro",
                         })}
                         className="flex-1 px-2.5 py-1 bg-slate-950 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-cyan-500 font-mono"
                       />

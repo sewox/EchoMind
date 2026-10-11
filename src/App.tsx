@@ -151,6 +151,7 @@ export interface RelatedMeetingItem {
 }
 
 import { getTagColorClass } from "./components/transcript/MeetingTagsBar";
+import { currentGeminiModel } from "./components/ModelHubModalConstants";
 
 const SIDEBAR_TAG_LIMIT = 6;
 
@@ -393,7 +394,7 @@ export function App() {
 
     if (cloudProvider === "gemini") {
       setProcessingStatusText(
-        `⚡ Google Gemini (${modelVersion || "gemini-1.5-flash"}) ile Çözümleniyor...`,
+        `⚡ Google Gemini (${currentGeminiModel(modelVersion)}) ile Çözümleniyor...`,
       );
     } else if (cloudProvider === "groq") {
       setProcessingStatusText(
@@ -713,7 +714,7 @@ export function App() {
     // Set clear visual processing status
     if (cloudProvider === "gemini") {
       setProcessingStatusText(
-        `⚡ Google Gemini (${modelVersion || "gemini-1.5-flash"}) ile Bulutta Çözümleniyor...`,
+        `⚡ Google Gemini (${currentGeminiModel(modelVersion)}) ile Bulutta Çözümleniyor...`,
       );
     } else if (cloudProvider === "groq") {
       setProcessingStatusText(
@@ -913,9 +914,9 @@ export function App() {
       } else if (activeEngine === "cloud_gemini" && geminiKey) {
         cloudProvider = "gemini";
         apiKey = geminiKey;
-        modelVersion =
-          localStorage.getItem("echomind_gemini_model_version") ||
-          "gemini-1.5-flash";
+        modelVersion = currentGeminiModel(
+          localStorage.getItem("echomind_gemini_model_version"),
+        );
       } else if (activeEngine === "cloud_openai" && openaiKey) {
         cloudProvider = "openai";
         apiKey = openaiKey;

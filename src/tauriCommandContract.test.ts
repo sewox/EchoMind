@@ -126,8 +126,6 @@ function invokeCalls(): Call[] {
 const IGNORED_EXTRAS: Record<string, string[]> = {
   // The backend reads the segments from the stored meeting.
   generate_meeting_summary: ["segments"],
-  // Live transcription always runs on the device engine.
-  transcribe_audio_buffer: ["cloudProvider", "apiKey", "modelVersion"],
 };
 
 describe("Tauri command arguments", () => {

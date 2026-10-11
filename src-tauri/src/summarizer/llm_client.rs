@@ -316,21 +316,14 @@ YALNIZCA VE YALNIZCA AŞAĞIDAKİ GEÇERLİ JSON ŞEMASINDA YANIT VER:\n\
             }
         }
 
-        let fallback_models = vec![
-            "gemini-2.5-flash".to_string(),
-            "gemini-2.0-flash".to_string(),
-            "gemini-1.5-flash".to_string(),
-            "gemini-1.5-pro".to_string(),
-        ];
+        let fallback_models: Vec<String> = crate::cloud_transcriber::GEMINI_FALLBACK_MODELS
+            .iter()
+            .map(|m| m.to_string())
+            .collect();
 
         let models_to_try = if !available_models.is_empty() {
             let mut priority_models = Vec::new();
-            for pref in &[
-                "gemini-2.5-flash",
-                "gemini-2.0-flash",
-                "gemini-1.5-flash",
-                "gemini-1.5-pro",
-            ] {
+            for pref in &crate::cloud_transcriber::GEMINI_FALLBACK_MODELS {
                 if let Some(pos) = available_models.iter().position(|m| m == pref) {
                     priority_models.push(available_models.remove(pos));
                 }

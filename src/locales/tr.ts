@@ -93,6 +93,18 @@ export const tr: TranslationKeys = {
     remainingMinutes: "~{n} dk kaldı",
     remainingSeconds: "~{n} sn kaldı",
   },
+  cloudRecording: {
+    title: "Kayıtlarda bulutu kullan",
+    desc: "Kapalıyken canlı kayıt ve kayıttan sonraki yazıya dökme her zaman bu bilgisayarda yapılır; aşağıda seçtiğiniz bulut motoru yalnızca dosya içe aktarırken ve yeniden yazıya dökerken kullanılır. Açarsanız kayıt sırasında ses 15 saniyelik parçalar hâlinde, kayıttan sonra da tamamı seçili sağlayıcıya gönderilir. Bulut hata verirse bilgisayardaki motor devreye girer.",
+    onDevice: "Şu an: kayıtlar bu bilgisayarda yazıya dökülüyor.",
+    active: "Şu an: kayıtlar {provider} ile yazıya dökülüyor.",
+    noEngine:
+      "Aşağıdan bir bulut motoru seçin; seçilene kadar kayıtlar bu bilgisayarda yazıya dökülür.",
+    noKey:
+      "{provider} için API anahtarını kaydedin; kaydedilene kadar kayıtlar bu bilgisayarda yazıya dökülür.",
+    paranoid:
+      "Paranoid Mod açıkken bulut kullanılamaz; kayıtlar bu bilgisayarda yazıya dökülür.",
+  },
   recordingLimit: {
     reached:
       "Kayıt {hours} saat sınırına ulaştığı için durduruldu ve kaydedildi. Toplantı sürüyorsa yeni bir kayıt başlatın.",

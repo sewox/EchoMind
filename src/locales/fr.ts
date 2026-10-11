@@ -93,6 +93,20 @@ export const fr: TranslationKeys = {
     remainingMinutes: "~{n} min restantes",
     remainingSeconds: "~{n} s restantes",
   },
+  cloudRecording: {
+    title: "Utiliser le cloud pour les enregistrements",
+    desc: "Désactivé : l’enregistrement en direct et la transcription qui suit se font toujours sur cet ordinateur ; le moteur cloud choisi ci-dessous ne sert qu’aux imports et aux nouvelles transcriptions. Activé : l’audio est envoyé au fournisseur choisi par tranches de 15 secondes pendant l’enregistrement, puis en entier. Si le cloud échoue, le moteur de cet ordinateur prend le relais.",
+    onDevice:
+      "Actuellement : les enregistrements sont transcrits sur cet ordinateur.",
+    active:
+      "Actuellement : les enregistrements sont transcrits avec {provider}.",
+    noEngine:
+      "Choisissez un moteur cloud ci-dessous ; d’ici là, les enregistrements sont transcrits sur cet ordinateur.",
+    noKey:
+      "Enregistrez la clé API de {provider} ; d’ici là, les enregistrements sont transcrits sur cet ordinateur.",
+    paranoid:
+      "Le cloud est indisponible en Mode Paranoïaque ; les enregistrements sont transcrits sur cet ordinateur.",
+  },
   recordingLimit: {
     reached:
       "L’enregistrement a atteint la limite de {hours} heures : il a été arrêté et sauvegardé. Si la réunion continue, lancez un nouvel enregistrement.",
