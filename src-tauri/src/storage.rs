@@ -1517,12 +1517,18 @@ fn save_current_meeting_blocking(
         // was paused while a past meeting was open, or the app quit mid-meeting.
         // With Apple dictation chosen, the live (Whisper) text is only a
         // preview: the whole recording is re-transcribed by Apple in the queue.
+        // Likewise when the remote side echoes in the mic (loudspeakers): the
+        // live text heard it twice; the queue transcribes it with the echo
+        // removed.
+        let full_pass_possible =
+            mode == SaveMode::Normal && audio_file_path.is_some() && mic.len() >= 16000;
         let transcript_pending =
             needs_full_transcription(&deduplicated_segments, mic.len(), live_covered_samples)
-                || (mode == SaveMode::Normal
-                    && audio_file_path.is_some()
-                    && mic.len() >= 16000
-                    && crate::asr_engine::queue_uses_apple());
+                || (full_pass_possible && crate::asr_engine::queue_uses_apple())
+                || (full_pass_possible
+                    && system
+                        .as_ref()
+                        .is_some_and(|sys| crate::echo::has_echo_pcm16(&mic, sys)));
         // Live slices aren't diarized (numbering would restart every slice);
         // label speakers once for the whole session now. Skipped on quit (tight
         // time budget) and when a full re-transcription is queued anyway.
