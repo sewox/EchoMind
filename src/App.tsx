@@ -94,6 +94,8 @@ export interface ModelStatus {
   download_progress: number;
   hardware_acceleration: string;
   used_fallback_model: boolean;
+  /** The model that could not be loaded, when `used_fallback_model`. */
+  fallback_from?: string | null;
 }
 
 export interface ActionItem {
