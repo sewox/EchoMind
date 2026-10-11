@@ -1248,7 +1248,7 @@ checksum = "15401da73a9ed8c80e3b2d4dc05fe10e7b72d7243b9f614e516a44fa99986e88"
 
 [[package]]
 name = "echomind"
-version = "0.2.14"
+version = "0.2.15"
 dependencies = [
  "chacha20poly1305",
  "chrono",
