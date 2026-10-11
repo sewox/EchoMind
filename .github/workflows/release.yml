@@ -21,7 +21,10 @@ jobs:
           - platform: "windows-latest"
             target: "x86_64-pc-windows-msvc"
             args: ""
-          - platform: "ubuntu-22.04"
+          # 24.04, not 22.04: ONNX Runtime's prebuilt Linux library (ort,
+          # download-binaries) needs glibc 2.38+, so the app cannot link on
+          # 22.04. The package then runs on Ubuntu 24.04+, Debian 13+, Fedora 40+.
+          - platform: "ubuntu-24.04"
             target: "x86_64-unknown-linux-gnu"
             args: ""
 
@@ -36,7 +39,7 @@ jobs:
           cache: "npm"
 
       - name: Install Linux System Dependencies
-        if: matrix.platform == 'ubuntu-22.04'
+        if: matrix.platform == 'ubuntu-24.04'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
