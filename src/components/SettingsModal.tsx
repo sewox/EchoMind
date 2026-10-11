@@ -591,7 +591,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           </div>
 
-          {/* Native system-audio capture (macOS process tap) */}
+          {/* Native system-audio capture (macOS tap, WASAPI loopback, PulseAudio/PipeWire monitor) */}
           <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/80 flex items-center justify-between gap-3">
             <div className="min-w-0">
               <label className="text-slate-200 font-medium flex items-center gap-1.5">

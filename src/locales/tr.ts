@@ -680,7 +680,7 @@ export const tr: TranslationKeys = {
       systemAudioSpeaker: "Sistem Sesi: Hoparlör/Ortam",
       systemAudioCaptureToggle: "Sistem sesini kaydet (uzaktaki katılımcılar)",
       systemAudioCaptureDesc:
-        "macOS 14.2+ üzerinde toplantı uygulamalarının sesini mikrofonla birlikte kaydeder. Kapalıysa yalnızca mikrofon kullanılır.",
+        "Toplantı uygulamalarının sesini mikrofonla birlikte kaydeder (macOS 14.2+, Windows, Linux: PulseAudio/PipeWire). Kapalıysa yalnızca mikrofon kullanılır.",
       systemAudioUnsupported:
         "Bu platformda yerel sistem sesi yakalama desteklenmiyor. Sanal loopback aygıtı kullanabilir veya yalnızca mikrofonla kaydedebilirsiniz.",
       systemAudioDeniedHint:
