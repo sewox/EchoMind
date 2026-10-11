@@ -2,8 +2,10 @@
 //! microphone so transcription hears everyone and speakers can be attributed
 //! by channel: microphone = the local user, system audio = remote people.
 //!
-//! macOS 14.2+: Core Audio process tap (Swift bridge in `swift/EchoMindAudio`).
-//! Other platforms: not yet available (`is_supported()` = false).
+//! - macOS 14.2+: Core Audio process tap (Swift bridge in `swift/EchoMindAudio`).
+//! - Windows: WASAPI loopback of the default output device (through cpal).
+//! - Linux: the monitor of the default output in PulseAudio or PipeWire
+//!   (`libpulse-simple`, loaded at run time so the app still starts without it).
 use crate::audio::{align_sys_buffer_to_mic, SharedAudioState};
 
 /// Whether this OS build can capture system audio.
@@ -28,7 +30,10 @@ pub fn stop() {
 /// System taps often pause callbacks during silence; the mic timeline is the
 /// master, so we pad the system buffer up to the current mic length before
 /// writing, and trim a large lead if the two clocks drift apart.
-#[cfg_attr(all(not(target_os = "macos"), not(test)), allow(dead_code))]
+#[cfg_attr(
+    not(any(target_os = "macos", target_os = "windows", target_os = "linux", test)),
+    allow(dead_code)
+)]
 pub(crate) fn ingest(state: &SharedAudioState, interleaved: &[f32], channels: usize, rate: f64) {
     if interleaved.is_empty() || channels == 0 {
         return;
@@ -139,7 +144,338 @@ mod imp {
     }
 }
 
-#[cfg(not(target_os = "macos"))]
+/// A capture thread that owns its platform stream: started with a ready
+/// handshake (so `start` can report an error), stopped by flag and joined, so
+/// no callback runs after `stop` returns.
+#[cfg(any(target_os = "windows", target_os = "linux"))]
+mod worker {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::{mpsc, Arc, Mutex};
+    use std::thread::JoinHandle;
+
+    static RUNNING: Mutex<Option<(Arc<AtomicBool>, JoinHandle<()>)>> = Mutex::new(None);
+
+    /// Runs `capture` on its own thread. It calls `ready` once the stream is
+    /// open (or failed) and must return soon after the stop flag is set.
+    pub fn start<F>(capture: F) -> Result<(), String>
+    where
+        F: FnOnce(&AtomicBool, &dyn Fn(Result<(), String>)) + Send + 'static,
+    {
+        let mut running = RUNNING.lock().unwrap();
+        if running.is_some() {
+            return Ok(());
+        }
+        let stop = Arc::new(AtomicBool::new(false));
+        let (ready_tx, ready_rx) = mpsc::channel();
+        let flag = Arc::clone(&stop);
+        let handle = std::thread::Builder::new()
+            .name("system-audio".into())
+            .spawn(move || {
+                capture(&flag, &|result| {
+                    let _ = ready_tx.send(result);
+                })
+            })
+            .map_err(|e| format!("system audio thread failed to start: {e}"))?;
+        match ready_rx.recv() {
+            Ok(Ok(())) => {
+                *running = Some((stop, handle));
+                Ok(())
+            }
+            Ok(Err(e)) => {
+                let _ = handle.join();
+                Err(e)
+            }
+            Err(_) => {
+                let _ = handle.join();
+                Err("system audio capture stopped before it started".into())
+            }
+        }
+    }
+
+    pub fn stop() {
+        let running = RUNNING.lock().unwrap().take();
+        if let Some((stop, handle)) = running {
+            stop.store(true, Ordering::SeqCst);
+            let _ = handle.join();
+        }
+    }
+
+    pub fn stop_requested(flag: &AtomicBool) -> bool {
+        flag.load(Ordering::SeqCst)
+    }
+}
+
+#[cfg(target_os = "windows")]
+mod imp {
+    use super::*;
+    use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+    use std::time::Duration;
+
+    pub fn is_supported() -> bool {
+        cpal::default_host().default_output_device().is_some()
+    }
+
+    pub fn start(state: SharedAudioState) -> Result<(), String> {
+        worker::start(move |stop, ready| match open_loopback(state) {
+            Ok(stream) => {
+                ready(Ok(()));
+                // The stream lives on this thread until stop; dropping it
+                // here ends the callbacks before `stop` returns.
+                while !worker::stop_requested(stop) {
+                    std::thread::sleep(Duration::from_millis(50));
+                }
+                drop(stream);
+            }
+            Err(e) => ready(Err(e)),
+        })
+    }
+
+    /// WASAPI records what the default output device plays when an input
+    /// stream is opened on it (loopback mode; cpal sets the flag).
+    fn open_loopback(state: SharedAudioState) -> Result<cpal::Stream, String> {
+        let device = cpal::default_host()
+            .default_output_device()
+            .ok_or("no audio output device for system audio capture")?;
+        let config = device
+            .default_output_config()
+            .map_err(|e| format!("system audio output format unavailable: {e}"))?;
+        let channels = config.channels() as usize;
+        let rate = config.sample_rate().0 as f64;
+        let format = config.sample_format();
+        let config: cpal::StreamConfig = config.into();
+        let stream = match format {
+            cpal::SampleFormat::F32 => device.build_input_stream(
+                &config,
+                move |data: &[f32], _: &cpal::InputCallbackInfo| {
+                    ingest(&state, data, channels, rate)
+                },
+                on_error,
+                None,
+            ),
+            cpal::SampleFormat::I16 => device.build_input_stream(
+                &config,
+                move |data: &[i16], _: &cpal::InputCallbackInfo| {
+                    let samples: Vec<f32> = data.iter().map(|&s| s as f32 / 32768.0).collect();
+                    ingest(&state, &samples, channels, rate)
+                },
+                on_error,
+                None,
+            ),
+            other => {
+                return Err(format!(
+                    "system audio sample format {other:?} not supported"
+                ))
+            }
+        }
+        .map_err(|e| format!("system audio capture failed (WASAPI loopback): {e}"))?;
+        stream
+            .play()
+            .map_err(|e| format!("system audio capture failed to start: {e}"))?;
+        Ok(stream)
+    }
+
+    fn on_error(e: cpal::StreamError) {
+        eprintln!("⚠️ System audio stream error: {e}");
+    }
+
+    pub fn stop() {
+        worker::stop()
+    }
+}
+
+#[cfg(target_os = "linux")]
+mod imp {
+    use super::*;
+    use libloading::Library;
+    use std::ffi::{c_char, c_int, c_void, CStr};
+    use std::sync::OnceLock;
+
+    /// `pa_sample_spec`.
+    #[repr(C)]
+    pub(super) struct SampleSpec {
+        pub format: c_int,
+        pub rate: u32,
+        pub channels: u8,
+    }
+
+    /// `pa_buffer_attr`; `u32::MAX` asks the server for its default.
+    #[repr(C)]
+    pub(super) struct BufferAttr {
+        pub maxlength: u32,
+        pub tlength: u32,
+        pub prebuf: u32,
+        pub minreq: u32,
+        pub fragsize: u32,
+    }
+
+    const PA_STREAM_RECORD: c_int = 2;
+    const PA_SAMPLE_FLOAT32LE: c_int = 5;
+    pub(super) const RATE: u32 = 48_000;
+    pub(super) const CHANNELS: u8 = 2;
+    /// 20 ms reads: system audio is padded to the mic timeline whenever it
+    /// lags, so it must arrive in small pieces, not in seconds-long bursts.
+    pub(super) const READ_FRAMES: usize = RATE as usize / 50;
+
+    type NewFn = unsafe extern "C" fn(
+        server: *const c_char,
+        name: *const c_char,
+        dir: c_int,
+        dev: *const c_char,
+        stream_name: *const c_char,
+        spec: *const SampleSpec,
+        map: *const c_void,
+        attr: *const BufferAttr,
+        error: *mut c_int,
+    ) -> *mut c_void;
+    type ReadFn = unsafe extern "C" fn(
+        s: *mut c_void,
+        data: *mut c_void,
+        bytes: usize,
+        error: *mut c_int,
+    ) -> c_int;
+    type FreeFn = unsafe extern "C" fn(s: *mut c_void);
+    type StrErrorFn = unsafe extern "C" fn(error: c_int) -> *const c_char;
+
+    struct Pulse {
+        new: NewFn,
+        read: ReadFn,
+        free: FreeFn,
+        strerror: Option<StrErrorFn>,
+        _simple: Library,
+        _pulse: Option<Library>,
+    }
+
+    /// libpulse-simple, from PulseAudio or PipeWire's pipewire-pulse; `None`
+    /// when neither is installed.
+    fn pulse() -> Option<&'static Pulse> {
+        static PULSE: OnceLock<Option<Pulse>> = OnceLock::new();
+        PULSE
+            .get_or_init(|| {
+                // SAFETY: plain C libraries without load-time side effects;
+                // the symbols are looked up with their documented signatures.
+                unsafe {
+                    let simple = Library::new("libpulse-simple.so.0").ok()?;
+                    let pulse = Library::new("libpulse.so.0").ok();
+                    let new = *simple.get::<NewFn>(b"pa_simple_new\0").ok()?;
+                    let read = *simple.get::<ReadFn>(b"pa_simple_read\0").ok()?;
+                    let free = *simple.get::<FreeFn>(b"pa_simple_free\0").ok()?;
+                    let strerror = pulse
+                        .as_ref()
+                        .and_then(|l| l.get::<StrErrorFn>(b"pa_strerror\0").ok())
+                        .map(|f| *f);
+                    Some(Pulse {
+                        new,
+                        read,
+                        free,
+                        strerror,
+                        _simple: simple,
+                        _pulse: pulse,
+                    })
+                }
+            })
+            .as_ref()
+    }
+
+    fn describe(pulse: &Pulse, error: c_int) -> String {
+        match pulse.strerror {
+            // SAFETY: pa_strerror returns a static string (or null).
+            Some(f) => unsafe {
+                let text = f(error);
+                if text.is_null() {
+                    format!("error {error}")
+                } else {
+                    CStr::from_ptr(text).to_string_lossy().into_owned()
+                }
+            },
+            None => format!("error {error}"),
+        }
+    }
+
+    pub fn is_supported() -> bool {
+        pulse().is_some()
+    }
+
+    /// The monitor of the default output: what the speakers or headphones play.
+    struct Recorder(*mut c_void);
+
+    // SAFETY: a pa_simple connection is used from the one thread that owns it.
+    unsafe impl Send for Recorder {}
+
+    fn open(pulse: &Pulse) -> Result<Recorder, String> {
+        let spec = SampleSpec {
+            format: PA_SAMPLE_FLOAT32LE,
+            rate: RATE,
+            channels: CHANNELS,
+        };
+        let attr = BufferAttr {
+            maxlength: u32::MAX,
+            tlength: u32::MAX,
+            prebuf: u32::MAX,
+            minreq: u32::MAX,
+            fragsize: (READ_FRAMES * CHANNELS as usize * 4) as u32,
+        };
+        let mut error: c_int = 0;
+        // SAFETY: every pointer is valid for the call; strings are NUL-terminated.
+        let handle = unsafe {
+            (pulse.new)(
+                std::ptr::null(),
+                c"EchoMind".as_ptr(),
+                PA_STREAM_RECORD,
+                c"@DEFAULT_MONITOR@".as_ptr(),
+                c"System audio".as_ptr(),
+                &spec,
+                std::ptr::null(),
+                &attr,
+                &mut error,
+            )
+        };
+        if handle.is_null() {
+            return Err(format!(
+                "system audio capture failed (PulseAudio/PipeWire: {})",
+                describe(pulse, error)
+            ));
+        }
+        Ok(Recorder(handle))
+    }
+
+    pub fn start(state: SharedAudioState) -> Result<(), String> {
+        let pulse = pulse().ok_or("system audio needs PulseAudio or PipeWire (libpulse)")?;
+        worker::start(move |stop, ready| {
+            let recorder = match open(pulse) {
+                Ok(r) => r,
+                Err(e) => return ready(Err(e)),
+            };
+            ready(Ok(()));
+            let mut buf = vec![0f32; READ_FRAMES * CHANNELS as usize];
+            while !worker::stop_requested(stop) {
+                let mut error: c_int = 0;
+                // SAFETY: `buf` holds exactly the bytes asked for; the read
+                // blocks for about 20 ms, so the stop flag is seen promptly.
+                let status = unsafe {
+                    (pulse.read)(
+                        recorder.0,
+                        buf.as_mut_ptr() as *mut c_void,
+                        buf.len() * 4,
+                        &mut error,
+                    )
+                };
+                if status < 0 {
+                    eprintln!("⚠️ System audio capture ended: {}", describe(pulse, error));
+                    break;
+                }
+                ingest(&state, &buf, CHANNELS as usize, RATE as f64);
+            }
+            // SAFETY: the connection is not used after this.
+            unsafe { (pulse.free)(recorder.0) };
+        })
+    }
+
+    pub fn stop() {
+        worker::stop()
+    }
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
 mod imp {
     use super::*;
     pub fn is_supported() -> bool {
@@ -178,6 +514,22 @@ mod tests {
         );
         // Leading pad is silence.
         assert!(st.sys_pcm_16k_buffer[..4800].iter().all(|&s| s == 0));
+    }
+
+    /// The layouts libpulse expects (`pa_sample_spec`, `pa_buffer_attr`).
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn test_pulse_structs_match_the_c_layout() {
+        assert_eq!(std::mem::size_of::<imp::SampleSpec>(), 12);
+        assert_eq!(std::mem::size_of::<imp::BufferAttr>(), 20);
+        assert_eq!(imp::READ_FRAMES, 960, "20 ms at 48 kHz");
+    }
+
+    /// Without PulseAudio/PipeWire this reports unsupported instead of failing.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn test_linux_support_check_never_panics() {
+        let _ = is_supported();
     }
 
     #[test]

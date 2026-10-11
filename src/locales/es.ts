@@ -680,7 +680,7 @@ export const es: TranslationKeys = {
       systemAudioCaptureToggle:
         "Capturar audio del sistema (participantes remotos)",
       systemAudioCaptureDesc:
-        "En macOS 14.2+, graba el audio de las apps de reunión junto al micrófono. Si está desactivado, solo se usa el micrófono.",
+        "Graba el audio de las apps de reunión junto al micrófono (macOS 14.2+, Windows, Linux con PulseAudio/PipeWire). Si está desactivado, solo se usa el micrófono.",
       systemAudioUnsupported:
         "La captura nativa de audio del sistema no es compatible en esta plataforma. Usa un dispositivo loopback virtual o solo el micrófono.",
       systemAudioDeniedHint:

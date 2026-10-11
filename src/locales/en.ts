@@ -677,7 +677,7 @@ export const en: TranslationKeys = {
       systemAudioSpeaker: "System Audio: Speaker/Room",
       systemAudioCaptureToggle: "Capture system audio (remote participants)",
       systemAudioCaptureDesc:
-        "On macOS 14.2+, records meeting-app audio alongside the microphone. When off, only the microphone is used.",
+        "Records meeting-app audio alongside the microphone (macOS 14.2+, Windows, Linux with PulseAudio/PipeWire). When off, only the microphone is used.",
       systemAudioUnsupported:
         "Native system-audio capture is not supported on this platform. Use a virtual loopback device or record microphone only.",
       systemAudioDeniedHint:
