@@ -730,7 +730,7 @@ fn worker_loop(app: tauri::AppHandle) {
         }
         if engine_label.is_none() {
             result = transcriber.transcribe_pcm_batch(&pcm, "auto", &q.cancel_current);
-            engine_label = Some("Cihazda (Whisper)".to_string());
+            engine_label = Some(transcriber.device_label());
         }
         drop(pcm);
         if let Ok(segs) = result.as_mut() {

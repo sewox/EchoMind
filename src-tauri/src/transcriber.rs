@@ -37,6 +37,42 @@ pub struct TranscriptSegment {
     pub confidence: f32,  // 0.0 - 1.0
 }
 
+/// Whisper models, most accurate first.
+const MODELS_BEST_FIRST: [&str; 5] = ["large-v3-turbo", "medium", "small", "base", "tiny"];
+
+/// The model key of a model path ("models/ggml-small.bin" → "small").
+fn model_key_of(path: &str) -> Option<&'static str> {
+    let file = Path::new(path).file_name()?.to_str()?;
+    let key = file.strip_prefix("ggml-")?.strip_suffix(".bin")?;
+    MODELS_BEST_FIRST.into_iter().find(|k| *k == key)
+}
+
+fn model_file(key: &str) -> String {
+    format!("models/ggml-{key}.bin")
+}
+
+fn model_name(key: &str) -> &'static str {
+    match key {
+        "large-v3-turbo" => "Whisper Large v3 Turbo",
+        "medium" => "Whisper Medium",
+        "small" => "Whisper Small",
+        "base" => "Whisper Base",
+        "tiny" => "Whisper Tiny",
+        _ => "Whisper",
+    }
+}
+
+/// Models to try when the chosen one fails to load: those on disk, best first.
+fn fallback_candidates(
+    requested: Option<&str>,
+    downloaded: impl Fn(&str) -> bool,
+) -> Vec<&'static str> {
+    MODELS_BEST_FIRST
+        .into_iter()
+        .filter(|key| Some(*key) != requested && downloaded(key))
+        .collect()
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModelStatus {
     pub model_name: String,
@@ -49,6 +85,9 @@ pub struct ModelStatus {
     /// model instead. Grok Bot's v0.2.5 QA report flagged exactly this case on
     /// Linux: base loaded instead of small with no visible signal to the user.
     pub used_fallback_model: bool,
+    /// The model that could not be loaded, when `used_fallback_model`.
+    #[serde(default)]
+    pub fallback_from: Option<String>,
 }
 
 pub struct TranscriberState {
@@ -57,6 +96,10 @@ pub struct TranscriberState {
     pub model_display_name: String,
     pub is_model_loaded: bool,
     pub used_fallback_model: bool,
+    /// The model that could not be loaded, when `used_fallback_model`.
+    pub fallback_from: Option<&'static str>,
+    /// The model in memory (or last in memory), by key.
+    pub loaded_model: Option<&'static str>,
     pub segments: Vec<TranscriptSegment>,
     pub segment_counter: usize,
     /// Which engines wrote this session's live slices (for the meeting label).
@@ -91,6 +134,8 @@ impl Default for TranscriberState {
             model_display_name: "Whisper Small 244M (Kullanım Anında Yüklenecek)".to_string(),
             is_model_loaded: false,
             used_fallback_model: false,
+            fallback_from: None,
+            loaded_model: None,
             segments: Vec::new(),
             segment_counter: 0,
             live_engines: LiveEngines::default(),
@@ -206,23 +251,46 @@ impl GlobalTranscriberEngine {
             state.selected_model_path.clone()
         };
 
-        let fallback_path = "models/ggml-base.bin";
-        if self.init_model(&model_path).is_err() {
-            self.init_model(fallback_path)?;
-            let fell_back = model_path != fallback_path;
+        let requested = model_key_of(&model_path);
+        let requested_name = requested.map_or("Whisper", model_name);
+        if let Err(e) = self.init_model(&model_path) {
+            // The chosen model is missing or broken: use the best one on disk
+            // and say so, rather than a fixed model that may not be there.
+            let fallback = fallback_candidates(requested, is_model_downloaded)
+                .into_iter()
+                .find(|key| self.init_model(&model_file(key)).is_ok());
+            let Some(fallback) = fallback else {
+                return Err(format!(
+                    "Konuşma tanıma modeli ({requested_name}) yüklenemedi ve bu bilgisayarda başka model yok. Modeller penceresinden bir model indirin. ({e})"
+                ));
+            };
+            eprintln!(
+                "⚠️ [Model Fallback] {requested_name} yüklenemedi ({e}); indirilmiş en iyi model {} kullanılıyor.",
+                model_name(fallback)
+            );
             let mut state = self.state.lock().unwrap();
-            state.used_fallback_model = fell_back;
-            if fell_back {
-                eprintln!(
-                    "⚠️ [Model Fallback] İstenen model yüklenemedi ({}), Base modele düşüldü — kalite daha düşük olabilir.",
-                    model_path
-                );
-            }
+            state.used_fallback_model = true;
+            state.fallback_from = requested.or(Some("Whisper"));
         } else {
             let mut state = self.state.lock().unwrap();
             state.used_fallback_model = false;
+            state.fallback_from = None;
         }
         Ok(())
+    }
+
+    /// Engine label for a meeting transcribed on this device, naming the
+    /// model actually used (and the one it stood in for).
+    pub fn device_label(&self) -> String {
+        let state = self.state.lock().unwrap();
+        let used = state
+            .loaded_model
+            .or_else(|| model_key_of(&state.selected_model_path))
+            .map_or("Whisper", model_name);
+        match state.fallback_from.filter(|_| state.used_fallback_model) {
+            Some(from) => format!("Cihazda ({used} — {} yüklenemedi)", model_name(from)),
+            None => format!("Cihazda ({used})"),
+        }
     }
 
     pub fn init_model(&self, model_path: &str) -> Result<(), String> {
@@ -276,18 +344,20 @@ impl GlobalTranscriberEngine {
 
         let mut state = self.state.lock().unwrap();
         state.is_model_loaded = true;
-        state.selected_model_path = actual_path.to_str().unwrap().to_string();
+        // `selected_model_path` stays the user's choice; a fallback must not
+        // become the new choice when the model is loaded again.
+        state.loaded_model = model_key_of(&filename);
 
         let gpu_label = if is_gpu_active {
             "Metal/CUDA GPU"
         } else {
             "CPU AVX2 Vector"
         };
-        state.model_display_name = if model_path.contains("small") {
-            format!("ggml-small.bin (Whisper Small 244M - {})", gpu_label)
-        } else {
-            format!("ggml-base.bin (Whisper Base 74M - {})", gpu_label)
-        };
+        state.model_display_name = format!(
+            "{} ({})",
+            model_key_of(&filename).map_or("Whisper", model_name),
+            gpu_label
+        );
 
         println!(
             "Whisper GGML Model talep üzerine başarıyla yüklendi [Donanım: {}]: {:?}",
@@ -319,7 +389,11 @@ impl GlobalTranscriberEngine {
                 }
                 let mut state = self.state.lock().unwrap();
                 state.is_model_loaded = false;
-                state.model_display_name = "Whisper Small 244M (Bellekten Boşaltıldı)".to_string();
+                let name = state
+                    .loaded_model
+                    .or_else(|| model_key_of(&state.selected_model_path))
+                    .map_or("Whisper", model_name);
+                state.model_display_name = format!("{name} (Bellekten Boşaltıldı)");
                 println!(
                     "Whisper GGML modeli bellekten boşaltıldı (Metal GPU ve RAM serbest bırakıldı)."
                 );
@@ -760,6 +834,10 @@ impl GlobalTranscriberEngine {
             download_progress: 100.0,
             hardware_acceleration: accel,
             used_fallback_model: state.used_fallback_model,
+            fallback_from: state
+                .fallback_from
+                .filter(|_| state.used_fallback_model)
+                .map(|key| model_name(key).to_string()),
         }
     }
 }
@@ -1335,6 +1413,55 @@ pub fn unload_transcription_model() -> ModelStatus {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn model_keys_come_from_model_paths() {
+        assert_eq!(model_key_of("models/ggml-small.bin"), Some("small"));
+        assert_eq!(
+            model_key_of("/Users/x/Library/models/ggml-large-v3-turbo.bin"),
+            Some("large-v3-turbo")
+        );
+        assert_eq!(model_key_of("ggml-tiny.bin"), Some("tiny"));
+        assert_eq!(model_key_of("models/other.bin"), None);
+    }
+
+    #[test]
+    fn a_missing_model_falls_back_to_the_best_one_on_disk() {
+        let on_disk = |keys: &'static [&'static str]| move |k: &str| keys.contains(&k);
+        assert_eq!(
+            fallback_candidates(Some("large-v3-turbo"), on_disk(&["base", "medium"])),
+            ["medium", "base"],
+            "best first, not a fixed Base"
+        );
+        assert_eq!(
+            fallback_candidates(Some("small"), on_disk(&["small", "tiny"])),
+            ["tiny"],
+            "never the model that just failed"
+        );
+        assert!(fallback_candidates(Some("small"), on_disk(&[])).is_empty());
+    }
+
+    #[test]
+    fn the_device_label_names_the_model_used() {
+        let engine = GlobalTranscriberEngine::new();
+        assert_eq!(engine.device_label(), "Cihazda (Whisper Small)");
+        {
+            let mut state = engine.state.lock().unwrap();
+            state.loaded_model = Some("base");
+            state.used_fallback_model = true;
+            state.fallback_from = Some("large-v3-turbo");
+        }
+        assert_eq!(
+            engine.device_label(),
+            "Cihazda (Whisper Base — Whisper Large v3 Turbo yüklenemedi)"
+        );
+        let status = engine.get_model_status();
+        assert!(status.used_fallback_model);
+        assert_eq!(
+            status.fallback_from.as_deref(),
+            Some("Whisper Large v3 Turbo")
+        );
+    }
 
     #[test]
     fn test_transcriber_initialization() {

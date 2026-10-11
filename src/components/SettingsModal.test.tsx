@@ -100,6 +100,33 @@ describe("SettingsModal Component", () => {
     fireEvent.click(checkboxes[1]);
   });
 
+  it("warns when transcription fell back to another model, read fresh on open", async () => {
+    (invoke as any).mockImplementation((cmd: string) => {
+      if (cmd === "get_model_status")
+        return Promise.resolve({
+          ...mockModelStatus,
+          model_name: "Whisper Base (CPU AVX2 Vector)",
+          used_fallback_model: true,
+          fallback_from: "Whisper Small",
+        });
+      if (cmd === "get_stored_api_keys")
+        return Promise.resolve({ groq: "", gemini: "", openai: "" });
+      return Promise.resolve([]);
+    });
+
+    render(
+      <I18nProvider>
+        <SettingsModal {...defaultProps} />
+      </I18nProvider>,
+    );
+    fireEvent.click(screen.getByRole("tab", { name: /Cihaz & Gizlilik/i }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(
+      "Whisper Small yüklenemedi; yazıya dökmede şu an Whisper Base (CPU AVX2 Vector) kullanılıyor.",
+    );
+  });
+
   it("handles API keys input, key visibility toggles, Ollama connection testing, and saving", async () => {
     (invoke as any).mockImplementation((cmd: string) => {
       if (cmd === "get_audio_devices") return Promise.resolve([]);
@@ -810,7 +837,9 @@ describe("SettingsModal Component", () => {
       await screen.findByTestId("system-audio-unsupported"),
     ).toBeInTheDocument();
 
-    const toggle = screen.getByTestId("system-audio-toggle") as HTMLInputElement;
+    const toggle = screen.getByTestId(
+      "system-audio-toggle",
+    ) as HTMLInputElement;
     expect(toggle.checked).toBe(true);
 
     fireEvent.click(toggle);

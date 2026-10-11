@@ -1578,7 +1578,9 @@ fn save_current_meeting_blocking(
             phase2_deferred: None,
             detailed_topics: None,
             participants: None,
-            engine_used: Some(live_engines.label("Cihazda (Whisper Small)")),
+            engine_used: Some(
+                live_engines.label(&crate::transcriber::get_global_transcriber().device_label()),
+            ),
             summary_provider: Some("EchoMind Akıllı Özet".to_string()),
             tags: None,
             transcript_pending,

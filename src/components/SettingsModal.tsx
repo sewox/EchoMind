@@ -64,9 +64,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
   onClose,
   hardware,
-  modelStatus,
+  modelStatus: initialModelStatus,
 }) => {
   const { t, language, setLanguage } = useI18n();
+  // Read again on open: a model that fails to load only shows when it is
+  // first used, long after the app fetched the status at start.
+  const [modelStatus, setModelStatus] = useState(initialModelStatus);
+  useEffect(() => {
+    setModelStatus(initialModelStatus);
+    if (!isOpen) return;
+    invoke<ModelStatus>("get_model_status")
+      .then((status) => status && setModelStatus(status))
+      .catch(() => {});
+  }, [isOpen, initialModelStatus]);
   const { setPrivacyMode, isParanoid, isBalanced, isMaxIntelligence } =
     usePrivacyMode();
   const [activeTab, setActiveTab] = useState<
@@ -989,6 +999,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     : t("ui.settings.aiOnDemand")}
                 </span>
               </div>
+            )}
+            {modelStatus?.used_fallback_model && (
+              <p role="alert" className="text-amber-400 text-[11px]">
+                {t("ui.settings.modelFallback", {
+                  from: modelStatus.fallback_from ?? "",
+                  used: modelStatus.model_name,
+                })}
+              </p>
             )}
           </div>
 
