@@ -703,6 +703,7 @@ fn worker_loop(app: tauri::AppHandle) {
         // partial result. Each falls back to the next if it fails.
         let mut engine_label = None;
         let mut result = Err(String::new());
+        let mut cloud_failed = false;
         if let Some(choice) = crate::cloud_recording::active(None) {
             match transcribe_with_cloud(&choice, &pcm, channels.len()) {
                 Ok(segs) => {
@@ -710,10 +711,17 @@ fn worker_loop(app: tauri::AppHandle) {
                     result = Ok(segs);
                     engine_label = Some(choice.label());
                 }
-                Err(e) => eprintln!("⚠️ Bulut yazıya dökme başarısız, cihazda devam: {}", e),
+                Err(e) => {
+                    eprintln!("⚠️ Bulut yazıya dökme başarısız, cihazda devam: {}", e);
+                    cloud_failed = true;
+                }
             }
         }
-        if engine_label.is_none() && crate::asr_engine::queue_uses_apple() {
+        // Apple dictation also stands in for a failed cloud pass: it beats
+        // the Whisper fallback wherever it is available.
+        let apple = crate::asr_engine::queue_uses_apple()
+            || (cloud_failed && crate::asr_engine::apple_available());
+        if engine_label.is_none() && apple {
             result = transcribe_with_apple(&pcm);
             match &result {
                 Ok(_) => engine_label = Some(crate::asr_engine::APPLE_ENGINE_LABEL.to_string()),
