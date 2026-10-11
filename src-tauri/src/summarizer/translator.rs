@@ -143,7 +143,7 @@ STRICT CONTEXT & INTEGRITY PRESERVATION RULES:\n\
             }),
         };
 
-        let candidate_models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+        let candidate_models = crate::cloud_transcriber::GEMINI_FALLBACK_MODELS;
         let client = reqwest::blocking::Client::builder()
             .timeout(std::time::Duration::from_secs(60))
             .build()

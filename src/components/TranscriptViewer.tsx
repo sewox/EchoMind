@@ -34,6 +34,7 @@ import { MeetingAnalyticsModal } from "./transcript/MeetingAnalyticsModal";
 import { MeetingTemplate, BUILTIN_TEMPLATES } from "../types/templates";
 import { MeetingAnalytics } from "../types/analytics";
 import { CredentialStore } from "../services/credentialStore";
+import { cloudModelVersion } from "../services/activeEngine";
 import { SoundbiteResult } from "../types/soundbite";
 import { Tooltip } from "./ui/Tooltip";
 import { useI18n } from "../locales/i18nContext";
@@ -457,6 +458,7 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
           "transcribe_audio_buffer",
           {
             language: selectedLanguage,
+            modelVersion: cloudModelVersion(),
           },
         );
         if (res && res.length > 0) {
@@ -472,39 +474,14 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
     return () => clearInterval(transcribeInterval);
   }, [isRecording, selectedPastMeeting, selectedLanguage]);
 
+  // The backend decides between the device and the cloud (cloud recording
+  // setting) and reads any API key itself.
   const handleTranscribeBuffer = async () => {
     setIsProcessing(true);
     try {
-      const activeEngine =
-        localStorage.getItem("echomind_active_engine") || "local";
-      let cloudProvider: string | null = null;
-      let apiKey: string | null = null;
-      let modelVersion: string | null = null;
-
-      if (activeEngine === "cloud_groq") {
-        cloudProvider = "groq";
-        apiKey = (await CredentialStore.get("echomind_groq_key")) || null;
-        modelVersion =
-          localStorage.getItem("echomind_groq_model_version") ||
-          "whisper-large-v3-turbo";
-      } else if (activeEngine === "cloud_gemini") {
-        cloudProvider = "gemini";
-        apiKey = (await CredentialStore.get("echomind_gemini_key")) || null;
-        modelVersion =
-          localStorage.getItem("echomind_gemini_model_version") ||
-          "gemini-1.5-flash";
-      } else if (activeEngine === "cloud_openai") {
-        cloudProvider = "openai";
-        apiKey = (await CredentialStore.get("echomind_openai_key")) || null;
-        modelVersion =
-          localStorage.getItem("echomind_openai_model_version") || "whisper-1";
-      }
-
       const res = await invoke<TranscriptSegment[]>("transcribe_audio_buffer", {
         language: selectedLanguage,
-        cloudProvider,
-        apiKey,
-        modelVersion,
+        modelVersion: cloudModelVersion(),
       });
       setSegments(res);
     } catch (err) {

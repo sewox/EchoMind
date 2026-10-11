@@ -1406,7 +1406,7 @@ fn save_current_meeting_blocking(
     let transcriber = crate::transcriber::get_global_transcriber();
 
     // Explicit order: stop is done by the caller; finalize segments, then claim.
-    let segments = transcriber.take_history();
+    let (segments, live_engines) = transcriber.take_history_with_engines();
 
     let (session_id, mic, system, live_covered_samples) = match audio_engine.claim_pcm_for_save() {
         PcmClaim::AlreadySaved { session_id } => {
@@ -1578,7 +1578,7 @@ fn save_current_meeting_blocking(
             phase2_deferred: None,
             detailed_topics: None,
             participants: None,
-            engine_used: Some("Cihazda (Whisper Small)".to_string()),
+            engine_used: Some(live_engines.label("Cihazda (Whisper Small)")),
             summary_provider: Some("EchoMind Akıllı Özet".to_string()),
             tags: None,
             transcript_pending,
