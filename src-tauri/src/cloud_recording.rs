@@ -16,6 +16,17 @@ pub const PROVIDERS: [&str; 3] = ["groq", "openai", "gemini"];
 /// Longest piece sent in one request: 8 minutes of 16 kHz mono 16-bit WAV is
 /// about 15 MB, under the 25 MB upload limit of the Whisper APIs.
 const PIECE_SECONDS: usize = 8 * 60;
+/// Gemini's timestamps drift further the longer the piece (by up to two
+/// minutes over eight on a real meeting), so it gets short pieces.
+const GEMINI_PIECE_SECONDS: usize = 2 * 60;
+
+fn piece_seconds(provider: &str) -> usize {
+    if provider == "gemini" {
+        GEMINI_PIECE_SECONDS
+    } else {
+        PIECE_SECONDS
+    }
+}
 
 fn prefs_path() -> PathBuf {
     get_storage_dir().join("cloud_recording.txt")
@@ -157,9 +168,11 @@ pub fn transcribe_pcm(
         language
     };
     let mut out = Vec::new();
-    for (offset_ms, piece) in
-        crate::transcriber::split_audio_at_natural_pauses(pcm, 16000, PIECE_SECONDS)
-    {
+    for (offset_ms, piece) in crate::transcriber::split_audio_at_natural_pauses(
+        pcm,
+        16000,
+        piece_seconds(&choice.provider),
+    ) {
         let wav = std::env::temp_dir().join(format!(
             "echomind_cloud_{}_{}.wav",
             std::process::id(),
@@ -191,6 +204,13 @@ pub fn transcribe_pcm(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn gemini_gets_short_pieces() {
+        assert_eq!(piece_seconds("gemini"), 120);
+        assert_eq!(piece_seconds("groq"), 480);
+        assert_eq!(piece_seconds("openai"), 480);
+    }
 
     #[test]
     fn segments_stay_inside_their_piece() {
