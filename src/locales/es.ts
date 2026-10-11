@@ -708,6 +708,8 @@ export const es: TranslationKeys = {
       aiStatus: "Estado de la IA:",
       aiReady: "Listo",
       aiOnDemand: "Se carga bajo demanda",
+      modelFallback:
+        "No se pudo cargar {from}; la transcripción usa {used} en su lugar. Descargue {from} en la ventana Modelos.",
       cloudWarnToggle:
         "Mostrar aviso de privacidad para procesamiento en la nube",
       cloudWarnToggleDesc:

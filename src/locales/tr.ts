@@ -708,6 +708,8 @@ export const tr: TranslationKeys = {
       aiStatus: "Yapay Zeka Durumu:",
       aiReady: "Kullanıma Hazır",
       aiOnDemand: "İhtiyaç Anında Açılır",
+      modelFallback:
+        "{from} yüklenemedi; yazıya dökmede şu an {used} kullanılıyor. Modeller penceresinden {from} modelini indirin.",
       cloudWarnToggle: "Bulut İşlemlerinde Gizlilik Uyarısı Göster",
       cloudWarnToggleDesc:
         "Hızlı bulut seçeneği kullanıldığında, ses kaydınızın internet üzerinden yapay zeka sunucusuna gideceğini işlem öncesinde hatırlatır.",

@@ -611,6 +611,7 @@ export interface TranslationKeys {
       aiStatus: string;
       aiReady: string;
       aiOnDemand: string;
+      modelFallback: string;
       cloudWarnToggle: string;
       cloudWarnToggleDesc: string;
       localLlmTitle: string;

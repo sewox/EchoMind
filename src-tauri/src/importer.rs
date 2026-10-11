@@ -66,6 +66,16 @@ fn local_model_label(model_version: Option<&str>) -> &'static str {
 /// returned label — the label must never claim a cloud engine that didn't run.
 /// Local Whisper runs in batch mode, so the result never leaks into (or picks
 /// up) the live-recording transcript history.
+/// Cloud engines are sent the audio file rather than samples.
+fn is_cloud_provider(provider: Option<&str>) -> bool {
+    provider.is_some_and(|p| {
+        matches!(
+            p.trim().to_lowercase().as_str(),
+            "groq" | "openai" | "gemini"
+        )
+    })
+}
+
 fn run_asr_engine(
     audio_path: &Path,
     pcm_16k: &[f32],
@@ -778,10 +788,17 @@ pub async fn retranscribe_meeting(
 
         // 1. Decode audio to 16kHz PCM
         crate::import_progress::decoding();
+        let started = std::time::Instant::now();
         let mut channels = decode_audio_file_channels_16k(&path)?;
+        println!("⏱️ Ses çözme: {:.1} sn sürdü", started.elapsed().as_secs_f32());
         // App recordings keep mic and system audio apart; with loudspeakers
         // the mic also holds the remote side, which doubles it in the mix.
-        if let Some(lag) = crate::echo::clean_channels(&mut channels) {
+        let samples = channels.first().map_or(0, Vec::len);
+        if let Some(lag) =
+            crate::dual_track::timed("Yankı giderme", samples, || {
+                crate::echo::clean_channels(&mut channels)
+            })
+        {
             println!("🔇 Yankı giderildi (sistem sesi {lag:.0} ms kaydırıldı)");
         }
         let mut pcm_16k = mix_channels(&channels);
@@ -791,19 +808,55 @@ pub async fn retranscribe_meeting(
         let lang = language.as_deref().unwrap_or("auto");
 
         // 2. ASR (cloud / offline engine, local Whisper fallback with honest label)
-        let (mut segments_raw, engine_label) = run_asr_engine(
-            &path,
-            &pcm_16k,
-            lang,
-            cloud_provider.as_deref(),
-            api_key.as_deref(),
-            model_version.as_deref(),
-        )?;
-        drop(pcm_16k);
-        // Recordings with system audio: microphone vs remote side by channel.
-        if let [mic, system] = channels.as_slice() {
-            crate::diarization::attribute_speakers_by_channel(&mut segments_raw, mic, system, 16000);
-        }
+        let asr = |audio: &[f32]| {
+            run_asr_engine(
+                &path,
+                audio,
+                lang,
+                cloud_provider.as_deref(),
+                api_key.as_deref(),
+                model_version.as_deref(),
+            )
+        };
+        // Recordings with system audio: the microphone ("Siz") and the remote
+        // side are transcribed apart and merged by time. Cloud engines get the
+        // file itself, so they keep the mixed path for now.
+        let (segments_raw, engine_label) = match channels.as_slice() {
+            [mic, system] if !is_cloud_provider(cloud_provider.as_deref()) => {
+                drop(pcm_16k);
+                let mut label = String::new();
+                // Apple dictation stays quiet on silence; Whisper does not.
+                let silence = if matches!(
+                    cloud_provider.as_deref().map(str::trim),
+                    Some("apple_speech" | "apple_native" | "apple")
+                ) {
+                    crate::dual_track::Silence::Keep
+                } else {
+                    crate::dual_track::Silence::Remove
+                };
+                let segments = crate::dual_track::transcribe(mic, system, silence, |track| {
+                    let mut track = track.to_vec();
+                    crate::audio::normalize_audio_samples(&mut track);
+                    let (segments, used) = asr(&track)?;
+                    label = used;
+                    Ok(segments)
+                })?;
+                (segments, label)
+            }
+            _ => {
+                let (mut segments, label) = asr(&pcm_16k)?;
+                drop(pcm_16k);
+                if let [mic, system] = channels.as_slice() {
+                    crate::diarization::attribute_speakers_by_channel(
+                        &mut segments,
+                        mic,
+                        system,
+                        16000,
+                    );
+                }
+                (segments, label)
+            }
+        };
         drop(channels);
 
         let total_duration_ms = duration_seconds * 1000;

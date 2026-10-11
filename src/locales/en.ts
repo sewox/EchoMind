@@ -704,6 +704,8 @@ export const en: TranslationKeys = {
       aiStatus: "AI Status:",
       aiReady: "Ready",
       aiOnDemand: "Loads On Demand",
+      modelFallback:
+        "{from} could not be loaded; transcription is using {used} instead. Download {from} in the Models window.",
       cloudWarnToggle: "Show Privacy Warning for Cloud Processing",
       cloudWarnToggleDesc:
         "Before a fast cloud option runs, reminds you that your recording will be sent over the internet to an AI server.",

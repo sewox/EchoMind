@@ -706,6 +706,8 @@ export const fr: TranslationKeys = {
       aiStatus: "Statut de l'IA :",
       aiReady: "Prêt",
       aiOnDemand: "Chargé à la demande",
+      modelFallback:
+        "{from} n'a pas pu être chargé ; la transcription utilise {used} à la place. Téléchargez {from} dans la fenêtre Modèles.",
       cloudWarnToggle:
         "Afficher un avertissement de confidentialité pour le cloud",
       cloudWarnToggleDesc:
