@@ -205,9 +205,29 @@ mod worker {
     }
 }
 
-/// How often the capture thread checks which output is the default.
+/// How often the capture thread checks which output is the default when it
+/// cannot be told (Linux without server events), and how long it waits
+/// between attempts to reopen a broken stream.
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 const FOLLOW_INTERVAL: std::time::Duration = std::time::Duration::from_secs(1);
+
+/// Windows polls the default output this often: whatever plays between the
+/// switch and the reopen is not recorded, so the check has to be short.
+#[cfg(target_os = "windows")]
+const WINDOWS_CHECK_INTERVAL: std::time::Duration = std::time::Duration::from_millis(200);
+
+/// `PA_SUBSCRIPTION_MASK_SERVER`: server changes, the default sink included.
+#[cfg_attr(not(any(target_os = "linux", test)), allow(dead_code))]
+const PA_SUBSCRIPTION_MASK_SERVER: u32 = 0x0080;
+
+/// Whether a libpulse subscription event is about the server (where the
+/// default sink lives) rather than a sink, source or stream.
+#[cfg_attr(not(any(target_os = "linux", test)), allow(dead_code))]
+fn is_server_event(event: u32) -> bool {
+    const FACILITY_MASK: u32 = 0x000F;
+    const FACILITY_SERVER: u32 = 0x0007;
+    event & FACILITY_MASK == FACILITY_SERVER
+}
 
 /// The default output changed (speakers → headset mid-meeting): the stream
 /// recording the old one must be reopened, or the system track goes silent.
@@ -251,7 +271,7 @@ mod imp {
             // ends the callbacks before `stop` returns.
             while !worker::stop_requested(stop) {
                 std::thread::sleep(Duration::from_millis(50));
-                if checked.elapsed() < FOLLOW_INTERVAL && !broken.load(Ordering::SeqCst) {
+                if checked.elapsed() < WINDOWS_CHECK_INTERVAL && !broken.load(Ordering::SeqCst) {
                     continue;
                 }
                 checked = Instant::now();
@@ -364,6 +384,7 @@ mod imp {
     use super::*;
     use libloading::Library;
     use std::ffi::{c_char, c_int, c_void, CStr, CString};
+    use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::OnceLock;
     use std::time::{Duration, Instant};
 
@@ -429,6 +450,8 @@ mod imp {
     type StrErrorFn = unsafe extern "C" fn(error: c_int) -> *const c_char;
     type InfoCallback =
         extern "C" fn(c: *mut c_void, info: *const ServerInfo, userdata: *mut c_void);
+    type SubscribeCallback =
+        extern "C" fn(c: *mut c_void, event: u32, index: u32, userdata: *mut c_void);
 
     /// The asynchronous libpulse calls needed to ask which output is the
     /// default (pa_simple cannot).
@@ -455,6 +478,14 @@ mod imp {
         ) -> *mut c_void,
         operation_get_state: unsafe extern "C" fn(o: *mut c_void) -> c_int,
         operation_unref: unsafe extern "C" fn(o: *mut c_void),
+        context_set_subscribe_callback:
+            unsafe extern "C" fn(c: *mut c_void, cb: SubscribeCallback, userdata: *mut c_void),
+        context_subscribe: unsafe extern "C" fn(
+            c: *mut c_void,
+            mask: u32,
+            cb: *const c_void,
+            userdata: *mut c_void,
+        ) -> *mut c_void,
     }
 
     struct Pulse {
@@ -501,6 +532,10 @@ mod imp {
                                 .ok()?,
                             operation_get_state: *l.get(b"pa_operation_get_state\0").ok()?,
                             operation_unref: *l.get(b"pa_operation_unref\0").ok()?,
+                            context_set_subscribe_callback: *l
+                                .get(b"pa_context_set_subscribe_callback\0")
+                                .ok()?,
+                            context_subscribe: *l.get(b"pa_context_subscribe\0").ok()?,
                         })
                     });
                     Some(Pulse {
@@ -543,6 +578,17 @@ mod imp {
         api: &'static Introspect,
         mainloop: *mut c_void,
         context: *mut c_void,
+        /// Set by the server-event callback; boxed so its address stays put
+        /// while libpulse holds it.
+        changed: Box<AtomicBool>,
+    }
+
+    extern "C" fn on_server_event(_c: *mut c_void, event: u32, _index: u32, userdata: *mut c_void) {
+        if is_server_event(event) {
+            // SAFETY: `userdata` is the boxed flag of a live DefaultOutput;
+            // the callback runs on its thread, inside mainloop_iterate.
+            unsafe { (*(userdata as *const AtomicBool)).store(true, Ordering::SeqCst) };
+        }
     }
 
     impl DefaultOutput {
@@ -556,10 +602,11 @@ mod imp {
                 }
                 let context =
                     (api.context_new)((api.mainloop_get_api)(mainloop), c"EchoMind".as_ptr());
-                let watcher = DefaultOutput {
+                let mut watcher = DefaultOutput {
                     api,
                     mainloop,
                     context,
+                    changed: Box::new(AtomicBool::new(false)),
                 };
                 if context.is_null()
                     || (api.context_connect)(context, std::ptr::null(), 0, std::ptr::null()) < 0
@@ -568,7 +615,10 @@ mod imp {
                 }
                 for _ in 0..1000 {
                     match (api.context_get_state)(context) {
-                        PA_CONTEXT_READY => return Some(watcher),
+                        PA_CONTEXT_READY => {
+                            watcher.subscribe();
+                            return Some(watcher);
+                        }
                         PA_CONTEXT_FAILED | PA_CONTEXT_TERMINATED => return None,
                         _ => {
                             if (api.mainloop_iterate)(mainloop, 1, std::ptr::null_mut()) < 0 {
@@ -579,6 +629,41 @@ mod imp {
                 }
                 None
             }
+        }
+
+        /// Asks the server to report its own changes (a new default sink
+        /// among them), so a switch is followed at once instead of at the
+        /// next one-second check.
+        fn subscribe(&mut self) {
+            // SAFETY: the context is ready; the flag outlives the context
+            // (Drop disconnects before the box is freed).
+            unsafe {
+                let flag = &*self.changed as *const AtomicBool as *mut c_void;
+                (self.api.context_set_subscribe_callback)(self.context, on_server_event, flag);
+                let op = (self.api.context_subscribe)(
+                    self.context,
+                    PA_SUBSCRIPTION_MASK_SERVER,
+                    std::ptr::null(),
+                    std::ptr::null_mut(),
+                );
+                if !op.is_null() {
+                    (self.api.operation_unref)(op);
+                }
+            }
+        }
+
+        /// Handles pending server events without waiting; true when one
+        /// arrived since the last call.
+        fn server_changed(&mut self) -> bool {
+            // SAFETY: non-blocking dispatch on the thread that owns the loop.
+            unsafe {
+                for _ in 0..16 {
+                    if (self.api.mainloop_iterate)(self.mainloop, 0, std::ptr::null_mut()) <= 0 {
+                        break;
+                    }
+                }
+            }
+            self.changed.swap(false, Ordering::SeqCst)
         }
 
         /// The default sink's name, or `None` when the server doesn't say.
@@ -735,7 +820,11 @@ mod imp {
                 } else {
                     ingest(&state, &buf, CHANNELS as usize, RATE as f64);
                 }
-                if !failed && checked.elapsed() < FOLLOW_INTERVAL {
+                // A server event means "ask now"; without events, ask once a
+                // second as before.
+                let event = watcher.as_mut().is_some_and(DefaultOutput::server_changed);
+                let due = checked.elapsed() >= FOLLOW_INTERVAL;
+                if !failed && !event && !due {
                     continue;
                 }
                 checked = Instant::now();
@@ -869,6 +958,18 @@ mod tests {
             output_changed(None, Some("headset")),
             "learned the output later"
         );
+    }
+
+    /// libpulse event = facility | type; only the server facility (where the
+    /// default sink is) triggers a check.
+    #[test]
+    fn test_only_server_events_trigger_a_check() {
+        assert!(is_server_event(0x0007), "server, new");
+        assert!(is_server_event(0x0010 | 0x0007), "server, change");
+        assert!(!is_server_event(0x0010), "sink change");
+        assert!(!is_server_event(0x0010 | 0x0001), "source change");
+        assert!(!is_server_event(0x0020 | 0x0002), "sink input removed");
+        assert_eq!(PA_SUBSCRIPTION_MASK_SERVER, 1 << 7);
     }
 
     #[test]
