@@ -12,7 +12,7 @@ const translations = {
     navSecurity: "Güvenlik & DLP",
     navHardware: "Donanım",
     navDownload: "İndir",
-    badgeRelease: "EchoMind v0.2.16 Yayında • Sıfır-Güven Mimarisi",
+    badgeRelease: "EchoMind v0.2.17 Yayında • Sıfır-Güven Mimarisi",
     heroTitle: "Toplantılarınızı Donanım Gücüyle Dinleyen Hibrit Yapay Zekâ",
     heroSubtitle:
       "Apple Metal ve NVIDIA CUDA ile %100 yerel ve gizli çalışabilen, kurumsal DLP ve toplantılar arası semantik hafıza sunan yeni nesil masaüstü toplantı asistanı.",
@@ -96,7 +96,7 @@ const translations = {
     navSecurity: "Security & DLP",
     navHardware: "Hardware",
     navDownload: "Download",
-    badgeRelease: "EchoMind v0.2.16 Released • Zero-Trust Architecture",
+    badgeRelease: "EchoMind v0.2.17 Released • Zero-Trust Architecture",
     heroTitle: "Hardware-Aware Hybrid AI Meeting Intelligence",
     heroSubtitle:
       "A next-generation desktop meeting assistant that runs 100% locally with Apple Metal & NVIDIA CUDA, featuring enterprise DLP and cross-meeting semantic memory.",
