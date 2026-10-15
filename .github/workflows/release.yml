@@ -70,6 +70,15 @@ jobs:
           & "$env:RUNNER_TEMP\VulkanSDK-Installer.exe" --accept-licenses --default-answer --confirm-command install
           Add-Content $env:GITHUB_ENV "VULKAN_SDK=C:\VulkanSDK\${env:VULKAN_VERSION}"
           Add-Content $env:GITHUB_PATH "C:\VulkanSDK\${env:VULKAN_VERSION}\bin"
+          # The Visual Studio generator runs the steps of ggml's shader
+          # generator (an ExternalProject) out of order; Ninja does not.
+          choco install ninja -y --no-progress
+          Add-Content $env:GITHUB_ENV "CMAKE_GENERATOR=Ninja"
+
+      # Ninja needs the MSVC compiler on PATH.
+      - name: Set up MSVC
+        if: matrix.platform == 'windows-latest'
+        uses: ilammy/msvc-dev-cmd@v1
 
       - name: Install Rust Stable
         uses: dtolnay/rust-toolchain@stable
