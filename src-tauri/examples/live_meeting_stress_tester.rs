@@ -87,8 +87,8 @@ fn main() {
         if hw.has_ane { "EVET ✅" } else { "YOK" }
     );
     println!(
-        "   - NVIDIA CUDA Desteği       : {}",
-        if hw.has_cuda { "EVET ✅" } else { "YOK" }
+        "   - GPU (Vulkan) Desteği      : {}",
+        if hw.has_gpu { "EVET ✅" } else { "YOK" }
     );
     println!(
         "   - AVX2 Desteği              : {}",
