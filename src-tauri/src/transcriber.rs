@@ -1656,6 +1656,11 @@ mod tests {
             .iter()
             .any(|d| d.device_type == llama_cpp_2::LlamaBackendDeviceType::Cpu));
         println!("Whisper GPU: {:?}", whisper_gpu());
+        // CI removes vulkan-1.dll on Windows and sets this.
+        if std::env::var_os("ECHOMIND_EXPECT_NO_VULKAN").is_some() {
+            assert!(devices.iter().all(|d| d.backend != "Vulkan"));
+            assert_eq!(whisper_gpu(), None);
+        }
     }
 
     #[test]

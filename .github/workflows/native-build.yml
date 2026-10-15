@@ -61,11 +61,20 @@ jobs:
       - name: Build and link the app and its tests
         run: cargo test --manifest-path src-tauri/Cargo.toml --no-run
 
-      # Lists ggml's devices for real. The runner has no GPU and normally no
-      # Vulkan driver, so on Windows this goes through the vulkan-1.dll
-      # delay-load hook; a crash here means the app would not start there.
+      # Lists ggml's devices for real, on a runner without a GPU. On Windows
+      # it runs twice: with vulkan-1.dll (the SDK installs it), then without
+      # it, as on a PC with no graphics driver, which goes through the
+      # delay-load hook. A crash here means the app would not start there.
       - name: Start ggml without a GPU
-        shell: bash
+        shell: pwsh
         run: |
-          if [ "$RUNNER_OS" = "Windows" ]; then ls -la /c/Windows/System32/vulkan-1.dll || echo "no vulkan-1.dll in System32"; fi
           cargo test --manifest-path src-tauri/Cargo.toml --lib ggml_devices -- --nocapture
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          if ($env:RUNNER_OS -eq 'Windows') {
+            Remove-Item C:\Windows\System32\vulkan-1.dll
+            $env:PATH = ($env:PATH -split ';' | Where-Object { $_ -notlike '*VulkanSDK*' }) -join ';'
+            where.exe vulkan-1.dll
+            $env:ECHOMIND_EXPECT_NO_VULKAN = '1'
+            cargo test --manifest-path src-tauri/Cargo.toml --lib ggml_devices -- --nocapture
+            if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          }
