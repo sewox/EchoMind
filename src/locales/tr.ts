@@ -110,6 +110,8 @@ export const tr: TranslationKeys = {
       "Kayıt {hours} saat sınırına ulaştığı için durduruldu ve kaydedildi. Toplantı sürüyorsa yeni bir kayıt başlatın.",
     silence:
       "{minutes} dakika boyunca hiç ses gelmediği için kayıt durduruldu ve kaydedildi. Sessiz kısım kayda eklenmedi.",
+    silenceEmpty:
+      "{minutes} dakika boyunca hiç ses gelmediği için kayıt durduruldu. Kayıtta hiç ses olmadığından kaydedilmedi.",
   },
   sidebar: {
     title: "Toplantı Geçmişi",
@@ -507,7 +509,7 @@ export const tr: TranslationKeys = {
     ignoredAppsTitle: "İzlenecek Uygulamalar",
     ignoreListTitle: "Yoksayılan Uygulamalar (bundle ID)",
     ignoreListDesc:
-      "Bu listedeki uygulamalar toplantı istemi tetiklemez (Sesli Notlar, Siri, kayıt araçları…). Yanlış pozitifleri susturmak için bir macOS bundle ID ekleyin.",
+      "Bu listedeki uygulamalar toplantı istemi tetiklemez (Sesli Notlar, Siri, kayıt araçları…). Yanlış pozitifleri susturmak için uygulamanın kimliğini ekleyin: macOS'ta bundle ID, Windows ve Linux'ta program adı.",
     ignoreListPlaceholder: "com.example.App",
     ignoreListAdd: "Ekle",
     ignoreListRemove: "Kaldır",

@@ -110,6 +110,8 @@ export const de: TranslationKeys = {
       "Die Aufnahme hat das Limit von {hours} Stunden erreicht und wurde beendet und gespeichert. Läuft das Meeting noch, starten Sie eine neue Aufnahme.",
     silence:
       "{minutes} Minuten lang kein Ton, daher wurde die Aufnahme beendet und gespeichert. Der stille Teil wurde weggelassen.",
+    silenceEmpty:
+      "{minutes} Minuten lang kein Ton, daher wurde die Aufnahme beendet. Sie enthielt gar keinen Ton und wurde nicht gespeichert.",
   },
   sidebar: {
     title: "Meeting-Verlauf",

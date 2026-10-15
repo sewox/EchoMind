@@ -110,6 +110,8 @@ export const en: TranslationKeys = {
       "The recording reached the {hours}-hour limit, so it was stopped and saved. If the meeting is still going, start a new recording.",
     silence:
       "No sound for {minutes} minutes, so the recording was stopped and saved. The silent part was left out.",
+    silenceEmpty:
+      "No sound for {minutes} minutes, so the recording was stopped. It had no sound at all, so nothing was saved.",
   },
   sidebar: {
     title: "Meeting History",
@@ -506,7 +508,7 @@ export const en: TranslationKeys = {
     ignoredAppsTitle: "Monitored Applications",
     ignoreListTitle: "Ignored Apps (bundle IDs)",
     ignoreListDesc:
-      "Apps on this list never trigger a meeting prompt (Voice Memos, Siri, recorders, …). Add a macOS bundle ID to silence false positives.",
+      "Apps on this list never trigger a meeting prompt (Voice Memos, Siri, recorders, …). Add an app to silence false positives: its bundle ID on macOS, its program name on Windows and Linux.",
     ignoreListPlaceholder: "com.example.App",
     ignoreListAdd: "Add",
     ignoreListRemove: "Remove",

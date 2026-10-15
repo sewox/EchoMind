@@ -100,6 +100,7 @@ export interface TranslationKeys {
   recordingLimit: {
     reached: string;
     silence: string;
+    silenceEmpty: string;
   };
   sidebar: {
     title: string;

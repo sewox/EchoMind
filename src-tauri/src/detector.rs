@@ -268,14 +268,16 @@ impl MeetingDetector {
             let settings = get_global_detector().settings.lock().unwrap();
             effective_ignore_list(&settings.ignored_apps)
         };
-        Self::scan_processes_with_ignore(&ignore)
+        Self::scan_processes_with_ignore(&ignore).unwrap_or_default()
     }
 
-    fn scan_processes_with_ignore(ignore: &[String]) -> Vec<MeetingAppInfo> {
-        // Unsupported (macOS before 14.2, Linux without PulseAudio/PipeWire):
-        // nothing is detected; recording is still available by hand.
-        let raw = list_mic_holding_processes().unwrap_or_default();
-        Self::scan_via_mic_activity(raw, ignore)
+    /// `None` when the OS could not be asked (macOS before 14.2, Linux
+    /// without PulseAudio/PipeWire, or a failed query): nothing is known, so
+    /// a running meeting must not be taken as ended. Recording is still
+    /// available by hand.
+    fn scan_processes_with_ignore(ignore: &[String]) -> Option<Vec<MeetingAppInfo>> {
+        let raw = list_mic_holding_processes()?;
+        Some(Self::scan_via_mic_activity(raw, ignore))
     }
 
     /// Mic-activity detection: any process holding the microphone for ~5 s is a
@@ -572,16 +574,22 @@ impl MeetingDetector {
                 };
 
                 if !current_settings.enabled {
+                    crate::audio::set_meeting_holds_mic(false);
                     thread::sleep(Duration::from_millis(1000));
                     continue;
                 }
 
                 let ignore = effective_ignore_list(&current_settings.ignored_apps);
-                let all_active = Self::scan_processes_with_ignore(&ignore);
+                let Some(all_active) = Self::scan_processes_with_ignore(&ignore) else {
+                    crate::audio::set_meeting_holds_mic(false);
+                    thread::sleep(Duration::from_millis(1000));
+                    continue;
+                };
                 let filtered_active: Vec<MeetingAppInfo> = all_active
                     .into_iter()
                     .filter(|app| !is_ignored_bundle(&app.app_id, &ignore))
                     .collect();
+                crate::audio::set_meeting_holds_mic(!filtered_active.is_empty());
 
                 let current_count = filtered_active.len();
 
@@ -704,6 +712,7 @@ impl MeetingDetector {
                 thread::sleep(Duration::from_millis(1000));
             }
 
+            crate::audio::set_meeting_holds_mic(false);
             println!("🛑 Toplantı Algılama Servisi Durduruldu.");
         });
 

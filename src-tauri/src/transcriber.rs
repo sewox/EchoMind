@@ -1029,10 +1029,36 @@ pub async fn transcribe_audio_buffer(
     .map_err(|e| format!("Yazıya dökme görevi tamamlanamadı: {e}"))?
 }
 
+/// Held while a live slice is taken and transcribed. Slices then land in
+/// order, and a save waits for the one in flight instead of saving without
+/// its text.
+fn live_slice_gate() -> &'static Mutex<()> {
+    static GATE: Mutex<()> = Mutex::new(());
+    &GATE
+}
+
+/// Waits up to `timeout` for a live slice in flight to land in the history.
+/// Hold the guard until the recording is claimed, so no new slice starts in
+/// between. `None` if the slice is still running after `timeout`.
+pub fn wait_for_live_slice(timeout: Duration) -> Option<std::sync::MutexGuard<'static, ()>> {
+    let deadline = Instant::now() + timeout;
+    loop {
+        match live_slice_gate().try_lock() {
+            Ok(guard) => return Some(guard),
+            Err(std::sync::TryLockError::Poisoned(e)) => return Some(e.into_inner()),
+            Err(std::sync::TryLockError::WouldBlock) if Instant::now() < deadline => {
+                std::thread::sleep(Duration::from_millis(50))
+            }
+            Err(std::sync::TryLockError::WouldBlock) => return None,
+        }
+    }
+}
+
 fn transcribe_audio_buffer_blocking(
     language: String,
     model_version: Option<String>,
 ) -> Result<Vec<TranscriptSegment>, String> {
+    let _slice = live_slice_gate().lock().unwrap_or_else(|e| e.into_inner());
     let engine = get_global_transcriber();
     let audio_engine = crate::audio::get_global_audio_engine();
     // Live transcription advances a cursor only — never take/clear the session
@@ -1454,6 +1480,23 @@ pub fn unload_transcription_model() -> ModelStatus {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn save_waits_for_the_live_slice_in_flight() {
+        let (held, is_held) = std::sync::mpsc::channel();
+        let slice = std::thread::spawn(move || {
+            let _slice = live_slice_gate().lock().unwrap();
+            held.send(()).unwrap();
+            std::thread::sleep(Duration::from_millis(150));
+        });
+        is_held.recv().unwrap();
+        // Quit does not wait for it.
+        assert!(wait_for_live_slice(Duration::ZERO).is_none());
+        let started = Instant::now();
+        assert!(wait_for_live_slice(Duration::from_secs(5)).is_some());
+        assert!(started.elapsed() >= Duration::from_millis(100));
+        slice.join().unwrap();
+    }
 
     #[test]
     fn whisper_leaves_cores_free_off_apple_silicon() {

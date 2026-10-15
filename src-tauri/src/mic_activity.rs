@@ -403,11 +403,11 @@ pub fn is_echomind_bundle(bundle_id: &str) -> bool {
 /// (defaults + user additions). Matches exact bundle id, parent after helper
 /// resolution, known short aliases (`zoom`, `discord`, …), and EchoMind.
 pub fn is_ignored_bundle(bundle_id: &str, ignored: &[String]) -> bool {
-    if is_echomind_bundle(bundle_id) {
+    if is_echomind_bundle(bundle_id) || is_audio_tool(bundle_id) {
         return true;
     }
     let resolved = resolve_helper_to_parent(bundle_id);
-    if is_echomind_bundle(&resolved) {
+    if is_echomind_bundle(&resolved) || is_audio_tool(&resolved) {
         return true;
     }
 
@@ -416,7 +416,11 @@ pub fn is_ignored_bundle(bundle_id: &str, ignored: &[String]) -> bool {
         if e.is_empty() {
             continue;
         }
-        if e == bundle_id || e == resolved {
+        // Entries as users type them: any case, "Zoom.exe" or "zoom".
+        if e.eq_ignore_ascii_case(bundle_id)
+            || e.eq_ignore_ascii_case(&resolved)
+            || canonical_app_id(e) == resolved
+        {
             return true;
         }
         // Short aliases used by the legacy detector / older settings UI.
@@ -428,6 +432,47 @@ pub fn is_ignored_bundle(bundle_id: &str, ignored: &[String]) -> bool {
     // unless the user explicitly removed them from the merged ignore list.
     // Callers pass `effective_ignore_list(settings.ignored_apps)`.
     false
+}
+
+/// Tools that hold the microphone all the time (noise removal, virtual
+/// mixers, sound servers' own streams) or show its level (sound settings).
+/// They are never a meeting, and one left running would make the meeting
+/// never end, so they are ignored whatever the user's ignore list says.
+fn is_audio_tool(app_id: &str) -> bool {
+    const TOOLS: &[&str] = &[
+        // Noise removal and virtual mixers
+        "ai.krisp.krispmac",
+        "krisp",
+        "nvidia broadcast",
+        "nvidia broadcast ui",
+        "voicemeeter",
+        "voicemeeter_x64",
+        "voicemeeterpro",
+        "voicemeeterpro_x64",
+        "voicemeeter8",
+        "voicemeeter8x64",
+        "wavelink",
+        "steelseriessonar",
+        "easyeffects",
+        "pulseeffects",
+        "noisetorch",
+        // Sound servers' own streams (loopbacks, filters, echo cancel)
+        "pipewire",
+        "pipewire-pulse",
+        "wireplumber",
+        "pulseaudio",
+        // Input level meters
+        "windows.immersivecontrolpanel_cw5n1h2txyewy",
+        "pavucontrol",
+        "pavucontrol-qt",
+        "pwvucontrol",
+        "gnome-control-center",
+        "plasmashell",
+        // Voice typing / voice control
+        "voiceaccess",
+        "speechruntime",
+    ];
+    TOOLS.iter().any(|t| app_id.eq_ignore_ascii_case(t))
 }
 
 fn alias_matches(alias: &str, bundle_id: &str) -> bool {
@@ -535,9 +580,8 @@ mod imp {
             Ok(list) => Some(list),
             Err(err) => {
                 eprintln!("⚠️ mic process snapshot parse failed: {err}");
-                // Supported but parse failed — return empty rather than falling
-                // back to the legacy gate (would miss real meetings).
-                Some(Vec::new())
+                // Unknown, not "nobody": a running meeting must not end here.
+                None
             }
         }
     }
@@ -560,6 +604,17 @@ fn windows_package_owns_exe(family: &str, exe: &str) -> bool {
     let exe = exe.to_ascii_lowercase();
     exe.contains(&format!("\\windowsapps\\{}_", name.to_ascii_lowercase()))
         && exe.contains(&format!("__{}\\", publisher.to_ascii_lowercase()))
+}
+
+/// The program behind an ALSA client's stream name. Through PipeWire's ALSA
+/// plugin a stream has no process properties, only a name like
+/// "PipeWire ALSA [echomind]"; PulseAudio's plugin says "ALSA plug-in [x]".
+#[cfg(any(test, target_os = "linux"))]
+fn alsa_client_binary(name: &str) -> Option<&str> {
+    let rest = name
+        .strip_prefix("PipeWire ALSA [")
+        .or_else(|| name.strip_prefix("ALSA plug-in ["))?;
+    rest.strip_suffix(']').filter(|b| !b.is_empty())
 }
 
 #[cfg(target_os = "windows")]
@@ -940,6 +995,9 @@ mod imp {
     /// One recording stream, as the server describes it.
     struct Stream {
         source: u32,
+        /// `PA_INVALID_INDEX` for a stream a server module owns (loopback,
+        /// echo cancel), not an app.
+        client: u32,
         corked: bool,
         pid: i32,
         binary: String,
@@ -991,6 +1049,7 @@ mod imp {
             let prop = |key: &CStr| text((api.proplist_gets)(info.proplist, key.as_ptr()));
             (*(userdata as *mut Vec<Stream>)).push(Stream {
                 source: info.source,
+                client: info.client,
                 corked: info.corked != 0,
                 pid: prop(c"application.process.id").parse().unwrap_or(0),
                 binary: prop(c"application.process.binary"),
@@ -1034,12 +1093,18 @@ mod imp {
         Some(
             streams
                 .into_iter()
-                .filter(|s| !s.corked && !monitors.contains(&s.source) && s.pid != own_pid)
+                .filter(|s| {
+                    !s.corked
+                        && s.client != u32::MAX
+                        && !monitors.contains(&s.source)
+                        && s.pid != own_pid
+                        && !(s.binary.is_empty() && s.name.is_empty())
+                })
                 .map(|s| {
-                    let id_source = if s.binary.is_empty() {
-                        &s.name
-                    } else {
+                    let id_source = if !s.binary.is_empty() {
                         &s.binary
+                    } else {
+                        alsa_client_binary(&s.name).unwrap_or(&s.name)
                     };
                     MicHoldingProcess {
                         pid: s.pid,
@@ -1048,7 +1113,11 @@ mod imp {
                         } else {
                             canonical_app_id(id_source)
                         },
-                        display_name: if s.name.is_empty() { s.binary } else { s.name },
+                        display_name: match alsa_client_binary(&s.name) {
+                            Some(program) => program.to_string(),
+                            None if s.name.is_empty() => s.binary,
+                            None => s.name,
+                        },
                     }
                 })
                 .collect(),
@@ -1234,6 +1303,63 @@ mod tests {
         assert_eq!(list.len(), 1);
         assert_eq!(list[0].pid, 55);
         assert_eq!(list[0].bundle_id, "us.zoom.xos");
+    }
+
+    #[test]
+    fn alsa_streams_are_named_after_their_program() {
+        assert_eq!(
+            alsa_client_binary("PipeWire ALSA [echomind]"),
+            Some("echomind")
+        );
+        assert_eq!(alsa_client_binary("ALSA plug-in [zoom]"), Some("zoom"));
+        assert_eq!(alsa_client_binary("PipeWire ALSA []"), None);
+        assert_eq!(alsa_client_binary("Firefox"), None);
+        // EchoMind's own capture then counts as EchoMind.
+        let own = canonical_app_id(alsa_client_binary("PipeWire ALSA [echomind]").unwrap());
+        assert!(is_echomind_bundle(&own));
+    }
+
+    #[test]
+    fn ignore_entries_match_as_users_type_them() {
+        let zoom = canonical_app_id("Zoom.exe");
+        for entry in ["Zoom.exe", "zoom.exe", "zoom", "us.zoom.xos"] {
+            assert!(is_ignored_bundle(&zoom, &[entry.to_string()]), "{entry}");
+        }
+        let store_app = "Contoso.Recorder_8wekyb3d8bbwe";
+        assert!(is_ignored_bundle(
+            store_app,
+            &["contoso.recorder_8wekyb3d8bbwe".to_string()]
+        ));
+        assert!(!is_ignored_bundle(&zoom, &["teams.exe".to_string()]));
+    }
+
+    #[test]
+    fn always_on_audio_tools_never_count_as_a_meeting() {
+        // Even with a customized ignore list that predates them.
+        let user_list = vec!["com.hnc.Discord".to_string()];
+        for raw in [
+            "krisp.exe",
+            "NVIDIA Broadcast.exe",
+            "voicemeeterpro.exe",
+            "easyeffects",
+            "pipewire",
+            "pavucontrol",
+        ] {
+            let id = canonical_app_id(raw);
+            assert!(is_ignored_bundle(&id, &user_list), "{raw} -> {id}");
+        }
+        assert!(is_ignored_bundle("ai.krisp.krispMac", &user_list));
+        assert!(is_ignored_bundle(
+            "windows.immersivecontrolpanel_cw5n1h2txyewy",
+            &user_list
+        ));
+        // Meeting apps are not swept up with them.
+        for raw in ["Zoom.exe", "ms-teams.exe", "chrome", "firefox"] {
+            assert!(
+                !is_ignored_bundle(&canonical_app_id(raw), &user_list),
+                "{raw}"
+            );
+        }
     }
 
     #[test]

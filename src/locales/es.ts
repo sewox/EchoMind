@@ -110,6 +110,8 @@ export const es: TranslationKeys = {
       "La grabación llegó al límite de {hours} horas, así que se detuvo y se guardó. Si la reunión sigue, inicie una nueva grabación.",
     silence:
       "No hubo sonido durante {minutes} minutos, así que la grabación se detuvo y se guardó. La parte en silencio no se incluyó.",
+    silenceEmpty:
+      "No hubo sonido durante {minutes} minutos, así que la grabación se detuvo. No tenía ningún sonido, así que no se guardó.",
   },
   sidebar: {
     title: "Historial de Reuniones",
@@ -506,7 +508,7 @@ export const es: TranslationKeys = {
     ignoredAppsTitle: "Aplicaciones Supervisadas",
     ignoreListTitle: "Apps ignoradas (bundle IDs)",
     ignoreListDesc:
-      "Las apps de esta lista no disparan el aviso de reunión (Notas de Voz, Siri, grabadoras…). Añada un bundle ID de macOS para silenciar falsos positivos.",
+      "Las apps de esta lista no disparan el aviso de reunión (Notas de Voz, Siri, grabadoras…). Añada una app para silenciar falsos positivos: su bundle ID en macOS, su nombre de programa en Windows y Linux.",
     ignoreListPlaceholder: "com.example.App",
     ignoreListAdd: "Añadir",
     ignoreListRemove: "Quitar",

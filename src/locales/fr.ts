@@ -112,6 +112,8 @@ export const fr: TranslationKeys = {
       "L’enregistrement a atteint la limite de {hours} heures : il a été arrêté et sauvegardé. Si la réunion continue, lancez un nouvel enregistrement.",
     silence:
       "Aucun son pendant {minutes} minutes : l'enregistrement a été arrêté et sauvegardé, sans la partie silencieuse.",
+    silenceEmpty:
+      "Aucun son pendant {minutes} minutes : l'enregistrement a été arrêté. Il ne contenait aucun son et n'a donc pas été sauvegardé.",
   },
   sidebar: {
     title: "Historique des Réunions",
@@ -506,7 +508,7 @@ export const fr: TranslationKeys = {
     ignoredAppsTitle: "Applications Surveillées",
     ignoreListTitle: "Apps ignorées (bundle IDs)",
     ignoreListDesc:
-      "Les apps de cette liste ne déclenchent pas l'invite de réunion (Mémos Vocaux, Siri, enregistreurs…). Ajoutez un bundle ID macOS pour couper les faux positifs.",
+      "Les apps de cette liste ne déclenchent pas l'invite de réunion (Mémos Vocaux, Siri, enregistreurs…). Ajoutez une app pour couper les faux positifs : son bundle ID sur macOS, son nom de programme sous Windows et Linux.",
     ignoreListPlaceholder: "com.example.App",
     ignoreListAdd: "Ajouter",
     ignoreListRemove: "Retirer",

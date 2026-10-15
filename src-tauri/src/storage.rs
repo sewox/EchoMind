@@ -1396,6 +1396,14 @@ fn save_current_meeting_blocking(
     use crate::audio::PcmClaim;
     use std::sync::atomic::Ordering;
 
+    // Live transcription runs off the UI thread, so Stop can arrive while a
+    // slice is being transcribed: wait for its text (Quit has no time for it).
+    let live_wait = match mode {
+        SaveMode::Normal => std::time::Duration::from_secs(180),
+        SaveMode::QuitNoWhisper => std::time::Duration::ZERO,
+    };
+    let live_slice = crate::transcriber::wait_for_live_slice(live_wait);
+
     // Serialize so AlreadySaved always sees a published outcome (Done/Nothing).
     let (gate_lock, gate_cv) = session_save_gate();
     let mut gate = gate_lock
@@ -1408,7 +1416,8 @@ fn save_current_meeting_blocking(
     // Explicit order: stop is done by the caller; finalize segments, then claim.
     let (segments, live_engines) = transcriber.take_history_with_engines();
 
-    let (session_id, mic, system, live_covered_samples) = match audio_engine.claim_pcm_for_save() {
+    let claim = audio_engine.claim_pcm_for_save();
+    let (session_id, mic, system, live_covered_samples, silence_cut) = match claim {
         PcmClaim::AlreadySaved { session_id } => {
             // Wait until the winner publishes Done/Nothing — never bare Err.
             loop {
@@ -1448,6 +1457,7 @@ fn save_current_meeting_blocking(
             mic,
             system,
             live_covered_samples,
+            silence_cut,
         } => {
             *gate = Some(SessionSaveCache {
                 session_id,
@@ -1456,16 +1466,18 @@ fn save_current_meeting_blocking(
             gate_cv.notify_all();
             // Release gate lock while doing FLAC I/O so waiters can observe Pending.
             drop(gate);
-            (session_id, mic, system, live_covered_samples)
+            (session_id, mic, system, live_covered_samples, silence_cut)
         }
     };
+    drop(live_slice);
 
     // A recording stopped for silence had its silent tail cut: drop any live
-    // text from beyond the audio that was kept.
+    // text from beyond the audio that was kept. (Only then: a cloud engine's
+    // timestamps can run a little past the end of a slice.)
     let recorded_ms = mic.len() as u64 * 1000 / 16000;
     let segments: Vec<_> = segments
         .into_iter()
-        .filter(|s| s.start_time_ms < recorded_ms)
+        .filter(|s| !silence_cut || s.start_time_ms < recorded_ms)
         .collect();
 
     flac_save_in_flight().store(true, Ordering::SeqCst);
