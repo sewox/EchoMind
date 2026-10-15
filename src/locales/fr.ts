@@ -110,6 +110,8 @@ export const fr: TranslationKeys = {
   recordingLimit: {
     reached:
       "L’enregistrement a atteint la limite de {hours} heures : il a été arrêté et sauvegardé. Si la réunion continue, lancez un nouvel enregistrement.",
+    silence:
+      "Aucun son pendant {minutes} minutes : l'enregistrement a été arrêté et sauvegardé, sans la partie silencieuse.",
   },
   sidebar: {
     title: "Historique des Réunions",
@@ -212,6 +214,8 @@ export const fr: TranslationKeys = {
     smartRedaction: "Rédaction & Correction Intelligente",
     redacting: "Rédaction en cours...",
     noSearchResults: "Aucune conversation trouvée pour cette recherche.",
+    recordingNoLive:
+      "Enregistrement en cours. La transcription en direct est désactivée ; elle sera préparée après l'enregistrement.",
     listeningLive: "Écoute en direct en cours...",
     renameSpeaker: "Modifier le nom du locuteur",
     speakerInfo: "Séparation des locuteurs et flux de dialogue horodaté",
@@ -675,6 +679,9 @@ export const fr: TranslationKeys = {
       yourVoice: "Votre voix : entrée active",
       systemAudioLoopback: "Audio système : loopback actif",
       systemAudioSpeaker: "Audio système : haut-parleur/pièce",
+      liveTranscriptionToggle: "Transcription en direct",
+      liveTranscriptionDesc:
+        "Transcrit la conversation pendant la réunion. Désactivée, la transcription est préparée en arrière-plan après l'enregistrement, ce qui soulage les ordinateurs moins puissants pendant l'appel.",
       systemAudioCaptureToggle:
         "Capturer l'audio système (participants distants)",
       systemAudioCaptureDesc:

@@ -13,6 +13,7 @@ import {
   Sparkles,
   Mic,
   Volume2,
+  MessageSquareText,
   RefreshCw,
   Radio,
   Edit3,
@@ -28,6 +29,10 @@ import {
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { CredentialStore } from "../services/credentialStore";
+import {
+  isLiveTranscriptionEnabled,
+  setLiveTranscriptionEnabled,
+} from "../services/liveTranscription";
 import { usePrivacyMode } from "../hooks/usePrivacyMode";
 import { HardwareInfo, ModelStatus } from "../App";
 import {
@@ -160,6 +165,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const [askCloudConfirm, setAskCloudConfirm] = useState<boolean>(true);
   const [systemAudioEnabled, setSystemAudioEnabled] = useState<boolean>(true);
+  const [liveTranscription, setLiveTranscription] = useState<boolean>(
+    isLiveTranscriptionEnabled,
+  );
   const [systemAudioSupported, setSystemAudioSupported] =
     useState<boolean>(false);
 
@@ -380,6 +388,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
+  const handleLiveTranscriptionToggle = (enabled: boolean) => {
+    setLiveTranscription(enabled);
+    setLiveTranscriptionEnabled(enabled);
+  };
+
   const handleSystemAudioToggle = (enabled: boolean) => {
     setSystemAudioEnabled(enabled);
     if (enabled) {
@@ -592,6 +605,25 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </div>
 
           {/* Native system-audio capture (macOS tap, WASAPI loopback, PulseAudio/PipeWire monitor) */}
+          <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/80 flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <label className="text-slate-200 font-medium flex items-center gap-1.5">
+                <MessageSquareText className="w-4 h-4 text-cyan-400 shrink-0" />
+                {t("ui.settings.liveTranscriptionToggle")}
+              </label>
+              <p className="text-slate-400 text-[11px] mt-0.5">
+                {t("ui.settings.liveTranscriptionDesc")}
+              </p>
+            </div>
+            <input
+              type="checkbox"
+              checked={liveTranscription}
+              onChange={(e) => handleLiveTranscriptionToggle(e.target.checked)}
+              data-testid="live-transcription-toggle"
+              className="w-4 h-4 rounded border-slate-700 bg-slate-800 text-cyan-600 focus:ring-0 cursor-pointer shrink-0"
+            />
+          </div>
+
           <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/80 flex items-center justify-between gap-3">
             <div className="min-w-0">
               <label className="text-slate-200 font-medium flex items-center gap-1.5">

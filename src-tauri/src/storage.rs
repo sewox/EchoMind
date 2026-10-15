@@ -1460,14 +1460,25 @@ fn save_current_meeting_blocking(
         }
     };
 
+    // A recording stopped for silence had its silent tail cut: drop any live
+    // text from beyond the audio that was kept.
+    let recorded_ms = mic.len() as u64 * 1000 / 16000;
+    let segments: Vec<_> = segments
+        .into_iter()
+        .filter(|s| s.start_time_ms < recorded_ms)
+        .collect();
+
     flac_save_in_flight().store(true, Ordering::SeqCst);
     let save_result = (|| {
         let now = chrono::Local::now();
         let id = format!("mtg_{}_{}", now.format("%Y%m%d_%H%M%S"), session_id);
         let date_formatted = now.format("%d %B %Y, %H:%M").to_string();
 
+        // The page's timer keeps counting through a cut silent tail or a
+        // sleeping laptop; the audio is what was recorded.
+        let recorded_seconds = (mic.len() as u64).div_ceil(16000);
         let actual_duration = if duration_seconds > 0 {
-            duration_seconds
+            duration_seconds.min(recorded_seconds.max(1))
         } else {
             (mic.len() as u64) / 16000
         };

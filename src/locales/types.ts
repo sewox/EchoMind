@@ -99,6 +99,7 @@ export interface TranslationKeys {
   };
   recordingLimit: {
     reached: string;
+    silence: string;
   };
   sidebar: {
     title: string;
@@ -173,6 +174,7 @@ export interface TranslationKeys {
     smartRedaction: string;
     redacting: string;
     noSearchResults: string;
+    recordingNoLive: string;
     listeningLive: string;
     renameSpeaker: string;
     speakerInfo?: string;
@@ -587,6 +589,8 @@ export interface TranslationKeys {
       yourVoice: string;
       systemAudioLoopback: string;
       systemAudioSpeaker: string;
+      liveTranscriptionToggle: string;
+      liveTranscriptionDesc: string;
       systemAudioCaptureToggle: string;
       systemAudioCaptureDesc: string;
       systemAudioUnsupported: string;

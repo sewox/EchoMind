@@ -43,7 +43,7 @@ pub(crate) fn ingest(state: &SharedAudioState, interleaved: &[f32], channels: us
         .map(|c| c.iter().sum::<f32>() / channels as f32)
         .collect();
     let mut st = state.lock().unwrap();
-    if !st.is_recording || st.limit_reached {
+    if !st.is_recording || st.limit_reached || st.silence_stopped {
         return;
     }
     let rms = (mono.iter().map(|s| s * s).sum::<f32>() / mono.len() as f32).sqrt();
@@ -63,6 +63,9 @@ pub(crate) fn ingest(state: &SharedAudioState, interleaved: &[f32], channels: us
     st.sys_pcm_16k_buffer
         .extend(out.iter().map(|&s| crate::audio::sample_to_i16(s)));
     st.sys_capture_active = true;
+    if rms > crate::audio::SOUND_RMS {
+        st.last_sound_sample = st.sys_pcm_16k_buffer.len();
+    }
     // If the system clock ran ahead of the mic by more than ~300 ms, trim so
     // the next mic pad keeps the two tracks sample-aligned.
     const MAX_LEAD: usize = 16000 * 3 / 10;

@@ -35,6 +35,7 @@ import { MeetingTemplate, BUILTIN_TEMPLATES } from "../types/templates";
 import { MeetingAnalytics } from "../types/analytics";
 import { CredentialStore } from "../services/credentialStore";
 import { cloudModelVersion } from "../services/activeEngine";
+import { isLiveTranscriptionEnabled } from "../services/liveTranscription";
 import { SoundbiteResult } from "../types/soundbite";
 import { Tooltip } from "./ui/Tooltip";
 import { useI18n } from "../locales/i18nContext";
@@ -451,7 +452,8 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
 
     let isAutoTranscribing = false;
     const transcribeInterval = setInterval(async () => {
-      if (isAutoTranscribing) return;
+      // Read on every tick so turning it off in Settings applies mid-meeting.
+      if (isAutoTranscribing || !isLiveTranscriptionEnabled()) return;
       isAutoTranscribing = true;
       try {
         const res = await invoke<TranscriptSegment[]>(

@@ -47,6 +47,18 @@ fn model_key_of(path: &str) -> Option<&'static str> {
     MODELS_BEST_FIRST.into_iter().find(|k| *k == key)
 }
 
+/// CPU threads for Whisper. On Apple silicon the GPU does the heavy work, so
+/// all but one core is fine. Elsewhere Whisper runs on the CPU alone: leave
+/// two cores free so the window, audio capture and other apps stay responsive
+/// (with every core busy, Windows marked the app "not responding").
+fn whisper_thread_count(cpu_count: usize) -> i32 {
+    if cfg!(target_os = "macos") {
+        cpu_count.saturating_sub(1).clamp(4, 12) as i32
+    } else {
+        cpu_count.saturating_sub(2).clamp(2, 8) as i32
+    }
+}
+
 fn model_file(key: &str) -> String {
     format!("models/ggml-{key}.bin")
 }
@@ -505,7 +517,7 @@ impl GlobalTranscriberEngine {
         let cpu_count = std::thread::available_parallelism()
             .map(|n| n.get())
             .unwrap_or(8);
-        let n_threads = (cpu_count.saturating_sub(1)).clamp(4, 12) as i32;
+        let n_threads = whisper_thread_count(cpu_count);
         let is_auto = language.is_empty() || language.eq_ignore_ascii_case("auto");
 
         // VAD-Based Intelligent Natural Pause Audio Slicing:
@@ -1001,8 +1013,23 @@ pub fn get_global_transcriber() -> &'static GlobalTranscriberEngine {
 /// on (see `cloud_recording`), the slice goes to the chosen cloud engine and
 /// falls back to the device if that fails. `model_version`: the cloud model
 /// the user picked.
+///
+/// Runs on a blocking worker: Whisper (or a cloud request with its retries)
+/// can take many seconds, and a sync command runs on the UI thread, freezing
+/// the window meanwhile.
 #[tauri::command]
-pub fn transcribe_audio_buffer(
+pub async fn transcribe_audio_buffer(
+    language: String,
+    model_version: Option<String>,
+) -> Result<Vec<TranscriptSegment>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        transcribe_audio_buffer_blocking(language, model_version)
+    })
+    .await
+    .map_err(|e| format!("Yazıya dökme görevi tamamlanamadı: {e}"))?
+}
+
+fn transcribe_audio_buffer_blocking(
     language: String,
     model_version: Option<String>,
 ) -> Result<Vec<TranscriptSegment>, String> {
@@ -1208,7 +1235,8 @@ pub fn is_model_downloaded(key: &str) -> bool {
         .any(|m| m.key == key && m.is_downloaded)
 }
 
-#[tauri::command]
+/// Unloading waits for a running inference to stop, so keep it off the UI thread.
+#[tauri::command(async)]
 pub fn switch_transcription_model(model_key: String) -> Result<ModelStatus, String> {
     let filename = match model_key.as_str() {
         "tiny" => "models/ggml-tiny.bin",
@@ -1230,8 +1258,21 @@ pub fn switch_transcription_model(model_key: String) -> Result<ModelStatus, Stri
     Ok(engine.get_model_status())
 }
 
+/// Downloads take minutes; run them on a blocking worker, not the UI thread.
 #[tauri::command]
-pub fn download_whisper_model(app: tauri::AppHandle, model_key: String) -> Result<String, String> {
+pub async fn download_whisper_model(
+    app: tauri::AppHandle,
+    model_key: String,
+) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || download_whisper_model_blocking(app, model_key))
+        .await
+        .map_err(|e| format!("Model indirme görevi tamamlanamadı: {e}"))?
+}
+
+fn download_whisper_model_blocking(
+    app: tauri::AppHandle,
+    model_key: String,
+) -> Result<String, String> {
     println!(
         "[FirstRunModelSetup] download_whisper_model called: {}",
         model_key
@@ -1403,7 +1444,7 @@ pub fn get_model_status() -> ModelStatus {
     engine.get_model_status()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn unload_transcription_model() -> ModelStatus {
     let engine = get_global_transcriber();
     engine.cleanup_context();
@@ -1413,6 +1454,18 @@ pub fn unload_transcription_model() -> ModelStatus {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn whisper_leaves_cores_free_off_apple_silicon() {
+        if cfg!(target_os = "macos") {
+            assert_eq!(whisper_thread_count(12), 11);
+        } else {
+            assert_eq!(whisper_thread_count(12), 8);
+            assert_eq!(whisper_thread_count(8), 6);
+            assert_eq!(whisper_thread_count(4), 2);
+            assert_eq!(whisper_thread_count(2), 2);
+        }
+    }
 
     #[test]
     fn model_keys_come_from_model_paths() {

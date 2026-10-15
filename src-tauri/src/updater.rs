@@ -160,8 +160,16 @@ pub fn select_best_asset(assets: &[ReleaseAsset]) -> Option<ReleaseAsset> {
     assets.first().cloned()
 }
 
+/// Network calls run on a blocking worker: on the UI thread a slow connection
+/// would freeze the window for up to the request timeout.
 #[tauri::command]
-pub fn check_for_updates() -> Result<UpdateCheckResult, String> {
+pub async fn check_for_updates() -> Result<UpdateCheckResult, String> {
+    tauri::async_runtime::spawn_blocking(check_for_updates_blocking)
+        .await
+        .map_err(|e| format!("Güncelleme kontrolü tamamlanamadı: {e}"))?
+}
+
+fn check_for_updates_blocking() -> Result<UpdateCheckResult, String> {
     let current_version = env!("CARGO_PKG_VERSION").to_string();
     let url = "https://api.github.com/repos/sewox/EchoMind/releases/latest";
 
@@ -215,7 +223,19 @@ pub fn check_for_updates() -> Result<UpdateCheckResult, String> {
 }
 
 #[tauri::command]
-pub fn download_and_install_update(
+pub async fn download_and_install_update(
+    app: tauri::AppHandle,
+    download_url: Option<String>,
+    filename: Option<String>,
+) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        download_and_install_update_blocking(app, download_url, filename)
+    })
+    .await
+    .map_err(|e| format!("Güncelleme görevi tamamlanamadı: {e}"))?
+}
+
+fn download_and_install_update_blocking(
     app: tauri::AppHandle,
     download_url: Option<String>,
     filename: Option<String>,
@@ -223,7 +243,7 @@ pub fn download_and_install_update(
     let target_url = match download_url {
         Some(url) if !url.trim().is_empty() => url,
         _ => {
-            let check = check_for_updates()?;
+            let check = check_for_updates_blocking()?;
             let asset = select_best_asset(&check.assets).ok_or_else(|| {
                 "Bu platform için uygun güncelleme paketi bulunamadı.".to_string()
             })?;

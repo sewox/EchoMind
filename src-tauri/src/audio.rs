@@ -55,6 +55,11 @@ pub struct AudioState {
     /// True when the system-audio tap was successfully started for this
     /// session (even if callbacks have been silent so far).
     pub sys_capture_started: bool,
+    /// Mic-buffer position just after the last sound on either track.
+    pub last_sound_sample: usize,
+    /// Both tracks were silent for [`SILENCE_STOP_SAMPLES`]: the silent tail
+    /// was cut and the recording is being stopped and saved.
+    pub silence_stopped: bool,
     pub mic_resampler: Option<crate::resample::Downsampler>,
     pub sys_resampler: Option<crate::resample::Downsampler>,
 }
@@ -77,6 +82,8 @@ impl Default for AudioState {
             limit_reached: false,
             sys_capture_active: false,
             sys_capture_started: false,
+            last_sound_sample: 0,
+            silence_stopped: false,
             mic_resampler: None,
             sys_resampler: None,
         }
@@ -89,6 +96,22 @@ pub const MAX_RECORDING_SAMPLES: usize = 16000 * 3600 * 8;
 
 /// Event sent when a recording stops at [`MAX_RECORDING_SAMPLES`].
 pub const LIMIT_EVENT: &str = "recording-limit-reached";
+
+/// A recording whose microphone and system audio both stay silent this long
+/// is stopped and saved without the silent tail: the call is over but
+/// nothing stopped the recording (say, the lid was closed right after
+/// hanging up, or the meeting app stayed open).
+pub const SILENCE_STOP_SAMPLES: usize = 16000 * 60 * 10;
+
+/// Kept after the last sound so the final words are not clipped.
+pub const SILENCE_TAIL_KEPT: usize = 16000 * 2;
+
+/// RMS above which audio counts as sound (about -40 dBFS): speech is well
+/// above it, a quiet room stays below.
+pub const SOUND_RMS: f32 = 0.01;
+
+/// Event sent when a recording stops for silence (payload: minutes).
+pub const SILENCE_EVENT: &str = "recording-silence-stopped";
 
 static APP: OnceLock<tauri::AppHandle> = OnceLock::new();
 
@@ -574,6 +597,8 @@ impl GlobalAudioEngine {
             state.session_saved = false;
             state.sys_pcm_16k_buffer.clear();
             state.limit_reached = false;
+            state.last_sound_sample = 0;
+            state.silence_stopped = false;
             state.sys_capture_active = false;
             state.sys_capture_started = false;
             state.mic_resampler = None;
@@ -1104,9 +1129,44 @@ fn process_audio_data(
         .process(&filtered_mono);
 
     // Accumulate in the 16 kHz buffer only while recording, up to the limit.
-    if state.is_recording && !state.limit_reached {
+    if state.is_recording && !state.limit_reached && !state.silence_stopped {
         append_recorded(&mut state, &resampled_pcm);
+        if rms > SOUND_RMS {
+            state.last_sound_sample = state.pcm_16k_buffer.len();
+        }
+        stop_if_silent(&mut state, SILENCE_STOP_SAMPLES);
     }
+}
+
+/// Cuts the silent tail and stops the recording once both tracks have been
+/// silent for `limit` samples. Only with system audio: without it, a quiet
+/// listener on headphones would look like silence.
+fn stop_if_silent(state: &mut AudioState, limit: usize) {
+    let len = state.pcm_16k_buffer.len();
+    if state.silence_stopped
+        || !state.sys_capture_started
+        || len.saturating_sub(state.last_sound_sample) < limit
+    {
+        return;
+    }
+    let keep = (state.last_sound_sample + SILENCE_TAIL_KEPT).min(len);
+    state.pcm_16k_buffer.truncate(keep);
+    state.sys_pcm_16k_buffer.truncate(keep);
+    state.live_transcribe_cursor = state.live_transcribe_cursor.min(keep);
+    state.silence_stopped = true;
+    eprintln!(
+        "⏹️ {} dakikadır ses yok; sessiz kısım kesilip kayıt durduruluyor.",
+        limit / 16000 / 60
+    );
+    #[cfg(not(test))]
+    thread::spawn(move || {
+        use tauri::Emitter;
+        let _ = get_global_audio_engine().stop();
+        if let Some(app) = APP.get() {
+            let _ = app.emit(SILENCE_EVENT, limit / 16000 / 60);
+            let _ = app.emit("trigger-stop-recording", ());
+        }
+    });
 }
 
 /// Appends microphone samples to the session; at [`MAX_RECORDING_SAMPLES`]
@@ -2013,6 +2073,48 @@ mod tests {
             100,
             "system audio stays on the mic timeline"
         );
+    }
+
+    #[test]
+    fn test_long_silence_cuts_the_tail_and_stops() {
+        let mut state = AudioState {
+            sys_capture_started: true,
+            pcm_16k_buffer: vec![0; 100_000],
+            sys_pcm_16k_buffer: vec![0; 100_000],
+            live_transcribe_cursor: 90_000,
+            last_sound_sample: 10_000,
+            ..Default::default()
+        };
+        stop_if_silent(&mut state, 50_000);
+        let keep = 10_000 + SILENCE_TAIL_KEPT;
+        assert!(state.silence_stopped);
+        assert_eq!(state.pcm_16k_buffer.len(), keep);
+        assert_eq!(state.sys_pcm_16k_buffer.len(), keep);
+        assert_eq!(state.live_transcribe_cursor, keep);
+    }
+
+    #[test]
+    fn test_short_silence_keeps_recording() {
+        let mut state = AudioState {
+            sys_capture_started: true,
+            pcm_16k_buffer: vec![0; 100_000],
+            last_sound_sample: 60_000,
+            ..Default::default()
+        };
+        stop_if_silent(&mut state, 50_000);
+        assert!(!state.silence_stopped);
+        assert_eq!(state.pcm_16k_buffer.len(), 100_000);
+    }
+
+    #[test]
+    fn test_silence_never_stops_a_mic_only_recording() {
+        // Without system audio, a quiet listener on headphones is not silence.
+        let mut state = AudioState {
+            pcm_16k_buffer: vec![0; 100_000],
+            ..Default::default()
+        };
+        stop_if_silent(&mut state, 50_000);
+        assert!(!state.silence_stopped);
     }
 
     #[test]

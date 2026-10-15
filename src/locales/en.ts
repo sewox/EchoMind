@@ -108,6 +108,8 @@ export const en: TranslationKeys = {
   recordingLimit: {
     reached:
       "The recording reached the {hours}-hour limit, so it was stopped and saved. If the meeting is still going, start a new recording.",
+    silence:
+      "No sound for {minutes} minutes, so the recording was stopped and saved. The silent part was left out.",
   },
   sidebar: {
     title: "Meeting History",
@@ -213,6 +215,8 @@ export const en: TranslationKeys = {
     smartRedaction: "Smart Redaction & Cleanup",
     redacting: "Redacting...",
     noSearchResults: "No speech matches found for your search.",
+    recordingNoLive:
+      "Recording. Live transcription is off; the transcript will be prepared after recording ends.",
     listeningLive: "Listening to speech, streaming live...",
     renameSpeaker: "Edit Speaker Name",
     speakerInfo: "Speaker diarization and timestamped dialogue feed",
@@ -675,6 +679,9 @@ export const en: TranslationKeys = {
       yourVoice: "Your Voice: Active Input",
       systemAudioLoopback: "System Audio: Loopback Active",
       systemAudioSpeaker: "System Audio: Speaker/Room",
+      liveTranscriptionToggle: "Live transcription",
+      liveTranscriptionDesc:
+        "Transcribes speech while the meeting is running. When off, the transcript is prepared in the background after recording ends, which keeps less powerful computers free during the call.",
       systemAudioCaptureToggle: "Capture system audio (remote participants)",
       systemAudioCaptureDesc:
         "Records meeting-app audio alongside the microphone (macOS 14.2+, Windows, Linux with PulseAudio/PipeWire). When off, only the microphone is used.",
