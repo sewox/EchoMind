@@ -74,6 +74,13 @@ jobs:
           # generator (an ExternalProject) out of order; Ninja does not.
           choco install ninja -y --no-progress
           Add-Content $env:GITHUB_ENV "CMAKE_GENERATOR=Ninja"
+          # The shader generator's nested CMake build dirs pass Windows' 260
+          # character path limit under the default target dir.
+          Add-Content $env:GITHUB_ENV "CARGO_TARGET_DIR=C:\t"
+          # cmake-rs replaces CMake's default C++ flags, dropping /EHsc; ggml's
+          # Vulkan backend reports failures (no driver, out of memory) with
+          # exceptions.
+          Add-Content $env:GITHUB_ENV "CXXFLAGS=/EHsc"
 
       # Ninja needs the MSVC compiler on PATH.
       - name: Set up MSVC
