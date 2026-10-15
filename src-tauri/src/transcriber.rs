@@ -48,15 +48,44 @@ fn model_key_of(path: &str) -> Option<&'static str> {
 }
 
 /// CPU threads for Whisper. On Apple silicon the GPU does the heavy work, so
-/// all but one core is fine. Elsewhere Whisper runs on the CPU alone: leave
-/// two cores free so the window, audio capture and other apps stay responsive
-/// (with every core busy, Windows marked the app "not responding").
+/// all but one core is fine. Elsewhere Whisper often runs on the CPU alone
+/// (no discrete GPU): leave two cores free so the window, audio capture and
+/// other apps stay responsive (with every core busy, Windows marked the app
+/// "not responding").
 fn whisper_thread_count(cpu_count: usize) -> i32 {
     if cfg!(target_os = "macos") {
         cpu_count.saturating_sub(1).clamp(4, 12) as i32
     } else {
         cpu_count.saturating_sub(2).clamp(2, 8) as i32
     }
+}
+
+/// The GPU Whisper runs on: its index among the GPUs ggml lists (what
+/// whisper.cpp's `gpu_device` counts) and its name. On macOS that is Metal.
+/// Elsewhere it is the first discrete GPU, through Vulkan; integrated GPUs are
+/// left out (they share the CPU's memory and power, and they are untested), so
+/// a machine without a discrete GPU, or without a Vulkan driver, uses the CPU.
+fn whisper_gpu() -> Option<(i32, String)> {
+    if cfg!(target_os = "macos") {
+        return Some((0, "Metal".to_string()));
+    }
+    pick_discrete_gpu(&llama_cpp_2::list_llama_ggml_backend_devices())
+}
+
+/// Name of the GPU Whisper runs on off macOS, if any (for the settings page).
+#[cfg(not(target_os = "macos"))]
+pub fn whisper_gpu_name() -> Option<String> {
+    whisper_gpu().map(|(_, name)| name)
+}
+
+fn pick_discrete_gpu(devices: &[llama_cpp_2::LlamaBackendDevice]) -> Option<(i32, String)> {
+    use llama_cpp_2::LlamaBackendDeviceType as Kind;
+    devices
+        .iter()
+        .filter(|d| matches!(d.device_type, Kind::Gpu | Kind::IntegratedGpu))
+        .enumerate()
+        .find(|(_, d)| d.device_type == Kind::Gpu)
+        .map(|(i, d)| (i as i32, d.description.clone()))
 }
 
 fn model_file(key: &str) -> String {
@@ -329,13 +358,17 @@ impl GlobalTranscriberEngine {
             }
         };
 
+        let gpu = whisper_gpu();
         let mut ctx_params = WhisperContextParameters::default();
-        ctx_params.use_gpu(true);
+        ctx_params.use_gpu(gpu.is_some());
+        if let Some((index, _)) = &gpu {
+            ctx_params.gpu_device(*index);
+        }
 
         let (ctx, is_gpu_active) =
             match WhisperContext::new_with_params(actual_path.to_str().unwrap(), ctx_params) {
-                Ok(c) => (c, true),
-                Err(e) => {
+                Ok(c) => (c, gpu.is_some()),
+                Err(e) if gpu.is_some() => {
                     println!(
                         "GPU donanım hızlandırma bulunamadı, CPU moduna geçiliyor: {}",
                         e
@@ -349,6 +382,7 @@ impl GlobalTranscriberEngine {
                             })?;
                     (c, false)
                 }
+                Err(e) => return Err(format!("Whisper GGML model yüklenirken hata oluştu: {}", e)),
             };
 
         let mut lock = self.whisper_ctx.lock().unwrap();
@@ -360,10 +394,9 @@ impl GlobalTranscriberEngine {
         // become the new choice when the model is loaded again.
         state.loaded_model = model_key_of(&filename);
 
-        let gpu_label = if is_gpu_active {
-            "Metal/CUDA GPU"
-        } else {
-            "CPU AVX2 Vector"
+        let gpu_label = match gpu.filter(|_| is_gpu_active) {
+            Some((_, name)) => format!("GPU: {name}"),
+            None => "CPU".to_string(),
         };
         state.model_display_name = format!(
             "{} ({})",
@@ -1564,6 +1597,65 @@ mod tests {
         let engine = GlobalTranscriberEngine::new();
         let status = engine.get_model_status();
         assert!(!status.is_loaded);
+    }
+
+    fn device(
+        kind: llama_cpp_2::LlamaBackendDeviceType,
+        description: &str,
+    ) -> llama_cpp_2::LlamaBackendDevice {
+        llama_cpp_2::LlamaBackendDevice {
+            index: 0,
+            name: String::new(),
+            description: description.to_string(),
+            backend: String::new(),
+            memory_total: 0,
+            memory_free: 0,
+            device_type: kind,
+        }
+    }
+
+    #[test]
+    fn whisper_takes_the_discrete_gpu_and_never_the_integrated_one() {
+        use llama_cpp_2::LlamaBackendDeviceType::{Cpu, Gpu, IntegratedGpu};
+        // A laptop: the Intel GPU is listed first, the NVIDIA one second.
+        let laptop = [
+            device(IntegratedGpu, "Intel(R) UHD Graphics"),
+            device(Gpu, "NVIDIA GeForce RTX 3060 Laptop GPU"),
+            device(Cpu, "CPU"),
+        ];
+        assert_eq!(
+            pick_discrete_gpu(&laptop),
+            Some((1, "NVIDIA GeForce RTX 3060 Laptop GPU".to_string()))
+        );
+        // The CPU device does not count towards whisper.cpp's GPU index.
+        let desktop = [device(Cpu, "CPU"), device(Gpu, "AMD Radeon RX 7600")];
+        assert_eq!(
+            pick_discrete_gpu(&desktop),
+            Some((0, "AMD Radeon RX 7600".to_string()))
+        );
+        assert_eq!(
+            pick_discrete_gpu(&[device(IntegratedGpu, "Intel"), device(Cpu, "CPU")]),
+            None
+        );
+        // No Vulkan driver: ggml lists the CPU alone.
+        assert_eq!(pick_discrete_gpu(&[device(Cpu, "CPU")]), None);
+    }
+
+    /// Lists ggml's devices for real: on Windows this loads vulkan-1.dll (or
+    /// goes through the delay-load hook when it is missing) and must not crash.
+    #[test]
+    fn ggml_devices_can_be_listed() {
+        let devices = llama_cpp_2::list_llama_ggml_backend_devices();
+        for d in &devices {
+            println!(
+                "ggml device: {} / {} ({:?})",
+                d.backend, d.description, d.device_type
+            );
+        }
+        assert!(devices
+            .iter()
+            .any(|d| d.device_type == llama_cpp_2::LlamaBackendDeviceType::Cpu));
+        println!("Whisper GPU: {:?}", whisper_gpu());
     }
 
     #[test]

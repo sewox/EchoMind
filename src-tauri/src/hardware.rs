@@ -16,7 +16,7 @@ pub struct HardwareInfo {
     pub gpu_name: String,
     pub gpu_acceleration: String,
     pub has_ane: bool,  // Apple Neural Engine
-    pub has_cuda: bool, // NVIDIA CUDA
+    pub has_gpu: bool,  // Whisper runs on a discrete GPU (Vulkan), off macOS
     pub has_avx2: bool, // CPU AVX2 instructions
     pub summary_headline: String,
     pub recommended_ai_mode: String,
@@ -53,7 +53,7 @@ impl HardwareInfo {
 
         let has_avx2 = is_avx2_supported();
 
-        let (gpu_name, gpu_acceleration, has_ane, has_cuda) =
+        let (gpu_name, gpu_acceleration, has_ane, has_gpu) =
             Self::detect_gpu_and_acceleration(&cpu_brand, has_avx2);
 
         let summary_headline = if cfg!(target_os = "macos") && cfg!(target_arch = "aarch64") {
@@ -61,8 +61,8 @@ impl HardwareInfo {
                 "Apple Silicon {} Metal Hızlandırma Aktif (ANE Desteği Var)",
                 cpu_brand
             )
-        } else if has_cuda {
-            format!("{} CUDA Hızlandırma Aktif", gpu_name)
+        } else if has_gpu {
+            format!("{} Vulkan GPU Hızlandırma Aktif", gpu_name)
         } else if has_avx2 {
             format!("{} (AVX2 CPU Hızlandırması Aktif)", cpu_brand)
         } else {
@@ -72,8 +72,8 @@ impl HardwareInfo {
         let recommended_ai_mode = if cfg!(target_os = "macos") && cfg!(target_arch = "aarch64") {
             "Yerel Whisper-Metal (TR/EN) + Yerel Gemma 2 (2B/9B GGUF) veya Gemini 1.5 Flash"
                 .to_string()
-        } else if has_cuda {
-            "Yerel Whisper-CUDA + Yerel Gemma 2 (CUDA) / Gemini 1.5 Flash".to_string()
+        } else if has_gpu {
+            "Yerel Whisper (Vulkan GPU) + Gemini 1.5 Flash (Online Özetleme)".to_string()
         } else {
             "Yerel Whisper-CPU (Turbo) + Gemini 1.5 Flash (Online Özetleme)".to_string()
         };
@@ -89,7 +89,7 @@ impl HardwareInfo {
             gpu_name,
             gpu_acceleration,
             has_ane,
-            has_cuda,
+            has_gpu,
             has_avx2,
             summary_headline,
             recommended_ai_mode,
@@ -119,30 +119,24 @@ impl HardwareInfo {
             }
         }
 
-        #[cfg(target_os = "windows")]
+        #[cfg(not(target_os = "macos"))]
         {
-            let has_cuda = detect_windows_cuda();
-            if has_cuda {
-                let gpu_name = get_windows_gpu_name().unwrap_or_else(|| "NVIDIA GPU".to_string());
-                let gpu_accel = "NVIDIA CUDA (cuBLAS / TensorRT)".to_string();
-                (gpu_name, gpu_accel, false, true)
-            } else {
-                let gpu_name =
-                    get_windows_gpu_name().unwrap_or_else(|| "DirectX 12 / Vulkan GPU".to_string());
-                let gpu_accel = if _has_avx2 {
-                    "CPU AVX2 Vector Acceleration".to_string()
-                } else {
-                    "CPU Standard Execution".to_string()
-                };
-                (gpu_name, gpu_accel, false, false)
+            // The GPU Whisper actually runs on, as ggml's Vulkan backend sees it.
+            if let Some(name) = crate::transcriber::whisper_gpu_name() {
+                return (name, "Vulkan GPU".to_string(), false, true);
             }
-        }
-
-        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-        {
+            #[cfg(target_os = "windows")]
+            let gpu_name = get_windows_gpu_name();
+            #[cfg(not(target_os = "windows"))]
+            let gpu_name: Option<String> = None;
+            let gpu_accel = if _has_avx2 {
+                "CPU AVX2 Vector Acceleration".to_string()
+            } else {
+                "CPU Standard Execution".to_string()
+            };
             (
-                "Standard GPU".to_string(),
-                "CPU Fallback".to_string(),
+                gpu_name.unwrap_or_else(|| "Standard GPU".to_string()),
+                gpu_accel,
                 false,
                 false,
             )
@@ -180,11 +174,6 @@ fn get_macos_cpu_brand() -> Option<String> {
 #[cfg(not(target_os = "macos"))]
 fn get_macos_cpu_brand() -> Option<String> {
     None
-}
-
-#[cfg(target_os = "windows")]
-fn detect_windows_cuda() -> bool {
-    std::path::Path::new("C:\\Windows\\System32\\nvcuda.dll").exists()
 }
 
 #[cfg(target_os = "windows")]

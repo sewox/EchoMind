@@ -88,13 +88,18 @@ pub fn shutdown(timeout: std::time::Duration) -> bool {
     }
 }
 
-fn gpu_layers() -> u32 {
-    // Metal on Apple silicon; elsewhere the shared ggml is CPU-only for now.
+/// Metal on Apple silicon. Elsewhere the model stays on the CPU for now: ggml
+/// has Vulkan there for Whisper, and an empty device list keeps llama.cpp off
+/// it (without one it would still move large prompt batches to the GPU).
+fn model_params() -> LlamaModelParams {
+    let params = LlamaModelParams::default();
     if cfg!(target_os = "macos") {
-        999
-    } else {
-        0
+        return params.with_n_gpu_layers(999);
     }
+    params
+        .with_n_gpu_layers(0)
+        .with_devices(&[])
+        .expect("an empty device list is always valid")
 }
 
 fn threads() -> i32 {
@@ -128,7 +133,7 @@ pub fn generate_json(spec: &LlmModel, req: &GenRequest) -> Result<String, String
         if !catalog::is_installed(spec) {
             return Err(format!("{} yüklü değil.", spec.name));
         }
-        let params = LlamaModelParams::default().with_n_gpu_layers(gpu_layers());
+        let params = model_params();
         let model = LlamaModel::load_from_file(backend, &path, &params)
             .map_err(|e| format!("{} yüklenemedi: {e}", spec.name))?;
         *guard = Some(Loaded {

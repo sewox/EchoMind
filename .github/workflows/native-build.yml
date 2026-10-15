@@ -30,5 +30,26 @@ jobs:
         with:
           workspaces: "./src-tauri -> target"
 
+      # ggml's Vulkan backend (Whisper on the GPU) needs the SDK to build.
+      - name: Install Vulkan SDK
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          VULKAN_VERSION: 1.4.357.0
+        run: |
+          curl.exe -s -o $env:RUNNER_TEMP/VulkanSDK-Installer.exe -L "https://sdk.lunarg.com/sdk/download/${env:VULKAN_VERSION}/windows/vulkansdk-windows-X64-${env:VULKAN_VERSION}.exe"
+          & "$env:RUNNER_TEMP\VulkanSDK-Installer.exe" --accept-licenses --default-answer --confirm-command install
+          Add-Content $env:GITHUB_ENV "VULKAN_SDK=C:\VulkanSDK\${env:VULKAN_VERSION}"
+          Add-Content $env:GITHUB_PATH "C:\VulkanSDK\${env:VULKAN_VERSION}\bin"
+
       - name: Build and link the app and its tests
         run: cargo test --manifest-path src-tauri/Cargo.toml --no-run
+
+      # Lists ggml's devices for real. The runner has no GPU and normally no
+      # Vulkan driver, so on Windows this goes through the vulkan-1.dll
+      # delay-load hook; a crash here means the app would not start there.
+      - name: Start ggml without a GPU
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then ls -la /c/Windows/System32/vulkan-1.dll || echo "no vulkan-1.dll in System32"; fi
+          cargo test --manifest-path src-tauri/Cargo.toml --lib ggml_devices -- --nocapture

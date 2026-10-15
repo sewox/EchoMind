@@ -39,6 +39,8 @@ path = "examples/diarization_eval.rs"
 
 [build-dependencies]
 tauri-build = { version = "2.0.5", features = [] }
+# Windows: compiles the delay-load hook in windows/vulkan_delay_load.c.
+cc = "1"
 
 # Swift bridge for Core Audio process taps — only needed when building for macOS.
 [target.'cfg(target_os = "macos")'.build-dependencies]
@@ -81,9 +83,12 @@ swift-rs = "1.0"
 whisper-rs = { version = "0.16.0", features = ["metal"] }
 llama-cpp-2 = { version = "=0.1.158", features = ["metal"] }
 
+# Vulkan elsewhere: one backend for NVIDIA, AMD and Intel GPUs, served by the
+# graphics driver (no CUDA runtime to ship). Whisper uses llama.cpp's ggml (see
+# [patch.crates-io] below), so this feature gives both of them the GPU.
 [target.'cfg(not(target_os = "macos"))'.dependencies]
 whisper-rs = { version = "0.16.0" }
-llama-cpp-2 = { version = "=0.1.158" }
+llama-cpp-2 = { version = "=0.1.158", features = ["vulkan"] }
 
 # System audio on Linux: libpulse-simple is loaded at run time, so the app
 # still starts on systems without PulseAudio/PipeWire.
