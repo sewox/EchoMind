@@ -6,6 +6,7 @@ import "./index.css";
 import { I18nProvider } from "./locales/i18nContext";
 
 import { ShowcaseDemo } from "./ShowcaseDemo";
+import { logWindowErrors } from "./services/diagnostics";
 
 const isIslandView =
   typeof window !== "undefined" &&
@@ -13,6 +14,8 @@ const isIslandView =
 
 const isDemoView =
   typeof window !== "undefined" && window.location.search.includes("demo=");
+
+logWindowErrors();
 
 if (isIslandView && typeof document !== "undefined") {
   document.documentElement.style.backgroundColor = "transparent";

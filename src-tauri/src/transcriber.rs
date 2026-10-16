@@ -52,7 +52,7 @@ fn model_key_of(path: &str) -> Option<&'static str> {
 /// (no discrete GPU): leave two cores free so the window, audio capture and
 /// other apps stay responsive (with every core busy, Windows marked the app
 /// "not responding").
-fn whisper_thread_count(cpu_count: usize) -> i32 {
+pub(crate) fn whisper_thread_count(cpu_count: usize) -> i32 {
     if cfg!(target_os = "macos") {
         cpu_count.saturating_sub(1).clamp(4, 12) as i32
     } else {
@@ -73,6 +73,14 @@ fn whisper_gpu() -> Option<(i32, String)> {
 }
 
 /// Name of the GPU Whisper runs on off macOS, if any (for the settings page).
+/// Where Whisper runs: "GPU: <name>" or "CPU".
+pub fn whisper_device_label() -> String {
+    match whisper_gpu() {
+        Some((_, name)) => format!("GPU: {name}"),
+        None => "CPU".to_string(),
+    }
+}
+
 #[cfg(not(target_os = "macos"))]
 pub fn whisper_gpu_name() -> Option<String> {
     whisper_gpu().map(|(_, name)| name)
@@ -358,6 +366,7 @@ impl GlobalTranscriberEngine {
             }
         };
 
+        let load_started = Instant::now();
         let gpu = whisper_gpu();
         let mut ctx_params = WhisperContextParameters::default();
         ctx_params.use_gpu(gpu.is_some());
@@ -405,8 +414,10 @@ impl GlobalTranscriberEngine {
         );
 
         println!(
-            "Whisper GGML Model talep üzerine başarıyla yüklendi [Donanım: {}]: {:?}",
-            gpu_label, actual_path
+            "Whisper GGML Model talep üzerine başarıyla yüklendi [Donanım: {}] ({:.1} sn): {:?}",
+            gpu_label,
+            load_started.elapsed().as_secs_f32(),
+            actual_path
         );
         Ok(())
     }
@@ -570,6 +581,7 @@ impl GlobalTranscriberEngine {
         // language selection there's no ambiguity to resolve, so it keeps the simple single
         // forced-language chunking.
         crate::import_progress::transcribing(0.0);
+        let run_started = Instant::now();
         let decode_chunks: Vec<DecodeChunk> = if is_auto {
             segment_by_detected_language(ctx, samples, n_threads)
         } else {
@@ -689,7 +701,7 @@ impl GlobalTranscriberEngine {
                     if has_loop
                         && (loop_ratio > 0.60 || cleaned_text.split_whitespace().count() < 2)
                     {
-                        println!("🚫 [ASR Hallucination Guard] Tekrarlayan döngü segmenti reddedildi (oran: {:.2}): {:?}", loop_ratio, segment_text);
+                        println!("🚫 [ASR Hallucination Guard] Tekrarlayan döngü segmenti reddedildi (oran: {:.2}, {} kelime)", loop_ratio, segment_text.split_whitespace().count());
                         continue;
                     }
 
@@ -781,6 +793,19 @@ impl GlobalTranscriberEngine {
             }
         }
 
+        let audio_secs = samples.len() as f32 / 16000.0;
+        let run_secs = run_started.elapsed().as_secs_f32();
+        println!(
+            "⏱️ Whisper ({}): {:.1} sn ses {:.1} sn'de yazıya döküldü (gerçek zamanın {:.1} katı hızında) | {} | {} iş parçacığı, {} parça",
+            if is_batch { "kayıt" } else { "canlı" },
+            audio_secs,
+            run_secs,
+            audio_secs / run_secs.max(0.001),
+            self.state.lock().unwrap().model_display_name,
+            n_threads,
+            decode_chunks.len()
+        );
+
         if is_batch {
             crate::import_progress::diarizing();
             // Whole recording: diarize here. Live slices are diarized once for
@@ -866,10 +891,8 @@ impl GlobalTranscriberEngine {
         let state = self.state.lock().unwrap();
         let accel = if cfg!(target_os = "macos") && cfg!(target_arch = "aarch64") {
             "Metal & CoreML (Apple Neural Engine / GPU)".to_string()
-        } else if cfg!(target_os = "windows") {
-            "NVIDIA CUDA / DirectX GPU".to_string()
         } else {
-            "CPU Multi-Core AVX2 Vector Engine".to_string()
+            whisper_device_label()
         };
 
         ModelStatus {

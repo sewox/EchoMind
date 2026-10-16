@@ -79,6 +79,14 @@ export interface TranslationKeys {
     error: string;
     save: string;
   };
+  diagnostics: {
+    title: string;
+    desc: string;
+    create: string;
+    creating: string;
+    saved: string;
+    error: string;
+  };
   importProgress: {
     decoding: string;
     transcribing: string;

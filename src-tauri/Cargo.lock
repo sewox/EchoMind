@@ -1257,6 +1257,7 @@ dependencies = [
  "flacenc",
  "hound",
  "keyring",
+ "libc",
  "libloading 0.8.9",
  "llama-cpp-2",
  "ndarray 0.17.2",

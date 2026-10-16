@@ -84,6 +84,14 @@ export const tr: TranslationKeys = {
     error: "Kaydedilemedi",
     save: "Kaydet",
   },
+  diagnostics: {
+    title: "Tanılama Raporu",
+    desc: "Sistem, ekran kartı, ayarlar ve uygulama logunu tek bir metin dosyasına yazar. Ses kaydı, döküm metni veya API anahtarı içermez. Bir sorun yaşadığınızda bu dosyayı gönderin.",
+    create: "Rapor oluştur",
+    creating: "Hazırlanıyor…",
+    saved: "Kaydedildi: {path}",
+    error: "Rapor oluşturulamadı: {error}",
+  },
   importProgress: {
     decoding: "Ses dosyası okunuyor…",
     transcribing: "Yazıya dökülüyor…",

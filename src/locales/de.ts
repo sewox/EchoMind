@@ -84,6 +84,14 @@ export const de: TranslationKeys = {
     error: "Speichern fehlgeschlagen",
     save: "Speichern",
   },
+  diagnostics: {
+    title: "Diagnosebericht",
+    desc: "Schreibt System, Grafikkarte, Einstellungen und das App-Protokoll in eine Textdatei. Sie enthält keine Aufnahme, kein Transkript und keinen API-Schlüssel. Senden Sie diese Datei, wenn etwas nicht funktioniert.",
+    create: "Bericht erstellen",
+    creating: "Wird erstellt…",
+    saved: "Gespeichert: {path}",
+    error: "Bericht konnte nicht erstellt werden: {error}",
+  },
   importProgress: {
     decoding: "Audiodatei wird gelesen…",
     transcribing: "Wird transkribiert…",

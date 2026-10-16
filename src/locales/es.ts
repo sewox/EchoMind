@@ -84,6 +84,14 @@ export const es: TranslationKeys = {
     error: "No se pudo guardar",
     save: "Guardar",
   },
+  diagnostics: {
+    title: "Informe de diagnóstico",
+    desc: "Escribe el sistema, la tarjeta gráfica, los ajustes y el registro de la aplicación en un archivo de texto. No contiene grabaciones, transcripciones ni claves API. Envíe este archivo si algo falla.",
+    create: "Crear informe",
+    creating: "Preparando…",
+    saved: "Guardado: {path}",
+    error: "No se pudo crear el informe: {error}",
+  },
   importProgress: {
     decoding: "Leyendo el archivo de audio…",
     transcribing: "Transcribiendo…",

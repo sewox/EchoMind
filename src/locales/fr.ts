@@ -84,6 +84,14 @@ export const fr: TranslationKeys = {
     error: "Échec de l'enregistrement",
     save: "Enregistrer",
   },
+  diagnostics: {
+    title: "Rapport de diagnostic",
+    desc: "Écrit le système, la carte graphique, les réglages et le journal de l'application dans un fichier texte. Il ne contient ni enregistrement, ni transcription, ni clé API. Envoyez ce fichier en cas de problème.",
+    create: "Créer le rapport",
+    creating: "Préparation…",
+    saved: "Enregistré : {path}",
+    error: "Impossible de créer le rapport : {error}",
+  },
   importProgress: {
     decoding: "Lecture du fichier audio…",
     transcribing: "Transcription…",

@@ -65,6 +65,16 @@ jobs:
       # it runs twice: with vulkan-1.dll (the SDK installs it), then without
       # it, as on a PC with no graphics driver, which goes through the
       # delay-load hook. A crash here means the app would not start there.
+      # The release app has no console on Windows: its output must reach the
+      # log file through the pipe.
+      - name: Diagnostics log captures the app's output
+        shell: pwsh
+        run: |
+          cargo run --manifest-path src-tauri/Cargo.toml --example diag_log_check -- "$env:RUNNER_TEMP/diag.txt"
+          $code = $LASTEXITCODE
+          Get-Content "$env:RUNNER_TEMP/diag.txt"
+          exit $code
+
       - name: Start ggml without a GPU
         shell: pwsh
         run: |

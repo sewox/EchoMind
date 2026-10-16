@@ -4,7 +4,13 @@ on:
   push:
     tags:
       - "v*"
+  # A test build: a prerelease, not marked latest, so the in-app updater and
+  # the site's download links keep pointing at the last release.
   workflow_dispatch:
+    inputs:
+      test_tag:
+        description: "Prerelease tag, e.g. v0.2.18-test.1"
+        required: true
 
 permissions:
   contents: write
@@ -104,10 +110,13 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Shown in the diagnostics report, next to the version.
+          ECHOMIND_BUILD_LABEL: ${{ inputs.test_tag }}
         with:
-          tagName: v__VERSION__
-          releaseName: "EchoMind AI Assistant v__VERSION__"
+          tagName: ${{ inputs.test_tag || 'v__VERSION__' }}
+          releaseName: ${{ inputs.test_tag && format('EchoMind AI Assistant {0} (test)', inputs.test_tag) || 'EchoMind AI Assistant v__VERSION__' }}
           releaseBody: "Otomatik EchoMind Kurulum Paketleri (macOS .dmg / Windows .msi & .exe / Linux .deb & .AppImage)"
           releaseDraft: false
-          prerelease: false
+          prerelease: ${{ inputs.test_tag && 'true' || 'false' }}
+          releaseCommitish: ${{ github.sha }}
           args: ${{ matrix.args }}

@@ -402,8 +402,9 @@ YALNIZCA VE YALNIZCA AŞAĞIDAKİ GEÇERLİ JSON ŞEMASINDA YANIT VER:\n\
                 );
             } else {
                 eprintln!(
-                    "❌ Gemini {} content JSON parse failed: {}",
-                    model, extracted_json
+                    "❌ Gemini {} content JSON parse failed ({} chars)",
+                    model,
+                    extracted_json.len()
                 );
             }
         }

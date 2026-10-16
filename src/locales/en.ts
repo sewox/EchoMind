@@ -84,6 +84,14 @@ export const en: TranslationKeys = {
     error: "Could not save",
     save: "Save",
   },
+  diagnostics: {
+    title: "Diagnostics Report",
+    desc: "Writes the system, graphics card, settings and the app log into one text file. It holds no recording, transcript text or API key. Send this file when something goes wrong.",
+    create: "Create report",
+    creating: "Preparing…",
+    saved: "Saved: {path}",
+    error: "Could not create the report: {error}",
+  },
   importProgress: {
     decoding: "Reading the audio file…",
     transcribing: "Transcribing…",
