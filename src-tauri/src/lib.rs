@@ -7,6 +7,7 @@ pub mod cloud_transcriber;
 pub mod credentials;
 pub mod cross_memory;
 pub mod detector;
+pub mod diag_log;
 pub mod diarization;
 pub mod dual_track;
 pub mod dlp;
@@ -92,6 +93,7 @@ use transcription_queue::{
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    diag_log::init();
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![
@@ -207,11 +209,15 @@ pub fn run() {
             add_meeting_tag,
             remove_meeting_tag,
             get_related_meetings,
-            get_all_tags
+            get_all_tags,
+            diag_log::create_diagnostic_report,
+            diag_log::log_frontend_error
         ])
         .setup(|app| {
             // Resolve Keychain / keystore keys on a background thread so the main
             // window can paint even while macOS shows its Keychain Access prompt.
+            diag_log::watch_main_thread(app.handle().clone());
+            diag_log::log_system_once();
             import_progress::init(app.handle().clone());
             audio::init(app.handle().clone());
             storage::start_storage_unlock(app.handle().clone());

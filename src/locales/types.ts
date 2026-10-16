@@ -79,6 +79,14 @@ export interface TranslationKeys {
     error: string;
     save: string;
   };
+  diagnostics: {
+    title: string;
+    desc: string;
+    create: string;
+    creating: string;
+    saved: string;
+    error: string;
+  };
   importProgress: {
     decoding: string;
     transcribing: string;
@@ -99,6 +107,8 @@ export interface TranslationKeys {
   };
   recordingLimit: {
     reached: string;
+    silence: string;
+    silenceEmpty: string;
   };
   sidebar: {
     title: string;
@@ -173,6 +183,7 @@ export interface TranslationKeys {
     smartRedaction: string;
     redacting: string;
     noSearchResults: string;
+    recordingNoLive: string;
     listeningLive: string;
     renameSpeaker: string;
     speakerInfo?: string;
@@ -587,6 +598,8 @@ export interface TranslationKeys {
       yourVoice: string;
       systemAudioLoopback: string;
       systemAudioSpeaker: string;
+      liveTranscriptionToggle: string;
+      liveTranscriptionDesc: string;
       systemAudioCaptureToggle: string;
       systemAudioCaptureDesc: string;
       systemAudioUnsupported: string;

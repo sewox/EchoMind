@@ -47,6 +47,55 @@ fn model_key_of(path: &str) -> Option<&'static str> {
     MODELS_BEST_FIRST.into_iter().find(|k| *k == key)
 }
 
+/// CPU threads for Whisper. On Apple silicon the GPU does the heavy work, so
+/// all but one core is fine. Elsewhere Whisper often runs on the CPU alone
+/// (no discrete GPU): leave two cores free so the window, audio capture and
+/// other apps stay responsive (with every core busy, Windows marked the app
+/// "not responding").
+pub(crate) fn whisper_thread_count(cpu_count: usize) -> i32 {
+    if cfg!(target_os = "macos") {
+        cpu_count.saturating_sub(1).clamp(4, 12) as i32
+    } else {
+        cpu_count.saturating_sub(2).clamp(2, 8) as i32
+    }
+}
+
+/// The GPU Whisper runs on: its index among the GPUs ggml lists (what
+/// whisper.cpp's `gpu_device` counts) and its name. On macOS that is Metal.
+/// Elsewhere it is the first discrete GPU, through Vulkan; integrated GPUs are
+/// left out (they share the CPU's memory and power, and they are untested), so
+/// a machine without a discrete GPU, or without a Vulkan driver, uses the CPU.
+fn whisper_gpu() -> Option<(i32, String)> {
+    if cfg!(target_os = "macos") {
+        return Some((0, "Metal".to_string()));
+    }
+    pick_discrete_gpu(&llama_cpp_2::list_llama_ggml_backend_devices())
+}
+
+/// Name of the GPU Whisper runs on off macOS, if any (for the settings page).
+/// Where Whisper runs: "GPU: <name>" or "CPU".
+pub fn whisper_device_label() -> String {
+    match whisper_gpu() {
+        Some((_, name)) => format!("GPU: {name}"),
+        None => "CPU".to_string(),
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn whisper_gpu_name() -> Option<String> {
+    whisper_gpu().map(|(_, name)| name)
+}
+
+fn pick_discrete_gpu(devices: &[llama_cpp_2::LlamaBackendDevice]) -> Option<(i32, String)> {
+    use llama_cpp_2::LlamaBackendDeviceType as Kind;
+    devices
+        .iter()
+        .filter(|d| matches!(d.device_type, Kind::Gpu | Kind::IntegratedGpu))
+        .enumerate()
+        .find(|(_, d)| d.device_type == Kind::Gpu)
+        .map(|(i, d)| (i as i32, d.description.clone()))
+}
+
 fn model_file(key: &str) -> String {
     format!("models/ggml-{key}.bin")
 }
@@ -317,13 +366,18 @@ impl GlobalTranscriberEngine {
             }
         };
 
+        let load_started = Instant::now();
+        let gpu = whisper_gpu();
         let mut ctx_params = WhisperContextParameters::default();
-        ctx_params.use_gpu(true);
+        ctx_params.use_gpu(gpu.is_some());
+        if let Some((index, _)) = &gpu {
+            ctx_params.gpu_device(*index);
+        }
 
         let (ctx, is_gpu_active) =
             match WhisperContext::new_with_params(actual_path.to_str().unwrap(), ctx_params) {
-                Ok(c) => (c, true),
-                Err(e) => {
+                Ok(c) => (c, gpu.is_some()),
+                Err(e) if gpu.is_some() => {
                     println!(
                         "GPU donanım hızlandırma bulunamadı, CPU moduna geçiliyor: {}",
                         e
@@ -337,6 +391,7 @@ impl GlobalTranscriberEngine {
                             })?;
                     (c, false)
                 }
+                Err(e) => return Err(format!("Whisper GGML model yüklenirken hata oluştu: {}", e)),
             };
 
         let mut lock = self.whisper_ctx.lock().unwrap();
@@ -348,10 +403,9 @@ impl GlobalTranscriberEngine {
         // become the new choice when the model is loaded again.
         state.loaded_model = model_key_of(&filename);
 
-        let gpu_label = if is_gpu_active {
-            "Metal/CUDA GPU"
-        } else {
-            "CPU AVX2 Vector"
+        let gpu_label = match gpu.filter(|_| is_gpu_active) {
+            Some((_, name)) => format!("GPU: {name}"),
+            None => "CPU".to_string(),
         };
         state.model_display_name = format!(
             "{} ({})",
@@ -360,8 +414,10 @@ impl GlobalTranscriberEngine {
         );
 
         println!(
-            "Whisper GGML Model talep üzerine başarıyla yüklendi [Donanım: {}]: {:?}",
-            gpu_label, actual_path
+            "Whisper GGML Model talep üzerine başarıyla yüklendi [Donanım: {}] ({:.1} sn): {:?}",
+            gpu_label,
+            load_started.elapsed().as_secs_f32(),
+            actual_path
         );
         Ok(())
     }
@@ -505,7 +561,7 @@ impl GlobalTranscriberEngine {
         let cpu_count = std::thread::available_parallelism()
             .map(|n| n.get())
             .unwrap_or(8);
-        let n_threads = (cpu_count.saturating_sub(1)).clamp(4, 12) as i32;
+        let n_threads = whisper_thread_count(cpu_count);
         let is_auto = language.is_empty() || language.eq_ignore_ascii_case("auto");
 
         // VAD-Based Intelligent Natural Pause Audio Slicing:
@@ -525,6 +581,7 @@ impl GlobalTranscriberEngine {
         // language selection there's no ambiguity to resolve, so it keeps the simple single
         // forced-language chunking.
         crate::import_progress::transcribing(0.0);
+        let run_started = Instant::now();
         let decode_chunks: Vec<DecodeChunk> = if is_auto {
             segment_by_detected_language(ctx, samples, n_threads)
         } else {
@@ -644,7 +701,7 @@ impl GlobalTranscriberEngine {
                     if has_loop
                         && (loop_ratio > 0.60 || cleaned_text.split_whitespace().count() < 2)
                     {
-                        println!("🚫 [ASR Hallucination Guard] Tekrarlayan döngü segmenti reddedildi (oran: {:.2}): {:?}", loop_ratio, segment_text);
+                        println!("🚫 [ASR Hallucination Guard] Tekrarlayan döngü segmenti reddedildi (oran: {:.2}, {} kelime)", loop_ratio, segment_text.split_whitespace().count());
                         continue;
                     }
 
@@ -736,6 +793,19 @@ impl GlobalTranscriberEngine {
             }
         }
 
+        let audio_secs = samples.len() as f32 / 16000.0;
+        let run_secs = run_started.elapsed().as_secs_f32();
+        println!(
+            "⏱️ Whisper ({}): {:.1} sn ses {:.1} sn'de yazıya döküldü (gerçek zamanın {:.1} katı hızında) | {} | {} iş parçacığı, {} parça",
+            if is_batch { "kayıt" } else { "canlı" },
+            audio_secs,
+            run_secs,
+            audio_secs / run_secs.max(0.001),
+            self.state.lock().unwrap().model_display_name,
+            n_threads,
+            decode_chunks.len()
+        );
+
         if is_batch {
             crate::import_progress::diarizing();
             // Whole recording: diarize here. Live slices are diarized once for
@@ -821,10 +891,8 @@ impl GlobalTranscriberEngine {
         let state = self.state.lock().unwrap();
         let accel = if cfg!(target_os = "macos") && cfg!(target_arch = "aarch64") {
             "Metal & CoreML (Apple Neural Engine / GPU)".to_string()
-        } else if cfg!(target_os = "windows") {
-            "NVIDIA CUDA / DirectX GPU".to_string()
         } else {
-            "CPU Multi-Core AVX2 Vector Engine".to_string()
+            whisper_device_label()
         };
 
         ModelStatus {
@@ -1001,11 +1069,52 @@ pub fn get_global_transcriber() -> &'static GlobalTranscriberEngine {
 /// on (see `cloud_recording`), the slice goes to the chosen cloud engine and
 /// falls back to the device if that fails. `model_version`: the cloud model
 /// the user picked.
+///
+/// Runs on a blocking worker: Whisper (or a cloud request with its retries)
+/// can take many seconds, and a sync command runs on the UI thread, freezing
+/// the window meanwhile.
 #[tauri::command]
-pub fn transcribe_audio_buffer(
+pub async fn transcribe_audio_buffer(
     language: String,
     model_version: Option<String>,
 ) -> Result<Vec<TranscriptSegment>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        transcribe_audio_buffer_blocking(language, model_version)
+    })
+    .await
+    .map_err(|e| format!("Yazıya dökme görevi tamamlanamadı: {e}"))?
+}
+
+/// Held while a live slice is taken and transcribed. Slices then land in
+/// order, and a save waits for the one in flight instead of saving without
+/// its text.
+fn live_slice_gate() -> &'static Mutex<()> {
+    static GATE: Mutex<()> = Mutex::new(());
+    &GATE
+}
+
+/// Waits up to `timeout` for a live slice in flight to land in the history.
+/// Hold the guard until the recording is claimed, so no new slice starts in
+/// between. `None` if the slice is still running after `timeout`.
+pub fn wait_for_live_slice(timeout: Duration) -> Option<std::sync::MutexGuard<'static, ()>> {
+    let deadline = Instant::now() + timeout;
+    loop {
+        match live_slice_gate().try_lock() {
+            Ok(guard) => return Some(guard),
+            Err(std::sync::TryLockError::Poisoned(e)) => return Some(e.into_inner()),
+            Err(std::sync::TryLockError::WouldBlock) if Instant::now() < deadline => {
+                std::thread::sleep(Duration::from_millis(50))
+            }
+            Err(std::sync::TryLockError::WouldBlock) => return None,
+        }
+    }
+}
+
+fn transcribe_audio_buffer_blocking(
+    language: String,
+    model_version: Option<String>,
+) -> Result<Vec<TranscriptSegment>, String> {
+    let _slice = live_slice_gate().lock().unwrap_or_else(|e| e.into_inner());
     let engine = get_global_transcriber();
     let audio_engine = crate::audio::get_global_audio_engine();
     // Live transcription advances a cursor only — never take/clear the session
@@ -1208,7 +1317,8 @@ pub fn is_model_downloaded(key: &str) -> bool {
         .any(|m| m.key == key && m.is_downloaded)
 }
 
-#[tauri::command]
+/// Unloading waits for a running inference to stop, so keep it off the UI thread.
+#[tauri::command(async)]
 pub fn switch_transcription_model(model_key: String) -> Result<ModelStatus, String> {
     let filename = match model_key.as_str() {
         "tiny" => "models/ggml-tiny.bin",
@@ -1230,8 +1340,21 @@ pub fn switch_transcription_model(model_key: String) -> Result<ModelStatus, Stri
     Ok(engine.get_model_status())
 }
 
+/// Downloads take minutes; run them on a blocking worker, not the UI thread.
 #[tauri::command]
-pub fn download_whisper_model(app: tauri::AppHandle, model_key: String) -> Result<String, String> {
+pub async fn download_whisper_model(
+    app: tauri::AppHandle,
+    model_key: String,
+) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || download_whisper_model_blocking(app, model_key))
+        .await
+        .map_err(|e| format!("Model indirme görevi tamamlanamadı: {e}"))?
+}
+
+fn download_whisper_model_blocking(
+    app: tauri::AppHandle,
+    model_key: String,
+) -> Result<String, String> {
     println!(
         "[FirstRunModelSetup] download_whisper_model called: {}",
         model_key
@@ -1403,7 +1526,7 @@ pub fn get_model_status() -> ModelStatus {
     engine.get_model_status()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn unload_transcription_model() -> ModelStatus {
     let engine = get_global_transcriber();
     engine.cleanup_context();
@@ -1413,6 +1536,35 @@ pub fn unload_transcription_model() -> ModelStatus {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn save_waits_for_the_live_slice_in_flight() {
+        let (held, is_held) = std::sync::mpsc::channel();
+        let slice = std::thread::spawn(move || {
+            let _slice = live_slice_gate().lock().unwrap();
+            held.send(()).unwrap();
+            std::thread::sleep(Duration::from_millis(150));
+        });
+        is_held.recv().unwrap();
+        // Quit does not wait for it.
+        assert!(wait_for_live_slice(Duration::ZERO).is_none());
+        let started = Instant::now();
+        assert!(wait_for_live_slice(Duration::from_secs(5)).is_some());
+        assert!(started.elapsed() >= Duration::from_millis(100));
+        slice.join().unwrap();
+    }
+
+    #[test]
+    fn whisper_leaves_cores_free_off_apple_silicon() {
+        if cfg!(target_os = "macos") {
+            assert_eq!(whisper_thread_count(12), 11);
+        } else {
+            assert_eq!(whisper_thread_count(12), 8);
+            assert_eq!(whisper_thread_count(8), 6);
+            assert_eq!(whisper_thread_count(4), 2);
+            assert_eq!(whisper_thread_count(2), 2);
+        }
+    }
 
     #[test]
     fn model_keys_come_from_model_paths() {
@@ -1468,6 +1620,70 @@ mod tests {
         let engine = GlobalTranscriberEngine::new();
         let status = engine.get_model_status();
         assert!(!status.is_loaded);
+    }
+
+    fn device(
+        kind: llama_cpp_2::LlamaBackendDeviceType,
+        description: &str,
+    ) -> llama_cpp_2::LlamaBackendDevice {
+        llama_cpp_2::LlamaBackendDevice {
+            index: 0,
+            name: String::new(),
+            description: description.to_string(),
+            backend: String::new(),
+            memory_total: 0,
+            memory_free: 0,
+            device_type: kind,
+        }
+    }
+
+    #[test]
+    fn whisper_takes_the_discrete_gpu_and_never_the_integrated_one() {
+        use llama_cpp_2::LlamaBackendDeviceType::{Cpu, Gpu, IntegratedGpu};
+        // A laptop: the Intel GPU is listed first, the NVIDIA one second.
+        let laptop = [
+            device(IntegratedGpu, "Intel(R) UHD Graphics"),
+            device(Gpu, "NVIDIA GeForce RTX 3060 Laptop GPU"),
+            device(Cpu, "CPU"),
+        ];
+        assert_eq!(
+            pick_discrete_gpu(&laptop),
+            Some((1, "NVIDIA GeForce RTX 3060 Laptop GPU".to_string()))
+        );
+        // The CPU device does not count towards whisper.cpp's GPU index.
+        let desktop = [device(Cpu, "CPU"), device(Gpu, "AMD Radeon RX 7600")];
+        assert_eq!(
+            pick_discrete_gpu(&desktop),
+            Some((0, "AMD Radeon RX 7600".to_string()))
+        );
+        assert_eq!(
+            pick_discrete_gpu(&[device(IntegratedGpu, "Intel"), device(Cpu, "CPU")]),
+            None
+        );
+        // No Vulkan driver: ggml lists the CPU alone.
+        assert_eq!(pick_discrete_gpu(&[device(Cpu, "CPU")]), None);
+    }
+
+    /// Lists ggml's devices for real: on Windows this loads vulkan-1.dll (or
+    /// goes through the delay-load hook when it is missing) and must not crash.
+    #[test]
+    fn ggml_devices_can_be_listed() {
+        let devices = llama_cpp_2::list_llama_ggml_backend_devices();
+        for d in &devices {
+            println!(
+                "ggml device: {} / {} ({:?})",
+                d.backend, d.description, d.device_type
+            );
+        }
+        assert!(devices
+            .iter()
+            .any(|d| d.device_type == llama_cpp_2::LlamaBackendDeviceType::Cpu));
+        println!("Whisper GPU: {:?}", whisper_gpu());
+        // CI removes vulkan-1.dll on Windows and sets this.
+        if std::env::var_os("ECHOMIND_EXPECT_NO_VULKAN").is_some() {
+            assert!(devices.iter().all(|d| d.backend != "Vulkan"));
+            assert_eq!(whisper_gpu(), None);
+        }
     }
 
     #[test]

@@ -1250,12 +1250,14 @@ checksum = "15401da73a9ed8c80e3b2d4dc05fe10e7b72d7243b9f614e516a44fa99986e88"
 name = "echomind"
 version = "0.2.17"
 dependencies = [
+ "cc",
  "chacha20poly1305",
  "chrono",
  "cpal",
  "flacenc",
  "hound",
  "keyring",
+ "libc",
  "libloading 0.8.9",
  "llama-cpp-2",
  "ndarray 0.17.2",

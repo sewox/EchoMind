@@ -16,7 +16,7 @@ pub struct HardwareInfo {
     pub gpu_name: String,
     pub gpu_acceleration: String,
     pub has_ane: bool,  // Apple Neural Engine
-    pub has_cuda: bool, // NVIDIA CUDA
+    pub has_gpu: bool,  // Whisper runs on a discrete GPU (Vulkan), off macOS
     pub has_avx2: bool, // CPU AVX2 instructions
     pub summary_headline: String,
     pub recommended_ai_mode: String,
@@ -53,7 +53,7 @@ impl HardwareInfo {
 
         let has_avx2 = is_avx2_supported();
 
-        let (gpu_name, gpu_acceleration, has_ane, has_cuda) =
+        let (gpu_name, gpu_acceleration, has_ane, has_gpu) =
             Self::detect_gpu_and_acceleration(&cpu_brand, has_avx2);
 
         let summary_headline = if cfg!(target_os = "macos") && cfg!(target_arch = "aarch64") {
@@ -61,8 +61,8 @@ impl HardwareInfo {
                 "Apple Silicon {} Metal Hızlandırma Aktif (ANE Desteği Var)",
                 cpu_brand
             )
-        } else if has_cuda {
-            format!("{} CUDA Hızlandırma Aktif", gpu_name)
+        } else if has_gpu {
+            format!("{} Vulkan GPU Hızlandırma Aktif", gpu_name)
         } else if has_avx2 {
             format!("{} (AVX2 CPU Hızlandırması Aktif)", cpu_brand)
         } else {
@@ -72,8 +72,8 @@ impl HardwareInfo {
         let recommended_ai_mode = if cfg!(target_os = "macos") && cfg!(target_arch = "aarch64") {
             "Yerel Whisper-Metal (TR/EN) + Yerel Gemma 2 (2B/9B GGUF) veya Gemini 1.5 Flash"
                 .to_string()
-        } else if has_cuda {
-            "Yerel Whisper-CUDA + Yerel Gemma 2 (CUDA) / Gemini 1.5 Flash".to_string()
+        } else if has_gpu {
+            "Yerel Whisper (Vulkan GPU) + Gemini 1.5 Flash (Online Özetleme)".to_string()
         } else {
             "Yerel Whisper-CPU (Turbo) + Gemini 1.5 Flash (Online Özetleme)".to_string()
         };
@@ -89,7 +89,7 @@ impl HardwareInfo {
             gpu_name,
             gpu_acceleration,
             has_ane,
-            has_cuda,
+            has_gpu,
             has_avx2,
             summary_headline,
             recommended_ai_mode,
@@ -119,30 +119,24 @@ impl HardwareInfo {
             }
         }
 
-        #[cfg(target_os = "windows")]
+        #[cfg(not(target_os = "macos"))]
         {
-            let has_cuda = detect_windows_cuda();
-            if has_cuda {
-                let gpu_name = get_windows_gpu_name().unwrap_or_else(|| "NVIDIA GPU".to_string());
-                let gpu_accel = "NVIDIA CUDA (cuBLAS / TensorRT)".to_string();
-                (gpu_name, gpu_accel, false, true)
-            } else {
-                let gpu_name =
-                    get_windows_gpu_name().unwrap_or_else(|| "DirectX 12 / Vulkan GPU".to_string());
-                let gpu_accel = if _has_avx2 {
-                    "CPU AVX2 Vector Acceleration".to_string()
-                } else {
-                    "CPU Standard Execution".to_string()
-                };
-                (gpu_name, gpu_accel, false, false)
+            // The GPU Whisper actually runs on, as ggml's Vulkan backend sees it.
+            if let Some(name) = crate::transcriber::whisper_gpu_name() {
+                return (name, "Vulkan GPU".to_string(), false, true);
             }
-        }
-
-        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-        {
+            #[cfg(target_os = "windows")]
+            let gpu_name = get_windows_gpu_name();
+            #[cfg(not(target_os = "windows"))]
+            let gpu_name: Option<String> = None;
+            let gpu_accel = if _has_avx2 {
+                "CPU AVX2 Vector Acceleration".to_string()
+            } else {
+                "CPU Standard Execution".to_string()
+            };
             (
-                "Standard GPU".to_string(),
-                "CPU Fallback".to_string(),
+                gpu_name.unwrap_or_else(|| "Standard GPU".to_string()),
+                gpu_accel,
                 false,
                 false,
             )
@@ -182,30 +176,124 @@ fn get_macos_cpu_brand() -> Option<String> {
     None
 }
 
+/// A display adapter as DXGI lists it.
 #[cfg(target_os = "windows")]
-fn detect_windows_cuda() -> bool {
-    std::path::Path::new("C:\\Windows\\System32\\nvcuda.dll").exists()
+struct Adapter {
+    name: String,
+    dedicated_mb: usize,
+    driver: Option<String>,
+    vendor: u32,
+    software: bool,
 }
 
 #[cfg(target_os = "windows")]
-fn get_windows_gpu_name() -> Option<String> {
-    use std::process::Command;
-    let output = Command::new("wmic")
-        .args(["path", "win32_VideoController", "get", "name"])
-        .output()
-        .ok()?;
-    if output.status.success() {
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let lines: Vec<&str> = stdout
-            .lines()
-            .map(|l| l.trim())
-            .filter(|l| !l.is_empty() && *l != "Name")
-            .collect();
-        if let Some(first) = lines.first() {
-            return Some(first.to_string());
+fn windows_adapters() -> Vec<Adapter> {
+    use windows::core::Interface;
+    use windows::Win32::Graphics::Dxgi::{
+        CreateDXGIFactory1, IDXGIDevice, IDXGIFactory1, DXGI_ADAPTER_FLAG_SOFTWARE,
+    };
+    let mut adapters = Vec::new();
+    // SAFETY: COM calls on interfaces DXGI hands out; nothing outlives them.
+    unsafe {
+        let Ok(factory) = CreateDXGIFactory1::<IDXGIFactory1>() else {
+            return adapters;
+        };
+        let mut index = 0;
+        while let Ok(adapter) = factory.EnumAdapters1(index) {
+            index += 1;
+            let Ok(desc) = adapter.GetDesc1() else {
+                continue;
+            };
+            let len = desc
+                .Description
+                .iter()
+                .position(|&c| c == 0)
+                .unwrap_or(desc.Description.len());
+            // The user-mode driver version, as Device Manager shows it.
+            let driver = adapter
+                .CheckInterfaceSupport(&IDXGIDevice::IID)
+                .ok()
+                .map(|v| {
+                    let v = v as u64;
+                    format!(
+                        "{}.{}.{}.{}",
+                        v >> 48,
+                        (v >> 32) & 0xffff,
+                        (v >> 16) & 0xffff,
+                        v & 0xffff
+                    )
+                });
+            adapters.push(Adapter {
+                name: String::from_utf16_lossy(&desc.Description[..len])
+                    .trim()
+                    .to_string(),
+                dedicated_mb: desc.DedicatedVideoMemory / (1024 * 1024),
+                driver,
+                vendor: desc.VendorId,
+                software: desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE.0 as u32 != 0,
+            });
         }
     }
-    None
+    adapters
+}
+
+/// The hardware adapter with the most dedicated memory (a discrete GPU over
+/// the integrated one).
+#[cfg(target_os = "windows")]
+fn get_windows_gpu_name() -> Option<String> {
+    windows_adapters()
+        .into_iter()
+        .filter(|a| !a.software)
+        .max_by_key(|a| a.dedicated_mb)
+        .map(|a| a.name)
+}
+
+/// The display adapters, one line each, for the diagnostics log. Windows
+/// only; elsewhere ggml's device list says enough.
+pub fn display_adapters() -> Vec<String> {
+    #[cfg(target_os = "windows")]
+    {
+        windows_adapters()
+            .into_iter()
+            .map(|a| {
+                format!(
+                    "{} | {} MB ayrık bellek | sürücü {} | üretici {:04x}{}",
+                    a.name,
+                    a.dedicated_mb,
+                    a.driver.as_deref().unwrap_or("?"),
+                    a.vendor,
+                    if a.software { " | yazılım" } else { "" }
+                )
+            })
+            .collect()
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        Vec::new()
+    }
+}
+
+/// `nvidia-smi`'s view of NVIDIA GPUs (driver, memory, load), where the
+/// driver installed it.
+pub fn nvidia_smi() -> Option<String> {
+    if cfg!(target_os = "macos") {
+        return None;
+    }
+    let mut cmd = std::process::Command::new("nvidia-smi");
+    cmd.args([
+        "--query-gpu=name,driver_version,memory.total,memory.used,utilization.gpu",
+        "--format=csv,noheader",
+    ]);
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+    let out = cmd.output().ok()?;
+    out.status
+        .success()
+        .then(|| String::from_utf8_lossy(&out.stdout).into_owned())
 }
 
 #[tauri::command]

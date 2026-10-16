@@ -30,5 +30,61 @@ jobs:
         with:
           workspaces: "./src-tauri -> target"
 
+      # ggml's Vulkan backend (Whisper on the GPU) needs the SDK to build.
+      - name: Install Vulkan SDK
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          VULKAN_VERSION: 1.4.357.0
+        run: |
+          curl.exe -s -o $env:RUNNER_TEMP/VulkanSDK-Installer.exe -L "https://sdk.lunarg.com/sdk/download/${env:VULKAN_VERSION}/windows/vulkansdk-windows-X64-${env:VULKAN_VERSION}.exe"
+          & "$env:RUNNER_TEMP\VulkanSDK-Installer.exe" --accept-licenses --default-answer --confirm-command install
+          Add-Content $env:GITHUB_ENV "VULKAN_SDK=C:\VulkanSDK\${env:VULKAN_VERSION}"
+          Add-Content $env:GITHUB_PATH "C:\VulkanSDK\${env:VULKAN_VERSION}\bin"
+          # The Visual Studio generator runs the steps of ggml's shader
+          # generator (an ExternalProject) out of order; Ninja does not.
+          choco install ninja -y --no-progress
+          Add-Content $env:GITHUB_ENV "CMAKE_GENERATOR=Ninja"
+          # The shader generator's nested CMake build dirs pass Windows' 260
+          # character path limit under the default target dir.
+          Add-Content $env:GITHUB_ENV "CARGO_TARGET_DIR=C:\t"
+          # cmake-rs replaces CMake's default C++ flags, dropping /EHsc; ggml's
+          # Vulkan backend reports failures (no driver, out of memory) with
+          # exceptions.
+          Add-Content $env:GITHUB_ENV "CXXFLAGS=/EHsc"
+
+      # Ninja needs the MSVC compiler on PATH.
+      - name: Set up MSVC
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
       - name: Build and link the app and its tests
         run: cargo test --manifest-path src-tauri/Cargo.toml --no-run
+
+      # Lists ggml's devices for real, on a runner without a GPU. On Windows
+      # it runs twice: with vulkan-1.dll (the SDK installs it), then without
+      # it, as on a PC with no graphics driver, which goes through the
+      # delay-load hook. A crash here means the app would not start there.
+      # The release app has no console on Windows: its output must reach the
+      # log file through the pipe.
+      - name: Diagnostics log captures the app's output
+        shell: pwsh
+        run: |
+          cargo run --manifest-path src-tauri/Cargo.toml --example diag_log_check -- "$env:RUNNER_TEMP/diag.txt"
+          $code = $LASTEXITCODE
+          Get-Content "$env:RUNNER_TEMP/diag.txt"
+          exit $code
+
+      - name: Start ggml without a GPU
+        shell: pwsh
+        run: |
+          cargo test --manifest-path src-tauri/Cargo.toml --lib ggml_devices -- --nocapture
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          if ($env:RUNNER_OS -eq 'Windows') {
+            Remove-Item C:\Windows\System32\vulkan-1.dll
+            $env:PATH = ($env:PATH -split ';' | Where-Object { $_ -notlike '*VulkanSDK*' }) -join ';'
+            where.exe vulkan-1.dll
+            $env:ECHOMIND_EXPECT_NO_VULKAN = '1'
+            cargo test --manifest-path src-tauri/Cargo.toml --lib ggml_devices -- --nocapture
+            if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          }

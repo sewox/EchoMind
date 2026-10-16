@@ -55,6 +55,11 @@ pub struct AudioState {
     /// True when the system-audio tap was successfully started for this
     /// session (even if callbacks have been silent so far).
     pub sys_capture_started: bool,
+    /// Mic-buffer position just after the last sound on either track.
+    pub last_sound_sample: usize,
+    /// Both tracks were silent for [`SILENCE_STOP_SAMPLES`]: the silent tail
+    /// was cut and the recording is being stopped and saved.
+    pub silence_stopped: bool,
     pub mic_resampler: Option<crate::resample::Downsampler>,
     pub sys_resampler: Option<crate::resample::Downsampler>,
 }
@@ -77,6 +82,8 @@ impl Default for AudioState {
             limit_reached: false,
             sys_capture_active: false,
             sys_capture_started: false,
+            last_sound_sample: 0,
+            silence_stopped: false,
             mic_resampler: None,
             sys_resampler: None,
         }
@@ -89,6 +96,38 @@ pub const MAX_RECORDING_SAMPLES: usize = 16000 * 3600 * 8;
 
 /// Event sent when a recording stops at [`MAX_RECORDING_SAMPLES`].
 pub const LIMIT_EVENT: &str = "recording-limit-reached";
+
+/// A recording whose microphone and system audio both stay silent this long
+/// is stopped and saved without the silent tail: the call is over but
+/// nothing stopped the recording (say, the lid was closed right after
+/// hanging up, or the meeting app stayed open).
+pub const SILENCE_STOP_SAMPLES: usize = 16000 * 60 * 10;
+
+/// Kept after the last sound so the final words are not clipped.
+pub const SILENCE_TAIL_KEPT: usize = 16000 * 2;
+
+/// RMS above which audio counts as sound (about -40 dBFS): speech is well
+/// above it, a quiet room stays below.
+pub const SOUND_RMS: f32 = 0.01;
+
+/// Event sent when a recording stops for silence (payload: [`SilenceStop`]).
+pub const SILENCE_EVENT: &str = "recording-silence-stopped";
+
+/// Payload of [`SILENCE_EVENT`].
+#[derive(Debug, Clone, Copy, serde::Serialize)]
+pub struct SilenceStop {
+    pub minutes: usize,
+    /// The recording had no sound at all, so nothing is saved.
+    pub empty: bool,
+}
+
+/// Set by the meeting detector while a meeting app holds the microphone.
+static MEETING_HOLDS_MIC: AtomicBool = AtomicBool::new(false);
+
+/// Called by the meeting detector on every scan.
+pub fn set_meeting_holds_mic(holds: bool) {
+    MEETING_HOLDS_MIC.store(holds, Ordering::Relaxed);
+}
 
 static APP: OnceLock<tauri::AppHandle> = OnceLock::new();
 
@@ -190,6 +229,8 @@ pub enum PcmClaim {
         /// when it was captured.
         system: Option<Vec<i16>>,
         live_covered_samples: usize,
+        /// The recording was stopped for silence and its silent tail cut.
+        silence_cut: bool,
     },
     /// First claim but buffer empty / too short — session marked saved so
     /// nothing retries; caller must not create a meeting or FLAC.
@@ -574,6 +615,8 @@ impl GlobalAudioEngine {
             state.session_saved = false;
             state.sys_pcm_16k_buffer.clear();
             state.limit_reached = false;
+            state.last_sound_sample = 0;
+            state.silence_stopped = false;
             state.sys_capture_active = false;
             state.sys_capture_started = false;
             state.mic_resampler = None;
@@ -914,6 +957,13 @@ impl GlobalAudioEngine {
     /// a chunk (~1.0 s at 16 kHz for clean sentence recognition).
     pub const LIVE_TRANSCRIBE_MIN_SAMPLES: usize = 16000;
 
+    /// Longest live slice (60 s). After live transcription was off for a
+    /// while, or on a machine slower than real time, the backlog is caught up
+    /// a minute at a time instead of in one long run that a save would wait
+    /// for; whatever is left when the recording stops is transcribed from the
+    /// saved file.
+    pub const LIVE_TRANSCRIBE_MAX_SAMPLES: usize = 16000 * 60;
+
     /// Consume newly accumulated PCM for live transcription via a cursor.
     /// Does **not** clear or take the session persist buffer — only advances
     /// `live_transcribe_cursor`. Returns `None` when fewer than `min_samples`
@@ -939,12 +989,13 @@ impl GlobalAudioEngine {
             return None;
         }
         let start = state.live_transcribe_cursor;
-        let sys_from = start.min(state.sys_pcm_16k_buffer.len());
+        let end = start + unread.min(Self::LIVE_TRANSCRIBE_MAX_SAMPLES);
+        let sys_len = state.sys_pcm_16k_buffer.len();
         let samples = mix_channels(
-            &state.pcm_16k_buffer[start..],
-            &state.sys_pcm_16k_buffer[sys_from..],
+            &state.pcm_16k_buffer[start..end],
+            &state.sys_pcm_16k_buffer[start.min(sys_len)..end.min(sys_len)],
         );
-        state.live_transcribe_cursor = state.pcm_16k_buffer.len();
+        state.live_transcribe_cursor = end;
         Some((start, samples))
     }
 
@@ -964,6 +1015,7 @@ impl GlobalAudioEngine {
             || std::mem::take(&mut state.sys_capture_active);
         let live_covered_samples = state.live_transcribe_cursor.min(mic.len());
         state.live_transcribe_cursor = 0;
+        let silence_cut = state.silence_stopped;
         if mic.len() < MIN_SAVE_PCM_SAMPLES {
             return PcmClaim::NothingToSave { session_id };
         }
@@ -978,6 +1030,7 @@ impl GlobalAudioEngine {
             mic,
             system,
             live_covered_samples,
+            silence_cut,
         }
     }
 
@@ -1104,9 +1157,60 @@ fn process_audio_data(
         .process(&filtered_mono);
 
     // Accumulate in the 16 kHz buffer only while recording, up to the limit.
-    if state.is_recording && !state.limit_reached {
+    if state.is_recording && !state.limit_reached && !state.silence_stopped {
         append_recorded(&mut state, &resampled_pcm);
+        if rms > SOUND_RMS {
+            state.last_sound_sample = state.pcm_16k_buffer.len();
+        }
+        stop_if_silent(
+            &mut state,
+            SILENCE_STOP_SAMPLES,
+            MEETING_HOLDS_MIC.load(Ordering::Relaxed),
+        );
     }
+}
+
+/// Cuts the silent tail and stops the recording once both tracks have been
+/// silent for `limit` samples. Only with system audio: without it, a quiet
+/// listener on headphones would look like silence. Never while a meeting app
+/// holds the microphone: the call is still on (a lobby, a long pause), and
+/// the detector stops the recording when the app lets go. A recording with
+/// no sound at all is dropped rather than saved as a few silent seconds.
+fn stop_if_silent(state: &mut AudioState, limit: usize, meeting_holds_mic: bool) {
+    let len = state.pcm_16k_buffer.len();
+    if state.silence_stopped
+        || !state.sys_capture_started
+        || meeting_holds_mic
+        || len.saturating_sub(state.last_sound_sample) < limit
+    {
+        return;
+    }
+    let keep = if state.last_sound_sample == 0 {
+        0
+    } else {
+        (state.last_sound_sample + SILENCE_TAIL_KEPT).min(len)
+    };
+    state.pcm_16k_buffer.truncate(keep);
+    state.sys_pcm_16k_buffer.truncate(keep);
+    state.live_transcribe_cursor = state.live_transcribe_cursor.min(keep);
+    state.silence_stopped = true;
+    let stop = SilenceStop {
+        minutes: limit / 16000 / 60,
+        empty: keep == 0,
+    };
+    eprintln!(
+        "⏹️ {} dakikadır ses yok; sessiz kısım kesilip kayıt durduruluyor.",
+        stop.minutes
+    );
+    #[cfg(not(test))]
+    thread::spawn(move || {
+        use tauri::Emitter;
+        let _ = get_global_audio_engine().stop();
+        if let Some(app) = APP.get() {
+            let _ = app.emit(SILENCE_EVENT, stop);
+            let _ = app.emit("trigger-stop-recording", ());
+        }
+    });
 }
 
 /// Appends microphone samples to the session; at [`MAX_RECORDING_SAMPLES`]
@@ -2016,6 +2120,148 @@ mod tests {
     }
 
     #[test]
+    fn test_long_silence_cuts_the_tail_and_stops() {
+        let mut state = AudioState {
+            sys_capture_started: true,
+            pcm_16k_buffer: vec![0; 100_000],
+            sys_pcm_16k_buffer: vec![0; 100_000],
+            live_transcribe_cursor: 90_000,
+            last_sound_sample: 10_000,
+            ..Default::default()
+        };
+        stop_if_silent(&mut state, 50_000, false);
+        let keep = 10_000 + SILENCE_TAIL_KEPT;
+        assert!(state.silence_stopped);
+        assert_eq!(state.pcm_16k_buffer.len(), keep);
+        assert_eq!(state.sys_pcm_16k_buffer.len(), keep);
+        assert_eq!(state.live_transcribe_cursor, keep);
+    }
+
+    #[test]
+    fn test_short_silence_keeps_recording() {
+        let mut state = AudioState {
+            sys_capture_started: true,
+            pcm_16k_buffer: vec![0; 100_000],
+            last_sound_sample: 60_000,
+            ..Default::default()
+        };
+        stop_if_silent(&mut state, 50_000, false);
+        assert!(!state.silence_stopped);
+        assert_eq!(state.pcm_16k_buffer.len(), 100_000);
+    }
+
+    #[test]
+    fn test_silence_never_stops_a_mic_only_recording() {
+        // Without system audio, a quiet listener on headphones is not silence.
+        let mut state = AudioState {
+            pcm_16k_buffer: vec![0; 100_000],
+            ..Default::default()
+        };
+        stop_if_silent(&mut state, 50_000, false);
+        assert!(!state.silence_stopped);
+    }
+
+    /// The real capture path: 10 ms callbacks on both tracks.
+    #[test]
+    fn test_capture_after_the_call_ends_is_cut_at_the_last_sound() {
+        let state: SharedAudioState = Arc::new(Mutex::new(AudioState {
+            is_recording: true,
+            sys_capture_started: true,
+            ..Default::default()
+        }));
+        let tone = |amp: f32| -> Vec<f32> {
+            (0..160)
+                .map(|i| amp * (i as f32 * 2.0 * std::f32::consts::PI * 300.0 / 16000.0).sin())
+                .collect()
+        };
+        let feed = |seconds: usize, mic_amp: f32, sys_amp: f32| {
+            for _ in 0..seconds * 100 {
+                process_audio_data(&tone(mic_amp), 16000, 1, &state);
+                crate::system_audio::ingest(&state, &tone(sys_amp), 1, 16000.0);
+            }
+        };
+        feed(30, 0.2, 0.0); // the user talks
+        feed(30, 0.0005, 0.2); // the other side talks
+        let last_sound = state.lock().unwrap().pcm_16k_buffer.len();
+        feed(9 * 60, 0.0005, 0.0); // hung up; a quiet room
+        assert!(
+            !state.lock().unwrap().silence_stopped,
+            "9 minutes is not enough"
+        );
+        feed(2 * 60, 0.0005, 0.0);
+
+        let st = state.lock().unwrap();
+        assert!(st.silence_stopped);
+        let kept = st.pcm_16k_buffer.len();
+        assert!(
+            kept.abs_diff(last_sound + SILENCE_TAIL_KEPT) <= 1600,
+            "kept {kept}, last sound at {last_sound}"
+        );
+        assert!(st.sys_pcm_16k_buffer.len() <= kept);
+        drop(st);
+        // Nothing more is recorded until it is stopped and saved.
+        feed(5, 0.2, 0.2);
+        assert_eq!(state.lock().unwrap().pcm_16k_buffer.len(), kept);
+    }
+
+    #[test]
+    fn test_silence_never_stops_while_a_meeting_app_holds_the_mic() {
+        // A lobby or a long pause: the call is still on.
+        let mut state = AudioState {
+            sys_capture_started: true,
+            pcm_16k_buffer: vec![0; 100_000],
+            last_sound_sample: 10_000,
+            ..Default::default()
+        };
+        stop_if_silent(&mut state, 50_000, true);
+        assert!(!state.silence_stopped);
+        assert_eq!(state.pcm_16k_buffer.len(), 100_000);
+        // Once the app lets go, the silence already counted applies at once.
+        stop_if_silent(&mut state, 50_000, false);
+        assert!(state.silence_stopped);
+    }
+
+    #[test]
+    fn test_a_recording_without_any_sound_is_not_saved() {
+        let engine = GlobalAudioEngine::new();
+        {
+            let mut state = engine.state.lock().unwrap();
+            state.sys_capture_started = true;
+            state.pcm_16k_buffer = vec![0; 100_000];
+            state.sys_pcm_16k_buffer = vec![0; 100_000];
+            stop_if_silent(&mut state, 50_000, false);
+            assert!(state.silence_stopped);
+            assert!(state.pcm_16k_buffer.is_empty());
+        }
+        assert!(matches!(
+            engine.claim_pcm_for_save(),
+            PcmClaim::NothingToSave { .. }
+        ));
+    }
+
+    #[test]
+    fn test_claim_says_when_the_silent_tail_was_cut() {
+        let engine = GlobalAudioEngine::new();
+        {
+            let mut state = engine.state.lock().unwrap();
+            state.sys_capture_started = true;
+            state.pcm_16k_buffer = vec![1; 100_000];
+            state.sys_pcm_16k_buffer = vec![1; 100_000];
+            state.last_sound_sample = 20_000;
+            stop_if_silent(&mut state, 50_000, false);
+        }
+        match engine.claim_pcm_for_save() {
+            PcmClaim::Claimed {
+                mic, silence_cut, ..
+            } => {
+                assert!(silence_cut);
+                assert_eq!(mic.len(), 20_000 + SILENCE_TAIL_KEPT);
+            }
+            other => panic!("expected Claimed, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn test_recording_below_the_limit_keeps_going() {
         let mut state = AudioState {
             is_recording: true,
@@ -2026,6 +2272,21 @@ mod tests {
         assert!(!state.limit_reached);
         // The real limit holds hours of audio (well past the old 2-hour cap).
         assert_eq!(MAX_RECORDING_SAMPLES / 16000 / 3600, 8);
+    }
+
+    #[test]
+    fn test_a_live_backlog_is_taken_a_minute_at_a_time() {
+        let engine = GlobalAudioEngine::new();
+        let max = GlobalAudioEngine::LIVE_TRANSCRIBE_MAX_SAMPLES;
+        engine.inject_pcm_for_test(vec![0.1; max * 2 + 16_000], 3);
+        engine.inject_sys_pcm_for_test(vec![0.1; max + 8_000]);
+        let (start, first) = engine.take_pcm_for_live_transcribe_at(16_000).unwrap();
+        assert_eq!((start, first.len()), (0, max));
+        let (start, second) = engine.take_pcm_for_live_transcribe_at(16_000).unwrap();
+        assert_eq!((start, second.len()), (max, max));
+        let (start, last) = engine.take_pcm_for_live_transcribe_at(16_000).unwrap();
+        assert_eq!((start, last.len()), (max * 2, 16_000));
+        assert!(engine.take_pcm_for_live_transcribe_at(16_000).is_none());
     }
 
     #[test]

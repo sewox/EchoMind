@@ -20,6 +20,7 @@ import { TranscriptSegment } from "../TranscriptViewer";
 import { MeetingRecord } from "../../App";
 import { useI18n } from "../../locales/i18nContext";
 import { LiveSuggestionItem } from "../../types/suggestions";
+import { isLiveTranscriptionEnabled } from "../../services/liveTranscription";
 
 interface LiveFeedViewProps {
   segments: TranscriptSegment[];
@@ -302,8 +303,10 @@ export const LiveFeedView: React.FC<LiveFeedViewProps> = ({
               ? t("transcript.noSearchResults") ||
                 "Aramanızla eşleşen konuşma bulunamadı."
               : isRecording
-                ? t("transcript.listeningLive") ||
-                  "Konuşmalar dinleniyor, anlık yazıya dökülecek..."
+                ? isLiveTranscriptionEnabled()
+                  ? t("transcript.listeningLive") ||
+                    "Konuşmalar dinleniyor, anlık yazıya dökülecek..."
+                  : t("transcript.recordingNoLive")
                 : t("transcript.noRecordings") ||
                   "Henüz bir konuşma kaydı bulunmuyor."}
           </p>

@@ -50,7 +50,10 @@ jobs:
             patchelf \
             libasound2-dev \
             libssl-dev \
-            libdbus-1-dev
+            libdbus-1-dev \
+            libvulkan-dev \
+            glslc \
+            spirv-headers
 
       - name: Install NPM Dependencies
         run: npm ci

@@ -91,7 +91,8 @@
           "libayatana-appindicator3-1",
           "librsvg2-2",
           "libasound2",
-          "libssl3"
+          "libssl3",
+          "libvulkan1"
         ],
         "section": "utils",
         "priority": "optional"

@@ -1,13 +1,12 @@
 use crate::mic_activity::{
-    browser_display_name, effective_ignore_list, is_ignored_bundle,
-    is_mic_process_listing_supported, list_mic_holding_processes, prefer_display_name,
-    recommended_title, resolve_mic_process, tracker_now_ms, MicHoldTracker, ResolvedMicApp,
+    browser_display_name, effective_ignore_list, is_ignored_bundle, list_mic_holding_processes,
+    prefer_display_name, recommended_title, resolve_mic_process, tracker_now_ms, MicHoldTracker,
+    ResolvedMicApp,
 };
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
 use std::time::Duration;
-use sysinfo::System;
 use tauri::{AppHandle, Emitter, Manager};
 
 /// Escapes a value for safe interpolation inside a double-quoted AppleScript string literal.
@@ -19,10 +18,10 @@ fn escape_applescript_string(input: &str) -> String {
 }
 
 /// Runs `osascript -e <script>` with a hard wall-clock timeout. Every call site in
-/// the detection hot path (scan_processes' browser tab scan, is_app_in_active_call's
-/// per-app checks) used to call `Command::output()` directly, which blocks with no
-/// timeout at all — a single slow AppleScript call (a browser with many open tabs,
-/// a busy system, an unresponsive app) could stall the entire 1s polling loop
+/// the detection hot path (scan_processes' browser tab scan) used to call
+/// `Command::output()` directly, which blocks with no timeout at all — a single
+/// slow AppleScript call (a browser with many open tabs, a busy system, an
+/// unresponsive app) could stall the entire 1s polling loop
 /// indefinitely, silently blowing past the "island exits Aktif within 5s of the
 /// meeting ending" bound the loop is designed to meet, since the loop can't even
 /// reach its next iteration until the current one returns. Returns the trimmed
@@ -261,23 +260,24 @@ impl MeetingDetector {
 
     /// Public entry used by the monitoring loop and `check_active_meetings`.
     ///
-    /// macOS 14.2+: mic-activity path (any app holding input after debounce).
-    /// Older macOS / Linux / Windows: legacy hardcoded process-name scan.
+    /// One method on every platform: a meeting is an app holding the
+    /// microphone (after a short debounce), and it ends when the app lets go.
+    /// A meeting app that is merely open is not a meeting.
     pub fn scan_processes() -> Vec<MeetingAppInfo> {
         let ignore = {
             let settings = get_global_detector().settings.lock().unwrap();
             effective_ignore_list(&settings.ignored_apps)
         };
-        Self::scan_processes_with_ignore(&ignore)
+        Self::scan_processes_with_ignore(&ignore).unwrap_or_default()
     }
 
-    fn scan_processes_with_ignore(ignore: &[String]) -> Vec<MeetingAppInfo> {
-        if is_mic_process_listing_supported() {
-            if let Some(raw) = list_mic_holding_processes() {
-                return Self::scan_via_mic_activity(raw, ignore);
-            }
-        }
-        Self::scan_processes_legacy()
+    /// `None` when the OS could not be asked (macOS before 14.2, Linux
+    /// without PulseAudio/PipeWire, or a failed query): nothing is known, so
+    /// a running meeting must not be taken as ended. Recording is still
+    /// available by hand.
+    fn scan_processes_with_ignore(ignore: &[String]) -> Option<Vec<MeetingAppInfo>> {
+        let raw = list_mic_holding_processes()?;
+        Some(Self::scan_via_mic_activity(raw, ignore))
     }
 
     /// Mic-activity detection: any process holding the microphone for ~5 s is a
@@ -495,264 +495,6 @@ impl MeetingDetector {
         Self::meeting_from_browser_tab_dump(browser, &raw, date_str)
     }
 
-    /// Legacy hardcoded process-name + browser-tab scan. Used on Linux/Windows
-    /// and on macOS older than 14.2 (or when the mic-process bridge is unavailable).
-    pub fn scan_processes_legacy() -> Vec<MeetingAppInfo> {
-        let mut sys = System::new_all();
-        sys.refresh_processes(sysinfo::ProcessesToUpdate::All);
-
-        // Hints for nicer names / confidence only on the mic path; here they
-        // remain the detection gate for platforms without Core Audio process objects.
-        let targets: Vec<(&str, &str, Vec<&str>)> = vec![
-            (
-                "zoom",
-                "Zoom",
-                vec!["zoom.us", "zoom.exe", "zoom", "cpthost.exe", "cpthost"],
-            ),
-            (
-                "teams",
-                "Microsoft Teams",
-                vec![
-                    "teams.exe",
-                    "teams",
-                    "ms-teams.exe",
-                    "ms-teams",
-                    "msteams.exe",
-                    "msteams",
-                    "teams2",
-                    "teams-for-linux",
-                ],
-            ),
-            (
-                "webex",
-                "Cisco Webex",
-                vec![
-                    "webex.exe",
-                    "webex",
-                    "ciscocollabhost.exe",
-                    "ciscocollabhost",
-                    "atmgr.exe",
-                    "webexmta",
-                ],
-            ),
-            ("slack", "Slack", vec!["slack.exe", "slack"]),
-            (
-                "discord",
-                "Discord",
-                vec!["discord.exe", "discord", "discord-canary", "discord-ptb"],
-            ),
-            (
-                "skype",
-                "Skype",
-                vec!["skype.exe", "skype", "skypeforlinux"],
-            ),
-            ("facetime", "Apple FaceTime", vec!["facetime"]),
-        ];
-
-        let mut results = Vec::new();
-        let date_str = chrono::Local::now().format("%d %B %Y").to_string();
-
-        // 1. Scan Standalone Native Desktop Apps (Cross-platform: macOS, Linux, Windows)
-        for (app_id, display_name, match_patterns) in targets {
-            let mut found = false;
-            let mut matched_proc_name = String::new();
-
-            for process in sys.processes().values() {
-                let proc_name = process.name().to_string_lossy().to_lowercase();
-                let base_name = proc_name.strip_suffix(".exe").unwrap_or(&proc_name);
-
-                // Exclude system background daemons, message stores, helpers, updaters
-                if proc_name.contains("helper")
-                    || proc_name.contains("stored")
-                    || proc_name.contains("daemon")
-                    || proc_name.contains("update")
-                    || proc_name.contains("service")
-                    || proc_name.contains("crash")
-                    || proc_name.contains("notification")
-                    || proc_name.contains("renderer")
-                    || proc_name.contains("gpu-process")
-                {
-                    continue;
-                }
-
-                for pattern in &match_patterns {
-                    let pattern_base = pattern.strip_suffix(".exe").unwrap_or(*pattern);
-                    if proc_name == *pattern || base_name == pattern_base {
-                        // Check if the application is in an active call/meeting (not just text chatting)
-                        if !Self::is_app_in_active_call(app_id) {
-                            continue;
-                        }
-
-                        found = true;
-                        matched_proc_name = proc_name.clone();
-                        break;
-                    }
-                }
-                if found {
-                    break;
-                }
-            }
-
-            if found {
-                results.push(MeetingAppInfo {
-                    app_id: app_id.to_string(),
-                    display_name: display_name.to_string(),
-                    process_name: matched_proc_name,
-                    is_running: true,
-                    recommended_title: format!("{} Toplantısı - {}", display_name, date_str),
-                });
-            }
-        }
-
-        // 2. Scan Browser-based Meetings (Google Meet, Teams Web, Zoom Web) via AppleScript on macOS
-        #[cfg(target_os = "macos")]
-        {
-            let browser_candidates = vec![
-                ("Google Chrome", vec!["chrome", "google chrome"]),
-                ("Arc", vec!["arc"]),
-                ("Brave Browser", vec!["brave", "brave browser"]),
-                ("Microsoft Edge", vec!["edge", "microsoft edge", "msedge"]),
-                ("Safari", vec!["safari"]),
-                ("Firefox", vec!["firefox"]),
-            ];
-
-            // Only query browsers that are actually running to avoid heavy osascript spawn overhead
-            let running_browsers: Vec<&str> = browser_candidates
-                .into_iter()
-                .filter(|(_browser_name, match_names)| {
-                    sys.processes().values().any(|p| {
-                        let pname = p.name().to_string_lossy().to_lowercase();
-                        match_names
-                            .iter()
-                            .any(|m| pname == *m || pname.starts_with(m))
-                    })
-                })
-                .map(|(b, _)| b)
-                .collect();
-
-            for browser in running_browsers {
-                if let Some(info) = Self::scan_browser_tabs_for_meeting(browser, &date_str) {
-                    // Legacy path: only surface Meet / Teams web (preserve prior
-                    // behaviour). Broader hosts are mic-path enrichment only.
-                    if (info.app_id == "meet" || info.app_id == "teams")
-                        && !results.iter().any(|r| r.app_id == info.app_id)
-                    {
-                        results.push(info);
-                    }
-                }
-            }
-        }
-
-        results
-    }
-
-    pub fn is_app_in_active_call(_app_id: &str) -> bool {
-        #[cfg(target_os = "macos")]
-        {
-            match _app_id {
-                "facetime" => run_osascript_with_timeout(
-                    "tell application \"System Events\" to return (exists (processes where name is \"FaceTime\"))",
-                    Duration::from_millis(1500),
-                )
-                .map(|s| {
-                    let s = s.trim().to_lowercase();
-                    s == "true" || s.is_empty()
-                })
-                .unwrap_or(true),
-                "teams" => {
-                    let script = "tell application \"System Events\"
-                        if exists (processes where name contains \"Teams\") then
-                            tell (first process whose name contains \"Teams\")
-                                set winTitles to name of every window
-                                repeat with t in winTitles
-                                    set tLow to (t as text)
-                                    if tLow contains \"Meeting\" or tLow contains \"Toplantı\" or tLow contains \"Call\" or tLow contains \"Görüşme\" or tLow contains \"Arama\" then
-                                        return \"true\"
-                                    end if
-                                end repeat
-                            end tell
-                        end if
-                        return \"true\"
-                    end tell";
-                    run_osascript_with_timeout(script, Duration::from_millis(1500))
-                        .map(|s| s.trim().to_lowercase() != "false")
-                        .unwrap_or(true)
-                }
-                "slack" => {
-                    let script = "tell application \"System Events\"
-                        if exists (processes where name is \"Slack\") then
-                            tell process \"Slack\"
-                                set winTitles to name of every window
-                                repeat with t in winTitles
-                                    set tLow to (t as text)
-                                    if tLow contains \"Huddle\" or tLow contains \"Call\" or tLow contains \"Sesli\" or tLow contains \"Görüşme\" then
-                                        return \"true\"
-                                    end if
-                                end repeat
-                            end tell
-                        end if
-                        return \"true\"
-                    end tell";
-                    run_osascript_with_timeout(script, Duration::from_millis(1500))
-                        .map(|s| s.trim().to_lowercase() != "false")
-                        .unwrap_or(true)
-                }
-                "zoom" => {
-                    let mut sys = System::new();
-                    sys.refresh_processes(sysinfo::ProcessesToUpdate::All);
-                    let has_cpthost = sys.processes().values().any(|p| {
-                        let n = p.name().to_string_lossy().to_lowercase();
-                        n.contains("cpthost") || n.contains("zoom")
-                    });
-                    if has_cpthost {
-                        return true;
-                    }
-                    let script = "tell application \"System Events\"
-                        if exists (processes where name contains \"zoom\") then
-                            tell (first process whose name contains \"zoom\")
-                                set winTitles to name of every window
-                                repeat with t in winTitles
-                                    set tLow to (t as text)
-                                    if tLow contains \"Meeting\" or tLow contains \"Toplantı\" then
-                                        return \"true\"
-                                    end if
-                                end repeat
-                            end tell
-                        end if
-                        return \"true\"
-                    end tell";
-                    run_osascript_with_timeout(script, Duration::from_millis(1500))
-                        .map(|s| s.trim().to_lowercase() != "false")
-                        .unwrap_or(true)
-                }
-                "discord" => {
-                    let script = "tell application \"System Events\"
-                        if exists (processes where name is \"Discord\") then
-                            tell process \"Discord\"
-                                set winTitles to name of every window
-                                repeat with t in winTitles
-                                    set tLow to (t as text)
-                                    if tLow contains \"Voice\" or tLow contains \"Ses\" or tLow contains \"Call\" or tLow contains \"Görüşme\" then
-                                        return \"true\"
-                                    end if
-                                end repeat
-                            end tell
-                        end if
-                        return \"true\"
-                    end tell";
-                    run_osascript_with_timeout(script, Duration::from_millis(1500))
-                        .map(|s| s.trim().to_lowercase() != "false")
-                        .unwrap_or(true)
-                }
-                _ => true,
-            }
-        }
-        #[cfg(not(target_os = "macos"))]
-        {
-            true
-        }
-    }
-
     pub fn get_target_meeting_window_bounds() -> Option<(f64, f64, f64, f64)> {
         #[cfg(target_os = "macos")]
         {
@@ -832,16 +574,22 @@ impl MeetingDetector {
                 };
 
                 if !current_settings.enabled {
+                    crate::audio::set_meeting_holds_mic(false);
                     thread::sleep(Duration::from_millis(1000));
                     continue;
                 }
 
                 let ignore = effective_ignore_list(&current_settings.ignored_apps);
-                let all_active = Self::scan_processes_with_ignore(&ignore);
+                let Some(all_active) = Self::scan_processes_with_ignore(&ignore) else {
+                    crate::audio::set_meeting_holds_mic(false);
+                    thread::sleep(Duration::from_millis(1000));
+                    continue;
+                };
                 let filtered_active: Vec<MeetingAppInfo> = all_active
                     .into_iter()
                     .filter(|app| !is_ignored_bundle(&app.app_id, &ignore))
                     .collect();
+                crate::audio::set_meeting_holds_mic(!filtered_active.is_empty());
 
                 let current_count = filtered_active.len();
 
@@ -964,6 +712,7 @@ impl MeetingDetector {
                 thread::sleep(Duration::from_millis(1000));
             }
 
+            crate::audio::set_meeting_holds_mic(false);
             println!("🛑 Toplantı Algılama Servisi Durduruldu.");
         });
 
@@ -1184,11 +933,6 @@ mod tests {
             .is_none(),
             "unrelated /teams/ paths must not detect Teams Web"
         );
-    }
-
-    #[test]
-    fn test_scan_processes_legacy_runs_without_panic() {
-        let _ = MeetingDetector::scan_processes_legacy();
     }
 
     #[test]

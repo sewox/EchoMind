@@ -1,15 +1,19 @@
-//! Mic-activity based meeting detection helpers (macOS 14.2+).
+//! Mic-activity based meeting detection — the one detection method on every
+//! platform: a meeting is an app holding the microphone, and it ends when the
+//! app lets go. An open meeting app that is not in a call is not a meeting.
 //!
-//! On supported macOS builds, Core Audio process objects report which other
-//! processes currently hold microphone input. This module owns:
-//! - FFI to the Swift bridge (`echomind_mic_proc_*`)
-//! - Debounce / session state machine (~5 s hold, short drop grace)
-//! - Default + user ignore lists
-//! - Browser helper → parent app resolution
-//! - Bundle-id → display-name hints (known meeting apps are hints only)
+//! Which processes hold the microphone comes from the OS:
+//! - macOS 14.2+: Core Audio process objects (Swift bridge `echomind_mic_proc_*`)
+//! - Windows 10+: the privacy registry behind the taskbar "microphone in use"
+//!   icon (`CapabilityAccessManager\ConsentStore\microphone`)
+//! - Linux: PulseAudio / PipeWire recording streams (`libpulse`, loaded at
+//!   run time)
 //!
-//! Linux/Windows and older macOS never call into Core Audio here; `is_supported`
-//! is false and the detector falls back to its legacy process-name scan.
+//! This module also owns the debounce / session state machine (~5 s hold,
+//! short drop grace), the default + user ignore lists, browser helper →
+//! parent app resolution and display-name hints (hints only, never a gate).
+//! Where the OS can't say (macOS before 14.2, Linux without libpulse),
+//! nothing is detected and recording stays manual.
 
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -54,9 +58,13 @@ const DEFAULT_IGNORED_BUNDLE_IDS: &[&str] = &[
     "com.loom.desktop",
     "com.obsproject.obs-studio",
     "com.knollsoft.Rectangle",
+    // Windows / Linux recorders (ids as `canonical_app_id` gives them)
+    "Microsoft.WindowsSoundRecorder_8wekyb3d8bbwe",
+    "audacity",
+    "gnome-sound-recorder",
 ];
 
-/// A process currently reported by Core Audio as holding mic input.
+/// A process the OS reports as holding mic input.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct MicHoldingProcess {
     pub pid: i32,
@@ -259,6 +267,58 @@ pub fn resolve_helper_to_parent(bundle_id: &str) -> String {
     b.to_string()
 }
 
+/// Maps a Windows executable / package name or a Linux binary name to the
+/// app id used everywhere else (the macOS bundle id), so ignore lists,
+/// display names and browser handling work the same on every platform.
+/// Unknown names come back lowercased, without ".exe".
+pub fn canonical_app_id(raw: &str) -> String {
+    let lower = raw.trim().to_ascii_lowercase();
+    let name = lower.strip_suffix(".exe").unwrap_or(&lower);
+    if is_own_executable(name) {
+        return ECHOMIND_BUNDLE_ID.to_string();
+    }
+    known_app_id(name).map_or_else(|| name.to_string(), str::to_string)
+}
+
+/// The app id of a well-known executable or binary name, if it is one.
+fn known_app_id(raw: &str) -> Option<&'static str> {
+    let lower = raw.trim().to_ascii_lowercase();
+    let name = lower.strip_suffix(".exe").unwrap_or(&lower);
+    let id = match name {
+        "chrome" | "google-chrome" | "google-chrome-stable" | "chromium" | "chromium-browser" => {
+            "com.google.Chrome"
+        }
+        "msedge" | "microsoft-edge" | "microsoft-edge-stable" => "com.microsoft.edgemac",
+        "firefox" | "firefox-bin" | "firefox-esr" => "org.mozilla.firefox",
+        "brave" | "brave-browser" => "com.brave.Browser",
+        "zoom" | "cpthost" | "zoomwebviewhost" => "us.zoom.xos",
+        "ms-teams" | "teams" | "msteams" | "teams-for-linux" => "com.microsoft.teams2",
+        "discord" | "discordcanary" | "discordptb" => "com.hnc.Discord",
+        "slack" => "com.tinyspeck.slackmacgap",
+        "skype" | "skypeapp" | "skypeforlinux" => "com.skype.skype",
+        "webex" | "ciscocollabhost" | "webexmta" | "atmgr" | "ciscowebexstart" => {
+            "Cisco-Systems.Spark"
+        }
+        "obs" | "obs64" | "obs32" => "com.obsproject.obs-studio",
+        _ => return None,
+    };
+    Some(id)
+}
+
+/// EchoMind's own executable ("echomind", or whatever this binary is called).
+fn is_own_executable(name: &str) -> bool {
+    if name == "echomind" {
+        return true;
+    }
+    std::env::current_exe()
+        .ok()
+        .and_then(|p| {
+            p.file_stem()
+                .map(|s| s.to_string_lossy().to_ascii_lowercase())
+        })
+        .is_some_and(|own| own == name)
+}
+
 /// Whether the (resolved) bundle id is a browser we can enrich via tab titles.
 pub fn is_browser_bundle_id(bundle_id: &str) -> bool {
     matches!(
@@ -343,11 +403,11 @@ pub fn is_echomind_bundle(bundle_id: &str) -> bool {
 /// (defaults + user additions). Matches exact bundle id, parent after helper
 /// resolution, known short aliases (`zoom`, `discord`, …), and EchoMind.
 pub fn is_ignored_bundle(bundle_id: &str, ignored: &[String]) -> bool {
-    if is_echomind_bundle(bundle_id) {
+    if is_echomind_bundle(bundle_id) || is_audio_tool(bundle_id) {
         return true;
     }
     let resolved = resolve_helper_to_parent(bundle_id);
-    if is_echomind_bundle(&resolved) {
+    if is_echomind_bundle(&resolved) || is_audio_tool(&resolved) {
         return true;
     }
 
@@ -356,7 +416,11 @@ pub fn is_ignored_bundle(bundle_id: &str, ignored: &[String]) -> bool {
         if e.is_empty() {
             continue;
         }
-        if e == bundle_id || e == resolved {
+        // Entries as users type them: any case, "Zoom.exe" or "zoom".
+        if e.eq_ignore_ascii_case(bundle_id)
+            || e.eq_ignore_ascii_case(&resolved)
+            || canonical_app_id(e) == resolved
+        {
             return true;
         }
         // Short aliases used by the legacy detector / older settings UI.
@@ -368,6 +432,47 @@ pub fn is_ignored_bundle(bundle_id: &str, ignored: &[String]) -> bool {
     // unless the user explicitly removed them from the merged ignore list.
     // Callers pass `effective_ignore_list(settings.ignored_apps)`.
     false
+}
+
+/// Tools that hold the microphone all the time (noise removal, virtual
+/// mixers, sound servers' own streams) or show its level (sound settings).
+/// They are never a meeting, and one left running would make the meeting
+/// never end, so they are ignored whatever the user's ignore list says.
+fn is_audio_tool(app_id: &str) -> bool {
+    const TOOLS: &[&str] = &[
+        // Noise removal and virtual mixers
+        "ai.krisp.krispmac",
+        "krisp",
+        "nvidia broadcast",
+        "nvidia broadcast ui",
+        "voicemeeter",
+        "voicemeeter_x64",
+        "voicemeeterpro",
+        "voicemeeterpro_x64",
+        "voicemeeter8",
+        "voicemeeter8x64",
+        "wavelink",
+        "steelseriessonar",
+        "easyeffects",
+        "pulseeffects",
+        "noisetorch",
+        // Sound servers' own streams (loopbacks, filters, echo cancel)
+        "pipewire",
+        "pipewire-pulse",
+        "wireplumber",
+        "pulseaudio",
+        // Input level meters
+        "windows.immersivecontrolpanel_cw5n1h2txyewy",
+        "pavucontrol",
+        "pavucontrol-qt",
+        "pwvucontrol",
+        "gnome-control-center",
+        "plasmashell",
+        // Voice typing / voice control
+        "voiceaccess",
+        "speechruntime",
+    ];
+    TOOLS.iter().any(|t| app_id.eq_ignore_ascii_case(t))
 }
 
 fn alias_matches(alias: &str, bundle_id: &str) -> bool {
@@ -436,14 +541,10 @@ pub fn parse_mic_snapshot_json(json: &str) -> Result<Vec<MicHoldingProcess>, Str
     serde_json::from_str(json).map_err(|e| format!("mic snapshot JSON: {e}"))
 }
 
-/// Platform probe + snapshot. Returns `None` when unsupported (non-macOS,
-/// older macOS, or bridge failure) so the detector can fall back.
+/// Platform probe + snapshot. Returns `None` when the OS can't say (older
+/// macOS, no libpulse, bridge failure); the detector then detects nothing.
 pub fn list_mic_holding_processes() -> Option<Vec<MicHoldingProcess>> {
     imp::list_mic_holding_processes()
-}
-
-pub fn is_mic_process_listing_supported() -> bool {
-    imp::is_supported()
 }
 
 #[cfg(target_os = "macos")]
@@ -479,20 +580,554 @@ mod imp {
             Ok(list) => Some(list),
             Err(err) => {
                 eprintln!("⚠️ mic process snapshot parse failed: {err}");
-                // Supported but parse failed — return empty rather than falling
-                // back to the legacy gate (would miss real meetings).
-                Some(Vec::new())
+                // Unknown, not "nobody": a running meeting must not end here.
+                None
             }
         }
     }
 }
 
-#[cfg(not(target_os = "macos"))]
+/// Windows stores a desktop app's privacy entry under its full path with `#`
+/// for every `\` ("C:#Program Files#Zoom#bin#Zoom.exe").
+#[cfg(any(test, target_os = "windows"))]
+fn windows_nonpackaged_path(key: &str) -> String {
+    key.replace('#', "\\")
+}
+
+/// Whether `exe` belongs to the Store package `family` ("MSTeams_8wekyb3d8bbwe"):
+/// packages install to `…\WindowsApps\<name>_<version>_<arch>__<publisher>\`.
+#[cfg(any(test, target_os = "windows"))]
+fn windows_package_owns_exe(family: &str, exe: &str) -> bool {
+    let Some((name, publisher)) = family.rsplit_once('_') else {
+        return false;
+    };
+    let exe = exe.to_ascii_lowercase();
+    exe.contains(&format!("\\windowsapps\\{}_", name.to_ascii_lowercase()))
+        && exe.contains(&format!("__{}\\", publisher.to_ascii_lowercase()))
+}
+
+/// The program behind an ALSA client's stream name. Through PipeWire's ALSA
+/// plugin a stream has no process properties, only a name like
+/// "PipeWire ALSA [echomind]"; PulseAudio's plugin says "ALSA plug-in [x]".
+#[cfg(any(test, target_os = "linux"))]
+fn alsa_client_binary(name: &str) -> Option<&str> {
+    let rest = name
+        .strip_prefix("PipeWire ALSA [")
+        .or_else(|| name.strip_prefix("ALSA plug-in ["))?;
+    rest.strip_suffix(']').filter(|b| !b.is_empty())
+}
+
+#[cfg(target_os = "windows")]
 mod imp {
     use super::*;
-    pub fn is_supported() -> bool {
-        false
+    use std::path::Path;
+    use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind};
+    use windows::core::{HSTRING, PWSTR};
+    use windows::Win32::Foundation::ERROR_SUCCESS;
+    use windows::Win32::System::Registry::{
+        RegCloseKey, RegEnumKeyExW, RegGetValueW, RegOpenKeyExW, HKEY, HKEY_CURRENT_USER, KEY_READ,
+        RRF_RT_REG_QWORD,
+    };
+
+    /// The per-user privacy store behind the taskbar "microphone in use" icon.
+    const CONSENT_STORE: &str = r"Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\microphone";
+
+    struct Key(HKEY);
+
+    impl Key {
+        fn open(parent: HKEY, path: &str) -> Option<Key> {
+            let mut key = HKEY::default();
+            // SAFETY: valid parent key and NUL-terminated path; closed in Drop.
+            let status =
+                unsafe { RegOpenKeyExW(parent, &HSTRING::from(path), 0, KEY_READ, &mut key) };
+            (status == ERROR_SUCCESS).then_some(Key(key))
+        }
+
+        fn subkeys(&self) -> Vec<String> {
+            let mut names = Vec::new();
+            let mut buf = [0u16; 1024];
+            for index in 0u32.. {
+                let mut len = buf.len() as u32;
+                // SAFETY: `buf` holds `len` UTF-16 units; the call writes at most that.
+                let status = unsafe {
+                    RegEnumKeyExW(
+                        self.0,
+                        index,
+                        PWSTR(buf.as_mut_ptr()),
+                        &mut len,
+                        None,
+                        PWSTR::null(),
+                        None,
+                        None,
+                    )
+                };
+                if status != ERROR_SUCCESS {
+                    break;
+                }
+                names.push(String::from_utf16_lossy(&buf[..len as usize]));
+            }
+            names
+        }
+
+        fn qword(&self, subkey: &str, value: &str) -> u64 {
+            let mut data = 0u64;
+            let mut size = std::mem::size_of::<u64>() as u32;
+            // SAFETY: RRF_RT_REG_QWORD writes exactly 8 bytes into `data`.
+            let status = unsafe {
+                RegGetValueW(
+                    self.0,
+                    &HSTRING::from(subkey),
+                    &HSTRING::from(value),
+                    RRF_RT_REG_QWORD,
+                    None,
+                    Some(&mut data as *mut u64 as *mut std::ffi::c_void),
+                    Some(&mut size),
+                )
+            };
+            if status == ERROR_SUCCESS {
+                data
+            } else {
+                0
+            }
+        }
+
+        /// Windows clears `LastUsedTimeStop` when an app opens the microphone
+        /// and sets it again when the app closes it.
+        fn in_use(&self, subkey: &str) -> bool {
+            self.qword(subkey, "LastUsedTimeStart") != 0
+                && self.qword(subkey, "LastUsedTimeStop") == 0
+        }
     }
+
+    impl Drop for Key {
+        fn drop(&mut self) {
+            // SAFETY: opened in `Key::open` and not closed since.
+            unsafe {
+                let _ = RegCloseKey(self.0);
+            }
+        }
+    }
+
+    enum Holder {
+        /// A desktop app, by full executable path.
+        Exe(String),
+        /// A Store app, by package family name.
+        Package(String),
+    }
+
+    impl Holder {
+        fn owns(&self, exe: &Path) -> bool {
+            let exe = exe.to_string_lossy();
+            match self {
+                Holder::Exe(path) => exe.eq_ignore_ascii_case(path),
+                Holder::Package(family) => windows_package_owns_exe(family, &exe),
+            }
+        }
+    }
+
+    pub fn list_mic_holding_processes() -> Option<Vec<MicHoldingProcess>> {
+        // The store appears with the first app that asks for the microphone;
+        // until then nobody holds it.
+        let Some(store) = Key::open(HKEY_CURRENT_USER, CONSENT_STORE) else {
+            return Some(Vec::new());
+        };
+        let mut holders = Vec::new();
+        for name in store.subkeys() {
+            if name == "NonPackaged" {
+                if let Some(desktop) = Key::open(store.0, "NonPackaged") {
+                    for key in desktop.subkeys() {
+                        if desktop.in_use(&key) {
+                            holders.push(Holder::Exe(windows_nonpackaged_path(&key)));
+                        }
+                    }
+                }
+            } else if store.in_use(&name) {
+                holders.push(Holder::Package(name));
+            }
+        }
+        if holders.is_empty() {
+            return Some(Vec::new());
+        }
+
+        // An app that crashed mid-call never clears its entry, so only count
+        // holders that are still running (and learn their pid and exe).
+        let mut sys = System::new();
+        sys.refresh_processes_specifics(
+            ProcessesToUpdate::All,
+            ProcessRefreshKind::new().with_exe(UpdateKind::OnlyIfNotSet),
+        );
+        let mut found = Vec::new();
+        for holder in &holders {
+            let running = sys.processes().values().find_map(|p| {
+                let exe = p.exe()?;
+                holder
+                    .owns(exe)
+                    .then(|| (p.pid().as_u32() as i32, exe.to_path_buf()))
+            });
+            let Some((pid, exe)) = running else {
+                continue;
+            };
+            let file = exe
+                .file_name()
+                .map(|f| f.to_string_lossy().into_owned())
+                .unwrap_or_default();
+            let bundle_id = match holder {
+                // A known app keeps its usual id; any other Store app is
+                // named by its package, which is what users would ignore.
+                Holder::Package(family) if known_app_id(&file).is_none() => family.clone(),
+                _ => canonical_app_id(&file),
+            };
+            let display_name = exe
+                .file_stem()
+                .map(|s| s.to_string_lossy().into_owned())
+                .unwrap_or_default();
+            found.push(MicHoldingProcess {
+                pid,
+                bundle_id,
+                display_name,
+            });
+        }
+        Some(found)
+    }
+}
+
+#[cfg(target_os = "linux")]
+mod imp {
+    use super::*;
+    use libloading::Library;
+    use std::collections::HashSet;
+    use std::ffi::{c_char, c_int, c_void, CStr};
+    use std::sync::{Mutex, OnceLock};
+
+    const PA_CONTEXT_READY: c_int = 4;
+    const PA_CONTEXT_FAILED: c_int = 5;
+    const PA_CONTEXT_TERMINATED: c_int = 6;
+    const PA_OPERATION_RUNNING: c_int = 0;
+    const PA_CHANNELS_MAX: usize = 32;
+
+    #[repr(C)]
+    struct SampleSpec {
+        format: c_int,
+        rate: u32,
+        channels: u8,
+    }
+
+    #[repr(C)]
+    struct ChannelMap {
+        channels: u8,
+        map: [c_int; PA_CHANNELS_MAX],
+    }
+
+    /// The leading fields of `pa_source_output_info` (one recording stream),
+    /// up to `corked`.
+    #[repr(C)]
+    pub(super) struct SourceOutputInfo {
+        index: u32,
+        name: *const c_char,
+        owner_module: u32,
+        client: u32,
+        source: u32,
+        sample_spec: SampleSpec,
+        channel_map: ChannelMap,
+        buffer_usec: u64,
+        source_usec: u64,
+        resample_method: *const c_char,
+        driver: *const c_char,
+        proplist: *const c_void,
+        corked: c_int,
+    }
+
+    /// The leading fields of `pa_source_info`, up to `index`.
+    #[repr(C)]
+    struct SourceInfo {
+        name: *const c_char,
+        index: u32,
+    }
+
+    type ListCallback<T> =
+        extern "C" fn(c: *mut c_void, info: *const T, eol: c_int, userdata: *mut c_void);
+    type ListFn<T> = unsafe extern "C" fn(
+        c: *mut c_void,
+        cb: ListCallback<T>,
+        userdata: *mut c_void,
+    ) -> *mut c_void;
+
+    struct Api {
+        mainloop_new: unsafe extern "C" fn() -> *mut c_void,
+        mainloop_get_api: unsafe extern "C" fn(m: *mut c_void) -> *mut c_void,
+        mainloop_iterate:
+            unsafe extern "C" fn(m: *mut c_void, block: c_int, retval: *mut c_int) -> c_int,
+        mainloop_free: unsafe extern "C" fn(m: *mut c_void),
+        context_new: unsafe extern "C" fn(api: *mut c_void, name: *const c_char) -> *mut c_void,
+        context_connect: unsafe extern "C" fn(
+            c: *mut c_void,
+            server: *const c_char,
+            flags: c_int,
+            api: *const c_void,
+        ) -> c_int,
+        context_get_state: unsafe extern "C" fn(c: *mut c_void) -> c_int,
+        context_disconnect: unsafe extern "C" fn(c: *mut c_void),
+        context_unref: unsafe extern "C" fn(c: *mut c_void),
+        source_list: ListFn<SourceInfo>,
+        source_output_list: ListFn<SourceOutputInfo>,
+        operation_get_state: unsafe extern "C" fn(o: *mut c_void) -> c_int,
+        operation_unref: unsafe extern "C" fn(o: *mut c_void),
+        proplist_gets: unsafe extern "C" fn(p: *const c_void, key: *const c_char) -> *const c_char,
+        _lib: Library,
+    }
+
+    /// libpulse, from PulseAudio or PipeWire's pipewire-pulse; `None` when
+    /// neither is installed.
+    fn api() -> Option<&'static Api> {
+        static API: OnceLock<Option<Api>> = OnceLock::new();
+        API.get_or_init(|| {
+            // SAFETY: a plain C library without load-time side effects; the
+            // symbols are looked up with their documented signatures.
+            unsafe {
+                let l = Library::new("libpulse.so.0").ok()?;
+                Some(Api {
+                    mainloop_new: *l.get(b"pa_mainloop_new\0").ok()?,
+                    mainloop_get_api: *l.get(b"pa_mainloop_get_api\0").ok()?,
+                    mainloop_iterate: *l.get(b"pa_mainloop_iterate\0").ok()?,
+                    mainloop_free: *l.get(b"pa_mainloop_free\0").ok()?,
+                    context_new: *l.get(b"pa_context_new\0").ok()?,
+                    context_connect: *l.get(b"pa_context_connect\0").ok()?,
+                    context_get_state: *l.get(b"pa_context_get_state\0").ok()?,
+                    context_disconnect: *l.get(b"pa_context_disconnect\0").ok()?,
+                    context_unref: *l.get(b"pa_context_unref\0").ok()?,
+                    source_list: *l.get(b"pa_context_get_source_info_list\0").ok()?,
+                    source_output_list: *l.get(b"pa_context_get_source_output_info_list\0").ok()?,
+                    operation_get_state: *l.get(b"pa_operation_get_state\0").ok()?,
+                    operation_unref: *l.get(b"pa_operation_unref\0").ok()?,
+                    proplist_gets: *l.get(b"pa_proplist_gets\0").ok()?,
+                    _lib: l,
+                })
+            }
+        })
+        .as_ref()
+    }
+
+    /// A connection to the sound server, kept between scans.
+    struct Connection {
+        api: &'static Api,
+        mainloop: *mut c_void,
+        context: *mut c_void,
+    }
+
+    // SAFETY: only used behind the CONNECTION mutex, one thread at a time.
+    unsafe impl Send for Connection {}
+
+    impl Connection {
+        fn open(api: &'static Api) -> Option<Self> {
+            // SAFETY: standard libpulse mainloop/context setup; freed in Drop.
+            unsafe {
+                let mainloop = (api.mainloop_new)();
+                if mainloop.is_null() {
+                    return None;
+                }
+                let context =
+                    (api.context_new)((api.mainloop_get_api)(mainloop), c"EchoMind".as_ptr());
+                let conn = Connection {
+                    api,
+                    mainloop,
+                    context,
+                };
+                if context.is_null()
+                    || (api.context_connect)(context, std::ptr::null(), 0, std::ptr::null()) < 0
+                {
+                    return None;
+                }
+                for _ in 0..1000 {
+                    match (api.context_get_state)(context) {
+                        PA_CONTEXT_READY => return Some(conn),
+                        PA_CONTEXT_FAILED | PA_CONTEXT_TERMINATED => return None,
+                        _ => {
+                            if (api.mainloop_iterate)(mainloop, 1, std::ptr::null_mut()) < 0 {
+                                return None;
+                            }
+                        }
+                    }
+                }
+                None
+            }
+        }
+
+        fn ready(&self) -> bool {
+            // SAFETY: the context lives as long as `self`.
+            unsafe { (self.api.context_get_state)(self.context) == PA_CONTEXT_READY }
+        }
+
+        /// Runs one list query to completion; `false` if it could not start.
+        fn list<T, D>(&mut self, query: ListFn<T>, cb: ListCallback<T>, out: &mut D) -> bool {
+            // SAFETY: `out` outlives the operation, which is driven to the end
+            // (or abandoned) on this thread before returning.
+            unsafe {
+                let op = query(self.context, cb, out as *mut D as *mut c_void);
+                if op.is_null() {
+                    return false;
+                }
+                let mut spins = 0;
+                while (self.api.operation_get_state)(op) == PA_OPERATION_RUNNING && spins < 1000 {
+                    if (self.api.mainloop_iterate)(self.mainloop, 1, std::ptr::null_mut()) < 0 {
+                        break;
+                    }
+                    spins += 1;
+                }
+                (self.api.operation_unref)(op);
+                true
+            }
+        }
+    }
+
+    impl Drop for Connection {
+        fn drop(&mut self) {
+            // SAFETY: created in `open` and not freed since.
+            unsafe {
+                if !self.context.is_null() {
+                    (self.api.context_disconnect)(self.context);
+                    (self.api.context_unref)(self.context);
+                }
+                (self.api.mainloop_free)(self.mainloop);
+            }
+        }
+    }
+
+    /// One recording stream, as the server describes it.
+    struct Stream {
+        source: u32,
+        /// `PA_INVALID_INDEX` for a stream a server module owns (loopback,
+        /// echo cancel), not an app.
+        client: u32,
+        corked: bool,
+        pid: i32,
+        binary: String,
+        name: String,
+    }
+
+    fn text(ptr: *const c_char) -> String {
+        if ptr.is_null() {
+            String::new()
+        } else {
+            // SAFETY: libpulse strings are NUL-terminated and valid during the callback.
+            unsafe { CStr::from_ptr(ptr).to_string_lossy().into_owned() }
+        }
+    }
+
+    extern "C" fn on_source(
+        _c: *mut c_void,
+        info: *const SourceInfo,
+        eol: c_int,
+        userdata: *mut c_void,
+    ) {
+        if eol != 0 || info.is_null() {
+            return;
+        }
+        // SAFETY: `userdata` is the HashSet passed to `list`; `info` is valid here.
+        unsafe {
+            // Monitors play back what an output plays: recording one is
+            // capturing system audio (EchoMind does), not using the microphone.
+            if text((*info).name).ends_with(".monitor") {
+                (*(userdata as *mut HashSet<u32>)).insert((*info).index);
+            }
+        }
+    }
+
+    extern "C" fn on_stream(
+        _c: *mut c_void,
+        info: *const SourceOutputInfo,
+        eol: c_int,
+        userdata: *mut c_void,
+    ) {
+        if eol != 0 || info.is_null() {
+            return;
+        }
+        let Some(api) = api() else { return };
+        // SAFETY: `userdata` is the Vec passed to `list`; `info` and its
+        // proplist are valid for the duration of the callback.
+        unsafe {
+            let info = &*info;
+            let prop = |key: &CStr| text((api.proplist_gets)(info.proplist, key.as_ptr()));
+            (*(userdata as *mut Vec<Stream>)).push(Stream {
+                source: info.source,
+                client: info.client,
+                corked: info.corked != 0,
+                pid: prop(c"application.process.id").parse().unwrap_or(0),
+                binary: prop(c"application.process.binary"),
+                name: prop(c"application.name"),
+            });
+        }
+    }
+
+    /// The offsets libpulse uses on 64-bit Linux.
+    #[test]
+    fn stream_info_matches_the_c_layout() {
+        assert_eq!(std::mem::offset_of!(SourceOutputInfo, source), 24);
+        assert_eq!(std::mem::offset_of!(SourceOutputInfo, proplist), 208);
+        assert_eq!(std::mem::offset_of!(SourceOutputInfo, corked), 216);
+        assert_eq!(std::mem::offset_of!(SourceInfo, index), 8);
+    }
+
+    fn connection() -> &'static Mutex<Option<Connection>> {
+        static CONNECTION: OnceLock<Mutex<Option<Connection>>> = OnceLock::new();
+        CONNECTION.get_or_init(|| Mutex::new(None))
+    }
+
+    pub fn list_mic_holding_processes() -> Option<Vec<MicHoldingProcess>> {
+        let api = api()?;
+        let mut guard = connection().lock().unwrap_or_else(|e| e.into_inner());
+        if !guard.as_ref().is_some_and(Connection::ready) {
+            *guard = Connection::open(api);
+        }
+        let conn = guard.as_mut()?;
+
+        let mut monitors: HashSet<u32> = HashSet::new();
+        let mut streams: Vec<Stream> = Vec::new();
+        if !conn.list(api.source_list, on_source, &mut monitors)
+            || !conn.list(api.source_output_list, on_stream, &mut streams)
+        {
+            *guard = None;
+            return None;
+        }
+
+        let own_pid = std::process::id() as i32;
+        Some(
+            streams
+                .into_iter()
+                .filter(|s| {
+                    !s.corked
+                        && s.client != u32::MAX
+                        && !monitors.contains(&s.source)
+                        && s.pid != own_pid
+                        && !(s.binary.is_empty() && s.name.is_empty())
+                })
+                .map(|s| {
+                    let id_source = if !s.binary.is_empty() {
+                        &s.binary
+                    } else {
+                        alsa_client_binary(&s.name).unwrap_or(&s.name)
+                    };
+                    MicHoldingProcess {
+                        pid: s.pid,
+                        bundle_id: if id_source.is_empty() {
+                            String::new()
+                        } else {
+                            canonical_app_id(id_source)
+                        },
+                        display_name: match alsa_client_binary(&s.name) {
+                            Some(program) => program.to_string(),
+                            None if s.name.is_empty() => s.binary,
+                            None => s.name,
+                        },
+                    }
+                })
+                .collect(),
+        )
+    }
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
+mod imp {
+    use super::*;
     pub fn list_mic_holding_processes() -> Option<Vec<MicHoldingProcess>> {
         None
     }
@@ -668,6 +1303,107 @@ mod tests {
         assert_eq!(list.len(), 1);
         assert_eq!(list[0].pid, 55);
         assert_eq!(list[0].bundle_id, "us.zoom.xos");
+    }
+
+    #[test]
+    fn alsa_streams_are_named_after_their_program() {
+        assert_eq!(
+            alsa_client_binary("PipeWire ALSA [echomind]"),
+            Some("echomind")
+        );
+        assert_eq!(alsa_client_binary("ALSA plug-in [zoom]"), Some("zoom"));
+        assert_eq!(alsa_client_binary("PipeWire ALSA []"), None);
+        assert_eq!(alsa_client_binary("Firefox"), None);
+        // EchoMind's own capture then counts as EchoMind.
+        let own = canonical_app_id(alsa_client_binary("PipeWire ALSA [echomind]").unwrap());
+        assert!(is_echomind_bundle(&own));
+    }
+
+    #[test]
+    fn ignore_entries_match_as_users_type_them() {
+        let zoom = canonical_app_id("Zoom.exe");
+        for entry in ["Zoom.exe", "zoom.exe", "zoom", "us.zoom.xos"] {
+            assert!(is_ignored_bundle(&zoom, &[entry.to_string()]), "{entry}");
+        }
+        let store_app = "Contoso.Recorder_8wekyb3d8bbwe";
+        assert!(is_ignored_bundle(
+            store_app,
+            &["contoso.recorder_8wekyb3d8bbwe".to_string()]
+        ));
+        assert!(!is_ignored_bundle(&zoom, &["teams.exe".to_string()]));
+    }
+
+    #[test]
+    fn always_on_audio_tools_never_count_as_a_meeting() {
+        // Even with a customized ignore list that predates them.
+        let user_list = vec!["com.hnc.Discord".to_string()];
+        for raw in [
+            "krisp.exe",
+            "NVIDIA Broadcast.exe",
+            "voicemeeterpro.exe",
+            "easyeffects",
+            "pipewire",
+            "pavucontrol",
+        ] {
+            let id = canonical_app_id(raw);
+            assert!(is_ignored_bundle(&id, &user_list), "{raw} -> {id}");
+        }
+        assert!(is_ignored_bundle("ai.krisp.krispMac", &user_list));
+        assert!(is_ignored_bundle(
+            "windows.immersivecontrolpanel_cw5n1h2txyewy",
+            &user_list
+        ));
+        // Meeting apps are not swept up with them.
+        for raw in ["Zoom.exe", "ms-teams.exe", "chrome", "firefox"] {
+            assert!(
+                !is_ignored_bundle(&canonical_app_id(raw), &user_list),
+                "{raw}"
+            );
+        }
+    }
+
+    #[test]
+    fn windows_and_linux_names_map_to_the_same_app_ids() {
+        assert_eq!(canonical_app_id("Zoom.exe"), "us.zoom.xos");
+        assert_eq!(canonical_app_id("CptHost.exe"), "us.zoom.xos");
+        assert_eq!(canonical_app_id("ms-teams.exe"), "com.microsoft.teams2");
+        assert_eq!(canonical_app_id("teams-for-linux"), "com.microsoft.teams2");
+        assert_eq!(canonical_app_id("chrome.exe"), "com.google.Chrome");
+        assert_eq!(
+            canonical_app_id("google-chrome-stable"),
+            "com.google.Chrome"
+        );
+        assert_eq!(canonical_app_id("msedge.exe"), "com.microsoft.edgemac");
+        assert_eq!(canonical_app_id("firefox"), "org.mozilla.firefox");
+        assert_eq!(canonical_app_id("Discord.exe"), "com.hnc.Discord");
+        assert_eq!(canonical_app_id("obs64.exe"), "com.obsproject.obs-studio");
+        assert_eq!(canonical_app_id("SomeTool.exe"), "sometool");
+        // EchoMind's own capture is never a meeting.
+        assert!(is_echomind_bundle(&canonical_app_id("EchoMind.exe")));
+        assert!(is_echomind_bundle(&canonical_app_id("echomind")));
+        // Browsers stay browsers, so the "<Browser> Toplantısı" naming applies.
+        assert!(is_browser_bundle_id(&canonical_app_id("chrome.exe")));
+        // Ignore-list aliases work on Windows names too.
+        assert!(is_ignored_bundle(
+            &canonical_app_id("Zoom.exe"),
+            &["zoom".into()]
+        ));
+    }
+
+    #[test]
+    fn windows_privacy_keys_resolve_to_executables() {
+        assert_eq!(
+            windows_nonpackaged_path("C:#Program Files#Zoom#bin#Zoom.exe"),
+            r"C:\Program Files\Zoom\bin\Zoom.exe"
+        );
+        let teams = r"C:\Program Files\WindowsApps\MSTeams_24335.208.3315.1951_x64__8wekyb3d8bbwe\ms-teams.exe";
+        assert!(windows_package_owns_exe("MSTeams_8wekyb3d8bbwe", teams));
+        assert!(!windows_package_owns_exe(
+            "MSTeamsBeta_8wekyb3d8bbwe",
+            teams
+        ));
+        assert!(!windows_package_owns_exe("MSTeams_otherpublisher", teams));
+        assert!(!windows_package_owns_exe("nounderscore", teams));
     }
 
     #[test]

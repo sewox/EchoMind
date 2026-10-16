@@ -84,6 +84,14 @@ export const es: TranslationKeys = {
     error: "No se pudo guardar",
     save: "Guardar",
   },
+  diagnostics: {
+    title: "Informe de diagnóstico",
+    desc: "Escribe el sistema, la tarjeta gráfica, los ajustes y el registro de la aplicación en un archivo de texto. No contiene grabaciones, transcripciones ni claves API. Envíe este archivo si algo falla.",
+    create: "Crear informe",
+    creating: "Preparando…",
+    saved: "Guardado: {path}",
+    error: "No se pudo crear el informe: {error}",
+  },
   importProgress: {
     decoding: "Leyendo el archivo de audio…",
     transcribing: "Transcribiendo…",
@@ -108,6 +116,10 @@ export const es: TranslationKeys = {
   recordingLimit: {
     reached:
       "La grabación llegó al límite de {hours} horas, así que se detuvo y se guardó. Si la reunión sigue, inicie una nueva grabación.",
+    silence:
+      "No hubo sonido durante {minutes} minutos, así que la grabación se detuvo y se guardó. La parte en silencio no se incluyó.",
+    silenceEmpty:
+      "No hubo sonido durante {minutes} minutos, así que la grabación se detuvo. No tenía ningún sonido, así que no se guardó.",
   },
   sidebar: {
     title: "Historial de Reuniones",
@@ -212,6 +224,8 @@ export const es: TranslationKeys = {
     redacting: "Redactando...",
     noSearchResults:
       "No se encontraron conversaciones que coincidan con la búsqueda.",
+    recordingNoLive:
+      "Grabando. La transcripción en directo está desactivada; el texto se preparará al terminar la grabación.",
     listeningLive: "Escuchando en directo, el texto aparecerá en breve...",
     renameSpeaker: "Editar nombre del orador",
     speakerInfo:
@@ -502,7 +516,7 @@ export const es: TranslationKeys = {
     ignoredAppsTitle: "Aplicaciones Supervisadas",
     ignoreListTitle: "Apps ignoradas (bundle IDs)",
     ignoreListDesc:
-      "Las apps de esta lista no disparan el aviso de reunión (Notas de Voz, Siri, grabadoras…). Añada un bundle ID de macOS para silenciar falsos positivos.",
+      "Las apps de esta lista no disparan el aviso de reunión (Notas de Voz, Siri, grabadoras…). Añada una app para silenciar falsos positivos: su bundle ID en macOS, su nombre de programa en Windows y Linux.",
     ignoreListPlaceholder: "com.example.App",
     ignoreListAdd: "Añadir",
     ignoreListRemove: "Quitar",
@@ -677,6 +691,9 @@ export const es: TranslationKeys = {
       yourVoice: "Tu voz: entrada activa",
       systemAudioLoopback: "Audio del sistema: loopback activo",
       systemAudioSpeaker: "Audio del sistema: altavoz/ambiente",
+      liveTranscriptionToggle: "Transcripción en directo",
+      liveTranscriptionDesc:
+        "Transcribe la conversación durante la reunión. Si está desactivada, la transcripción se prepara en segundo plano al terminar la grabación, lo que libera a los equipos menos potentes durante la llamada.",
       systemAudioCaptureToggle:
         "Capturar audio del sistema (participantes remotos)",
       systemAudioCaptureDesc:

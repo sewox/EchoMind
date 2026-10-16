@@ -84,6 +84,14 @@ export const fr: TranslationKeys = {
     error: "Échec de l'enregistrement",
     save: "Enregistrer",
   },
+  diagnostics: {
+    title: "Rapport de diagnostic",
+    desc: "Écrit le système, la carte graphique, les réglages et le journal de l'application dans un fichier texte. Il ne contient ni enregistrement, ni transcription, ni clé API. Envoyez ce fichier en cas de problème.",
+    create: "Créer le rapport",
+    creating: "Préparation…",
+    saved: "Enregistré : {path}",
+    error: "Impossible de créer le rapport : {error}",
+  },
   importProgress: {
     decoding: "Lecture du fichier audio…",
     transcribing: "Transcription…",
@@ -110,6 +118,10 @@ export const fr: TranslationKeys = {
   recordingLimit: {
     reached:
       "L’enregistrement a atteint la limite de {hours} heures : il a été arrêté et sauvegardé. Si la réunion continue, lancez un nouvel enregistrement.",
+    silence:
+      "Aucun son pendant {minutes} minutes : l'enregistrement a été arrêté et sauvegardé, sans la partie silencieuse.",
+    silenceEmpty:
+      "Aucun son pendant {minutes} minutes : l'enregistrement a été arrêté. Il ne contenait aucun son et n'a donc pas été sauvegardé.",
   },
   sidebar: {
     title: "Historique des Réunions",
@@ -212,6 +224,8 @@ export const fr: TranslationKeys = {
     smartRedaction: "Rédaction & Correction Intelligente",
     redacting: "Rédaction en cours...",
     noSearchResults: "Aucune conversation trouvée pour cette recherche.",
+    recordingNoLive:
+      "Enregistrement en cours. La transcription en direct est désactivée ; elle sera préparée après l'enregistrement.",
     listeningLive: "Écoute en direct en cours...",
     renameSpeaker: "Modifier le nom du locuteur",
     speakerInfo: "Séparation des locuteurs et flux de dialogue horodaté",
@@ -502,7 +516,7 @@ export const fr: TranslationKeys = {
     ignoredAppsTitle: "Applications Surveillées",
     ignoreListTitle: "Apps ignorées (bundle IDs)",
     ignoreListDesc:
-      "Les apps de cette liste ne déclenchent pas l'invite de réunion (Mémos Vocaux, Siri, enregistreurs…). Ajoutez un bundle ID macOS pour couper les faux positifs.",
+      "Les apps de cette liste ne déclenchent pas l'invite de réunion (Mémos Vocaux, Siri, enregistreurs…). Ajoutez une app pour couper les faux positifs : son bundle ID sur macOS, son nom de programme sous Windows et Linux.",
     ignoreListPlaceholder: "com.example.App",
     ignoreListAdd: "Ajouter",
     ignoreListRemove: "Retirer",
@@ -675,6 +689,9 @@ export const fr: TranslationKeys = {
       yourVoice: "Votre voix : entrée active",
       systemAudioLoopback: "Audio système : loopback actif",
       systemAudioSpeaker: "Audio système : haut-parleur/pièce",
+      liveTranscriptionToggle: "Transcription en direct",
+      liveTranscriptionDesc:
+        "Transcrit la conversation pendant la réunion. Désactivée, la transcription est préparée en arrière-plan après l'enregistrement, ce qui soulage les ordinateurs moins puissants pendant l'appel.",
       systemAudioCaptureToggle:
         "Capturer l'audio système (participants distants)",
       systemAudioCaptureDesc:

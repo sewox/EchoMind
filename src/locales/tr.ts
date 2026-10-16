@@ -84,6 +84,14 @@ export const tr: TranslationKeys = {
     error: "Kaydedilemedi",
     save: "Kaydet",
   },
+  diagnostics: {
+    title: "Tanılama Raporu",
+    desc: "Sistem, ekran kartı, ayarlar ve uygulama logunu tek bir metin dosyasına yazar. Ses kaydı, döküm metni veya API anahtarı içermez. Bir sorun yaşadığınızda bu dosyayı gönderin.",
+    create: "Rapor oluştur",
+    creating: "Hazırlanıyor…",
+    saved: "Kaydedildi: {path}",
+    error: "Rapor oluşturulamadı: {error}",
+  },
   importProgress: {
     decoding: "Ses dosyası okunuyor…",
     transcribing: "Yazıya dökülüyor…",
@@ -108,6 +116,10 @@ export const tr: TranslationKeys = {
   recordingLimit: {
     reached:
       "Kayıt {hours} saat sınırına ulaştığı için durduruldu ve kaydedildi. Toplantı sürüyorsa yeni bir kayıt başlatın.",
+    silence:
+      "{minutes} dakika boyunca hiç ses gelmediği için kayıt durduruldu ve kaydedildi. Sessiz kısım kayda eklenmedi.",
+    silenceEmpty:
+      "{minutes} dakika boyunca hiç ses gelmediği için kayıt durduruldu. Kayıtta hiç ses olmadığından kaydedilmedi.",
   },
   sidebar: {
     title: "Toplantı Geçmişi",
@@ -213,6 +225,8 @@ export const tr: TranslationKeys = {
     smartRedaction: "Akıllı Redaksiyon & Düzeltme",
     redacting: "Redakte Ediliyor...",
     noSearchResults: "Aramanızla eşleşen konuşma bulunamadı.",
+    recordingNoLive:
+      "Kayıt sürüyor. Canlı yazıya dökme kapalı; döküm kayıt bittikten sonra hazırlanacak.",
     listeningLive: "Konuşmalar dinleniyor, anlık yazıya dökülecek...",
     renameSpeaker: "Konuşmacı Adını Düzenle",
     speakerInfo: "Konuşmacı ayrımı ve zaman damgalı diyalog akışı",
@@ -503,7 +517,7 @@ export const tr: TranslationKeys = {
     ignoredAppsTitle: "İzlenecek Uygulamalar",
     ignoreListTitle: "Yoksayılan Uygulamalar (bundle ID)",
     ignoreListDesc:
-      "Bu listedeki uygulamalar toplantı istemi tetiklemez (Sesli Notlar, Siri, kayıt araçları…). Yanlış pozitifleri susturmak için bir macOS bundle ID ekleyin.",
+      "Bu listedeki uygulamalar toplantı istemi tetiklemez (Sesli Notlar, Siri, kayıt araçları…). Yanlış pozitifleri susturmak için uygulamanın kimliğini ekleyin: macOS'ta bundle ID, Windows ve Linux'ta program adı.",
     ignoreListPlaceholder: "com.example.App",
     ignoreListAdd: "Ekle",
     ignoreListRemove: "Kaldır",
@@ -678,6 +692,9 @@ export const tr: TranslationKeys = {
       yourVoice: "Sizin Sesiniz: Aktif Giriş",
       systemAudioLoopback: "Sistem Sesi: Loopback Devrede",
       systemAudioSpeaker: "Sistem Sesi: Hoparlör/Ortam",
+      liveTranscriptionToggle: "Canlı yazıya dökme",
+      liveTranscriptionDesc:
+        "Konuşmaları toplantı sürerken yazıya döker. Kapalıysa döküm, kayıt bittikten sonra arka planda hazırlanır; düşük donanımlı bilgisayarlarda toplantı sırasında işlemciyi rahatlatır.",
       systemAudioCaptureToggle: "Sistem sesini kaydet (uzaktaki katılımcılar)",
       systemAudioCaptureDesc:
         "Toplantı uygulamalarının sesini mikrofonla birlikte kaydeder (macOS 14.2+, Windows, Linux: PulseAudio/PipeWire). Kapalıysa yalnızca mikrofon kullanılır.",

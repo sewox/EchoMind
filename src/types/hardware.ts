@@ -9,7 +9,7 @@ export interface HardwareInfo {
   gpu_name: string;
   gpu_acceleration: string;
   has_ane: boolean;
-  has_cuda: boolean;
+  has_gpu: boolean;
   has_avx2: boolean;
   summary_headline: string;
   recommended_ai_mode: string;

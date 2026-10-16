@@ -84,6 +84,14 @@ export const en: TranslationKeys = {
     error: "Could not save",
     save: "Save",
   },
+  diagnostics: {
+    title: "Diagnostics Report",
+    desc: "Writes the system, graphics card, settings and the app log into one text file. It holds no recording, transcript text or API key. Send this file when something goes wrong.",
+    create: "Create report",
+    creating: "Preparing…",
+    saved: "Saved: {path}",
+    error: "Could not create the report: {error}",
+  },
   importProgress: {
     decoding: "Reading the audio file…",
     transcribing: "Transcribing…",
@@ -108,6 +116,10 @@ export const en: TranslationKeys = {
   recordingLimit: {
     reached:
       "The recording reached the {hours}-hour limit, so it was stopped and saved. If the meeting is still going, start a new recording.",
+    silence:
+      "No sound for {minutes} minutes, so the recording was stopped and saved. The silent part was left out.",
+    silenceEmpty:
+      "No sound for {minutes} minutes, so the recording was stopped. It had no sound at all, so nothing was saved.",
   },
   sidebar: {
     title: "Meeting History",
@@ -213,6 +225,8 @@ export const en: TranslationKeys = {
     smartRedaction: "Smart Redaction & Cleanup",
     redacting: "Redacting...",
     noSearchResults: "No speech matches found for your search.",
+    recordingNoLive:
+      "Recording. Live transcription is off; the transcript will be prepared after recording ends.",
     listeningLive: "Listening to speech, streaming live...",
     renameSpeaker: "Edit Speaker Name",
     speakerInfo: "Speaker diarization and timestamped dialogue feed",
@@ -502,7 +516,7 @@ export const en: TranslationKeys = {
     ignoredAppsTitle: "Monitored Applications",
     ignoreListTitle: "Ignored Apps (bundle IDs)",
     ignoreListDesc:
-      "Apps on this list never trigger a meeting prompt (Voice Memos, Siri, recorders, …). Add a macOS bundle ID to silence false positives.",
+      "Apps on this list never trigger a meeting prompt (Voice Memos, Siri, recorders, …). Add an app to silence false positives: its bundle ID on macOS, its program name on Windows and Linux.",
     ignoreListPlaceholder: "com.example.App",
     ignoreListAdd: "Add",
     ignoreListRemove: "Remove",
@@ -675,6 +689,9 @@ export const en: TranslationKeys = {
       yourVoice: "Your Voice: Active Input",
       systemAudioLoopback: "System Audio: Loopback Active",
       systemAudioSpeaker: "System Audio: Speaker/Room",
+      liveTranscriptionToggle: "Live transcription",
+      liveTranscriptionDesc:
+        "Transcribes speech while the meeting is running. When off, the transcript is prepared in the background after recording ends, which keeps less powerful computers free during the call.",
       systemAudioCaptureToggle: "Capture system audio (remote participants)",
       systemAudioCaptureDesc:
         "Records meeting-app audio alongside the microphone (macOS 14.2+, Windows, Linux with PulseAudio/PipeWire). When off, only the microphone is used.",

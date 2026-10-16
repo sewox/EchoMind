@@ -342,6 +342,10 @@ export function App() {
 
   // Hours of the recording limit when a recording stopped at it (stays until dismissed).
   const [limitHours, setLimitHours] = useState<number | null>(null);
+  const [silenceStop, setSilenceStop] = useState<{
+    minutes: number;
+    empty: boolean;
+  } | null>(null);
 
   // Auto-dismiss completion notification after 6 seconds
   useEffect(() => {
@@ -506,8 +510,13 @@ export function App() {
         durationFormatted: newMeeting.duration_formatted,
         elapsedFormatted: formatElapsed(elapsedSec),
       });
-      // Ask user which model to transcribe with
-      if (newMeeting.audio_file_path && newMeeting.segments.length === 0) {
+      // Ask user which model to transcribe with, unless the background queue
+      // is already transcribing it (it would be transcribed twice at once).
+      if (
+        newMeeting.audio_file_path &&
+        newMeeting.segments.length === 0 &&
+        !newMeeting.transcript_pending
+      ) {
         promptMeetingTranscriptionRef.current(newMeeting);
       }
     } catch (err) {
@@ -555,6 +564,7 @@ export function App() {
     let unlistenStart: (() => void) | undefined;
     let unlistenStop: (() => void) | undefined;
     let unlistenLimit: (() => void) | undefined;
+    let unlistenSilence: (() => void) | undefined;
     let unlistenSaved: (() => void) | undefined;
     let unlistenTranscript: (() => void) | undefined;
 
@@ -579,6 +589,15 @@ export function App() {
       );
       if (cancelled) {
         unlistenLimit();
+        return;
+      }
+
+      unlistenSilence = await listen<{ minutes: number; empty: boolean }>(
+        "recording-silence-stopped",
+        (event) => setSilenceStop(event.payload),
+      );
+      if (cancelled) {
+        unlistenSilence();
         return;
       }
 
@@ -616,7 +635,8 @@ export function App() {
             });
             if (
               event.payload.audio_file_path &&
-              event.payload.segments.length === 0
+              event.payload.segments.length === 0 &&
+              !event.payload.transcript_pending
             ) {
               promptMeetingTranscriptionRef.current(event.payload);
             }
@@ -652,6 +672,7 @@ export function App() {
       unlistenStart?.();
       unlistenStop?.();
       unlistenLimit?.();
+      unlistenSilence?.();
       unlistenSaved?.();
       unlistenTranscript?.();
     };
@@ -1231,6 +1252,31 @@ export function App() {
               <X className="w-4 h-4" />
             </button>
           </div>
+        </div>
+      )}
+
+      {silenceStop !== null && (
+        <div
+          role="alert"
+          className="fixed top-20 left-1/2 -translate-x-1/2 z-50 max-w-lg flex items-start gap-3 px-4 py-3 rounded-2xl bg-slate-900/95 border border-amber-500/40 text-white shadow-2xl backdrop-blur-2xl"
+        >
+          <Clock className="w-5 h-5 shrink-0 mt-0.5 text-amber-300" />
+          <p className="text-xs text-slate-200">
+            {t(
+              silenceStop.empty
+                ? "recordingLimit.silenceEmpty"
+                : "recordingLimit.silence",
+              { minutes: String(silenceStop.minutes) },
+            )}
+          </p>
+          <button
+            onClick={() => setSilenceStop(null)}
+            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+            title={t("common.close")}
+            aria-label={t("common.close")}
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
       )}
 

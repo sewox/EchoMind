@@ -1977,6 +1977,48 @@ describe("App Top-Level Integration", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("explains a recording that stopped after a long silence", async () => {
+    (invoke as any).mockImplementation((cmd: string) => {
+      if (cmd === "get_all_meetings") return Promise.resolve(mockPastMeetings);
+      return Promise.resolve();
+    });
+
+    render(
+      <I18nProvider>
+        <App />
+      </I18nProvider>,
+    );
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 30));
+    });
+
+    const listeners =
+      globalTestEventListeners["recording-silence-stopped"] || [];
+    expect(listeners.length).toBe(1);
+    await act(async () => {
+      listeners[0]({ payload: { minutes: 10, empty: false } });
+    });
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "10 dakika boyunca hiç ses gelmediği için kayıt durduruldu ve kaydedildi.",
+    );
+
+    // Nothing but silence: nothing was saved, and the notice says so.
+    await act(async () => {
+      listeners[0]({ payload: { minutes: 10, empty: true } });
+    });
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Kayıtta hiç ses olmadığından kaydedilmedi.",
+    );
+    await act(async () => {
+      fireEvent.click(
+        within(screen.getByRole("alert")).getByRole("button", {
+          name: "Kapat",
+        }),
+      );
+    });
+    expect(screen.queryByText(/hiç ses gelmediği/)).not.toBeInTheDocument();
+  });
+
   it("applies meeting-transcript-ready updates from detached Whisper", async () => {
     setupDefaultInvoke();
 
@@ -2262,6 +2304,43 @@ describe("App Top-Level Integration", () => {
     });
 
     alertSpy.mockRestore();
+  });
+
+  it("does not ask for a model when the queue already transcribes the recording", async () => {
+    (invoke as any).mockImplementation((cmd: string) => {
+      if (cmd === "get_all_meetings") return Promise.resolve(mockPastMeetings);
+      return Promise.resolve();
+    });
+
+    render(
+      <I18nProvider>
+        <App />
+      </I18nProvider>,
+    );
+
+    // Live transcription off: saved without text, queued for the full file.
+    const savedListeners = await waitForEventListeners("meeting-saved");
+    await act(async () => {
+      savedListeners[savedListeners.length - 1]({
+        payload: {
+          ...mockPastMeetings[0],
+          id: "mtg_queued",
+          audio_file_path: "/tmp/recorded_new.flac",
+          duration_seconds: 800,
+          segments: [],
+          transcript_pending: true,
+        },
+      });
+      await new Promise((r) => setTimeout(r, 20));
+    });
+
+    expect(
+      screen.queryByText(/Akıllı İşlem Tavsiyesi/i),
+    ).not.toBeInTheDocument();
+    expect(invoke).not.toHaveBeenCalledWith(
+      "retranscribe_meeting",
+      expect.anything(),
+    );
   });
 
   it("handles smart advisor confirm for retranscribe meeting with cloud and local engines", async () => {

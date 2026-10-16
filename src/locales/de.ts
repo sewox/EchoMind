@@ -84,6 +84,14 @@ export const de: TranslationKeys = {
     error: "Speichern fehlgeschlagen",
     save: "Speichern",
   },
+  diagnostics: {
+    title: "Diagnosebericht",
+    desc: "Schreibt System, Grafikkarte, Einstellungen und das App-Protokoll in eine Textdatei. Sie enthält keine Aufnahme, kein Transkript und keinen API-Schlüssel. Senden Sie diese Datei, wenn etwas nicht funktioniert.",
+    create: "Bericht erstellen",
+    creating: "Wird erstellt…",
+    saved: "Gespeichert: {path}",
+    error: "Bericht konnte nicht erstellt werden: {error}",
+  },
   importProgress: {
     decoding: "Audiodatei wird gelesen…",
     transcribing: "Wird transkribiert…",
@@ -108,6 +116,10 @@ export const de: TranslationKeys = {
   recordingLimit: {
     reached:
       "Die Aufnahme hat das Limit von {hours} Stunden erreicht und wurde beendet und gespeichert. Läuft das Meeting noch, starten Sie eine neue Aufnahme.",
+    silence:
+      "{minutes} Minuten lang kein Ton, daher wurde die Aufnahme beendet und gespeichert. Der stille Teil wurde weggelassen.",
+    silenceEmpty:
+      "{minutes} Minuten lang kein Ton, daher wurde die Aufnahme beendet. Sie enthielt gar keinen Ton und wurde nicht gespeichert.",
   },
   sidebar: {
     title: "Meeting-Verlauf",
@@ -211,6 +223,8 @@ export const de: TranslationKeys = {
     smartRedaction: "Intelligente Redaktion & Korrektur",
     redacting: "Wird redigiert...",
     noSearchResults: "Keine passenden Gespräche gefunden.",
+    recordingNoLive:
+      "Aufnahme läuft. Live-Transkription ist aus; das Transkript wird nach der Aufnahme erstellt.",
     listeningLive: "Live-Zuhören aktiv, Text erscheint gleich...",
     renameSpeaker: "Sprechernamen bearbeiten",
     speakerInfo: "Sprechertrennung und zeitgestempelter Dialogablauf",
@@ -673,6 +687,9 @@ export const de: TranslationKeys = {
       yourVoice: "Ihre Stimme: aktiver Eingang",
       systemAudioLoopback: "Systemaudio: Loopback aktiv",
       systemAudioSpeaker: "Systemaudio: Lautsprecher/Raum",
+      liveTranscriptionToggle: "Live-Transkription",
+      liveTranscriptionDesc:
+        "Transkribiert das Gespräch während des Meetings. Wenn deaktiviert, wird das Transkript nach der Aufnahme im Hintergrund erstellt – das entlastet leistungsschwächere Computer während des Gesprächs.",
       systemAudioCaptureToggle: "Systemaudio aufnehmen (entfernte Teilnehmer)",
       systemAudioCaptureDesc:
         "Nimmt Meeting-App-Audio zusammen mit dem Mikrofon auf (macOS 14.2+, Windows, Linux mit PulseAudio/PipeWire). Aus = nur Mikrofon.",
